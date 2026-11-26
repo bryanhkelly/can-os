@@ -56,7 +56,7 @@ export function PrivateLessonNotes({ sectionId, versionId, lessonId }: {
     {saved && <form className="space-y-3" onSubmit={event => { event.preventDefault(); void save(); }}>
       <Field label="Your notes" className="text-sm font-semibold">
         <Textarea value={body} rows={10} maxLength={30000} disabled={busy}
-          onChange={event => setBody(event.target.value)} className="p-4 font-normal leading-7"
+          onChange={event => setBody(event.target.value)} className="leading-7"
           placeholder="Capture a question, an example, or what you want to remember."/>
       </Field>
       <ActionFooter layout="inline">

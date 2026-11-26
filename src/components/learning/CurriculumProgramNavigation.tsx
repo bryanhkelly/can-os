@@ -21,8 +21,8 @@ export function CurriculumProgramNavigation({
   return (
     <WorkspaceLinkNavigation label="Curriculum program scope" surface="plain" className="gap-3">
       {programs.map((program) => (
-        <Button asChild key={program.id} variant="outline" size="sm"
-          className={selectedProgramId === program.id ? "min-h-11 border-primary bg-accent text-primary" : "min-h-11"}>
+        <Button asChild key={program.id} variant={selectedProgramId === program.id ? "default" : "outline"} size="sm"
+          className="min-h-11">
           <Link to={destination} search={{ programId: program.id }}
             aria-current={selectedProgramId === program.id ? "page" : undefined}>{program.name}</Link>
         </Button>

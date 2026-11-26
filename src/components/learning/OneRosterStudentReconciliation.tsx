@@ -59,10 +59,10 @@ export function OneRosterStudentReconciliation({programId}:{programId:string}) {
    <Input className="mt-1" value={sourceSystem} onChange={e=>{setSourceSystem(e.target.value);reset();}} placeholder="district-sis" maxLength={100}/>
   </Label>
   <Label className="block text-sm">OneRoster orgs.csv
-   <Textarea className="mt-1 min-h-24 font-mono text-xs" value={orgs} onChange={e=>{setOrgs(e.target.value);reset();}} maxLength={500000}/>
+   <Textarea className="mt-1 min-h-24 font-mono" value={orgs} onChange={e=>{setOrgs(e.target.value);reset();}} maxLength={500000}/>
   </Label>
   <Label className="block text-sm">OneRoster users.csv
-   <Textarea className="mt-1 min-h-24 font-mono text-xs" value={users} onChange={e=>{setUsers(e.target.value);reset();}} maxLength={500000}/>
+   <Textarea className="mt-1 min-h-24 font-mono" value={users} onChange={e=>{setUsers(e.target.value);reset();}} maxLength={500000}/>
   </Label>
   <Button variant="outline" type="button" disabled={busy||!sourceValid||!orgs.trim()||!users.trim()} onClick={()=>void execute("validate")} >Validate source</Button>
   {validated&&<div className="space-y-3  border p-3">
@@ -83,8 +83,8 @@ export function OneRosterStudentReconciliation({programId}:{programId:string}) {
   {validated&&<div className="space-y-3  border p-3" aria-label="Approve canonical Section placement">
    <h3 className="font-semibold">Approve Section placement</h3>
    <p className="text-xs text-muted-foreground">Requires previously approved student and class mappings under this issuer. CAN will enforce teacher readiness, seat limits, term, schedule and prerequisites.</p>
-   <Label className="block text-sm">OneRoster classes.csv<Textarea className="mt-1 min-h-20 font-mono text-xs" value={classesCsv} maxLength={500000} onChange={e=>{setClassesCsv(e.target.value);setPlacementValidated(false);setPlacementApproved(false);}}/></Label>
-   <Label className="block text-sm">OneRoster enrollments.csv<Textarea className="mt-1 min-h-20 font-mono text-xs" value={enrollmentsCsv} maxLength={500000} onChange={e=>{setEnrollmentsCsv(e.target.value);setPlacementValidated(false);setPlacementApproved(false);}}/></Label>
+   <Label className="block text-sm">OneRoster classes.csv<Textarea className="mt-1 min-h-20 font-mono" value={classesCsv} maxLength={500000} onChange={e=>{setClassesCsv(e.target.value);setPlacementValidated(false);setPlacementApproved(false);}}/></Label>
+   <Label className="block text-sm">OneRoster enrollments.csv<Textarea className="mt-1 min-h-20 font-mono" value={enrollmentsCsv} maxLength={500000} onChange={e=>{setEnrollmentsCsv(e.target.value);setPlacementValidated(false);setPlacementApproved(false);}}/></Label>
    <Label className="block text-sm">External class sourcedId<Input className="mt-1" value={externalClass} onChange={e=>{setExternalClass(e.target.value);setPlacementApproved(false);}}/></Label>
    <Label className="block text-sm">External enrollment sourcedId<Input className="mt-1" value={externalEnrollment} onChange={e=>{setExternalEnrollment(e.target.value);setPlacementApproved(false);}}/></Label>
    <Label className="block text-sm">Existing CAN Section UUID<Input className="mt-1" value={sectionId} onChange={e=>{setSectionId(e.target.value);setPlacementApproved(false);}}/></Label>
