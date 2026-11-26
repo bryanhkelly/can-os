@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { readEmailProviderMessageId, readEmailProviderReceipt } from "@/domain/email-provider-receipt";
 
 describe("email provider receipt evidence", () => {
-  it.each([null, undefined, false, 0, "", [], {}, { id: null }, { id: 42 }, { id: "" }]
+  it.each([null, undefined, false, 0, "", [], {}, { id: null }, { id: 42 }, { id: "" }, { id: "receipt" }, { id: "        " },
+    { id: " opaque-provider" }, { id: "opaque-provider\n" }, { id: "opaque\u0000provider" },
+    { id: "x".repeat(257) }]
     .map(body => ({ body })))(
     "does not infer provider evidence from $body", ({ body }) => {
       expect(readEmailProviderMessageId(body)).toBeUndefined();
@@ -10,6 +12,8 @@ describe("email provider receipt evidence", () => {
   );
 
   it("preserves the exact opaque provider identifier", () => {
+    expect(readEmailProviderMessageId({ id: "abcdefgh" })).toBe("abcdefgh");
+    expect(readEmailProviderMessageId({ id: "x".repeat(256) })).toBe("x".repeat(256));
     expect(readEmailProviderMessageId({ id: "opaque-provider-123" })).toBe("opaque-provider-123");
   });
 

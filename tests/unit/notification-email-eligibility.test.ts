@@ -69,11 +69,11 @@ describe("notification email identity validation", () => {
     const message = { to: "parent@example.test", subject: "Update", text: "School update" };
     const fetch = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 200 }))
-      .mockResolvedValueOnce(new Response('{"id":"receipt"}', { status: 200 }))
-      .mockResolvedValueOnce(new Response('{"id":"receipt"}', { status: 503 }));
+      .mockResolvedValueOnce(new Response('{"id":"provider-receipt"}', { status: 200 }))
+      .mockResolvedValueOnce(new Response('{"id":"provider-receipt"}', { status: 503 }));
     vi.stubGlobal("fetch", fetch);
     expect(await sendNotificationEmailWithReceipt(message)).toEqual({ accepted: true });
-    expect(await sendNotificationEmailWithReceipt(message)).toEqual({ accepted: true, providerMessageId: "receipt" });
+    expect(await sendNotificationEmailWithReceipt(message)).toEqual({ accepted: true, providerMessageId: "provider-receipt" });
     expect(await sendNotificationEmailWithReceipt(message)).toEqual({ accepted: false });
   });
 

@@ -23,7 +23,7 @@ afterEach(()=>{vi.unstubAllEnvs();vi.unstubAllGlobals();});
 describe("campaign worker fenced delivery",()=>{
  it("counts provider acceptance only after its own fenced settlement",async()=>{
   claim();mocked.execute.mockResolvedValueOnce({rows:[{eligible:true}]}).mockResolvedValueOnce({rows:[{id:work.id,status:"accepted",outcome_unconfirmed:false}]});
-  const send=vi.fn(async()=>new Response(JSON.stringify({id:"receipt"}),{status:200}));vi.stubGlobal("fetch",send);
+  const send=vi.fn(async()=>new Response(JSON.stringify({id:"provider-receipt"}),{status:200}));vi.stubGlobal("fetch",send);
   expect(await processEngagementCampaignDeliveries(1)).toEqual({accepted:1,failed:0,suppressed:0,retry:0,unconfirmed:0});
   expect(send).toHaveBeenCalledWith("https://api.resend.com/emails",expect.objectContaining({redirect:"error",headers:expect.objectContaining({"Idempotency-Key":"engagement-campaign/"+work.id})}));
  });
@@ -36,7 +36,7 @@ describe("campaign worker fenced delivery",()=>{
  });
  it("does not count acceptance after a webhook or another worker has settled the lease",async()=>{
   claim();mocked.execute.mockResolvedValueOnce({rows:[{eligible:true}]}).mockResolvedValueOnce({rows:[]});
-  vi.stubGlobal("fetch",vi.fn(async()=>new Response(JSON.stringify({id:"receipt"}),{status:200})));
+  vi.stubGlobal("fetch",vi.fn(async()=>new Response(JSON.stringify({id:"provider-receipt"}),{status:200})));
   expect(await processEngagementCampaignDeliveries(1)).toEqual({accepted:0,failed:0,suppressed:0,retry:0,unconfirmed:0});
  });
  it("never sends a recipient who is no longer eligible",async()=>{
@@ -54,11 +54,11 @@ describe("campaign worker fenced delivery",()=>{
   vi.stubGlobal("fetch",vi.fn(async()=>new Response(null,{status:429})));
   expect(await processEngagementCampaignDeliveries(1)).toEqual({accepted:0,failed:0,suppressed:0,retry:1,unconfirmed:0});
  });
- it("preserves an unconfirmed attempt when HTTP success has no usable receipt", async () => {
+ it.each(["", "receipt", "        ", "x".repeat(257)])("preserves an unconfirmed attempt when HTTP success has no usable receipt", async id => {
   claim();
   mocked.execute.mockResolvedValueOnce({ rows: [{ eligible: true }] })
    .mockResolvedValueOnce({ rows: [{ id: work.id, status: "pending", outcome_unconfirmed: true }] });
-  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ id: "" }), { status: 200 })));
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ id }), { status: 200 })));
   expect(await processEngagementCampaignDeliveries(1)).toEqual({
    accepted: 0, failed: 0, suppressed: 0, retry: 1, unconfirmed: 0,
   });

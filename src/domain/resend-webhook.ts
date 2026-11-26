@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import {readBoundedRequestBytes} from "./bounded-request-body";
+import {isEmailProviderMessageId} from "./email-provider-receipt";
 
 const MAX_WEBHOOK_BYTES = 64 * 1024;
 
@@ -73,7 +74,7 @@ export function parseResendReceiptEvent(raw: unknown): ResendReceiptEvent | null
       !["school_family", "noncredit_waitlist", "engagement_campaign"].includes(values.can_source) ||
       typeof receiptId !== "string" ||
       !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(receiptId) ||
-      typeof messageId !== "string" || messageId.length < 8 || messageId.length > 256)
+      !isEmailProviderMessageId(messageId))
     return null;
   return {
     type: event.type as ResendReceiptEvent["type"],

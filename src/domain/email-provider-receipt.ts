@@ -1,10 +1,16 @@
-/** Provider acceptance and confirmed delivery are different states.
- * Only a nonempty provider-assigned identifier is usable as receipt evidence. */
+/** A provider ID must be usable for both synchronous and webhook correlation.
+ * Preserve the opaque identifier exactly; never trim, coerce or invent it. */
+export function isEmailProviderMessageId(value: unknown): value is string {
+  return typeof value === "string" && value.length >= 8 && value.length <= 256 &&
+    !/[\s\x00-\x1f\x7f]/u.test(value);
+}
+
+/** Provider acceptance and confirmed delivery are different states. */
 export function readEmailProviderMessageId(body: unknown): string | undefined {
   if (typeof body !== "object" || body === null || !("id" in body)) {
     return undefined;
   }
-  return typeof body.id === "string" && body.id.length > 0 ? body.id : undefined;
+  return isEmailProviderMessageId(body.id) ? body.id : undefined;
 }
 
 /** Missing or malformed response JSON does not supply a receipt. Callers
