@@ -327,7 +327,7 @@ function SiteContactSharing({ siteId, siteName, current, available, grantAllowed
       <Button variant="outline" size="sm" type="button" disabled={!available || saving}
         onClick={() => void decide("revoke")}>Stop sharing</Button>
     </div> : <>
-      <Button type="button" variant="ghost" size="sm" className="text-xs font-semibold text-primary underline underline-offset-4"
+      <Button type="button" variant="ghost" size="sm" className="underline underline-offset-4"
         disabled={!available || !grantAllowed || saving} aria-expanded={expanded}
         onClick={() => setExpanded(!expanded)}>
         Share my contact with this location

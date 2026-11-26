@@ -100,7 +100,7 @@ function AssignmentResourcesPanel({ assessmentId, onError }: { assessmentId: str
   <ul className="divide-y divide-border/60">
    {resources.map(resource => <li key={resource.documentId} className="flex items-center justify-between gap-3 py-3 text-sm">
     <span className="min-w-0 font-semibold break-words">{resource.fileName}</span>
-    <Button type="button" variant="ghost" size="sm" className="shrink-0 text-primary underline"
+    <Button type="button" variant="ghost" size="sm" className="shrink-0 underline"
      onClick={async () => {
       try {
        const download = await getAssessmentResourceDownload({ data: { assessmentId, documentId: resource.documentId } });

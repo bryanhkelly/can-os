@@ -498,7 +498,7 @@ function LocalWebsiteCopyEditor({
       <p>Your unsaved edits remain here. Saving is paused to prevent overwriting someone else's revision.
         You can review or copy your current wording, then load the latest saved version.</p>
       <Button variant="outline" type="button" onClick={() => dirty ? setConfirmation({kind:"reload"}) : loadLatestRevision()}
-        className="min-h-11 border px-3 py-2 font-semibold">Discard my edits and load latest</Button>
+        className="min-h-11">Discard my edits and load latest</Button>
     </WorkspaceNotice>}
     {!data.canEdit && <WorkspaceNotice tone="attention" className="mt-3">
       This Site is view-only for your current assignment. A private Site Brand and

@@ -230,7 +230,7 @@ export function SupportView({referrals,role,search,route="/student/support"}:{re
        <p className="text-sm font-semibold">{service.kind.replaceAll("_"," ")} · {service.status}</p>
        <p className="mt-1 text-xs text-muted-foreground">{new Date(service.scheduledAt).toLocaleString()}</p>
        {service.outcome&&<p className="mt-2 text-xs">Outcome: {service.outcome}</p>}
-       {service.status==="scheduled"&&<Button type="button" disabled={busy||note.trim().length<3} onClick={()=>execute(()=>completeSupportService({data:{referralId:chosen.id,serviceId:service.id,outcome:note}}),"Service completion documented.")} className="mt-3  border border-border px-3 py-2 text-xs">Record completed service using note</Button>}
+       {service.status==="scheduled"&&<Button type="button" size="sm" disabled={busy||note.trim().length<3} onClick={()=>execute(()=>completeSupportService({data:{referralId:chosen.id,serviceId:service.id,outcome:note}}),"Service completion documented.")} className="mt-3">Record completed service using note</Button>}
      </div>)}
      {next&&next!=="plan_created"&&next!=="in_service"?<>
       {next==="review"&&!supportServicesReadyForReview(chosen.services)&&

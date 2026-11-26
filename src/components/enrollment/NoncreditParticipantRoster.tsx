@@ -39,7 +39,7 @@ export function NoncreditParticipantRoster({
                 {["withdrawn","cancelled"].includes(person.status)&&!person.seatReleased&&
                   person.completionOutcome!=="completed"&&
                   <div className="mt-2">
-                    <Button variant="ghost" type="button" className="text-xs text-primary underline"
+                    <Button variant="ghost" size="sm" type="button" className="underline"
                       onClick={()=>onStartRelease(person.registrationId)}>
                       Review capacity release
                     </Button>

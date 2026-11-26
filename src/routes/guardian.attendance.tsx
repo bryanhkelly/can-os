@@ -184,7 +184,7 @@ function GuardianAttendancePage() {
                     type="file"
                     accept={excuseAttachmentAccept}
                     disabled={busy}
-                    className="mt-2 min-h-11 text-xs"
+                    className="mt-2 min-h-11"
                     onChange={event => setExcuseFiles(current => ({ ...current, [absence.attendanceEventId]: event.target.files?.[0] ?? null }))}
                   />
                 </Label>

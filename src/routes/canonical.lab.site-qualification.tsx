@@ -101,7 +101,7 @@ function SiteResourceNeedForm({assessmentId}:{assessmentId:string}){
     finally{setBusy(false);}
   }
   return <div className="mt-3">
-    <Button variant="ghost" type="button" className="text-xs font-semibold text-primary underline"
+    <Button variant="ghost" size="sm" type="button" className="underline"
       onClick={()=>setOpen(!open)}>{open?"Cancel entry":"Record equipment or connectivity need"}</Button>
     {notice&&<p role="status" className="mt-2 text-xs">{notice}</p>}
     {open&&<form className="mt-3 space-y-3 border border-border p-3 text-xs" onSubmit={e=>void submit(e)}>
