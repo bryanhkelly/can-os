@@ -13,15 +13,22 @@ export async function campaignRows<T>(executor:Executor,query:SQL):Promise<T[]>{
  const result=await executor.execute(query);
  return result.rows as unknown as T[];
 }
-export function campaignSender(){
+/** Report configuration requirements without exposing credentials or sender details. */
+export function campaignSenderReadiness(){
  const from=process.env.CAN_CAMPAIGN_FROM_EMAIL?.trim();
  const address=process.env.CAN_CAMPAIGN_POSTAL_ADDRESS?.trim();
- const key=process.env.RESEND_API_KEY;
- const origin=process.env.CAN_ACCESS_PUBLIC_ORIGIN;
- if(!from||!address||!key||!origin||!process.env.RESEND_WEBHOOK_SECRET||/[\r\n]/.test(from)||address.length>500)return null;
- try{const url=new URL(origin);if(url.protocol!=="https:"||url.pathname!=="/"||url.search||url.hash||url.username||url.password)return null;}catch{return null;}
- return {from,address,key,origin};
+ const key=process.env.RESEND_API_KEY?.trim();
+ const origin=process.env.CAN_ACCESS_PUBLIC_ORIGIN?.trim();
+ const issues:string[]=[];
+ if(!from||/[\r\n]/.test(from))issues.push("An approved campaign sender is required.");
+ if(!address||address.length>500)issues.push("A valid campaign postal address is required.");
+ if(!key)issues.push("The Resend connection is not configured.");
+ if(!process.env.RESEND_WEBHOOK_SECRET?.trim())issues.push("Signed Resend delivery events are not configured.");
+ try{const url=new URL(origin??"");if(url.protocol!=="https:"||url.pathname!=="/"||url.search||url.hash||url.username||url.password)throw new Error();}
+ catch{issues.push("A valid public HTTPS origin is required.");}
+ return {issues,sender:issues.length===0&&from&&address&&key&&origin?{from,address,key,origin}:null};
 }
+export function campaignSender(){return campaignSenderReadiness().sender;}
 type Work = {
   id: string;
   lease_id: string;
