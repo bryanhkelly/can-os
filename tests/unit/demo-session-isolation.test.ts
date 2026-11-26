@@ -140,8 +140,13 @@ describe("public demo session isolation", () => {
     const second={...first,id:"second-grant",organizationId:"another-org",siteId:"another-site",role:"teacher"};
     const protectedRole={...first,id:"protected-grant",role:"platform_owner",organizationId:null,siteId:null};
     state.rows=[[first,second,protectedRole],[]];
-    expect((await readSessionGrants(first.accountId,first.email)).grants).toEqual([first,second]);
+    expect((await readSessionGrants(first.accountId,first.email,undefined,"private_access_code")).grants).toEqual([first,second]);
     expect(state.select).toHaveBeenCalledTimes(2);
+  });
+  it.each([null,"email_link","local_demo_code"] as const)("rejects private membership without private credential provenance (%s)",async method=>{
+    const first={...newGrant,privateCredential:true};
+    state.rows=[[first]];
+    expect((await readSessionGrants(first.accountId,first.email,undefined,method)).grants).toEqual([]);
   });
   it("never offers a private credential Account to shared fixture switching",async()=>{
     state.rows=[[adminGrant],[{...studentGrant,privateCredential:true}]];
