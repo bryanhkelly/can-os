@@ -31,7 +31,7 @@ beforeEach(()=>{
  state.updates=[];
  const now=new Date();
  state.ownerRows=[{sessionId:"owner-session",ownerAccountId:"owner-account",ownerPersonId:"owner-person",
-   ownerEmail:"owner@example.org",grantId:"owner-grant",grantPersonId:"owner-person",accountVerifiedAt:now,
+   ownerEmail:"owner@institution.edu",grantId:"owner-grant",grantPersonId:"owner-person",accountVerifiedAt:now,
    accountDisabled:false,personActive:true,sessionSharedDevice:false,lastActivityAt:now,
    expiresAt:new Date(now.getTime()+600000),delegatedGrantId:null}];
  state.rows=[[grant],[account],[grant]];
