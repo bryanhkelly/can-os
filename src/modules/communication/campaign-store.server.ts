@@ -15,8 +15,11 @@ export async function campaignRows<T>(executor:Executor,query:SQL):Promise<T[]>{
  return result.rows as unknown as T[];
 }
 /** Report configuration requirements without exposing credentials or sender details. */
-export function campaignSenderReadiness(){
- const {from,postalAddress:address,apiKey:key,publicOrigin:origin,webhookConfigured}=readEmailConfiguration("campaign");
+export function campaignSenderReadiness(approved?:{sender_from:string;postal_address:string}|null){
+ const config=readEmailConfiguration("campaign");
+ const from=approved?.sender_from??config.from;
+ const address=approved?.postal_address??config.postalAddress;
+ const {apiKey:key,publicOrigin:origin,webhookConfigured}=config;
  const issues:string[]=[];
  if(!from||/[\r\n]/.test(from))issues.push("An approved campaign sender is required.");
  if(!address||address.length>500)issues.push("A valid campaign postal address is required.");
@@ -27,6 +30,10 @@ export function campaignSenderReadiness(){
  return {issues,sender:issues.length===0&&from&&address&&key&&origin?{from,address,key,origin}:null};
 }
 export function campaignSender(){return campaignSenderReadiness().sender;}
+export async function readCampaignSenderReadiness(){
+ const {readCampaignSenderRegistry}=await import("./sender-registry.server");
+ return campaignSenderReadiness(await readCampaignSenderRegistry());
+}
 type Work = {
   id: string;
   lease_id: string;
@@ -188,7 +195,7 @@ async function processCampaignDelivery(work: Work, sender: CampaignSender): Prom
 /** Both schedulers use this exact queue. One message per recipient; never BCC bulk mail. */
 export async function processEngagementCampaignDeliveries(limit = 10, campaignId?:string): Promise<CampaignCounts> {
   const counts: CampaignCounts = { accepted: 0, failed: 0, suppressed: 0, retry: 0, unconfirmed: 0 };
-  const sender = campaignSender();
+  const sender = (await readCampaignSenderReadiness()).sender;
   if (!sender) return counts;
 
   for (let i = 0; i < Math.min(10, limit); i++) {
