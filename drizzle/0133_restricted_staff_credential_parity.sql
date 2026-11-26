@@ -125,5 +125,5 @@ AS $function$
  )
  SELECT e.effective_account_id,e.session_id,e.grant_id,e.person_id,
         e.role_code,e.organization_id,e.site_id
- FROM effective e;
+ FROM effective e
 $function$;
