@@ -5,7 +5,6 @@ export function parseClosedReportingWindow(
   selection: { from: string; to: string },
   asOf: Date,
   errorMessage: string,
-  maxDays = 90,
 ): { from: Date; to: Date } {
   const from = new Date(selection.from);
   const to = new Date(selection.to);
@@ -15,7 +14,7 @@ export function parseClosedReportingWindow(
 
   if (!Number.isFinite(start) || !Number.isFinite(end) ||
       !Number.isFinite(cutoff) || end <= start || end > cutoff ||
-      end - start > maxDays * DAY_MS) {
+      end - start > 90 * DAY_MS) {
     throw new Error(errorMessage);
   }
 
