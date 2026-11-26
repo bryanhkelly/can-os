@@ -1,8 +1,8 @@
-import { identityEmailDomain } from "@/domain/domain-classification";
+import { provisionNamedMailboxPerson } from "@/modules/identity/named-person-account.server";
 import { inArray, and, eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
-  accessAccounts, accountPersonGrants, documents, organizations, people, sites,
+  accountPersonGrants, documents, organizations, sites,
 } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
@@ -119,28 +119,9 @@ export async function bootstrapVerifiedChurch(actor: AccessContext, data: Church
       });
     }
 
-    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"staff-invitation:" + email}))`);
-    let [account] = await tx.select({
-      id: accessAccounts.id, disabled: accessAccounts.disabled,
-    }).from(accessAccounts).where(eq(accessAccounts.emailNormalized, email)).limit(1);
-    if (account?.disabled) throw new AuthorizationError("disabled launch administrator account");
-    if (!account) {
-      [account] = await tx.insert(accessAccounts).values({ emailNormalized: email })
-        .returning({ id: accessAccounts.id, disabled: accessAccounts.disabled });
-      if (!account) throw new Error("Unable to prepare administrator account");
-    }
-    const identities = await tx.select({ personId: accountPersonGrants.personId })
-      .from(accountPersonGrants).where(eq(accountPersonGrants.accountId, account.id));
-    const personIds = [...new Set(identities.map(row => row.personId))];
-    if (personIds.length > 1) throw new AuthorizationError("ambiguous account identity");
-    let personId = personIds[0];
-    if (!personId) {
-      const [person] = await tx.insert(people).values({
-        legalFirstName: data.firstName, legalLastName: data.lastName, email, domain: identityEmailDomain(email),
-      }).returning({ id: people.id });
-      if (!person) throw new Error("Unable to prepare administrator identity");
-      personId = person.id;
-    }
+    const identity=await provisionNamedMailboxPerson(tx,{email,firstName:data.firstName,lastName:data.lastName});
+    const account={id:identity.accountId};
+    const personId=identity.personId;
     const [existingGrant] = await tx.select({
       id: accountPersonGrants.id, active: accountPersonGrants.active,
     }).from(accountPersonGrants).where(and(
