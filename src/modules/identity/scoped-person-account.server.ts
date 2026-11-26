@@ -1,11 +1,10 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
 import type { db } from "@/db/client";
 import { accessAccounts, accountPersonGrants, people } from "@/db/schema";
-import { identityEmailDomain } from "@/domain/domain-classification";
+import { identityEmailDomain, isDemoAccountEmail } from "@/domain/domain-classification";
 import { issuePrivateAccountCredential } from "./private-account-credential.server";
 import { normalizeAccessEmail } from "@/domain/access-tokens";
 import { AuthorizationError } from "@/domain/command-context";
-import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { matchesDemoCredentialScope } from "./demo-school-tenants.server";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -41,7 +40,8 @@ export async function provisionScopedPersonAccount(tx: Tx, input: {
   if (account) {
     const grants = await tx.select({personId:accountPersonGrants.personId,role:accountPersonGrants.role,
       organizationId:accountPersonGrants.organizationId,siteId:accountPersonGrants.siteId})
-      .from(accountPersonGrants).where(eq(accountPersonGrants.accountId,account.id));
+      .from(accountPersonGrants).where(eq(accountPersonGrants.accountId,account.id)).limit(101);
+    if (grants.length>100) throw new AuthorizationError("bounded account membership review");
     if (grants.some(g=>g.personId!==input.personId))
       throw new AuthorizationError("account email belongs to a different identity");
     if (input.onlyRole && grants.some(g=>g.role!==input.onlyRole))
