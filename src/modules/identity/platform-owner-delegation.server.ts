@@ -66,8 +66,8 @@ export async function getVerifiedPlatformOwnerSession(request: Request, reader: 
       eq(accountPersonGrants.active, true),
       isNull(accountPersonGrants.organizationId),
       isNull(accountPersonGrants.siteId),
-    )).limit(1);
-  const [owner]=await (lock?query.for("update"):query);
+    ));
+  const [owner]=await (lock?query.for("update"):query).limit(1);
   if (!owner || !owner.ownerPersonId || owner.ownerPersonId !== owner.grantPersonId ||
       !owner.accountVerifiedAt || owner.privateCredential || owner.accountDisabled || !owner.personActive ||
       !isEligiblePrivilegedMailbox(owner.ownerEmail) ||
