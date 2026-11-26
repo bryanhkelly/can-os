@@ -3,12 +3,13 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import { accessAccounts, accessSessions, accountPersonGrants, people } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
-import { accessSessionCookie, hashAccessSecret, hashPrivateAccessCode, issueOpaqueSecret, sessionIdleCutoff } from "@/domain/access-tokens";
+import { accessSessionCookie, hashAccessSecret, sessionIdleCutoff } from "@/domain/access-tokens";
 import { readCookie } from "@/domain/session-cookies";
 import { roleCapabilities } from "@/domain/access-context";
 import { platformOwnerMayActAs, ownerDelegationLifetimeMs } from "@/domain/platform-owner-delegation";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { isEligiblePrivilegedMailbox } from "@/domain/domain-classification";
+import { issuePrivateAccountCredential } from "./private-account-credential.server";
 import { readOwnerDelegationGrants } from "./session-grants.server";
 import { assertRawAccountPerson } from "./unambiguous-adult-account.server";
 import { writeAudit } from "@/platform/mutation";
@@ -255,9 +256,9 @@ export async function rotatePrivateAccountAccessCode(request: Request, raw: unkn
     if(!eligible.some(grant=>grant.id===data.grantId)||!allGrants.length||allGrants.length>100||
       allGrants.some(grant=>grant.personId!==target.personId||!platformOwnerMayActAs(grant.role)))
       throw new AuthorizationError("independently protected account");
-    const privateAccessCode=issueOpaqueSecret();
+    const {privateAccessCode,privateAccessCodeHash}=issuePrivateAccountCredential(pepper);
     const now=new Date();
-    await tx.update(accessAccounts).set({privateAccessCodeHash:hashPrivateAccessCode(privateAccessCode,pepper),updatedAt:now})
+    await tx.update(accessAccounts).set({privateAccessCodeHash,updatedAt:now})
       .where(eq(accessAccounts.id,account.id));
     const revoked=await tx.update(accessSessions).set({revokedAt:now,updatedAt:now})
       .where(and(eq(accessSessions.accountId,account.id),isNull(accessSessions.revokedAt)))
