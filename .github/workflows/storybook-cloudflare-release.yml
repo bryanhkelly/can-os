@@ -1,5 +1,9 @@
 name: Storybook Cloudflare release
 on:
+  push:
+    branches: [6.1-storybook-configuration]
+    paths:
+      - '.github/workflows/storybook-cloudflare-release.yml'
   workflow_dispatch:
     inputs:
       deploy:
@@ -31,7 +35,7 @@ jobs:
       - run: npm run storybook:acceptance
       - run: npm run storybook:prepare-cloudflare
       - name: Deploy exact accepted static assets
-        if: inputs.deploy
+        if: github.event_name == 'workflow_dispatch' && inputs.deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.STORYBOOK_CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.STORYBOOK_CLOUDFLARE_ACCOUNT_ID }}
