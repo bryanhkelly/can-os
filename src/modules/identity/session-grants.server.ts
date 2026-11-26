@@ -1,4 +1,5 @@
 import { db } from "@/db/client";
+import type { SessionAuthenticationMethod } from "@/domain/access-context";
 import { privateAccountGrantEligible } from "@/domain/private-account-authority";
 import { hasValidAccessGrantScope } from "@/domain/access-grant-scope";
 import { AuthorizationError } from "@/domain/command-context";
@@ -11,7 +12,7 @@ import { readLegacyCredentialGrants } from "./legacy-shared-credential-grants.se
 export { listDemoSourceGrants } from "./legacy-shared-credential-grants.server";
 
 /** Resolve only current account grants or the separately provisioned demo-admin switch list. */
-export async function readSessionGrants(accountId: string, email: string, reader: GrantReader = db) {
+export async function readSessionGrants(accountId: string, email: string, reader: GrantReader = db, authenticationMethod: SessionAuthenticationMethod | null = null) {
   const normalizedEmail = email.trim().toLowerCase();
   const ownGrants = (await listActiveAccountGrants(accountId, reader))
     .filter(grant => grant.accountId === accountId && hasValidAccessGrantScope(grant));
@@ -20,13 +21,17 @@ export async function readSessionGrants(accountId: string, email: string, reader
   // Enrollment/rotation revokes earlier sessions; public fixture switching
   // cannot target accounts with individual credentials.
   if (ownGrants.some(grant => grant.privateCredential)) {
-    if (!isDemoAccountEmail(normalizedEmail)) return {grants:[],demoAccountSwitching:false};
+    if (authenticationMethod !== "private_access_code" || !isDemoAccountEmail(normalizedEmail)) return {grants:[],demoAccountSwitching:false};
     const grants = ownGrants.filter(grant => grant.privateCredential && privateAccountGrantEligible(grant,accountId,normalizedEmail));
     if (grants.length) await assertRawAccountPerson(accountId,grants[0]!.personId,reader);
     const founder = grants.find(grant => grant.role==="site_admin" && grant.siteId);
     return {grants,demoAccountSwitching:false,...(founder?.siteId?{launchSiteId:founder.siteId}:{})};
   }
 
+  if (authenticationMethod === "private_access_code" ||
+      (authenticationMethod === "email_link" && isDemoAccountEmail(normalizedEmail)) ||
+      (authenticationMethod === "local_demo_code" && !isDemoAccountEmail(normalizedEmail)))
+    return {grants:[],demoAccountSwitching:false};
   return readLegacyCredentialGrants(accountId,normalizedEmail,ownGrants,reader);
 }
 
