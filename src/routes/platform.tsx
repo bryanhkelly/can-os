@@ -11,6 +11,7 @@ import { ActionFooter, DirectoryTable, StatCard, WorkspaceNotice, WorkspaceShell
 import { safeLoader } from "@/lib/safe-loader";
 import { readPlatformAdminOverview } from "@/modules/identity/platform-admin.functions";
 
+import { PlatformCommunicationSettings } from "@/components/platform/PlatformCommunicationSettings";
 import { PlatformCatalogManager } from "@/components/platform/PlatformCatalogManager";
 import { PlatformOwnerDelegationPanel } from "@/components/platform/PlatformOwnerDelegationPanel";
 import { PlatformOwnerPilotAccessPanel } from "@/components/platform/PlatformOwnerPilotAccessPanel";
@@ -73,6 +74,7 @@ function PlatformAdministration() {
           Showing the first 100 Sites. Use the authorized reporting workflow for a complete inventory.
         </p>}
     </section>
+    {summary.platformOwner && <PlatformCommunicationSettings/>}
     {summary.platformOwner && <PlatformOwnerPilotAccessPanel/>}
     {summary.platformOwner && <PlatformOwnerDelegationPanel/>}
     <PlatformAccountHealth health={summary.accountHealth}/>
