@@ -19,3 +19,10 @@ Use the existing primitives, workspace and workflow patterns; add feature compos
 5. Complete route mapping, keyboard and responsive verification, independent visual evidence, authenticated journey tests and removal of superseded duplicates.
 
 Do not equate a file count with tested experience coverage.
+
+## Initial implementation
+
+- `ActionStateIndicator`, `GovernedSaveAction`, `AsyncOperationStatus`, `OutcomeMilestones` and `StudioLayout` are controlled presentation patterns. Existing `MutationFeedback` and unsaved-changes guards remain authoritative for their existing consumers.
+- Launch Studio overview uses persisted stage status; unknown stage evidence remains unconfirmed. Website content uses StudioLayout. Campaign prerequisite explanations retain existing command guards.
+- Representative story references are recorded for selected routes, not marked verified. New persona stories are synthetic compositions, not authenticated browser evidence.
+- The separate registry CI gate checks route inventory and references; full strict review is intentionally outstanding.

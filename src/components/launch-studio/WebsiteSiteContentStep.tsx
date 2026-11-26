@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useState, type Dispatch, type SetStateAction } from "react";
 import { Button } from "@/components/ui/button";
-import { DisclosureSection, SelectionCard } from "@/components/workspace";
+import { DisclosureSection, SelectionCard, StudioLayout } from "@/components/workspace";
 import { ChurchSourceSuggestionReview } from "@/components/operations/ChurchSourceSuggestionReview";
 import {
   isChurchSiteIdentityV61, isFaithBasedSiteIdentityV61, siteIdentityEditorialContextV61,
@@ -135,11 +135,11 @@ export function WebsiteSiteContentStep({
 
     </div>
 
-    <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(16rem,21rem)_minmax(0,1fr)]">
-      <div role="group" aria-label="Website content pages" className="space-y-2">
+    <StudioLayout navigationLabel="Website content pages" canvasLabel={previewLabels[page]+" content"}
+      navigation={<div className="space-y-2">
         {available.map(path=><SelectionCard key={path} kind="radio" name="website-content-page" value={path} checked={page===path} onChange={checked=>{if(checked)setSelectedPage(path);}} title={previewLabels[path]} detail={path==="/"? "Headline, welcome, story and vision":path==="/about"?"Mission, community and values":path==="/leadership"?"Leadership profiles and welcome":"Managed Site information"} icon={<span className="block w-16 shrink-0"><Structure id={content.branding.templateId??"heritage"} page={path} viewport="desktop" thumbnail/></span>} className="w-full"/>)}
-      </div>
-      <section className="min-w-0 space-y-5 border border-border bg-card p-4" aria-label={previewLabels[page]+" content"}>
+      </div>}
+      canvas={<div className="min-w-0 space-y-5">
         <h3 className="font-serif text-xl font-semibold">{previewLabels[page]}</h3>
     {page==="/"&&data.plannedExperienceNames.length>0&&<div className="space-y-3 border p-4">
       <h4 className="text-sm font-semibold">Experiences from your Site plan</h4>
@@ -219,7 +219,7 @@ export function WebsiteSiteContentStep({
     </DisclosureSection>}
     {page==="/leadership"&&<WebsiteLeadershipEditor content={content} setContent={setContent} disabled={busy||!data.canEdit}/>}
     {!["/","/about","/leadership"].includes(page)&&<div className="space-y-3 text-sm"><p>This page uses governed Site information and approved learning opportunities rather than independent website copy.</p><Link to="/launch/site" search={{siteId:data.siteId,module:page==="/contact"?"site-information":"programs-audiences"}} className="font-semibold text-primary underline">Manage source information</Link></div>}
-    </section></div>
+    </div>}/>
     <p className="text-xs text-muted-foreground">Your website pages and sections are prepared from your Site information and evolve with your approved learning opportunities.</p>
   </div>;
 }

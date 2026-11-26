@@ -7,7 +7,7 @@ export function StudioLayout({ navigation, canvas, inspector, toolbar, footer, n
 }) {
   return <div className="min-w-0 space-y-4">
     {toolbar && <div role="group" aria-label="Editor actions" className="flex min-w-0 flex-wrap items-center gap-3 border bg-card p-4">{toolbar}</div>}
-    <div className={inspector ? "grid min-w-0 items-start gap-4 xl:grid-cols-[14rem_minmax(0,1fr)_17rem]" : "grid min-w-0 items-start gap-4 lg:grid-cols-[14rem_minmax(0,1fr)]"}>
+    <div className={inspector ? "grid min-w-0 items-start gap-4 xl:grid-cols-[14rem_minmax(0,1fr)_17rem]" : "grid min-w-0 items-start gap-4 xl:grid-cols-[minmax(16rem,21rem)_minmax(0,1fr)]"}>
       <nav aria-label={navigationLabel} className="min-w-0 border bg-card p-4">{navigation}</nav>
       <section aria-label={canvasLabel} className="min-w-0 border bg-card p-4 sm:p-6">{canvas}</section>
       {inspector && <aside aria-label={inspectorLabel} className="min-w-0 border bg-card p-4">{inspector}</aside>}

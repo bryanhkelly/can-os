@@ -750,8 +750,13 @@
       "layout": "learning",
       "persona": "learner or educator",
       "review": "unreviewed",
-      "patterns": [],
-      "stories": [],
+      "patterns": [
+        "ClassroomWorkspace"
+      ],
+      "stories": [
+        "src/components/learning/ClassroomWorkspace.stories.tsx#Lesson",
+        "src/components/learning/ClassroomWorkspace.stories.tsx#UnavailableCurriculum"
+      ],
       "evidence": {
         "responsive": null,
         "accessibility": null,
@@ -1240,8 +1245,14 @@
       "layout": "guided",
       "persona": "authorized applicant or operator",
       "review": "unreviewed",
-      "patterns": [],
-      "stories": [],
+      "patterns": [
+        "OutcomeMilestones",
+        "StudioLayout"
+      ],
+      "stories": [
+        "src/components/launch-studio/LaunchStudio.stories.tsx#Entry",
+        "src/components/workspace/studio-layout.stories.tsx#Editable"
+      ],
       "evidence": {
         "responsive": null,
         "accessibility": null,
@@ -1394,8 +1405,14 @@
       "layout": "communication",
       "persona": "authorized communicator",
       "review": "unreviewed",
-      "patterns": [],
-      "stories": [],
+      "patterns": [
+        "MessagesWorkspace",
+        "QueryState"
+      ],
+      "stories": [
+        "src/components/communication/MessagesWorkspace.stories.tsx#Conversation",
+        "src/components/communication/MessagesWorkspace.stories.tsx#Unavailable"
+      ],
       "evidence": {
         "responsive": null,
         "accessibility": null,
@@ -1464,8 +1481,16 @@
       "layout": "guided",
       "persona": "authorized applicant or operator",
       "review": "unreviewed",
-      "patterns": [],
-      "stories": [],
+      "patterns": [
+        "OutcomeMilestones",
+        "StudioLayout",
+        "ActionStateIndicator"
+      ],
+      "stories": [
+        "src/components/launch-studio/LaunchStudio.stories.tsx#Entry",
+        "src/components/workspace/outcome-milestones.stories.tsx#Mixed",
+        "src/components/workspace/studio-layout.stories.tsx#Editable"
+      ],
       "evidence": {
         "responsive": null,
         "accessibility": null,
