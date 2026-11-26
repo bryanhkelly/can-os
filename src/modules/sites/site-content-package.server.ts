@@ -11,7 +11,8 @@ import {buildSitePackageInput,parseSiteContentPackage,privatePackageSourcesMatch
 import {writeAudit} from "@/platform/mutation";
 import type {AccessContext} from "@/domain/access-context";
 import {readAuthorizedSiteContentBrief} from "./site-content-brief.server";
-import {generateSitePackageWithGloo,assertGlooConfiguration,safeGlooFailure} from "./gloo-content-provider.server";
+import {generationEligibility} from "@/domain/site-generation-status";
+import {generateSitePackageWithGloo,assertGlooConfiguration,safeGlooFailure,glooConfiguration} from "./gloo-content-provider.server";
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Consumer="website"|"outreach";
 type Request={siteId:string;consumer:Consumer;options:SiteGenerationOptions};
@@ -29,9 +30,21 @@ async function prepare(actor:AccessContext,data:Request,tx?:Tx){
  if(new TextEncoder().encode(canonicalJson(input)).byteLength>48000)throw new Error("Site Intelligence input is too large.");
  return {brief,input,digest:hash(input)};
 }
+async function readEligibility(tx:Tx,siteId:string,organizationId:string,digest:string){
+ const scoped=scope(siteId,organizationId);
+ const now=new Date();
+ const [attempt]=await tx.select().from(inputs).where(and(scoped,eq(inputs.inputDigest,digest))).limit(1);
+ const [active]=await tx.select({leaseUntil:inputs.leaseUntil}).from(inputs).where(and(scoped,eq(inputs.status,"processing"),gt(inputs.leaseUntil,now))).limit(1);
+ const [usage]=await tx.select({count:sql<number>`count(*)::int`}).from(inputs).where(and(scoped,gt(inputs.createdAt,new Date(now.getTime()-86400000))));
+ const config=glooConfiguration();
+ return {attempt,eligibility:generationEligibility({attempt:attempt??null,activeUntil:active?.leaseUntil??null,dailyCount:usage?.count??0,configured:config.keyConfigured&&config.modelConfigured,now})};
+}
 export async function previewSitePackage(actor:AccessContext,data:Request){
- const {brief,input,digest}=await prepare(actor,data);
- return {input,digest,sourceRevisions:brief.sourceRevisions};
+ return db.transaction(async tx=>{
+  const {brief,input,digest}=await prepare(actor,data,tx);
+  const {eligibility}=await readEligibility(tx,data.siteId,brief.organizationId,digest);
+  return {input,digest,sourceRevisions:brief.sourceRevisions,eligibility};
+ });
 }
 function safeStoredInput(row:typeof inputs.$inferSelect){
  return sitePackageInputSchema.parse(row.input);
@@ -43,9 +56,10 @@ async function lockSite(tx:Tx,siteId:string,organizationId:string){
 export async function readStoredSitePackage(actor:AccessContext,siteId:string,consumer:Consumer,executor?:Tx){
  const read=async(tx:Tx)=>{
    const brief=await readAuthorizedSiteContentBrief(actor,siteId,consumer==="outreach"?"read":consumer,tx);
-   if(!brief.consent.contentReuseAllowed)return {status:"consent-required" as const,package:null};
+   if(!brief.consent.contentReuseAllowed)return {status:"consent-required" as const,package:null,generation:null};
    const scoped=scope(siteId,brief.organizationId);
-   const [latest]=await tx.select({status:inputs.status,leaseUntil:inputs.leaseUntil,attempts:inputs.attempts,revision:inputs.revision}).from(inputs).where(scoped).orderBy(desc(inputs.revision)).limit(1);
+   const [latest]=await tx.select({status:inputs.status,leaseUntil:inputs.leaseUntil,attempts:inputs.attempts,errorCode:inputs.errorCode,revision:inputs.revision}).from(inputs).where(scoped).orderBy(desc(inputs.updatedAt),desc(inputs.revision)).limit(1);
+   const generation=latest?{status:latest.status,attempts:latest.attempts,errorCode:latest.errorCode,leaseUntil:latest.leaseUntil?.toISOString()??null}:null;
    const rows=await tx.select({source:inputs,result:outputs}).from(inputs).innerJoin(outputs,and(eq(outputs.intelligenceVersionId,inputs.id),eq(outputs.siteId,inputs.siteId),eq(outputs.organizationId,inputs.organizationId))).where(and(scoped,eq(inputs.status,"ready"))).orderBy(desc(inputs.updatedAt),desc(inputs.revision)).limit(20);
    for(const {source,result} of rows){
      const saved=safeStoredInput(source);
@@ -55,9 +69,9 @@ export async function readStoredSitePackage(actor:AccessContext,siteId:string,co
      if(canonicalJson(saved.site.identity)!==canonicalJson(current.site.identity))continue;
      if(hash(saved)!==source.inputDigest||hash(result.content)!==result.outputDigest)throw new Error("Stored Site Intelligence integrity check failed.");
      const content=parseSiteContentPackage(canonicalJson(result.content),saved);
-     return {status:"ready" as const,latestStatus:latest?.status??"ready",package:{id:result.id,revision:source.revision,generatedAt:result.createdAt.toISOString(),language:saved.preferences.language,stale:hash(current)!==source.inputDigest,website:consumer==="website"?content.website:null,websiteComposition:consumer==="website"?content.websiteComposition??null:null,marketing:consumer==="outreach"?content.marketing:null,reviewNotes:content.reviewNotes}};
+     return {status:"ready" as const,generation,latestStatus:latest?.status??"ready",package:{id:result.id,revision:source.revision,generatedAt:result.createdAt.toISOString(),language:saved.preferences.language,stale:hash(current)!==source.inputDigest,website:consumer==="website"?content.website:null,websiteComposition:consumer==="website"?content.websiteComposition??null:null,marketing:consumer==="outreach"?content.marketing:null,reviewNotes:content.reviewNotes}};
    }
-   return {status:latest?.status==="processing"&&latest.leaseUntil&&latest.leaseUntil>new Date()?"processing" as const:latest?"refresh-required" as const:"not-generated" as const,package:null};
+   return {generation,status:latest?.status==="processing"&&latest.leaseUntil&&latest.leaseUntil>new Date()?"processing" as const:latest?"refresh-required" as const:"not-generated" as const,package:null};
  };
  return executor?read(executor):db.transaction(read);
 }
@@ -71,7 +85,7 @@ export async function processSitePackage(actor:AccessContext,data:Request&{diges
    const checked=await prepare(actor,data,tx);
    if(checked.digest!==data.digest||checked.brief.organizationId!==organizationId)throw new Error("Site input changed.");
    const scoped=scope(data.siteId,organizationId);
-   const [existing]=await tx.select().from(inputs).where(and(scoped,eq(inputs.inputDigest,data.digest))).limit(1);
+   const {attempt:existing,eligibility}=await readEligibility(tx,data.siteId,organizationId,data.digest);
    const now=new Date();
    if(existing?.status==="ready"){
      // Re-select the prior successful package without another provider call.
@@ -81,17 +95,12 @@ export async function processSitePackage(actor:AccessContext,data:Request&{diges
      await writeAudit(tx,actor,{action:"site.content_generation.reused",entityType:"site",entityId:data.siteId,scope:{siteId:data.siteId,organizationId},after:{inputId:existing.id,inputDigest:data.digest}});
      return {kind:"reused" as const};
    }
-   // Site-wide concurrency and cost controls, including abandoned leases.
-   const [active]=await tx.select({id:inputs.id}).from(inputs).where(and(scoped,eq(inputs.status,"processing"),gt(inputs.leaseUntil,now))).limit(1);
-   if(active)return {kind:"processing" as const};
-   const [usage]=await tx.select({count:sql<number>`count(*)::int`}).from(inputs).where(and(scoped,gt(inputs.createdAt,new Date(now.getTime()-86400000))));
-   if(!existing&&(usage?.count??0)>=5)throw new Error("Daily Site Intelligence generation limit reached.");
+   // The same eligibility contract is evaluated under the Site lock before a billable claim.
+   if(!eligibility.allowed){
+     if(eligibility.code==="processing")return {kind:"processing" as const};
+     return {kind:"failed" as const,code:eligibility.code,message:eligibility.message};
+   }
    try{assertGlooConfiguration();}catch(error){return {kind:"failed" as const,...safeGlooFailure(error)};}
-   // Configuration is checked before claiming an attempt. Rejected provider
-   // configuration can be retried after a cooldown, without unbounded counters.
-   const recoverable=existing?.status==="failed"&&/^gloo_http_(400|401|403|404|422)$/.test(existing.errorCode??"");
-   if(existing&&existing.attempts>=3&&!recoverable)return {kind:"failed" as const,code:"retry_limit",message:"Retry limit reached for this input."};
-   if(recoverable&&existing&&now.getTime()-existing.updatedAt.getTime()<300000)return {kind:"failed" as const,code:"retry_cooldown",message:"Correct the Gloo configuration and retry after five minutes."};
    const nextAttempt=Math.min(3,(existing?.attempts??0)+1);
    const leaseUntil=new Date(now.getTime()+leaseMs);
    let inputId:string;
@@ -111,11 +120,14 @@ export async function processSitePackage(actor:AccessContext,data:Request&{diges
  });
  if(claim.kind==="failed")return {status:"failed" as const,code:claim.code,message:claim.message};
  if(claim.kind!=="claimed")return {status:claim.kind};
+ let failureStage="provider";
  const fence=and(scope(data.siteId,organizationId),eq(inputs.id,claim.inputId),eq(inputs.status,"processing"),eq(inputs.leaseToken,token));
  try{
    const result=await generateSitePackageWithGloo(before.input);
+   failureStage="authorization";
    const currentActor=await resolveActor();
    if(currentActor.actorPersonId!==actor.actorPersonId||currentActor.accountId!==actor.accountId||currentActor.grantId!==actor.grantId||currentActor.sessionId!==actor.sessionId)throw new AuthorizationError("Site Intelligence authorization changed");
+   failureStage="persistence";
    await db.transaction(async tx=>{
      await lockSite(tx,data.siteId,organizationId);
      // No stale result can replace a more recent claim or be made available
@@ -132,7 +144,9 @@ export async function processSitePackage(actor:AccessContext,data:Request&{diges
    });
    return {status:"ready" as const};
  }catch(error){
-   const failure=safeGlooFailure(error);
+   const safe=safeGlooFailure(error);
+   const failure=safe.code==="processing_failed"?{code:"processing_"+failureStage,message:"Site Intelligence failed during "+failureStage+". Contact support."}:safe;
+   console.error("Site Intelligence failure", {siteId:data.siteId,inputId:claim.inputId,stage:failureStage,code:failure.code,errorType:error instanceof Error?error.name:"unknown"});
    await db.transaction(async tx=>{
      const [failed]=await tx.update(inputs).set({status:"failed",leaseToken:null,leaseUntil:null,errorCode:failure.code,updatedAt:new Date()}).where(fence).returning({id:inputs.id});
      if(failed)await emitReportableChange(tx,{eventType:EventTypes.SiteIntelligenceProcessingFailed,sourceId:failed.id,sourceVersion:token,occurredAt:new Date(),actorPersonId:actor.actorPersonId,dimensions:{organizationId,siteId:data.siteId},payload:{attempt:claim.attempt}});
