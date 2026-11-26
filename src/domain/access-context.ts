@@ -16,7 +16,8 @@ export type SessionPrincipal = {
  sessionId: string;
  activeGrantId: string | null;
 };
-export type SessionAuthenticationMethod = "email_link" | "local_demo_code" | "private_access_code";
+import type { SessionAuthenticationMethod } from "./session-credential-policy";
+export type { SessionAuthenticationMethod } from "./session-credential-policy";
 export type AccessContext = CommandContext & {
  /** Server-derived credential provenance, never accepted from a client command. */
  authenticationMethod?: SessionAuthenticationMethod | null;
