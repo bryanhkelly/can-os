@@ -59,13 +59,21 @@ export function assertAuthorizedReportFacts(
       throw new Error("Out-of-scope Organization or Site participation cannot be reported");
   }
 }
-function count(rows:readonly ParticipationReportingFact[]):ParticipationCount{
-  return {
-    registrations:rows.length,
-    uniquePeople:new Set(rows.map(r=>r.personId)).size,
-    active:rows.filter(r=>["registered","active"].includes(r.currentStatus)).length,
-    withdrawn:rows.filter(r=>r.currentStatus==="withdrawn").length,
-  };
+function count(rows: readonly ParticipationReportingFact[]): ParticipationCount {
+  const people = new Set<string>();
+  let active = 0;
+  let withdrawn = 0;
+
+  for (const row of rows) {
+    people.add(row.personId);
+    if (row.currentStatus === "registered" || row.currentStatus === "active") {
+      active++;
+    } else if (row.currentStatus === "withdrawn") {
+      withdrawn++;
+    }
+  }
+
+  return { registrations: rows.length, uniquePeople: people.size, active, withdrawn };
 }
 function group(
   facts:readonly ParticipationReportingFact[],
