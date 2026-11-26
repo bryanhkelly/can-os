@@ -59,7 +59,7 @@ export function ConnectedWorkflowsWorkspace({data,error}: {data: Awaited<ReturnT
               {program.status !== "active" && program.launch.journeyStatus === "ready" &&
                 <Button variant="outline" size="sm" type="button" disabled={busy}
                   onClick={() => void activate(program.id)}
-                  className=" border px-3 py-2 text-xs font-semibold disabled:opacity-50">
+                  >
                   {mutation.pending ? "Updating…" : "Activate through canonical validation"}
                 </Button>}
             </div>
@@ -97,7 +97,7 @@ export function ConnectedWorkflowsWorkspace({data,error}: {data: Awaited<ReturnT
               </p>
               {program.enrollment.expiredOffersAwaitingReconciliation > 0 && <div className="mt-3 flex flex-wrap items-center gap-3">
                 <span className="text-xs text-muted-foreground">{plural(program.enrollment.expiredOffersAwaitingReconciliation, "elapsed offer")} awaiting reconciliation.</span>
-                <Button variant="outline" size="sm" type="button" className=" border px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+                <Button variant="outline" size="sm" type="button"
                   disabled={busy} onClick={() => void reconcile(program.id)}>
                   {mutation.pending ? "Updating…" : "Expire elapsed offers"}
                 </Button>

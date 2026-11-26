@@ -227,7 +227,7 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
               <strong>{season.offeringName}</strong> · {season.name} · {season.startsOn} to {season.endsOn}
               <span className="ml-2 text-xs text-muted-foreground">{season.status} · {season.capacity ?? "Uncapped"} seats</span>
               {(season.status === "draft" || season.status === "registration") && <div className="mt-2">
-                <Button variant="ghost" type="button" className="text-xs font-semibold underline"
+                <Button variant="ghost" size="sm" type="button" className="underline"
                   onClick={() => setEvidenceSeasonId(old => old === season.id ? "" : season.id)}>
                   {evidenceSeasonId === season.id ? "Close operating evidence" : "Submit and review operating evidence"}
                 </Button>
@@ -321,8 +321,8 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
                               </Label>)}
                           </div>
                         </fieldset>
-                        <Button variant="outline" type="button" onClick={()=>addPackage(season.id)}
-                          className="col-span-2  border p-2 text-xs font-semibold">
+                        <Button variant="outline" size="sm" type="button" onClick={()=>addPackage(season.id)}
+                          className="col-span-2">
                           Add package option
                         </Button>
                       </div>
@@ -365,8 +365,8 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
                       <details className="mt-2  border p-2">
                         <summary className="cursor-pointer text-xs font-semibold">Daily registered rosters</summary>
                         <div className="mt-2 max-h-64 space-y-1 overflow-y-auto">
-                          {meetings.map(session => <Button variant="outline" key={session.id} type="button"
-                            className="block w-full  border px-2 py-1 text-left text-xs"
+                          {meetings.map(session => <Button variant="outline" size="sm" key={session.id} type="button"
+                            className="w-full justify-start text-left"
                             onClick={()=>showRoster(season.id,session.id)}>
                             {new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeStyle:"short",
                               timeZone:session.timezone}).format(new Date(session.startsAt))}
