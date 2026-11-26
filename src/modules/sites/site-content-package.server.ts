@@ -11,7 +11,7 @@ import {buildSitePackageInput,parseSiteContentPackage,privatePackageSourcesMatch
 import {writeAudit} from "@/platform/mutation";
 import type {AccessContext} from "@/domain/access-context";
 import {readAuthorizedSiteContentBrief} from "./site-content-brief.server";
-import {generateSitePackageWithGloo} from "./gloo-content-provider.server";
+import {generateSitePackageWithGloo,assertGlooConfiguration,safeGlooFailure} from "./gloo-content-provider.server";
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Consumer="website"|"outreach";
 type Request={siteId:string;consumer:Consumer;options:SiteGenerationOptions};
@@ -86,11 +86,17 @@ export async function processSitePackage(actor:AccessContext,data:Request&{diges
    if(active)return {kind:"processing" as const};
    const [usage]=await tx.select({count:sql<number>`count(*)::int`}).from(inputs).where(and(scoped,gt(inputs.createdAt,new Date(now.getTime()-86400000))));
    if(!existing&&(usage?.count??0)>=5)throw new Error("Daily Site Intelligence generation limit reached.");
-   if(existing&&existing.attempts>=3)throw new Error("Retry limit reached for this input.");
+   try{assertGlooConfiguration();}catch(error){return {kind:"failed" as const,...safeGlooFailure(error)};}
+   // Configuration is checked before claiming an attempt. Rejected provider
+   // configuration can be retried after a cooldown, without unbounded counters.
+   const recoverable=existing?.status==="failed"&&/^gloo_http_(400|401|403|404|422)$/.test(existing.errorCode??"");
+   if(existing&&existing.attempts>=3&&!recoverable)return {kind:"failed" as const,code:"retry_limit",message:"Retry limit reached for this input."};
+   if(recoverable&&existing&&now.getTime()-existing.updatedAt.getTime()<300000)return {kind:"failed" as const,code:"retry_cooldown",message:"Correct the Gloo configuration and retry after five minutes."};
+   const nextAttempt=Math.min(3,(existing?.attempts??0)+1);
    const leaseUntil=new Date(now.getTime()+leaseMs);
    let inputId:string;
    if(existing){
-     await tx.update(inputs).set({status:"processing",attempts:existing.attempts+1,leaseToken:token,leaseUntil,errorCode:null,updatedAt:now}).where(eq(inputs.id,existing.id));
+     await tx.update(inputs).set({status:"processing",attempts:nextAttempt,leaseToken:token,leaseUntil,errorCode:null,updatedAt:now}).where(eq(inputs.id,existing.id));
      inputId=existing.id;
    }else{
      const [last]=await tx.select({revision:inputs.revision}).from(inputs).where(scoped).orderBy(desc(inputs.revision)).limit(1);
@@ -99,10 +105,11 @@ export async function processSitePackage(actor:AccessContext,data:Request&{diges
      inputId=row.id;
    }
    await writeAudit(tx,actor,{action:"site.content_generation.requested",entityType:"site",entityId:data.siteId,scope:{siteId:data.siteId,organizationId},after:{inputId,inputDigest:data.digest,provider:"gloo",externalProcessingConfirmed:true}});
-   const attempt=(existing?.attempts??0)+1;
-   await emitReportableChange(tx,{eventType:EventTypes.SiteIntelligenceProcessingRequested,sourceId:inputId,sourceVersion:String(attempt),occurredAt:now,actorPersonId:actor.actorPersonId,dimensions:{organizationId,siteId:data.siteId},payload:{attempt}});
+   const attempt=nextAttempt;
+   await emitReportableChange(tx,{eventType:EventTypes.SiteIntelligenceProcessingRequested,sourceId:inputId,sourceVersion:token,occurredAt:now,actorPersonId:actor.actorPersonId,dimensions:{organizationId,siteId:data.siteId},payload:{attempt}});
    return {kind:"claimed" as const,inputId,attempt};
  });
+ if(claim.kind==="failed")return {status:"failed" as const,code:claim.code,message:claim.message};
  if(claim.kind!=="claimed")return {status:claim.kind};
  const fence=and(scope(data.siteId,organizationId),eq(inputs.id,claim.inputId),eq(inputs.status,"processing"),eq(inputs.leaseToken,token));
  try{
@@ -120,16 +127,17 @@ export async function processSitePackage(actor:AccessContext,data:Request&{diges
      const outputDigest=hash(result.content);
      const [saved]=await tx.insert(outputs).values({siteId:data.siteId,organizationId,intelligenceVersionId:row.id,content:result.content,outputDigest,provider:"gloo",model:result.model,providerResponseId:result.providerResponseId}).returning({id:outputs.id});
      if(!saved)throw new Error("Site Intelligence output missing");
-     await emitReportableChange(tx,{eventType:EventTypes.SiteIntelligenceProcessingCompleted,sourceId:row.id,sourceVersion:String(claim.attempt),occurredAt:new Date(),actorPersonId:currentActor.actorPersonId,dimensions:{organizationId,siteId:data.siteId},payload:{attempt:claim.attempt,outputId:saved.id}});
+     await emitReportableChange(tx,{eventType:EventTypes.SiteIntelligenceProcessingCompleted,sourceId:row.id,sourceVersion:token,occurredAt:new Date(),actorPersonId:currentActor.actorPersonId,dimensions:{organizationId,siteId:data.siteId},payload:{attempt:claim.attempt,outputId:saved.id}});
      await writeAudit(tx,currentActor,{action:"site.content_generation.completed",entityType:"site",entityId:data.siteId,scope:{siteId:data.siteId,organizationId},after:{inputId:row.id,outputId:saved?.id,inputDigest:data.digest,outputDigest,model:result.model}});
    });
    return {status:"ready" as const};
- }catch{
+ }catch(error){
+   const failure=safeGlooFailure(error);
    await db.transaction(async tx=>{
-     const [failed]=await tx.update(inputs).set({status:"failed",leaseToken:null,leaseUntil:null,errorCode:"processing_failed",updatedAt:new Date()}).where(fence).returning({id:inputs.id});
-     if(failed)await emitReportableChange(tx,{eventType:EventTypes.SiteIntelligenceProcessingFailed,sourceId:failed.id,sourceVersion:String(claim.attempt),occurredAt:new Date(),actorPersonId:actor.actorPersonId,dimensions:{organizationId,siteId:data.siteId},payload:{attempt:claim.attempt}});
-     if(failed)await writeAudit(tx,actor,{action:"site.content_generation.failed",entityType:"site",entityId:data.siteId,scope:{siteId:data.siteId,organizationId},after:{inputId:failed.id,inputDigest:data.digest,errorCode:"processing_failed"}});
+     const [failed]=await tx.update(inputs).set({status:"failed",leaseToken:null,leaseUntil:null,errorCode:failure.code,updatedAt:new Date()}).where(fence).returning({id:inputs.id});
+     if(failed)await emitReportableChange(tx,{eventType:EventTypes.SiteIntelligenceProcessingFailed,sourceId:failed.id,sourceVersion:token,occurredAt:new Date(),actorPersonId:actor.actorPersonId,dimensions:{organizationId,siteId:data.siteId},payload:{attempt:claim.attempt}});
+     if(failed)await writeAudit(tx,actor,{action:"site.content_generation.failed",entityType:"site",entityId:data.siteId,scope:{siteId:data.siteId,organizationId},after:{inputId:failed.id,inputDigest:data.digest,errorCode:failure.code}});
    });
-   throw new Error("Site Intelligence processing failed. Existing content is unchanged.");
+   return {status:"failed" as const,...failure};
  }
 }

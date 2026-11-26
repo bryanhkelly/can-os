@@ -1,6 +1,8 @@
 import {createServerFn} from "@tanstack/react-start";
 import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
 import {z} from "zod";
+import {AuthorizationError} from "@/domain/command-context";
+import {testGlooConnection} from "./gloo-content-provider.server";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {siteGenerationOptionsSchema} from "@/domain/site-content-generation";
 import {previewSitePackage,processSitePackage,readStoredSitePackage} from "./site-content-package.server";
@@ -18,4 +20,12 @@ export const processSiteIntelligence=createServerFn({method:"POST"}).validator((
  setResponseHeader("Cache-Control","private, no-store");
  const request=getRequest();
  return processSitePackage(await getCommandContext(request),data,()=>getCommandContext(request));
+});
+
+/** Independent synthetic connection probe, restricted to verified platform administration. */
+export const checkGlooConnection=createServerFn({method:"POST"}).handler(async()=>{
+ setResponseHeader("Cache-Control","private, no-store");
+ const actor=await getCommandContext(getRequest());
+ if(!actor.capabilities.has("platform.admin")||actor.delegationMode)throw new AuthorizationError("Platform administration");
+ return testGlooConnection();
 });

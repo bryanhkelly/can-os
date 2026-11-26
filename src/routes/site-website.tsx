@@ -431,6 +431,7 @@ function LocalWebsiteCopyEditor({
       }};
       const preview=await previewSiteIntelligence({data:request});
       const outcome=await processSiteIntelligence({data:{...request,digest:preview.digest,externalProcessingConfirmed:true}});
+      if(outcome.status==="failed"){setGenerationMessage(outcome.message+" ("+outcome.code+"). Existing content is unchanged.");return;}
       if(outcome.status==="processing"){setGenerationMessage("Content is already being generated. Select Generate Site Content again to retrieve it.");return;}
       const stored=await readSiteIntelligenceContent({data:{siteId:data.siteId,consumer:"website"}});
       const item=stored.package;

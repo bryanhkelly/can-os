@@ -1,5 +1,5 @@
 import {afterEach,describe,expect,it,vi} from "vitest";
-import {generateWithGloo,generateSitePackageWithGloo} from "@/modules/sites/gloo-content-provider.server";
+import {generateWithGloo,generateSitePackageWithGloo,testGlooConnection} from "@/modules/sites/gloo-content-provider.server";
 import {buildSiteGenerationInput,siteGenerationTaskSchema} from "@/domain/site-content-generation";
 import {projectSiteContentBriefV61} from "@/domain/site-content-brief-v61";
 import {initialOutreachPlanV61} from "@/domain/marketing-package-v61";
@@ -49,4 +49,21 @@ describe("Gloo persistent package transport",()=>{
     await expect(generateSitePackageWithGloo(packageInput,async()=>envelope({...packageContent,audiences:[{id:"unknown",description:"Unverified"}]}))).rejects.toThrow(/contract/);
     await expect(generateSitePackageWithGloo(packageInput,async()=>new Response("x".repeat(129000)))).rejects.toThrow(/invalid response/);
   });
+});
+
+describe("Gloo safe connection diagnostics",()=>{
+ it("reports missing variables without sending a request",async()=>{
+  vi.stubEnv("GLOO_API_KEY","");vi.stubEnv("GLOO_MODEL","");
+  const send=vi.fn(async()=>new Response("unexpected"));
+  expect(await testGlooConnection(send)).toMatchObject({ok:false,code:"gloo_missing_both",keyConfigured:false,modelConfigured:false});expect(send).not.toHaveBeenCalled();
+ });
+ it("records HTTP status without leaking response bodies or credentials",async()=>{
+  vi.stubEnv("GLOO_API_KEY","private-key");vi.stubEnv("GLOO_MODEL","private-model");
+  const result=await testGlooConnection(async()=>new Response("sensitive body",{status:401}));
+  expect(result).toMatchObject({ok:false,code:"gloo_http_401",keyConfigured:true,modelConfigured:true});expect(JSON.stringify(result)).not.toMatch(/private-key|private-model|sensitive body/);
+ });
+ it("confirms a real response envelope",async()=>{
+  vi.stubEnv("GLOO_API_KEY","key");vi.stubEnv("GLOO_MODEL","model");
+  expect(await testGlooConnection(async()=>new Response(JSON.stringify({status:"completed",output:[{type:"message",content:[{type:"output_text",text:"OK"}]}]})))).toMatchObject({ok:true,code:"gloo_ok"});
+ });
 });
