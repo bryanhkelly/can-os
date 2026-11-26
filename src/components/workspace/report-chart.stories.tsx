@@ -1,3 +1,4 @@
+import {chromaticWidthModes} from "../../../.storybook/viewports";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, within, waitFor } from "storybook/test";
 import { ReportChart } from "./report-chart";
@@ -5,7 +6,7 @@ import type {ReportChartSpec} from "./report-chart-data";
 const fixture={title:"Pilot participation",description:"Synthetic fixture only. Counts overlap.",valueLabel:"Registrations",kind:"comparison",format:"count",points:[{id:"registered",label:"Registered",value:102},{id:"engaged",label:"Engaged",value:87},{id:"completed",label:"Completed",value:69}]} satisfies ReportChartSpec;
 const meta = {
   title:"V6.1 foundations/Data Visualization/Charts", component:ReportChart,
-  parameters:{chromatic:{viewports:[390,768,1024,1440],modes:{light:{theme:"light"},dark:{theme:"dark"},site:{theme:"site"}}}},
+  parameters:{chromatic:{modes:{light:{theme:"light"},dark:{theme:"dark"},site:{theme:"site"}}}},
   args:{spec:fixture as ReportChartSpec},
 } satisfies Meta<typeof ReportChart>;
 export default meta;
@@ -22,8 +23,8 @@ export const Trend: Story = {args:{spec:{...fixture,title:"Monthly participation
 export const Missing: Story = {args:{spec:{...fixture,points:[{id:"missing",label:"Not measured",value:null}]}},
   play:async({canvasElement})=>{const canvas=within(canvasElement);await expect(canvas.getByText("Unavailable",{exact:true})).toBeVisible();}};
 export const Zero: Story = {args:{spec:{...fixture,points:[{id:"zero",label:"Registered",value:0}]}},play:async({canvasElement})=>{const canvas=within(canvasElement);await expect(canvas.getByText("All reported values are zero")).toBeVisible();await expect(canvas.getByText("0",{exact:true})).toBeVisible();}};
-export const Mobile: Story = {parameters:{chromatic:{viewports:[390]}},render:args=><div className="w-full max-w-[390px] p-3"><ReportChart {...args}/></div>,play:async({canvasElement})=>{await waitFor(()=>expect(canvasElement.querySelector(".recharts-surface")).not.toBeNull());const panel=canvasElement.querySelector("[data-report-chart]")!;expect(panel.scrollWidth).toBeLessThanOrEqual(panel.clientWidth+1);}};
-export const Dark: Story = {globals:{theme:"dark"},parameters:{chromatic:{viewports:[390,1440]}}};
+export const Mobile: Story = {parameters:{chromatic:{modes: chromaticWidthModes([390])}},render:args=><div className="w-full max-w-[390px] p-3"><ReportChart {...args}/></div>,play:async({canvasElement})=>{await waitFor(()=>expect(canvasElement.querySelector(".recharts-surface")).not.toBeNull());const panel=canvasElement.querySelector("[data-report-chart]")!;expect(panel.scrollWidth).toBeLessThanOrEqual(panel.clientWidth+1);}};
+export const Dark: Story = {globals:{theme:"dark"},parameters:{chromatic:{modes: chromaticWidthModes([390,1440])}}};
 
 export const Distribution: Story={args:{spec:{title:"Receipt mix",description:"Synthetic mutually exclusive fixture.",valueLabel:"Events",
   kind:"distribution",format:"count",population:"100 eligible events",total:100,seriesOrder:["a","b","c","d"],

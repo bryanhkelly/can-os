@@ -1,3 +1,4 @@
+import {chromaticWidthModes} from "../../../.storybook/viewports";
 import {useState} from "react";
 import type {Meta,StoryObj} from "@storybook/react-vite";
 import {expect,within,userEvent} from "storybook/test";
@@ -12,7 +13,7 @@ import {ActionFooter} from "./action-footer";
 import {LocalDateTimeField} from "./local-datetime-field";
 import {RecordFacts} from "./record-layout";
 import {WorkspaceNotice} from "./notice";
-const meta={title:"05 Page layouts/Branded, scheduling and settings",parameters:{chromatic:{viewports:[390,768,1024,1440]}}} satisfies Meta;
+const meta={title:"05 Page layouts/Branded, scheduling and settings",parameters:{chromatic:{modes: chromaticWidthModes([390,768,1024,1440])}}} satisfies Meta;
 export default meta;
 type Story=StoryObj<typeof meta>;
 

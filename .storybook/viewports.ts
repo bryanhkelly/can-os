@@ -8,7 +8,13 @@ export const viewports = {
   wide: {name:"Wide desktop · 1920",styles:{width:"1920px",height:"1080px"},type:"desktop"},
 } as const;
 
-// Retain the existing Chromatic width baselines during the migration.
+// Preserve the legacy automatic mode names while using the current Modes API.
 // The independent browser matrix additionally exercises 320px and theme combinations.
 export const baselineWidths = [390,768,1024,1440];
 export const storybookThemes = ["light","dark","site"] as const;
+
+/** Widths are named exactly as legacy Chromatic viewport-derived modes. */
+export function chromaticWidthModes(widths:readonly number[]){
+  return Object.fromEntries(widths.map(width=>[width+"px",{viewport:width}]));
+}
+export const baselineModes=chromaticWidthModes(baselineWidths);

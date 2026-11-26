@@ -8,8 +8,7 @@ const meta = {
   title: "V6.1 foundations/Shared navigation",
   parameters: {
     layout: "fullscreen",
-    chromatic: { modes: { light: { theme: "light" }, dark: { theme: "dark" }, site: { theme: "site" } },
-      viewports: [390, 768, 1440] },
+    chromatic: { modes: { light: { theme: "light" }, dark: { theme: "dark" }, site: { theme: "site" } } },
   },
 } satisfies Meta;
 export default meta;

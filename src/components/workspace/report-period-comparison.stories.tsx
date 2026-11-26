@@ -1,3 +1,4 @@
+import {chromaticWidthModes} from "../../../.storybook/viewports";
 import type {Meta,StoryObj} from "@storybook/react-vite";
 import {expect,within} from "storybook/test";
 import {ReportMetricComparison} from "./report-period-comparison";
@@ -13,7 +14,7 @@ export const Comparison:Story={play:async({canvasElement})=>{
   await expect(canvas.getByText("Prior 0 · Change 0")).toBeVisible();
   await expect(canvas.getByText("Prior comparison unavailable")).toBeVisible();
 }};
-export const Mobile:Story={parameters:{chromatic:{viewports:[390]}},render:args=><div className="max-w-[390px]"><ReportMetricComparison {...args}/></div>};
+export const Mobile:Story={parameters:{chromatic:{modes: chromaticWidthModes([390])}},render:args=><div className="max-w-[390px]"><ReportMetricComparison {...args}/></div>};
 export const Dark:Story={globals:{theme:"dark"}};
 
 export const SiteBrand:Story={globals:{theme:"site"}};

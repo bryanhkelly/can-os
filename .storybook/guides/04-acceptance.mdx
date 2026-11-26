@@ -22,3 +22,7 @@ The route registry starts with candidate layout assignments. Do not mark a route
 Storybook build or CI failure is not a passing gate. Missing runner logs or absent visual credentials are blockers, not grounds for auto-approval.
 
 The browser matrix exercises six named device and theme combinations, checks rendered overflow, unexpected network access and runtime exceptions, and verifies keyboard focus in the representative launch journey. It is not an authenticated application journey.
+
+## Visual modes
+
+Use named Chromatic Modes exclusively. The default width modes are 390px, 768px, 1024px and 1440px. Existing theme-specific modes remain available. Do not mix the retired viewport-array parameter with Modes. Initial migration or theme changes may require independent baseline review. Never automatically approve visual changes.

@@ -1,3 +1,4 @@
+import {chromaticWidthModes} from "../../../.storybook/viewports";
 import type {Meta,StoryObj} from "@storybook/react-vite";
 import {useState,type ComponentProps} from "react";
 import {expect,within,userEvent} from "storybook/test";
@@ -23,5 +24,5 @@ export const ErrorState:Story={args:{error:true}};
 export const StaleSelection:Story={args:{value:"US-CBSA-99999"},play:async({canvasElement})=>{
  await expect(within(canvasElement).getByText("Selected geography unavailable",{exact:true})).toBeInTheDocument();
 }};
-export const Mobile:Story={parameters:{chromatic:{viewports:[390]}},render:args=><div className="max-w-[390px]"><Controlled {...args}/></div>};
+export const Mobile:Story={parameters:{chromatic:{modes: chromaticWidthModes([390])}},render:args=><div className="max-w-[390px]"><Controlled {...args}/></div>};
 export const Dark:Story={globals:{theme:"dark"}};

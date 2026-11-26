@@ -154,7 +154,8 @@
     "storybook:inventory": "node scripts/storybook/check-index.mjs",
     "test:storybook:browser": "playwright test --config playwright.storybook.config.ts",
     "test:storybook:contracts": "node --test scripts/storybook/index-contract.test.mjs scripts/lib/v61-experience-registry.test.mjs",
-    "verify:storybook": "npm run test:storybook:contracts && npm run test:storybook && npm run build-storybook && npm run storybook:inventory && npm run test:storybook:browser"
+    "verify:storybook": "npm run check:storybook:visual-config && npm run test:storybook:contracts && npm run test:storybook && npm run build-storybook && npm run storybook:inventory && npm run test:storybook:browser",
+    "check:storybook:visual-config": "node scripts/storybook/check-visual-config.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
