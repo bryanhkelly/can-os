@@ -4,6 +4,7 @@ import {
   accessAccounts, accountPersonGrants, demoSchoolTenants, domainEvents,
   people, programs, publicFamilyStartRequests,
 } from "@/db/schema";
+import { isEligiblePrivilegedMailbox } from "@/domain/domain-classification";
 import { privateAccountGrantEligible } from "@/domain/private-account-authority";
 import { roleCapabilities } from "@/domain/access-context";
 import { hasValidAccessGrantScope } from "@/domain/access-grant-scope";
@@ -213,6 +214,7 @@ export async function readSessionGrants(accountId: string, email: string, reader
       normalizedEmail, syntheticGrants, reader,
     );
     const grants = ownGrants.filter(grant => {
+      if (grant.role === "platform_owner" && !isEligiblePrivilegedMailbox(normalizedEmail)) return false;
       const valor = grant.organizationId === LOCAL_DEMO_ADMIN.organizationId;
       const registered = byOrg.get(grant.organizationId ?? "");
       if (!valor && !registered) return true;
