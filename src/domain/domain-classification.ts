@@ -1,14 +1,14 @@
 /** Normalized DNS-style identity domains. Classification is never authority. */
 export function normalizeIdentityDomain(value: string | null | undefined): string | null {
-  const domain=value?.trim().toLowerCase();
-  if (!domain || domain.length>253 || !domain.includes(".")) return null;
-  if (!domain.split(".").every(label=>/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label))) return null;
+  const domain = value?.trim().toLowerCase();
+  if (!domain || domain.length > 253 || !domain.includes(".")) return null;
+  if (!domain.split(".").every(label => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label))) return null;
   return domain;
 }
 
 export function identityEmailDomain(email: string | null | undefined): string | null {
-  const parts=email?.trim().split("@");
-  if (!parts || parts.length!==2 || !parts[0] || parts.some(part=>/\s/.test(part))) return null;
+  const parts = email?.trim().split("@");
+  if (!parts || parts.length !== 2 || !parts[0] || parts.some(part => /\s/.test(part))) return null;
   return normalizeIdentityDomain(parts[1]);
 }
 
@@ -26,15 +26,16 @@ export function isDemoAccountEmail(email: string): boolean {
  * of content consumed by that owner. This is not a permission check. */
 export function classifyOwnedData(ownerDomain: string | null | undefined): "synthetic" | "real" | "unknown" {
   const domain = normalizeIdentityDomain(ownerDomain);
-  return domain === null ? "unknown" : isDemoDomain(domain) ? "synthetic" : "real";
+  if (domain === null) return "unknown";
+  return domain.endsWith(".demo") ? "synthetic" : "real";
 }
 
 /** Privileged mailbox authentication cannot rely on reserved test/example
  * identities, even if a historical fixture carries an email verification date.
  * This does not change Organization data classification. */
-export function isEligiblePrivilegedMailbox(email:string|null|undefined):boolean {
-  const domain=identityEmailDomain(email);
-  if(!domain||isDemoDomain(domain))return false;
-  return !["test","invalid","localhost","example"].includes(domain.split(".").at(-1)!) &&
-    !["example.com","example.net","example.org"].some(base=>domain===base||domain.endsWith("."+base));
+export function isEligiblePrivilegedMailbox(email: string | null | undefined): boolean {
+  const domain = identityEmailDomain(email);
+  if (!domain || domain.endsWith(".demo")) return false;
+  return !["test", "invalid", "localhost", "example"].includes(domain.split(".").at(-1)!) &&
+    !["example.com", "example.net", "example.org"].some(base => domain === base || domain.endsWith("." + base));
 }
