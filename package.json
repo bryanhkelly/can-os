@@ -165,8 +165,9 @@
     "storybook:prepare-private-preview": "node scripts/storybook/prepare-private-preview.mjs",
     "pretest:storybook": "npm run assets:prepare",
     "storybook:prepare-cloudflare": "node scripts/storybook/prepare-private-preview.mjs --cloudflare",
-    "build:storybook:cloudflare": "playwright install --with-deps chromium && npm run storybook:acceptance && npm run storybook:prepare-cloudflare",
-    "deploy:storybook:cloudflare": "node scripts/storybook/deploy-cloudflare.mjs"
+    "build:storybook:cloudflare": "playwright install chromium && npm run storybook:check-browser && npm run storybook:acceptance && npm run storybook:prepare-cloudflare",
+    "deploy:storybook:cloudflare": "node scripts/storybook/deploy-cloudflare.mjs",
+    "storybook:check-browser": "node scripts/storybook/check-browser.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

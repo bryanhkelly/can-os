@@ -1,5 +1,5 @@
 import {spawnSync,execFileSync} from "node:child_process";
-import {mkdirSync,writeFileSync,openSync,closeSync} from "node:fs";
+import {mkdirSync,writeFileSync,openSync,closeSync,readFileSync} from "node:fs";
 import {join} from "node:path";
 import {fileURLToPath} from "node:url";
 import {requiredStages} from "./release-contract.mjs";
@@ -37,7 +37,12 @@ function run(name){
  const status=result?.status===0?"passed":"failed";
  receipt.stages.push({name,status,exitCode:result?.status??null,durationMs:Date.now()-started,log:"runs/"+runId+"/logs/"+name+".log"});
  write();
- if(status!=="passed")throw Error("Acceptance failed at "+name+". See "+logfile);
+ if(status!=="passed"){
+  // Hosted builders cannot inspect a local log after a failed ephemeral build.
+  const tail=readFileSync(logfile,"utf8").split(/\r?\n/).slice(-80).join("\n");
+  console.error("Failed acceptance stage: "+name+"\n"+tail);
+  throw Error("Acceptance failed at "+name+". See "+logfile);
+ }
 }
 try{
  for(const stage of requiredStages)run(stage);
