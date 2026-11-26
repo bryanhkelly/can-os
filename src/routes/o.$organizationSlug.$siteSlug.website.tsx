@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { websiteSearchSchema, websiteStudioStepIds, loadWebsiteHome, WebsiteHome } from "./site-website";
+import { websiteSearchSchema, websiteStudioStepIds, loadWebsiteHome, loadWebsiteLaunchCompletion, WebsiteHome } from "./site-website";
 import { resolveAuthorizedSiteRoute } from "@/modules/sites/site-route-resolver.functions";
 
 /** Website Studio with human-readable Site identity and existing publisher authorization. */
@@ -10,6 +10,7 @@ export const Route = createFileRoute("/o/$organizationSlug/$siteSlug/website")({
     const siteId = await resolveAuthorizedSiteRoute({ data: params });
     return {
       siteId,
+      completion: siteId ? await loadWebsiteLaunchCompletion(siteId) : {},
       outcome: siteId ? await loadWebsiteHome(siteId) : {
         ok: false as const,
         authError: null,
@@ -23,9 +24,9 @@ export const Route = createFileRoute("/o/$organizationSlug/$siteSlug/website")({
 
 function FriendlySiteWebsitePage() {
   const navigate = Route.useNavigate();
-  const { siteId, outcome } = Route.useLoaderData();
+  const { siteId, outcome, completion } = Route.useLoaderData();
   const identity = Route.useParams();
-  return <WebsiteHome outcome={outcome}
+  return <WebsiteHome outcome={outcome} completion={completion}
     selection={{ ...Route.useSearch(), siteId: siteId ?? undefined }}
     friendlyIdentity={identity} studio
     onStepChange={step => void navigate({
