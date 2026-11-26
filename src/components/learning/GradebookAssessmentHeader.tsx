@@ -64,7 +64,7 @@ export function GradebookAssessmentHeader({
         />
       )}
       <Field className="mt-2 text-left" label={`New due date for ${assessment.title}`}>
-        <Input type="date" disabled={busy} value={dueDate} className="min-w-36 text-xs"
+        <Input type="date" disabled={busy} value={dueDate} className="min-w-36"
           onChange={event => onDueDateChange(event.target.value)}/>
       </Field>
       <div className="mt-2 flex flex-wrap gap-1">

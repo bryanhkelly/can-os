@@ -32,7 +32,7 @@ function TeacherFollowUpResolution({ item, onSaved }: { item: QueueItem; onSaved
   if (item.status === "resolved") return item.resolutionNote
     ? <p className="mt-2 whitespace-pre-wrap text-xs">{item.resolutionNote}</p> : null;
   return <div className="mt-3">
-    {!expanded && <Button variant="ghost" size="sm" type="button" className="text-sm underline"
+    {!expanded && <Button variant="ghost" size="sm" type="button" className="underline"
       onClick={() => setExpanded(true)}>Document follow-up and close</Button>}
     {expanded && <form noValidate className="mt-3 grid gap-3  border p-3"
       onSubmit={async event => {

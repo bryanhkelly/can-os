@@ -136,7 +136,7 @@ function CreatorDraftEditor({data,navigation}:{data:Draft;navigation?:ReactNode}
       {data.assetInventoryLimited && <WorkspaceNotice tone="attention" className="mt-4">Asset inventory reached its display limit. Ask the provider administrator for an appropriately scoped catalog before saving.</WorkspaceNotice>}
       <DisclosureSection title="Advanced supplemental materials" className="mt-6">
         <p className="mt-2 text-xs text-muted-foreground">Preserve or update the complete canonical materials array. Practice questions must meet the server's approved schema. No private answer keys may be stored here.</p>
-        <Textarea className="mt-3 min-h-40 font-mono text-xs"
+        <Textarea className="mt-3 min-h-40 font-mono"
           value={advancedMaterials} onChange={event=>{setAdvancedMaterials(event.target.value);setDirty(true);setValidation("");pendingRequestId.current=null;}}
           aria-label="Supplemental materials JSON"/>
       </DisclosureSection>

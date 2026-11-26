@@ -18,6 +18,6 @@ export function ClassPublishedResourcesList({
   return <ul className="space-y-3">{items.map(item => <li key={item.id} className=" border p-3 text-sm">
       {item.url && resolveClassVideo(item.url) ? <ClassVideoPlayer title={item.title} url={item.url} resourceId={item.id} declaredVideo={false}/> :
         item.url ? <SafeClassExternalLink url={item.url} title={item.title} kind="external" resourceId={item.id}/> :
-        <Button variant="ghost" size="sm" type="button" data-learning-resource-id={item.id} disabled={disabled} onClick={() => void onDownload(item.id)} className="underline disabled:opacity-50">{item.title}</Button>}
+        <Button variant="ghost" size="sm" type="button" data-learning-resource-id={item.id} disabled={disabled} onClick={() => void onDownload(item.id)} className="underline">{item.title}</Button>}
     </li>)}</ul>;
 }
