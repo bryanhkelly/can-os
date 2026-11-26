@@ -1,5 +1,5 @@
 import {canonicalJson} from "@/lib/canonical-json";
-import {rollupAuthorizedParticipation,type ParticipationReportingFact,type ReportingScopeProof} from "@/domain/participation-rollups";
+import {assertAuthorizedReportFacts,matchesReportingPopulation,rollupAuthorizedParticipation,type ParticipationReportingFact,type ReportingScopeProof,type ReportingPopulation} from "@/domain/participation-rollups";
 import {assertRelationshipActor,relationshipMatchesFact,type ReportingRelationship,type VerifiedRelationshipActor,type RelationshipMetric} from "@/domain/bottom-up-reporting-relationships";
 import {relationshipProposalMetrics} from "@/domain/relationship-metric-policy";
 
@@ -21,6 +21,7 @@ type VerifiedProjectionAuthority={
   recipientOrganizationId:string;
   currentAgreementIds:ReadonlySet<string>;
   sourceProof:ReportingScopeProof;
+  population:ReportingPopulation;
 };
 
 /** INTERNAL calculation, not an external disclosure authorization or endpoint.
@@ -46,8 +47,12 @@ export function projectRelationshipRegistrationMetric(
   const definition=supported[metric.metricKey as RegistrationMetricKey];
   const live=agreements.filter(a=>authority.currentAgreementIds.has(a.id)&&
     a.recipientOrganizationId===recipientOrganizationId);
-  const matched=new Map<string,{fact:RelationshipRegistrationFact;signature:string}>();
-  const provenance=new Set<string>();
+  const liveByOwner=new Map<string,ReportingRelationship[]>();
+  for(const agreement of live){
+    const existing=liveByOwner.get(agreement.ownerOrganizationId);
+    if(existing)existing.push(agreement);else liveByOwner.set(agreement.ownerOrganizationId,[agreement]);
+  }
+  const matched=new Map<string,{fact:RelationshipRegistrationFact;signature:string;agreementIds:Set<string>}>();
   for(const fact of facts){
     if(fact.source!==definition.source)continue;
     const occurred=Date.parse(fact.registeredAt);
@@ -55,18 +60,23 @@ export function projectRelationshipRegistrationMetric(
     if(occurred<from||occurred>=to)continue;
     const dimensions={organizationId:fact.operatingOrganizationId,siteId:fact.deliverySiteId,
       programId:fact.programId,offeringId:fact.offeringId,classId:fact.classId};
-    const eligible=live.filter(a=>relationshipMatchesFact(a,recipientOrganizationId,metric,{dimensions,occurredAt:fact.registeredAt},now));
+    const eligible=(liveByOwner.get(fact.operatingOrganizationId)??[]).filter(a=>relationshipMatchesFact(a,recipientOrganizationId,metric,{dimensions,occurredAt:fact.registeredAt},now));
     if(!eligible.length)continue;
     const key=fact.source+":"+fact.sourceId;
     const signature=canonicalJson(fact);
     const prior=matched.get(key);
     if(prior&&prior.signature!==signature)throw new Error("Conflicting canonical registration evidence");
-    if(!prior)matched.set(key,{fact,signature});
-    for(const a of eligible)provenance.add(a.id);
+    const match=prior??{fact,signature,agreementIds:new Set<string>()};
+    for(const a of eligible)match.agreementIds.add(a.id);
+    if(!prior)matched.set(key,match);
   }
-  const included=[...matched.values()].map(value=>value.fact);
-  if(!included.length)return {status:"no_authorized_evidence" as const,metric,value:null,distinctContributors:0,agreementIds:[] as string[]};
-  const result=rollupAuthorizedParticipation(included,authority.sourceProof,window);
-  return {status:"internal_projection" as const,metric,value:result.totals[definition.result],
+  const authorized=[...matched.values()];
+  if(authorized.length)assertAuthorizedReportFacts(authorized.map(value=>value.fact),authority.sourceProof);
+  const selected=authorized.filter(value=>matchesReportingPopulation(value.fact,authority.population));
+  const classification={population:authority.population.classification,classificationBasis:"current_operating_organization_domain" as const};
+  if(!selected.length)return {status:"no_authorized_evidence" as const,metric,...classification,value:null,distinctContributors:0,agreementIds:[] as string[]};
+  const result=rollupAuthorizedParticipation(selected.map(value=>value.fact),authority.sourceProof,window,authority.population);
+  const provenance=new Set(selected.flatMap(value=>[...value.agreementIds]));
+  return {status:"internal_projection" as const,metric,...classification,value:result.totals[definition.result],
     distinctContributors:result.totals.uniquePeople,agreementIds:[...provenance].sort()};
 }
