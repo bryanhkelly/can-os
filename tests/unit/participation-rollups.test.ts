@@ -35,6 +35,10 @@ describe("WS6 authorized multi-Site reporting",()=>{
   expect(combined.totals.uniquePeople).toBe(13);
   expect(()=>rollupAuthorizedParticipation(allFacts,proof,period,{ownerDomains,classification:"synthetic"})).toThrow("Out-of-scope");
  });
+ it("does not confuse missing classification evidence with a known nullable domain",()=>{
+  expect(()=>rollupAuthorizedParticipation(facts,proof,period,{ownerDomains:new Map(),classification:"all"})).toThrow("classification evidence missing");
+  expect(rollupAuthorizedParticipation(facts,proof,period,{ownerDomains:new Map([["orgA",null]]),classification:"unknown"}).totals.registrations).toBe(14);
+ });
  it("never counts a credited affiliation as an extra registration",()=>{
   const r=rollupAuthorizedParticipation(facts,proof,period);
   expect(r.totals.registrations).toBe(14);
