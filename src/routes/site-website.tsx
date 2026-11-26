@@ -1,4 +1,5 @@
 import { decodeUuidPathParam } from "@/domain/opaque-url-id";
+import { previewSiteIntelligence, processSiteIntelligence, readSiteIntelligenceContent } from "@/modules/sites/site-content-generation.functions";
 import { WebsiteReviewStep } from "@/components/launch-studio/WebsiteReviewStep";
 import { WebsiteBrandIdentityStep } from "@/components/launch-studio/WebsiteBrandIdentityStep";
 import { WebsiteSiteContentStep } from "@/components/launch-studio/WebsiteSiteContentStep";
@@ -304,7 +305,9 @@ function LocalWebsiteCopyEditor({
   const releaseNavigation = useLaunchUnsavedChanges(dirty);
   const [preparingArtwork, setPreparingArtwork] = useState(false);
   const mutation = useMutationFeedback(() => router.invalidate());
-  const busy = mutation.pending || mutation.refreshFailed || preparingArtwork;
+  const [generating,setGenerating]=useState(false);
+  const [generationMessage,setGenerationMessage]=useState("");
+  const busy = mutation.pending || mutation.refreshFailed || preparingArtwork || generating;
   const artworkGaps = [content.branding.heroImage, content.branding.logoImage ?? null]
     .flatMap(siteLocalImagePublicationGaps);
   const [error, setError] = useState("");
@@ -397,6 +400,7 @@ function LocalWebsiteCopyEditor({
     if(outcome.status==="saved"||outcome.status==="refresh-failed"){
       acceptSavedBrand(outcome.value.brand);
       markSaved(submitted,outcome.value.website.revision);
+      if(mode==="stay") return outcome.status==="saved";
       if(mode==="exit"&&outcome.status==="saved"){
         releaseNavigation();
         try { await router.navigate({ to: "/sites/$siteId", params: { siteId: data.siteId } }); }
@@ -409,6 +413,44 @@ function LocalWebsiteCopyEditor({
       normalizeClientError(outcome.error).code==="CONFLICT"){
       await router.invalidate().catch(()=>undefined);
     }
+  }
+  async function generateContent(advance=false) {
+    if(busy||!data.canEdit||!data.draftStorageReady||revisionConflict)return;
+    const consent=content.contentReuseConsent;
+    if(consent!=="granted"&&consent!=="denied")return;
+    // Save through the existing versioned draft command before reading the brief.
+    setGenerationMessage("");
+    setGenerating(true);
+    try {
+      if(!await saveDraft("stay"))return;
+      if(advance)onStepChange(4);
+      if(consent==="denied")return;
+      const request={siteId:data.siteId,consumer:"website" as const,options:{
+        tone:"welcoming" as const,language:"en" as const,includeStory:true,
+        includeLeadership:false,includeExistingCopy:false,includePublicReferences:false,
+      }};
+      const preview=await previewSiteIntelligence({data:request});
+      const outcome=await processSiteIntelligence({data:{...request,digest:preview.digest,externalProcessingConfirmed:true}});
+      if(outcome.status==="processing"){setGenerationMessage("Content is already being generated. Select Generate Site Content again to retrieve it.");return;}
+      const stored=await readSiteIntelligenceContent({data:{siteId:data.siteId,consumer:"website"}});
+      const item=stored.package;
+      if(!item?.website||item.stale)throw new Error("Current generated content is unavailable.");
+      // Only initialize unchanged starter fields on Continue; explicit regeneration
+      // may replace wording after the operator confirms.
+      setContent(old=>{
+        if(old.contentReuseConsent!=="granted")return old;
+        const next={...old};
+        for(const field of websiteStarterFieldIds){
+          const proposed=item.website?.[field];
+          if(typeof proposed==="string"&&(!advance||!old[field]?.trim()||data.currentRevision===0||old[field]===old.editorialBaseline?.fields[field]))next[field]=proposed;
+        }
+        if(item.websiteComposition&&!old.websiteComposition)next.websiteComposition=item.websiteComposition;
+        return next;
+      });
+      setGenerationMessage("Site content is ready. Review your wording and save your private draft.");
+    }catch{
+      setGenerationMessage("Site content could not be generated. Your draft is saved. Retry Generate Site Content or edit the wording manually.");
+    }finally{setGenerating(false);}
   }
   async function previewCurrentDraft() {
     if (previewPending) return;
@@ -577,7 +619,13 @@ function LocalWebsiteCopyEditor({
         disabled={busy||!data.canEdit}
         hasSavedContent={data.currentRevision>0}/>}
       {step===4&&<WebsiteSiteContentStep data={data} content={content}
-        setContent={setContent} busy={busy} onSavePrivateDraft={()=>void saveDraft("stay")}/>}
+        setContent={setContent} busy={busy}/>}
+      {step===4&&content.contentReuseConsent==="granted"&&<div className="space-y-2 border p-3">
+        <p role="status" className="text-sm">{generating?"Generating Site content…":generationMessage||"Generate website and outreach wording from your saved Site information."}</p>
+        <Button type="button" variant="outline" disabled={busy||!data.canEdit||revisionConflict} onClick={()=>{
+          if(window.confirm("Generate and replace the five main website text fields? Saved versions remain available."))void generateContent();
+        }}>Generate Site Content</Button>
+      </div>}
       {step === 2 && <WebsiteVisualIdentityStep
         data={data} content={content} brandDirection={brandDirection} busy={busy}
         setContent={setContent} onSelectArtwork={selectArtwork}/>}
@@ -615,8 +663,8 @@ function LocalWebsiteCopyEditor({
             disabled={busy || !data.canEdit || !data.draftStorageReady || revisionConflict}
             onClick={()=>void saveDraft("exit")}>Save &amp; Exit</Button>
           {step < 5 ? <Button type="button"
-            disabled={step===3 && (content.contentReuseConsent??"unselected")==="unselected"}
-            onClick={()=>onStepChange(Math.min(5,step+1))}>Continue</Button>
+            disabled={busy||(step===3 && ((content.contentReuseConsent??"unselected")==="unselected"||!data.canEdit||!data.draftStorageReady||revisionConflict))}
+            onClick={()=>step===3?void generateContent(true):onStepChange(Math.min(5,step+1))}>Continue</Button>
             : <Button type="button" disabled={busy || !data.canEdit || !data.draftStorageReady || revisionConflict}
               loading={busy} loadingLabel="Saving private draft…"
               onClick={()=>void saveDraft("stay")}>Save & Finish</Button>}

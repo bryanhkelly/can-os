@@ -17,7 +17,7 @@ export function WebsiteContentConsentStep({
       <h3 id="website-consent-title" className="font-serif text-2xl">Build on what you've shared</h3>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">
         We can use what you've shared about your organization, story, programs,
-        and community to suggest website and outreach wording you can edit.
+        and community to suggest website and outreach wording you can edit. If you agree, Continue sends your Site identity, planned programs, audiences, experiences and saved Site Story to Gloo AI Studio for editorial processing. Leadership biographies, existing website copy and profile links are excluded from this automatic request.
       </p>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">
         You review and edit the content before it is shared or published.
@@ -32,7 +32,7 @@ export function WebsiteContentConsentStep({
         <span className="space-y-1">
           <span className="block font-semibold">Yes, use my information</span>
           <span className="block text-sm text-muted-foreground">
-            Use the information I've shared to suggest website and outreach text I can review.
+            Save my choice and allow Gloo AI Studio to generate website and outreach text I can review.
           </span>
         </span>
       </label>
