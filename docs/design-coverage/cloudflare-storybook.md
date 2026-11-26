@@ -55,3 +55,7 @@ References:
 - https://developers.cloudflare.com/workers/static-assets/
 - https://developers.cloudflare.com/workers/configuration/cloudflare-access/
 - https://developers.cloudflare.com/workers/ci-cd/builds/build-branches/
+
+## Browser version consistency
+
+Playwright and @playwright/test are pinned to the same version and the lockfile has one playwright-core runtime. Managed builds check the actual resolution paths before downloading Chromium using the explicitly selected local CLI. Vitest and Playwright Test then use that same browser revision. A runtime mismatch is a build failure, not a reason to install multiple revisions.

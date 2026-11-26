@@ -165,9 +165,10 @@
     "storybook:prepare-private-preview": "node scripts/storybook/prepare-private-preview.mjs",
     "pretest:storybook": "npm run assets:prepare",
     "storybook:prepare-cloudflare": "node scripts/storybook/prepare-private-preview.mjs --cloudflare",
-    "build:storybook:cloudflare": "playwright install chromium && npm run storybook:check-browser && npm run storybook:acceptance && npm run storybook:prepare-cloudflare",
+    "build:storybook:cloudflare": "npm run storybook:check-playwright && node node_modules/playwright/cli.js install chromium && npm run storybook:check-browser && npm run storybook:acceptance && npm run storybook:prepare-cloudflare",
     "deploy:storybook:cloudflare": "node scripts/storybook/deploy-cloudflare.mjs",
-    "storybook:check-browser": "node scripts/storybook/check-browser.mjs"
+    "storybook:check-browser": "node scripts/storybook/check-browser.mjs",
+    "storybook:check-playwright": "node scripts/storybook/check-playwright.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -196,7 +197,7 @@
     "@cloudflare/vite-plugin": "^1.67.0",
     "@eslint/js": "^10.0.1",
     "@netlify/vite-plugin-tanstack-start": "^1.3.19",
-    "@playwright/test": "^1.56.1",
+    "@playwright/test": "1.64.1",
     "@storybook/addon-a11y": "^10.6.5",
     "@storybook/addon-docs": "^10.6.5",
     "@storybook/addon-vitest": "^10.6.5",
@@ -212,7 +213,7 @@
     "eslint": "^10.13.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-storybook": "^10.6.5",
-    "playwright": "^1.56.1",
+    "playwright": "1.64.1",
     "sharp": "^0.35.5",
     "storybook": "^10.6.5",
     "tailwindcss": "^4.2.1",
