@@ -40,7 +40,7 @@ export const readEngagementCampaignWorkspace = async (data: z.output<typeof read
  const s=await scope(data.engagementId);
  const lists=await campaignRows<ListRow>(db,sql`SELECT l.id,l.name,count(m.email)::int AS recipients
  FROM public.campaign_recipient_lists l LEFT JOIN public.campaign_list_members m ON m.list_id=l.id
- WHERE l.owner_scope=${s.ownerScope} GROUP BY l.id ORDER BY l.name LIMIT 100`);
+ WHERE l.owner_scope=${s.ownerScope} AND left(l.name,10)<>'__direct__' GROUP BY l.id ORDER BY l.name LIMIT 100`);
  const campaigns=await campaignRows<CampaignRow>(db,sql`SELECT c.id,c.subject,c.scheduled_at,c.cancelled_at,
  ${campaignDeliveryCountColumns}
  FROM public.engagement_campaigns c JOIN public.campaign_deliveries d ON d.campaign_id=c.id
@@ -52,6 +52,7 @@ export const readEngagementCampaignWorkspace = async (data: z.output<typeof read
 export const saveCampaignRecipientList = async (data: z.output<typeof saveCampaignRecipientListInput>) =>{
  const s=await scope(data.engagementId);
  const parsed=parseCampaignRecipients(data.raw);
+ if(data.name.startsWith("__direct__"))throw new Error("Reserved list name.");
  if(!parsed.recipients.length||parsed.invalid.length||parsed.tooMany)throw new Error("Enter valid, consented addresses within the campaign limit.");
  return db.transaction(async tx=>{
  const [list]=await campaignRows<{id:string}>(tx,sql`INSERT INTO public.campaign_recipient_lists(owner_scope,sender_scope,name,created_by_person_id)
@@ -78,12 +79,36 @@ export const queueEngagementCampaign = async (data: z.output<typeof queueEngagem
  // requests reuse an idempotency key with different recipient lists.
  const requestLock=JSON.stringify(["engagement-campaign",s.ownerScope,data.requestId]);
  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${requestLock},0))`);
- const [list]=await campaignRows<{id:string}>(tx,sql`SELECT id FROM public.campaign_recipient_lists WHERE id=${data.listId} AND owner_scope=${s.ownerScope} FOR UPDATE`);
- if(!list)throw new Error("Recipient list unavailable.");
+ const direct="raw" in data?parseCampaignRecipients(data.raw):null;
+ if(direct&&(!direct.recipients.length||direct.invalid.length||direct.tooMany))throw new Error("Enter valid, consented addresses within the campaign limit.");
  const [existing]=await campaignRows<{id:string;list_id:string;link_id:string;engagement_id:string;scheduled_at:string|Date}>(tx,sql`SELECT id,list_id,link_id,engagement_id,scheduled_at FROM public.engagement_campaigns WHERE owner_scope=${s.ownerScope} AND request_id=${data.requestId}`);
- if(existing){if(existing.list_id!==data.listId||existing.link_id!==data.linkId||existing.engagement_id!==data.engagementId||new Date(existing.scheduled_at).getTime()!==scheduledAt.getTime())throw new Error("Request already used.");return {id:existing.id};}
+ if(existing){
+  if(existing.link_id!==data.linkId||existing.engagement_id!==data.engagementId||new Date(existing.scheduled_at).getTime()!==scheduledAt.getTime())throw new Error("Request already used.");
+  if("listId" in data){if(existing.list_id!==data.listId)throw new Error("Request already used.");}
+  else{
+   const members=await campaignRows<{email:string}>(tx,sql`SELECT email FROM public.campaign_deliveries WHERE campaign_id=${existing.id} ORDER BY email`);
+   if(JSON.stringify(members.map(m=>m.email).sort())!==JSON.stringify([...direct!.recipients].sort()))throw new Error("Request already used.");
+  }
+  return {id:existing.id};
+ }
+ let list:{id:string}|undefined;
+ if("listId" in data){
+  [list]=await campaignRows<{id:string}>(tx,sql`SELECT id FROM public.campaign_recipient_lists WHERE id=${data.listId} AND owner_scope=${s.ownerScope} AND left(name,10)<>'__direct__' FOR UPDATE`);
+ }else{
+  // Internal snapshot retains consent, suppression and delivery integrity.
+  [list]=await campaignRows<{id:string}>(tx,sql`INSERT INTO public.campaign_recipient_lists(owner_scope,sender_scope,name,created_by_person_id)
+   VALUES(${s.ownerScope},${s.senderScope},${"__direct__"+data.requestId},${s.actor.actorPersonId}) RETURNING id`);
+  if(!list)throw new Error("Recipient snapshot unavailable.");
+  const addresses=sql`ARRAY[${sql.join(direct!.recipients.map(email=>sql`${email}`),sql`,`)}]::text[]`;
+  await tx.execute(sql`INSERT INTO public.campaign_contacts(owner_scope,email,consent_source,consent_by_person_id)
+   SELECT ${s.ownerScope},email,${data.consentSource},${s.actor.actorPersonId}::uuid FROM unnest(${addresses}) AS entries(email)
+   ON CONFLICT(owner_scope,email) DO NOTHING`);
+  await tx.execute(sql`INSERT INTO public.campaign_list_members(owner_scope,list_id,email)
+   SELECT ${s.ownerScope},${list.id}::uuid,email FROM unnest(${addresses}) AS entries(email)`);
+ }
+ if(!list)throw new Error("Recipient list unavailable.");
  const [campaign]=await campaignRows<{id:string}>(tx,sql`INSERT INTO public.engagement_campaigns(owner_scope,sender_scope,engagement_id,link_id,list_id,request_id,subject,body,public_url,sender_from,sender_address,created_by_person_id,scheduled_at)
- VALUES(${s.ownerScope},${s.senderScope},${data.engagementId},${data.linkId},${data.listId},${data.requestId},${draft.subject},${draft.body+"\n\nInvited by "+s.senderLabel},${draft.url},${sender.from},${sender.address},${s.actor.actorPersonId},${data.scheduledAt}::timestamptz) RETURNING id`);
+ VALUES(${s.ownerScope},${s.senderScope},${data.engagementId},${data.linkId},${list.id},${data.requestId},${draft.subject},${draft.body+"\n\nInvited by "+s.senderLabel},${draft.url},${sender.from},${sender.address},${s.actor.actorPersonId},${data.scheduledAt}::timestamptz) RETURNING id`);
  if(!campaign)throw new Error("Campaign write returned no record.");
  const inserted=await campaignRows<{id:string}>(tx,sql`INSERT INTO public.campaign_deliveries(owner_scope,campaign_id,email,status,next_attempt_at)
  SELECT m.owner_scope,${campaign.id},m.email,CASE WHEN s.email IS NULL THEN 'pending' ELSE 'suppressed' END,${data.scheduledAt}::timestamptz
