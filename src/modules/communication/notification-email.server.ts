@@ -1,3 +1,4 @@
+import {readEmailConfiguration} from "@/modules/communication/email-configuration.server";
 import { readOptionalEmailBrand } from "./email-brand.server";
 import { readEmailProviderReceipt } from "@/domain/email-provider-receipt";
 import { submitResendEmail } from "@/modules/communication/resend-email-transport.server";
@@ -32,7 +33,7 @@ function resolveActionUrl(actionUrl: string | undefined): string | undefined {
     if (url.protocol !== "https:" || !url.hostname) return undefined;
     // The sending service must never fall back to arbitrary HTTPS links if
     // the trusted application origin is missing or misconfigured.
-    const allowedOrigin = process.env.CAN_ACCESS_PUBLIC_ORIGIN;
+    const allowedOrigin = readEmailConfiguration("notification").publicOrigin;
     if (!allowedOrigin) return undefined;
     const trusted = new URL(allowedOrigin);
     if (trusted.protocol !== "https:" || url.origin !== trusted.origin) return undefined;
@@ -74,10 +75,7 @@ async function sendNotificationEmailCore(
     console.log("[notification-email] Demo account delivery suppressed");
     return { accepted: false };
   }
-  const apiKey = process.env.RESEND_API_KEY;
-  const from =
-    process.env.CAN_NOTIFICATIONS_FROM_EMAIL ??
-    process.env.CAN_ACCESS_FROM_EMAIL;
+  const {apiKey,from}=readEmailConfiguration("notification");
   if (!apiKey || !from) {
     console.log("[notification-email] Resend not configured; skipping email");
     return { accepted: false };
