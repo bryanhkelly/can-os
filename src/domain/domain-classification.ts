@@ -12,13 +12,17 @@ export function identityEmailDomain(email: string | null | undefined): string | 
   return normalizeIdentityDomain(parts[1]);
 }
 
+function isNormalizedDemoDomain(domain: string | null): boolean {
+  return domain?.endsWith(".demo") ?? false;
+}
+
 export function isDemoDomain(domain: string | null | undefined): boolean {
-  return normalizeIdentityDomain(domain)?.endsWith(".demo") ?? false;
+  return isNormalizedDemoDomain(normalizeIdentityDomain(domain));
 }
 
 /** Email classification is not proof of mailbox ownership or authority. */
 export function isDemoAccountEmail(email: string): boolean {
-  return isDemoDomain(identityEmailDomain(email));
+  return isNormalizedDemoDomain(identityEmailDomain(email));
 }
 
 /** Unknown domains are not evidence that an Organization's data is real.
@@ -27,7 +31,7 @@ export function isDemoAccountEmail(email: string): boolean {
 export function classifyOwnedData(ownerDomain: string | null | undefined): "synthetic" | "real" | "unknown" {
   const domain = normalizeIdentityDomain(ownerDomain);
   if (domain === null) return "unknown";
-  return domain.endsWith(".demo") ? "synthetic" : "real";
+  return isNormalizedDemoDomain(domain) ? "synthetic" : "real";
 }
 
 /** Privileged mailbox authentication cannot rely on reserved test/example
@@ -35,7 +39,7 @@ export function classifyOwnedData(ownerDomain: string | null | undefined): "synt
  * This does not change Organization data classification. */
 export function isEligiblePrivilegedMailbox(email: string | null | undefined): boolean {
   const domain = identityEmailDomain(email);
-  if (!domain || domain.endsWith(".demo")) return false;
+  if (!domain || isNormalizedDemoDomain(domain)) return false;
   return !["test", "invalid", "localhost", "example"].includes(domain.split(".").at(-1)!) &&
     !["example.com", "example.net", "example.org"].some(base => domain === base || domain.endsWith("." + base));
 }
