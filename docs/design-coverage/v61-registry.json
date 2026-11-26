@@ -2492,5 +2492,19 @@
         "browserJourney": null
       }
     }
-  ]
+  ],
+  "layoutReferences": {
+    "dashboard": "src/components/workspace/dashboard-layout.stories.tsx#SiteLeader",
+    "directory": "src/components/workspace/directory-table.stories.tsx#DirectoryComposition",
+    "record": "src/components/workspace/record-layout.stories.tsx#ApplicantRecord",
+    "guided": "src/components/workflow/workflow-patterns.stories.tsx#GuidedSetup",
+    "builder": "src/components/workspace/studio-layout.stories.tsx#Editable",
+    "review": "src/components/workflow/workflow-patterns.stories.tsx#SplitReview",
+    "learning": "src/components/learning/ClassroomWorkspace.stories.tsx#Lesson",
+    "report": "src/components/workspace/report-analytics.stories.tsx#Interactive",
+    "public": "src/components/workspace/experience-layouts.stories.tsx#PublicRegistration",
+    "calendar": "src/components/workspace/experience-layouts.stories.tsx#Scheduling",
+    "communication": "src/components/communication/MessagesWorkspace.stories.tsx#Conversation",
+    "settings": "src/components/workspace/experience-layouts.stories.tsx#Administration"
+  }
 }
