@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
+import { ActionStateIndicator } from "@/components/workspace/action-state";
 import type { StudyGroupRecord } from "@/domain/study-group-display";
 
 type Member = StudyGroupRecord["pendingMembers"][number];
@@ -30,8 +31,9 @@ export function GroupMembershipRequestRow({
       <p className="text-xs text-muted-foreground">
         {member.guardianReady ? "Guardian permission recorded" : "Awaiting guardian permission"}
       </p>
+      {!member.guardianReady&&<div className="mt-2"><ActionStateIndicator state={{kind:"blocked",detail:"Approval requires recorded guardian permission."}}/></div>}
     </div>
-    <div className="flex gap-2">
+    <div className="flex flex-wrap gap-2">
       <Button variant="outline" size="sm" type="button"
         disabled={busy || !membershipEnabled}
         onClick={() => void onDecision(groupId, member.studentPersonId, false)}>

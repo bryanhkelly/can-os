@@ -881,8 +881,13 @@
       "layout": "directory",
       "persona": "authorized workspace",
       "review": "unreviewed",
-      "patterns": [],
-      "stories": [],
+      "patterns": [
+        "ActionStateIndicator"
+      ],
+      "stories": [
+        "src/components/groups/GroupReviewRows.stories.tsx#PermissionRequired",
+        "src/components/groups/GroupReviewRows.stories.tsx#Moderation"
+      ],
       "evidence": {
         "responsive": null,
         "accessibility": null,
@@ -895,8 +900,13 @@
       "layout": "record",
       "persona": "authorized record viewer",
       "review": "unreviewed",
-      "patterns": [],
-      "stories": [],
+      "patterns": [
+        "ActionStateIndicator"
+      ],
+      "stories": [
+        "src/components/groups/GroupReviewRows.stories.tsx#PermissionRequired",
+        "src/components/groups/GroupReviewRows.stories.tsx#Moderation"
+      ],
       "evidence": {
         "responsive": null,
         "accessibility": null,
@@ -1412,11 +1422,13 @@
       "review": "unreviewed",
       "patterns": [
         "MessagesWorkspace",
-        "QueryState"
+        "QueryState",
+        "EntityPicker"
       ],
       "stories": [
         "src/components/communication/MessagesWorkspace.stories.tsx#Conversation",
-        "src/components/communication/MessagesWorkspace.stories.tsx#Unavailable"
+        "src/components/communication/MessagesWorkspace.stories.tsx#Unavailable",
+        "src/components/communication/ContactLookup.stories.tsx#SearchAndSelect"
       ],
       "evidence": {
         "responsive": null,
@@ -1949,7 +1961,8 @@
       ],
       "stories": [
         "src/components/workspace/work-queue.stories.tsx#Assigned",
-        "src/components/workspace/work-queue.stories.tsx#LimitedInventory"
+        "src/components/workspace/work-queue.stories.tsx#LimitedInventory",
+        "src/components/platform/PlatformReleaseCenter.stories.tsx#LimitedInventory"
       ],
       "evidence": {
         "responsive": null,

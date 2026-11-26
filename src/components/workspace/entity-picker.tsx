@@ -1,5 +1,7 @@
 import type {ReactNode} from "react";
 import {useId} from "react";
+import {Check} from "lucide-react";
+import {Button} from "@/components/ui/button";
 import {Checkbox,Radio} from "@/components/ui/choice";
 import {Label} from "@/components/ui/label";
 import {Field} from "@/components/ui/field";
@@ -9,26 +11,30 @@ import {EmptyState} from "./empty-state";
 export interface EntityPickerOption { id:string; label:string; detail?:ReactNode; disabled?:boolean }
 /** Controlled, accessible native selection. Owners supply an authorized result
  * window and selected IDs; filtering/pagination cannot silently clear selection. */
-export function EntityPicker({label,options,query,onQueryChange,selected,onChange,multiple=false,disabled=false,loading,error,onRetry,pagination}:{
+export function EntityPicker({label,options,query,onQueryChange,selected,onChange,multiple=false,disabled=false,loading,error,onRetry,pagination,searchLabel,searchDescription,empty,selectionSummary,mode="choice",resultsClassName}:{
  label:string;options:readonly EntityPickerOption[];query:string;onQueryChange:(query:string)=>void;
  selected:readonly string[];onChange:(ids:readonly string[])=>void;multiple?:boolean;disabled?:boolean;
  loading?:string;error?:string;onRetry?:()=>void;pagination?:ReactNode;
+ searchLabel?:string;searchDescription?:string;empty?:ReactNode;selectionSummary?:ReactNode;mode?:"choice"|"single-action";resultsClassName?:string;
 }){
  const id=useId();
  function toggle(option:EntityPickerOption,checked:boolean){
   if(disabled||option.disabled)return;
-  onChange(multiple?(checked?[...new Set([...selected,option.id])]:selected.filter(key=>key!==option.id)):(checked?[option.id]:selected));
+  onChange(multiple&&mode==="choice"?(checked?[...new Set([...selected,option.id])]:selected.filter(key=>key!==option.id)):(checked?[option.id]:selected));
  }
  return <fieldset disabled={disabled} className="min-w-0 space-y-3">
   <legend className="text-sm font-semibold">{label}</legend>
-  <Field label={"Search "+label.toLowerCase()}><Input type="search" value={query} onChange={e=>onQueryChange(e.target.value)}/></Field>
-  <p role="status" className="text-xs text-muted-foreground">{selected.length} selected</p>
-  <QueryState loading={loading} error={error} onRetry={onRetry} isEmpty={!options.length} empty={<EmptyState kind="matches"/>}>
-   <div className="divide-y border bg-card">{options.map(option=><Label key={option.id} className="flex min-w-0 items-start gap-3 p-3 text-sm">
+  <Field label={searchLabel??("Search "+label.toLowerCase())} description={searchDescription}><Input type="search" value={query} onChange={e=>onQueryChange(e.target.value)}/></Field>
+  {selectionSummary===undefined&&<p role="status" className="text-xs text-muted-foreground">{selected.length} selected</p>}
+  <QueryState loading={loading} error={error} onRetry={onRetry} isEmpty={!options.length} empty={empty??<EmptyState kind="matches"/>}>
+   <div className={"divide-y border bg-card "+(resultsClassName??"")}>{options.map(option=>mode==="single-action"?<div key={option.id}><Button type="button" variant={selected.includes(option.id)?"secondary":"ghost"} disabled={disabled||option.disabled} aria-pressed={selected.includes(option.id)} onClick={()=>toggle(option,true)} className="h-auto w-full justify-start whitespace-normal text-left">
+      {selected.includes(option.id)&&<Check aria-hidden="true"/>}<span className="min-w-0 break-words">{option.label}{option.detail&&<span className="block">{option.detail}</span>}</span>
+    </Button></div>:<Label key={option.id} className="flex min-w-0 items-start gap-3 p-3 text-sm">
     {multiple?<Checkbox checked={selected.includes(option.id)} disabled={option.disabled} onChange={e=>toggle(option,e.target.checked)}/>:<Radio name={id} value={option.id} checked={selected.includes(option.id)} disabled={option.disabled} onChange={e=>toggle(option,e.target.checked)}/>}
     <span className="min-w-0 [overflow-wrap:anywhere]"><span className="block font-medium">{option.label}</span>{option.detail&&<span className="block text-xs text-muted-foreground">{option.detail}</span>}</span>
    </Label>)}</div>
   </QueryState>
   {pagination}
+  {selectionSummary!==undefined&&<p role="status" className="text-sm">{selectionSummary}</p>}
  </fieldset>;
 }
