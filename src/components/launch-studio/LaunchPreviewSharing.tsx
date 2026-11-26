@@ -1,14 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, ExternalLink, Share2, X } from "lucide-react";
+import { Check, ExternalLink, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CopyLinkButton } from "@/components/links/CopyLinkButton";
 import { GoLinkQrButton } from "@/components/links/GoLinkQrButton";
 import { GoLinkActions, type GoLinkAction } from "@/components/links/GoLinkActions";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
-import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
-import { ActionDialog, EmptyState, QueryState, StatusBadge, WorkspaceNotice, WorkspacePanel, ActionFooter } from "@/components/workspace";
+import { ActionDialog, EmptyState, QueryState, StatusBadge, WorkspaceNotice, WorkspacePanel, ActionFooter, DistributionDialog, AsyncOperationStatus } from "@/components/workspace";
 import { getCanonicalGoLinkShareOrigin } from "@/modules/engagement/go-link-share-origin.functions";
 import { normalizeClientError } from "@/lib/client-error";
 import {
@@ -117,20 +116,8 @@ function LaunchPreviewSharingSession({ siteId }: { siteId: string }) {
       className="gap-2" onClick={() => setOpen(true)}>
       <Share2 className="size-4" aria-hidden="true" /> Share preview
     </Button>
-    <Modal open={open} onClose={close} label="Share Site website preview"
-      dismissible={!busy} busy={busy} className="max-w-2xl">
-      <div className="flex items-start justify-between gap-4 border-b p-5">
-        <div>
-          <h2 className="font-serif text-xl">Share your website preview</h2>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Invite leadership, families or partners to view the proposed website before official publication.
-          </p>
-        </div>
-        <Button size="sm" variant="ghost" aria-label="Close sharing" disabled={busy} onClick={close}>
-          <X className="size-5" />
-        </Button>
-      </div>
-      <div className="space-y-5 p-5">
+    <DistributionDialog open={open} onClose={close} title="Share your website preview" busy={busy}
+      description="Invite leadership, families or partners to view the proposed website before official publication.">
         <WorkspaceNotice tone="info">
           Recipients do not need CAN OS accounts. They can explore the proposed website,
           including your saved Programs &amp; Audiences as clearly labeled plans, not enrollment offers.
@@ -156,6 +143,7 @@ function LaunchPreviewSharingSession({ siteId }: { siteId: string }) {
             Create shareable preview
           </Button>
         </div>
+        {operation==="create"&&<AsyncOperationStatus title="Create preview link" state={{kind:"running"}}/>}
         {createdUrl && <div className="border p-4">
           <p className="flex items-center gap-2 text-sm font-semibold">
             <Check className="size-4 text-success" aria-hidden="true" /> View-only link created
@@ -199,8 +187,7 @@ function LaunchPreviewSharingSession({ siteId }: { siteId: string }) {
             </div> : !error ? <EmptyState className="mt-3" title="No active preview links."/> : null}
         </WorkspacePanel>
         {error && <WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
-      </div>
-    </Modal>
+    </DistributionDialog>
     <ActionDialog open={open&&!!revokeTarget} title="Revoke website preview permanently"
       description="Distributed copies will stop working. The saved website itself will not be changed."
       confirmLabel="Revoke preview" pending={busy} destructive

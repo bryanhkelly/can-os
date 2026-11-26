@@ -56,3 +56,6 @@ export { OutcomeMilestones, type OutcomeMilestone, type MilestoneState } from ".
 export { StudioLayout } from "./studio-layout";
 
 export { EntityPicker, type EntityPickerOption } from "./entity-picker";
+
+export { WorkQueue, type WorkQueueItem } from "./work-queue";
+export { DistributionDialog } from "./distribution-dialog";
