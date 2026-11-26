@@ -30,6 +30,6 @@ export function ProfilePhoto({ personId, name, revision = 0, size = "profile", r
       className="h-full w-full object-cover"/> : <span role="img" aria-label={`${name}: ${loading ? "loading photo" : current?.error ? "photo unavailable" : "no profile photo"}`}
         title={current?.error || name} className="flex h-full w-full items-center justify-center text-muted-foreground"><UserRound aria-hidden="true" className="size-6"/></span>}
     {current?.error && <Button variant="ghost" type="button" title="Retry profile picture" aria-label={`Retry profile picture for ${name}`}
-      onClick={() => setAttempt(value => value + 1)} className="absolute inset-0 flex items-end justify-end bg-card/40 p-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"><RefreshCw aria-hidden="true" className="size-4"/></Button>}
+      onClick={() => setAttempt(value => value + 1)} className="absolute inset-0 flex h-full w-full items-end justify-end"><RefreshCw aria-hidden="true" className="size-4"/></Button>}
   </div>;
 }

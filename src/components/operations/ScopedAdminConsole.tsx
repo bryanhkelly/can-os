@@ -190,7 +190,7 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false,
                 <FormItem>
                   <FormLabel className="text-sm font-semibold">Email</FormLabel>
                   <FormControl>
-                    <Input type="email" {...field} />
+                    <Input type="email" name={field.name} value={field.value} onChange={field.onChange} onBlur={field.onBlur} ref={field.ref} disabled={field.disabled} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -199,7 +199,7 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false,
                 <FormItem>
                   <FormLabel className="text-sm font-semibold">Role</FormLabel>
                   <FormControl>
-                    <Select className="capitalize" {...field}>
+                    <Select className="capitalize" name={field.name} value={field.value} onChange={field.onChange} onBlur={field.onBlur} ref={field.ref} disabled={field.disabled}>
                       {roles.map(option => <option key={option} value={option}>{option.replaceAll("_", " ")}</option>)}
                     </Select>
                   </FormControl>
@@ -215,7 +215,7 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false,
                 <FormItem>
                   <FormLabel className="text-sm font-semibold">First name</FormLabel>
                   <FormControl>
-                    <Input maxLength={80} {...field} />
+                    <Input maxLength={80} name={field.name} value={field.value} onChange={field.onChange} onBlur={field.onBlur} ref={field.ref} disabled={field.disabled} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -224,7 +224,7 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false,
                 <FormItem>
                   <FormLabel className="text-sm font-semibold">Last name</FormLabel>
                   <FormControl>
-                    <Input maxLength={80} {...field} />
+                    <Input maxLength={80} name={field.name} value={field.value} onChange={field.onChange} onBlur={field.onBlur} ref={field.ref} disabled={field.disabled} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -233,7 +233,7 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false,
                 <FormItem className="sm:col-span-2">
                   <FormLabel className="text-sm font-semibold">Exact Site (required)</FormLabel>
                   <FormControl>
-                    <Select required {...field} disabled={busy || Boolean(lockedSiteId)}>
+                    <Select required name={field.name} value={field.value} onChange={field.onChange} onBlur={field.onBlur} ref={field.ref} disabled={busy || Boolean(lockedSiteId)}>
                       <option value="">Select a permitted school</option>
                       {sites.filter(site => !lockedSiteId || site.id === lockedSiteId)
                         .map(site => <option key={site.id} value={site.id}>{site.name}</option>)}
