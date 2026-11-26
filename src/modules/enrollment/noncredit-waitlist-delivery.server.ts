@@ -37,9 +37,7 @@ const waitlistAdapter = {
         id: noncreditWaitlistEmailDeliveries.id,
         attempts: noncreditWaitlistEmailDeliveries.attempts,
       }).from(noncreditWaitlistEmailDeliveries)
-        .where(and(
-          outboundClaimPredicate(noncreditWaitlistEmailDeliveries, now, seenIds),
-        )).orderBy(asc(noncreditWaitlistEmailDeliveries.createdAt))
+        .where(outboundClaimPredicate(noncreditWaitlistEmailDeliveries, now, seenIds)).orderBy(asc(noncreditWaitlistEmailDeliveries.createdAt))
         .limit(1).for("update", { skipLocked: true });
       if (!row) return null;
       const leaseUntil = new Date(now.getTime() + leaseMs);
