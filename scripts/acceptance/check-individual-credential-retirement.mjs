@@ -45,7 +45,45 @@ const [counts] = await sql`
       AND g.organization_id IS NULL AND g.site_id IS NULL
       AND p.active AND NOT a.disabled
       AND a.email_verified_at IS NOT NULL AND a.email_normalized NOT LIKE '%.demo'
-      AND a.private_access_code_hash IS NULL) AS verified_owners
+      AND a.private_access_code_hash IS NULL
+      AND split_part(a.email_normalized,'@',2) !~ '(^|[.])(test|invalid|localhost|example)
+`;
+const [inventory] = await sql`
+ WITH account_state AS (
+   SELECT a.id, a.person_id, p.active AS person_active,
+     count(g.id) FILTER (WHERE g.active) AS active_grants,
+     count(g.id) FILTER (WHERE g.active AND g.person_id IS DISTINCT FROM a.person_id) AS conflicting_grants,
+     bool_or(g.role IN ('account_holder','student','guardian')) FILTER (WHERE g.active) AS family_or_personal,
+     bool_or(g.role NOT IN ('site_admin','registrar','teacher','room_facilitator','specialist',
+       'counselor','site_staff','site_leader','paraeducator','site_website_editor','academic_content_creator',
+       'account_holder','student','guardian')) FILTER (WHERE g.active) AS other_role
+   FROM public.access_accounts a
+   LEFT JOIN public.people p ON p.id=a.person_id
+   LEFT JOIN public.account_person_grants g ON g.account_id=a.id
+   WHERE NOT a.disabled AND a.email_normalized LIKE '%.demo' AND a.private_access_code_hash IS NULL
+   GROUP BY a.id,p.active
+ )
+ SELECT
+   count(*) FILTER (WHERE person_id IS NULL OR person_active IS NOT TRUE OR active_grants=0 OR conflicting_grants>0)::int AS identity_review,
+   count(*) FILTER (WHERE person_id IS NOT NULL AND person_active AND active_grants>0 AND conflicting_grants=0 AND other_role)::int AS role_review,
+   count(*) FILTER (WHERE person_id IS NOT NULL AND person_active AND active_grants>0 AND conflicting_grants=0 AND NOT other_role AND family_or_personal)::int AS family_personal_review,
+   count(*) FILTER (WHERE person_id IS NOT NULL AND person_active AND active_grants>0 AND conflicting_grants=0 AND NOT other_role AND NOT family_or_personal)::int AS operational_credential_review
+ FROM account_state
+`;
+const ready=counts.enabled_legacy_accounts===0 &&
+ counts.unexpired_legacy_sessions===0 && counts.verified_owners>0;
+console.log(JSON.stringify({status:ready?"eligible_for_retirement_review":"blocked",...counts,inventory,
+ limitation:"Counts do not establish secure credential handoff or successful sign-in; require separate operator evidence before retirement."},null,2));
+process.exitCode=ready?0:1;
+
+      AND split_part(a.email_normalized,'@',2) !~ '(^|[.])example[.](com|net|org)
+`;
+const ready=counts.enabled_legacy_accounts===0 &&
+ counts.unexpired_legacy_sessions===0 && counts.verified_owners>0;
+console.log(JSON.stringify({status:ready?"eligible_for_retirement_review":"blocked",...counts,
+ limitation:"Counts do not establish secure credential handoff or successful sign-in; require separate operator evidence before retirement."},null,2));
+process.exitCode=ready?0:1;
+) AS verified_owners
 `;
 const ready=counts.enabled_legacy_accounts===0 &&
  counts.unexpired_legacy_sessions===0 && counts.verified_owners>0;
