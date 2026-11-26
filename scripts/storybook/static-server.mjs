@@ -22,6 +22,7 @@ export async function createStorybookStaticServer(directory){
  return createServer(async(req,res)=>{
    res.setHeader("Cache-Control","no-store");
    res.setHeader("X-Content-Type-Options","nosniff");
+   res.setHeader("Content-Security-Policy","connect-src 'self'; form-action 'none'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; font-src 'self' data:; img-src 'self' data: blob:; media-src 'self' data: blob:");
    function reply(code,message){res.writeHead(code,{"Content-Type":"text/plain; charset=utf-8"});res.end(message);}
    if(!["GET","HEAD"].includes(req.method??"")){res.setHeader("Allow","GET, HEAD");return reply(405,"Method not allowed");}
    try{

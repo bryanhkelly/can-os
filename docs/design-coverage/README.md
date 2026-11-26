@@ -47,7 +47,7 @@ Storybook now has a branded manager, five editorial guide pages, a six-preset re
 
 Use `npm run verify:storybook` to run contract tests, Vitest browser stories, the static build, generated-index validation and independent Playwright smoke tests. The index must contain all registered stories and all five editorial guides. Playwright exercises representative journeys in six device/theme combinations; browser reports are retained as review artifacts. Story fixtures never prove a production mutation.
 
-Chromatic baseline approval remains independent. Named Chromatic Modes replace the inherited legacy width strategy. Existing width-derived mode names are retained where possible, but actual baseline continuity needs review. Local fonts remain an outstanding reproducibility improvement.
+Chromatic baseline approval remains independent. Named Chromatic Modes replace the inherited legacy width strategy. Existing width-derived mode names are retained where possible, but actual baseline continuity needs review. Local fonts are now pinned, bundled and checked for byte integrity.
 
 ## Visual configuration enforcement
 
@@ -60,3 +60,7 @@ The Storybook-only coverage explorer consumes the registry directly, with search
 Twelve core story families have explicit legacy IDs after navigation migration. A generated-index identity check guards the navigation map. A loopback static-only server, diagnostic command and optional Firefox/WebKit projects support local acceptance when CI is unavailable. The ordinary unit test runner excludes the dedicated Storybook acceptance folder.
 
 Mutation feedback stories now exercise the actual shared mutation runner with local command/read adapters, including refresh-only recovery after a committed write. FormActions exposes an optional accessible blocked reason. Actual LaunchStudioOverview stories cover a returned Site with confirmed Shape completion and a failed completion read. These fixtures are not production persistence evidence.
+
+## Deterministic typography and fixture isolation
+
+Four unmodified OFL fonts are pinned to the upstream Google Fonts revision and original Git blob identities. Licenses and provenance are copied into the static catalog. The build and browser test configurations now share a fail-closed runtime module guard for production-only dependencies. The loopback static server also restricts network and form access with CSP. Existing unmocked transitive imports, if present, must be resolved before the complete Storybook build can pass.

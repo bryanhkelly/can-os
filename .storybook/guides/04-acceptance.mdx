@@ -36,3 +36,9 @@ The six-case critical matrix covers the launch journey, milestone states and pri
 Run `npm ci`, then `npm run storybook:doctor` to inspect local prerequisites without disclosing credentials. Install Chromium using `npx playwright install chromium` and run `npm run verify:storybook`. For browser compatibility, install Firefox and WebKit using `npx playwright install firefox webkit` and run `npm run test:storybook:cross-browser` after building. The static acceptance server binds only to loopback, serves existing build files only and rejects application RPC and writes. No production environment is needed.
 
 The optional browser projects extend critical and registered-layout smoke cases; they do not automatically expand paid visual snapshots. Chromatic is still independently reviewed.
+
+## Isolated fixtures and typography
+
+Storybook uses local copies of the approved V6.1 typefaces, with pinned upstream blob identities and OFL licenses. `npm run check:storybook:fonts` verifies byte integrity. Browser acceptance requires the local fonts to load and no longer permits third-party font calls.
+
+The Storybook and Vitest bundlers reject runtime imports of production routes, database and server modules, and RPC facades without explicit fixture aliases. A failed isolation check identifies the offending module; fix the adapter boundary rather than bypassing the gate. The static acceptance server restricts connections, form submissions, fonts, and media with a content security policy. This is a development fixture boundary, not a production access-control system.
