@@ -56,3 +56,7 @@ After a passing receipt, `npm run storybook:prepare-private-preview` prepares on
 ## Browser evidence for review
 
 The static browser matrix now retains a rendered PNG for each successful exercised canvas as well as failure traces and screenshots. The HTML report links the review images; the JSON report supports machine inspection. These images must still be reviewed by a human against the design contract and visual baseline. They do not replace authenticated route acceptance. The receipt links to run-specific stage logs, so an incomplete new run cannot silently borrow an older run's logs.
+
+## Cloudflare review hosting
+
+Use `npm run storybook:prepare-cloudflare` after acceptance to generate a dedicated static Worker configuration. It starts with public URLs disabled, does not use the application Worker or any application bindings, and prints the exact deploy command. Configure Worker-level Cloudflare Access before enabling a hostname. See `docs/design-coverage/cloudflare-storybook.md` for the deployment checklist.
