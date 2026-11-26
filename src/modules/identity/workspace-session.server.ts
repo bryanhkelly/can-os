@@ -26,7 +26,7 @@ export async function readWorkspaceSession(request: Request) {
   // An expired delegation projects the original owner in read-only mode.
   const { grants, demoAccountSwitching } = context.delegatedByPlatformOwner && context.role !== "platform_owner"
     ? { grants: await readOwnerDelegationGrants(sessionAccountId, context.actorPersonId, account.email), demoAccountSwitching: false }
-    : await readSessionGrants(sessionAccountId, account.email);
+    : await readSessionGrants(sessionAccountId, account.email,db,context.authenticationMethod);
   const visibleGrants = context.delegatedByPlatformOwner
     ? grants.filter(grant => grant.id === context.grantId) : grants;
   if (!visibleGrants.some(grant => grant.id === context.grantId)) {
