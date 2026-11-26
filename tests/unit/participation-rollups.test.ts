@@ -39,6 +39,18 @@ describe("WS6 authorized multi-Site reporting",()=>{
   expect(()=>rollupAuthorizedParticipation(facts,proof,period,{ownerDomains:new Map(),classification:"all"})).toThrow("classification evidence missing");
   expect(rollupAuthorizedParticipation(facts,proof,period,{ownerDomains:new Map([["orgA",null]]),classification:"unknown"}).totals.registrations).toBe(14);
  });
+ it("counts each registration status independently without adding distinct people across groups", () => {
+  const statuses = ["registered", "active", "withdrawn", "completed", "cancelled"];
+  const rows = statuses.map((currentStatus, index) => ({
+   ...facts[0]!, sourceId: "status-" + index, currentStatus,
+   personId: index < 2 ? "shared-person" : "person-" + index,
+  }));
+  const result = rollupAuthorizedParticipation(rows, proof, period);
+  expect(result.totals).toEqual({ registrations: 5, uniquePeople: 4, active: 2, withdrawn: 1 });
+  expect(result.sites[0]).toMatchObject(result.totals);
+  expect(rollupAuthorizedParticipation([], proof, period).totals)
+   .toEqual({ registrations: 0, uniquePeople: 0, active: 0, withdrawn: 0 });
+ });
  it("never counts a credited affiliation as an extra registration",()=>{
   const r=rollupAuthorizedParticipation(facts,proof,period);
   expect(r.totals.registrations).toBe(14);
