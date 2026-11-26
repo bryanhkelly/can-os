@@ -1,3 +1,5 @@
+import { readOptionalEmailBrand } from "./email-brand.server";
+import { readEmailProviderReceipt } from "@/domain/email-provider-receipt";
 import { submitResendEmail } from "@/modules/communication/resend-email-transport.server";
 /**
  * Server-only transactional email for in-app notifications.
@@ -87,10 +89,7 @@ async function sendNotificationEmailCore(
     : message.text;
 
   try {
-    const brand = message.siteId
-      ? await import("@/modules/sites/school-brand.server")
-        .then(module => module.readSchoolBrand(message.siteId!))
-        .catch(() => { console.warn("[notification-email] School branding unavailable; using CAN branding"); return null; }) : null;
+    const brand = await readOptionalEmailBrand(message.siteId, "notification-email");
     const { renderSchoolEmail, schoolEmailLogoAttachment } = await import("@/domain/school-email");
     const logoAttachment = schoolEmailLogoAttachment(brand);
     const attachments = [
@@ -116,8 +115,7 @@ async function sendNotificationEmailCore(
       );
       return { accepted: false };
     }
-    const responseBody = await response.json().catch(() => null) as { id?: unknown } | null;
-    const providerMessageId = typeof responseBody?.id === "string" ? responseBody.id : undefined;
+    const providerMessageId = await readEmailProviderReceipt(response);
     return { accepted: true, ...(providerMessageId ? { providerMessageId } : {}) };
   } catch (error) {
     console.log(
