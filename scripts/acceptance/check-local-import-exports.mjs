@@ -47,6 +47,22 @@ for (const file of program.getSourceFiles()) {
       specifier.text.startsWith("@/"))) continue;
     const imported = ts.isImportDeclaration(statement)
       ? statement.importClause : statement.exportClause;
+    // Side-effect imports intentionally need no exported module symbol.
+    if (ts.isImportDeclaration(statement) && !imported) continue;
+    const moduleSymbol = checker.getSymbolAtLocation(specifier);
+    if (!moduleSymbol) {
+      // A real source file can resolve successfully yet have no module symbol
+      // (for example, a refactor removed its last export). Do not confuse that
+      // with generated routes, Vite assets or unresolved paths checked elsewhere.
+      const resolved = ts.resolveModuleName(specifier.text, file.fileName, parsed.options, ts.sys).resolvedModule;
+      const target = resolved && program.getSourceFile(resolved.resolvedFileName);
+      if (target && !ts.isExternalModule(target) && !target.commonJsModuleIndicator &&
+          /\.[cm]?[jt]sx?$/.test(target.fileName)) {
+        const location = file.getLineAndCharacterOfPosition(specifier.getStart(file));
+        failures.push(`${file.fileName.slice(root.length + 1)}:${location.line + 1}:${location.character + 1}: Local file ${JSON.stringify(specifier.text)} is not a module`);
+      }
+      continue;
+    }
     if (!imported) continue;
     const bindings = [];
     if (ts.isImportDeclaration(statement)) {
@@ -59,11 +75,6 @@ for (const file of program.getSourceFiles()) {
         bindings.push({ name: (element.propertyName ?? element.name).text, at: element.name });
     }
     if (!bindings.length) continue;
-    const moduleSymbol = checker.getSymbolAtLocation(specifier);
-    if (!moduleSymbol) {
-      // The preceding source-import gate rejects missing local source files.
-      continue;
-    }
     let exportNames = exportCache.get(moduleSymbol);
     if (!exportNames) {
       exportNames = new Set(checker.getExportsOfModule(moduleSymbol).map(symbol => symbol.getName()));
@@ -90,7 +101,7 @@ for (const file of program.getSourceFiles()) {
 
 for (const failure of failures) console.error(failure);
 if (failures.length) {
-  console.error(`Local import/export gate: ${failures.length} missing named exports among ${checked} local bindings.`);
+  console.error(`Local import/export gate: ${failures.length} import/export errors among ${checked} checked local bindings.`);
   process.exitCode = 1;
 } else {
   console.log(`Local import/export gate: ${checked} local imported/re-exported bindings resolved.`);

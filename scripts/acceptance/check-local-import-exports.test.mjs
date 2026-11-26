@@ -64,7 +64,7 @@ export { alsoAbsent } from "./source";`,
   assert.equal(result.status, 1);
   assert.match(result.stderr, /does not export "absent"/);
   assert.match(result.stderr, /does not export "alsoAbsent"/);
-  assert.match(result.stderr, /2 missing named exports/);
+  assert.match(result.stderr, /2 import\/export errors/);
 });
 
 test("JSON defaults from relative and aliased paths are valid", () => {
@@ -125,4 +125,27 @@ test("valid root build-config named export is accepted", () => {
   });
   assert.equal(result.status, 0, result.stderr);
   assert.ok(result.stdout.includes("1 local imported/re-exported bindings resolved"), result.stdout);
+});
+
+for (const [kind, consumer] of [
+  ["named", 'import { hidden } from "./script"; void hidden;'],
+  ["default", 'import hidden from "./script"; void hidden;'],
+  ["namespace", 'import * as hidden from "./script"; void hidden;'],
+  ["star re-export", 'export * from "./script";'],
+]) {
+  test(`${kind} import or re-export of an existing non-module fails`, () => {
+    const result = runFixture({"script.ts": "const hidden = 1;", "consumer.ts": consumer});
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(result.stderr, /is not a module/);
+  });
+}
+
+test("side-effect-only script imports remain valid", () => {
+  const result = runFixture({"script.ts": "console.log('fixture');", "consumer.ts": 'import "./script";'});
+  assert.equal(result.status, 0, result.stderr);
+});
+
+test("generated routes may be absent before route generation", () => {
+  const result = runFixture({"consumer.ts": 'import { routeTree } from "./routeTree.gen"; void routeTree;'});
+  assert.equal(result.status, 0, result.stderr);
 });
