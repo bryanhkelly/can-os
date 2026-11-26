@@ -63,7 +63,7 @@ if(profile==="pilot"){
   run("V6.1 independent visual evidence",["run","design:coverage","--","--strict"]);
   run("Canonical reporting foundation",["run","test:reporting:foundation"]);
   run("Individual credential and identity parity regressions",["exec","--","vitest","run",
-    "tests/unit/domain-classification.test.ts","tests/unit/individual-staff-handoff.test.ts","tests/unit/resend-email-transport.test.ts",
+    "tests/unit/domain-classification.test.ts","tests/unit/session-credential-policy.test.ts","tests/unit/individual-staff-handoff.test.ts","tests/unit/resend-email-transport.test.ts",
     "tests/unit/private-account-code-recovery.test.ts","tests/unit/demo-session-isolation.test.ts",
     "tests/unit/demo-sign-in.test.ts","tests/unit/student-access-link-outcome.test.ts",
     "tests/unit/account-activity-source-contract.test.ts","tests/unit/participation-rollups.test.ts",
