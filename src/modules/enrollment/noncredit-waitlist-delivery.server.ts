@@ -1,4 +1,5 @@
-import { and, asc, eq, gt, isNull, lte, notInArray, or } from "drizzle-orm";
+import { outboundClaimPredicate, outboundLeaseOwnership } from "@/modules/communication/outbound-lease-predicates.server";
+import { and, asc, eq, gt } from "drizzle-orm";
 import { db } from "@/db/client";
 import { accessAccounts, accountPersonGrants, people } from "@/db/schema";
 import {
@@ -19,11 +20,7 @@ import { readEligibleSelfEnrollmentReleases } from "./noncredit-self-enrollment-
 import { currentWaitlistEmailOpportunity } from "@/domain/noncredit-waitlist-email-policy";
 
 function owned(claim: OutboundClaim) {
-  return and(
-    eq(noncreditWaitlistEmailDeliveries.id, claim.id),
-    eq(noncreditWaitlistEmailDeliveries.status, "processing"),
-    eq(noncreditWaitlistEmailDeliveries.leaseUntil, claim.leaseUntil),
-  );
+  return outboundLeaseOwnership(noncreditWaitlistEmailDeliveries, claim);
 }
 
 /**
@@ -41,18 +38,7 @@ const waitlistAdapter = {
         attempts: noncreditWaitlistEmailDeliveries.attempts,
       }).from(noncreditWaitlistEmailDeliveries)
         .where(and(
-          ...(seenIds.length
-            ? [notInArray(noncreditWaitlistEmailDeliveries.id, [...seenIds])]
-            : []),
-          or(
-            and(eq(noncreditWaitlistEmailDeliveries.status, "pending"),
-              or(isNull(noncreditWaitlistEmailDeliveries.nextAttemptAt),
-                lte(noncreditWaitlistEmailDeliveries.nextAttemptAt, now))),
-            and(eq(noncreditWaitlistEmailDeliveries.status, "failed"),
-              lte(noncreditWaitlistEmailDeliveries.nextAttemptAt, now)),
-            and(eq(noncreditWaitlistEmailDeliveries.status, "processing"),
-              lte(noncreditWaitlistEmailDeliveries.leaseUntil, now)),
-          ),
+          outboundClaimPredicate(noncreditWaitlistEmailDeliveries, now, seenIds),
         )).orderBy(asc(noncreditWaitlistEmailDeliveries.createdAt))
         .limit(1).for("update", { skipLocked: true });
       if (!row) return null;
