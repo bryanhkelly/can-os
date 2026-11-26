@@ -42,3 +42,25 @@ export const KeyboardFocus: Story = {
     await expect(canvas.getByRole("button", { name: "Second action" })).toHaveFocus();
   },
 };
+
+export const UnavailableSaveActions: Story = {
+  render: () => <div className="flex flex-wrap gap-3 bg-background p-6">
+    <Button>Save &amp; Finish</Button>
+    <Button disabled>Save &amp; Continue</Button>
+    <Button variant="ghost" disabled>Save &amp; Exit</Button>
+    <Button asChild disabled><a href="#unavailable">Unavailable link</a></Button>
+  </div>,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("button", { name: "Save & Finish" })).toBeEnabled();
+    const disabled = canvas.getByRole("button", { name: "Save & Continue" });
+    await expect(disabled).toBeDisabled();
+    await expect(disabled).toHaveClass("bg-muted", "text-muted-foreground");
+    await expect(disabled).not.toHaveClass("bg-primary");
+    await expect(canvas.getByRole("button", { name: "Save & Exit" })).toBeDisabled();
+    const link = canvas.getByRole("link", { name: "Unavailable link" });
+    await expect(link).toHaveAttribute("aria-disabled", "true");
+    await expect(link).toHaveAttribute("tabindex", "-1");
+    await expect(link).toHaveClass("bg-muted");
+  },
+};
