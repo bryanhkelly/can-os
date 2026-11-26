@@ -4,7 +4,7 @@ const mocked=vi.hoisted(()=>({
 }));
 vi.mock("@/db/client",()=>({db:{execute:mocked.execute,transaction:mocked.transaction}}));
 vi.mock("@/modules/engagement/engagement-go.server",()=>({resolveGoExperience:mocked.resolve}));
-import {processEngagementCampaignDeliveries} from "@/modules/communication/campaign-store.server";
+import {processEngagementCampaignDeliveries,campaignSenderReadiness} from "@/modules/communication/campaign-store.server";
 
 const work={id:"11111111-1111-4111-8111-111111111111",lease_id:"22222222-2222-4222-8222-222222222222",email:"synthetic@real.org",
  unsubscribe_token:"33333333-3333-4333-8333-333333333333",attempts:1,outcome_unconfirmed:false,first_attempt_at:new Date().toISOString(),
@@ -84,5 +84,22 @@ describe("campaign worker fenced delivery",()=>{
   expect(await processEngagementCampaignDeliveries(1)).toEqual({
    accepted: 0, failed: 1, suppressed: 0, retry: 0, unconfirmed: 0,
   });
+ });
+});
+
+describe("campaign sender readiness",()=>{
+ it("uses the existing provider configuration and reports no secrets",()=>{
+  expect(campaignSenderReadiness().issues).toEqual([]);
+  vi.stubEnv("CAN_CAMPAIGN_POSTAL_ADDRESS","");
+  const result=campaignSenderReadiness();
+  expect(result.sender).toBeNull();
+  expect(result.issues).toEqual(["A valid campaign postal address is required."]);
+  expect(JSON.stringify(result)).not.toContain("mock-only");
+ });
+ it("requires signed delivery events and an approved origin",()=>{
+  vi.stubEnv("RESEND_WEBHOOK_SECRET","");
+  vi.stubEnv("CAN_ACCESS_PUBLIC_ORIGIN","http://example.org/path");
+  expect(campaignSenderReadiness().issues).toHaveLength(2);
+  expect(campaignSenderReadiness().sender).toBeNull();
  });
 });
