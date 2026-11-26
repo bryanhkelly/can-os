@@ -35,3 +35,12 @@ test("compatibility inventory does not classify ordinary email policy as a viola
     "classification/operational boundary review","fixture credential/configuration symbol","institution-specific literal"]);
   assert.deepEqual(identityCompatibilityReferences(parse(file,'isDemoAccountEmail(email);'),ts),[]);
 });
+
+test("provider email dispatch cannot be implemented in a business workflow",()=>{
+  const file="src/modules/enrollment/registration.server.ts";
+  assert.ok(check(file,'await fetch("https://api.resend.com/emails",options)').length);
+  assert.ok(check(file,'import {Resend} from "resend";').length);
+  assert.deepEqual(check(file,'import {submitResendEmail} from "@/modules/communication/resend-email-transport.server";'),[]);
+  assert.deepEqual(check("src/modules/communication/resend-email-transport.server.ts",
+    'await fetch("https://api.resend.com/emails",options)'),[]);
+});
