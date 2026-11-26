@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/db/client", () => ({ db: {} }));
 const readSchoolBrand = vi.hoisted(() => vi.fn());
 vi.mock("@/modules/sites/school-brand.server", () => ({ readSchoolBrand }));
-import { eligibleNotificationEmailAccount, sendNotificationEmail } from "@/modules/communication/notification-email.server";
+import { eligibleNotificationEmailAccount, sendNotificationEmail, sendNotificationEmailWithReceipt } from "@/modules/communication/notification-email.server";
 import { resolveSiteTheme } from "@/domain/site-theme";
 
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
@@ -61,6 +61,20 @@ describe("notification email identity validation", () => {
     expect(body.text).toBe("A new update");
     expect(body.html).toContain("Valor School");
     expect(body.html).toContain("#162b45");
+  });
+
+  it("does not confuse notification HTTP acceptance with a provider receipt", async () => {
+    vi.stubEnv("RESEND_API_KEY", "test-key");
+    vi.stubEnv("CAN_NOTIFICATIONS_FROM_EMAIL", "CAN <verified@example.test>");
+    const message = { to: "parent@example.test", subject: "Update", text: "School update" };
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+      .mockResolvedValueOnce(new Response('{"id":"receipt"}', { status: 200 }))
+      .mockResolvedValueOnce(new Response('{"id":"receipt"}', { status: 503 }));
+    vi.stubGlobal("fetch", fetch);
+    expect(await sendNotificationEmailWithReceipt(message)).toEqual({ accepted: true });
+    expect(await sendNotificationEmailWithReceipt(message)).toEqual({ accepted: true, providerMessageId: "receipt" });
+    expect(await sendNotificationEmailWithReceipt(message)).toEqual({ accepted: false });
   });
 
   it("requires independently verified, active account and person", () => {
