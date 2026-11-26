@@ -1,8 +1,8 @@
 import { submitResendEmail } from "@/modules/communication/resend-email-transport.server";
 /**
  * Server-only transactional email for in-app notifications.
- * Mirrors the Resend fetch pattern in identity/resend-access-mail.server.ts,
- * but never throws: email delivery must not break a domain transaction.
+ * Uses the shared Resend transport. Delivery errors return a failed receipt
+ * rather than interrupting the calling domain workflow.
  * Call from server code only; never import this module into a client component.
  */
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
@@ -68,7 +68,7 @@ async function sendNotificationEmailCore(
   message: NotificationEmailMessage,
   idempotencyKey?: string,
 ): Promise<NotificationEmailSendReceipt> {
-  if(suppressDemoEmailDelivery(message.to)){
+  if (suppressDemoEmailDelivery(message.to)) {
     console.log("[notification-email] Demo account delivery suppressed");
     return { accepted: false };
   }
@@ -109,7 +109,7 @@ async function sendNotificationEmailCore(
         { name: "can_source", value: message.providerReceipt.source },
         { name: "can_receipt", value: message.providerReceipt.receiptId },
       ] } : {}),
-    },apiKey,idempotencyKey);
+    }, apiKey, idempotencyKey);
     if (!response.ok) {
       console.log(
         `[notification-email] Resend delivery failed with status ${response.status}`,
@@ -130,8 +130,10 @@ async function sendNotificationEmailCore(
 /** Defense in depth: account/grant eligibility must survive both the SQL
  * filter and projection, including if a caller changes the query later. */
 export function eligibleNotificationEmailAccount(record: {
-  accountDisabled:boolean;emailVerifiedAt:Date|null;
-  grantActive:boolean;personActive:boolean;
+  accountDisabled: boolean;
+  emailVerifiedAt: Date | null;
+  grantActive: boolean;
+  personActive: boolean;
 }): boolean {
   return !record.accountDisabled && !!record.emailVerifiedAt &&
     record.grantActive && record.personActive;
@@ -148,7 +150,7 @@ export async function emailNotificationRecipients(
   organizationId: string | null,
 ): Promise<Map<string, string>> {
   const recipients = new Map<string, string>();
-  if(!organizationId)return recipients;
+  if (!organizationId) return recipients;
   const uniqueIds = [...new Set(personIds)];
   if (uniqueIds.length === 0) return recipients;
 
