@@ -36,11 +36,11 @@ export async function bindAuthorizedAccountPerson(tx:Tx,account:{
 },input:{email:string;firstName:string;lastName:string}){
   if(account.disabled)throw new AuthorizationError("enabled canonical Account");
   const email=normalizeAccessEmail(input.email);
-  const prior=await tx.select({personId:accountPersonGrants.personId})
-    .from(accountPersonGrants).where(eq(accountPersonGrants.accountId,account.id)).limit(101);
+  const prior=await tx.selectDistinct({personId:accountPersonGrants.personId})
+    .from(accountPersonGrants).where(eq(accountPersonGrants.accountId,account.id)).limit(2);
   const peopleIds=new Set(prior.map(row=>row.personId));
   if(account.personId)peopleIds.add(account.personId);
-  if(prior.length>100||peopleIds.size>1)
+  if(peopleIds.size>1)
     throw new AuthorizationError("unambiguous account Person");
   let personId=[...peopleIds][0];
   const personCreated=!personId;
