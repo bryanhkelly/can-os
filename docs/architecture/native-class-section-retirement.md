@@ -133,10 +133,10 @@ has the same records.
 ## Cutover candidate reporting (additional test01 verification)
 
 The source-to-native Course selection must be evidence based rather than a
-new permanent translation service. The read-only, test01-pinned candidate
-inventory is `npm run db:test01:class-cutover-candidates` with
+new permanent translation service. The current read-only, main-pinned candidate
+inventory is `npm run db:check:class-cutover-candidates` with
 `CAN_CLASS_CUTOVER_CANDIDATES=1` and
-`CAN_CLASS_CUTOVER_QA_DATABASE_URL` set to the isolated test01 connection.
+`CAN_CLASS_CUTOVER_QA_DATABASE_URL` set to the explicitly approved CAN OS main connection. The runner checks the pinned main branch and opens a read-only transaction. The test01 observations below are historical evidence, not current main results.
 
 It reports one entry per legacy class without learner names or email addresses,
 including source Course version, Site, Program and **aggregate** enrollment,
@@ -180,7 +180,7 @@ version under the same publisher and version number.
 
 The retirement preflight now requires these source-integrity conditions and
 checks nonoverlapping native Person/Account IDs and active native sessions.
-`npm run db:test01:class-cutover-candidates` generates the per-class
+`npm run db:check:class-cutover-candidates` generates the per-class
 candidate and evidence inventory, exiting nonzero when there are remaining
 legacy academic classes. Treat the report as a review input, never as
 permission to merge identities, rekey foreign keys or delete the old data.
