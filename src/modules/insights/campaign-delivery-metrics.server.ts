@@ -1,3 +1,4 @@
+import {readAuthorizedOwnerClassification} from "./reporting-population.server";
 import {sql} from "drizzle-orm";
 import {db} from "@/db/client";
 import type {AccessContext} from "@/domain/access-context";
@@ -34,6 +35,6 @@ export async function readSiteCampaignDeliveryMetrics(actor:AccessContext,input:
    AND c.created_at>=${from.toISOString()}::timestamptz AND c.created_at<${to.toISOString()}::timestamptz`);
   const counts=result.rows[0] as unknown as CampaignDeliveryMetrics|undefined;
   if(!counts)throw new Error("Campaign aggregate unavailable");
-  return {siteId:site.id,from:from.toISOString(),to:to.toISOString(),asOf:asOf.toISOString(),timeBasis:"campaign_creation_cohort_current_state" as const,counts,uniquePeople:null,conversionAttribution:null,includesOrganizationOwnedCampaigns:false};
+  return {siteId:site.id,...await readAuthorizedOwnerClassification(tx,site.organizationId),from:from.toISOString(),to:to.toISOString(),asOf:asOf.toISOString(),timeBasis:"campaign_creation_cohort_current_state" as const,counts,uniquePeople:null,conversionAttribution:null,includesOrganizationOwnedCampaigns:false};
  },{isolationLevel:"repeatable read",accessMode:"read only"});
 }
