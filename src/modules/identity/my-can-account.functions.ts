@@ -49,7 +49,7 @@ export const getMyCanAccount = createServerFn({ method: "GET" }).handler(async (
   ]);
   if (!account[0] || !person[0]) throw new AuthorizationError("active verified identity");
 
-  const { grants, demoAccountSwitching } = await readSessionGrants(accountId, account[0].email);
+  const { grants, demoAccountSwitching } = await readSessionGrants(accountId, account[0].email,db,actor.authenticationMethod);
   if (!grants.some(grant => grant.id === actor.grantId && grant.active)) {
     throw new AuthorizationError("active account membership");
   }
@@ -155,7 +155,7 @@ export const setMyCanFavoriteSite = createServerFn({ method: "POST" })
       .from(accessAccounts).where(and(eq(accessAccounts.id, accountId),
         eq(accessAccounts.disabled, false))).limit(1);
     if (!account) throw new AuthorizationError("active account");
-    const { grants } = await readSessionGrants(accountId, account.email);
+    const { grants } = await readSessionGrants(accountId, account.email,db,actor.authenticationMethod);
     if (!grants.some(grant => grant.id === actor.grantId && grant.active))
       throw new AuthorizationError("active membership");
     const authorizedSites = new Set([
