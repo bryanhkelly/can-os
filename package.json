@@ -127,7 +127,7 @@
     "check:component-boundaries": "node scripts/check-component-boundaries.mjs",
     "verify:architecture": "npm run check:build-source-syntax && npm run check:test-source-syntax && npm run check:local-import-exports && npm run check:test-import-exports && npm run check:component-boundaries && npm run test:reuse && npm run check:reuse && npm run check:class-architecture && npm run check:route-identifiers && npm run test:design-audit && npm run test:migration-safety && npm run db:check:journal && npm run verify:reporting:sql && node scripts/check-design-system.mjs && npm run design:coverage && node --test scripts/lib/identity-architecture.test.mjs",
     "architecture:inventory": "node scripts/report-component-architecture.mjs",
-    "quality:inventory": "node scripts/report-code-health.mjs && npm run architecture:inventory",
+    "quality:inventory": "node scripts/report-code-health.mjs && npm run architecture:inventory -- --all",
     "test:reuse": "node --test scripts/lib/component-reuse.test.mjs",
     "check:reuse": "node scripts/report-component-architecture.mjs --check",
     "check:local-import-exports": "node scripts/acceptance/check-local-import-exports.mjs",
