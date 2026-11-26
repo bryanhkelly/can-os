@@ -30,11 +30,13 @@ export function campaignSenderReadiness(approved?:{sender_from:string;postal_add
  return {issues,sender:issues.length===0&&from&&address&&key&&origin?{from,address,key,origin}:null};
 }
 export function campaignSender(){return campaignSenderReadiness().sender;}
-export async function readCampaignSenderReadiness(){
+export async function readCampaignSenderReadiness(organizationId:string|null=null){
  const {readCampaignSenderRegistryState}=await import("./sender-registry.server");
- const state=await readCampaignSenderRegistryState();
+ const local=organizationId?await readCampaignSenderRegistryState(organizationId):null;
+ const state=local?.configured?local:await readCampaignSenderRegistryState(null);
  if(state.configured&&!state.active)return {sender:null,issues:["Campaign sender approval has been revoked."]};
- return campaignSenderReadiness(state.active);
+ const result=campaignSenderReadiness(state.active);
+ return {...result,sender:result.sender?{...result.sender,versionId:state.active?.id??null}:null};
 }
 type Work = {
   id: string;
@@ -48,6 +50,8 @@ type Work = {
   public_url: string;
   sender_from: string;
   sender_address: string;
+  sender_scope?: string;
+  sender_version_id?: string|null;
   code: string;
 };
 async function claimCampaignDelivery(campaignId?:string){
@@ -76,7 +80,7 @@ async function claimCampaignDelivery(campaignId?:string){
   RETURNING d.id,d.lease_id,d.email,d.unsubscribe_token,d.attempts,d.first_attempt_at,d.campaign_id
  )
  SELECT d.id,d.lease_id,d.email,d.unsubscribe_token,d.attempts,d.first_attempt_at,
-  c.subject,c.body,c.public_url,c.sender_from,c.sender_address,l.code
+  c.subject,c.body,c.public_url,c.sender_from,c.sender_address,c.sender_scope,c.sender_version_id,l.code
  FROM claimed d JOIN public.engagement_campaigns c ON c.id=d.campaign_id
  JOIN public.engagement_definitions e ON e.id=c.engagement_id JOIN public.site_go_links l ON l.id=c.link_id`);
  return row;
@@ -103,7 +107,7 @@ async function stillEligible(work:Work){
  ) AS eligible`);
  return row?.eligible===true;
 }
-type CampaignSender = NonNullable<ReturnType<typeof campaignSender>>;
+type CampaignSender = NonNullable<Awaited<ReturnType<typeof readCampaignSenderReadiness>>["sender"]>;
 type CampaignSettlement = Awaited<ReturnType<typeof settle>>;
 type CampaignCounts = {
   accepted: number;
@@ -129,6 +133,7 @@ function matchesCampaignDestination(work: Work, sender: CampaignSender): boolean
   const url = new URL(work.public_url);
   return !parsed.invalid.length && parsed.recipients.length === 1 &&
     work.sender_from === sender.from && work.sender_address === sender.address &&
+    (work.sender_version_id??null) === (sender.versionId??null) &&
     url.origin === new URL(sender.origin).origin && url.pathname === "/go/" + work.code &&
     !url.search && !url.hash && !suppressDemoEmailDelivery(work.email);
 }
@@ -197,12 +202,15 @@ async function processCampaignDelivery(work: Work, sender: CampaignSender): Prom
 /** Both schedulers use this exact queue. One message per recipient; never BCC bulk mail. */
 export async function processEngagementCampaignDeliveries(limit = 10, campaignId?:string): Promise<CampaignCounts> {
   const counts: CampaignCounts = { accepted: 0, failed: 0, suppressed: 0, retry: 0, unconfirmed: 0 };
-  const sender = (await readCampaignSenderReadiness()).sender;
-  if (!sender) return counts;
+  const config=readEmailConfiguration("campaign");
+  if(!config.apiKey||!config.webhookConfigured||!config.publicOrigin)return counts;
 
   for (let i = 0; i < Math.min(10, limit); i++) {
     const work = await claimCampaignDelivery(campaignId);
     if (!work) break;
+    const organizationId=work.sender_scope?.startsWith("organization:")?work.sender_scope.slice("organization:".length):null;
+    const sender=(await readCampaignSenderReadiness(organizationId)).sender;
+    if(!sender){countCampaignSettlement(counts,await settle(work,"suppressed"));continue;}
     const result = await processCampaignDelivery(work, sender);
     countCampaignSettlement(counts, result.row);
     if (result.stopBatch) break;
