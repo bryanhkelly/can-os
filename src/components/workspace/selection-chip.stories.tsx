@@ -4,7 +4,7 @@ import { expect, userEvent, within } from "storybook/test";
 import { SelectionChip, SelectionChipGroup } from "./selection-chip";
 
 const meta = {
-  title: "Workspace/Selection Chip",
+  id: "workspace-selection-chip", title: "03 Components/Selection chip",
   component: SelectionChip,
   tags: ["autodocs"],
   parameters: { layout: "padded" },

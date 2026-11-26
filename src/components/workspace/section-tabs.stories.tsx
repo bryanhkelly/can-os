@@ -17,7 +17,7 @@ const withLocation = (path: string) => (Story: () => React.JSX.Element) => {
   return <RouterProvider router={createRouter({ routeTree: root, history: createMemoryHistory({ initialEntries: [path] }) })} />;
 };
 
-const meta = { title: "V6.1 templates/Section tabs", component: RecordTabs, parameters: { layout: "fullscreen" } } satisfies Meta<typeof RecordTabs>;
+const meta = { id: "v6-1-templates-section-tabs", title: "03 Components/Section tabs", component: RecordTabs, parameters: { layout: "fullscreen" } } satisfies Meta<typeof RecordTabs>;
 export default meta;
 type Story = StoryObj<typeof meta>;
 

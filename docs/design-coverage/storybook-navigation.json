@@ -850,6 +850,114 @@
         "NetworkPartner",
         "NetworkSteward"
       ]
+    },
+    {
+      "path": "src/components/workspace/directory-navigation.stories.tsx",
+      "previousTitle": "Foundations/Directory search and navigation",
+      "title": "03 Components/Directory navigation",
+      "metaId": "foundations-directory-search-and-navigation",
+      "exports": [
+        "SearchAndRetry",
+        "LateSearchResponse",
+        "DisabledPageBoundary",
+        "UnknownPageCount"
+      ]
+    },
+    {
+      "path": "src/components/workspace/disclosure-section.stories.tsx",
+      "previousTitle": "V6.1 foundations/Disclosure section",
+      "title": "03 Components/Disclosure section",
+      "metaId": "v6-1-foundations-disclosure-section",
+      "exports": [
+        "IndependentPanels",
+        "UncontrolledObserver",
+        "RetainsEditorState"
+      ]
+    },
+    {
+      "path": "src/components/workspace/report-period-comparison.stories.tsx",
+      "previousTitle": "V6.1 foundations/Data Visualization/Period comparison",
+      "title": "03 Components/Reporting/Period comparison",
+      "metaId": "v6-1-foundations-data-visualization-period-comparison",
+      "exports": [
+        "Comparison",
+        "Mobile",
+        "Dark",
+        "SiteBrand"
+      ]
+    },
+    {
+      "path": "src/components/workspace/section-tabs.stories.tsx",
+      "previousTitle": "V6.1 templates/Section tabs",
+      "title": "03 Components/Section tabs",
+      "metaId": "v6-1-templates-section-tabs",
+      "exports": [
+        "OneCurrentTab",
+        "ScopedLocation",
+        "RecordSections"
+      ]
+    },
+    {
+      "path": "src/components/workspace/selection-card.stories.tsx",
+      "previousTitle": "Workspace/V6.1 Selection Cards",
+      "title": "03 Components/Selection cards",
+      "metaId": "workspace-v6-1-selection-cards",
+      "exports": [
+        "RadioCheckboxAndDisabled"
+      ]
+    },
+    {
+      "path": "src/components/workspace/selection-chip.stories.tsx",
+      "previousTitle": "Workspace/Selection Chip",
+      "title": "03 Components/Selection chip",
+      "metaId": "workspace-selection-chip",
+      "exports": [
+        "Compact",
+        "Standard",
+        "AllStates",
+        "KeyboardAndLimit",
+        "NarrowWrapping"
+      ]
+    },
+    {
+      "path": "src/components/workspace/selection-patterns.stories.tsx",
+      "previousTitle": "Workspace/Selection Patterns",
+      "title": "04 Application patterns/Selection patterns",
+      "metaId": "workspace-selection-patterns",
+      "exports": [
+        "ComparisonGuide"
+      ]
+    },
+    {
+      "path": "src/components/workspace/workflow-intro.stories.tsx",
+      "previousTitle": "Foundations/Workflow introduction",
+      "title": "04 Application patterns/Workflow introduction",
+      "metaId": "foundations-workflow-introduction",
+      "exports": [
+        "SchoolLaunch",
+        "WithActions"
+      ]
+    },
+    {
+      "path": "src/components/workspace/workspace-link-navigation.stories.tsx",
+      "previousTitle": "V6.1 foundations/Shared navigation",
+      "title": "03 Components/Shared navigation",
+      "metaId": "v6-1-foundations-shared-navigation",
+      "exports": [
+        "ResponsiveRecordTabs",
+        "RelatedDestinations",
+        "PlainDestinationLinks"
+      ]
+    },
+    {
+      "path": "src/components/reporting/ReportingRelationshipPanel.stories.tsx",
+      "previousTitle": "V6.1/Reporting/Organization relationships",
+      "title": "08 Feature workspaces/Reporting/Organization relationships",
+      "metaId": "v6-1-reporting-organization-relationships",
+      "exports": [
+        "Proposal",
+        "Incoming"
+      ]
     }
   ]
 }

@@ -5,7 +5,7 @@ import { DetailNavigation } from "./workspace-panel";
 import { WorkspaceLinkNavigation } from "./workspace-link-navigation";
 
 const meta = {
-  title: "V6.1 foundations/Shared navigation",
+  id: "v6-1-foundations-shared-navigation", title: "03 Components/Shared navigation",
   parameters: {
     layout: "fullscreen",
     chromatic: { modes: { light: { theme: "light" }, dark: { theme: "dark" }, site: { theme: "site" } } },

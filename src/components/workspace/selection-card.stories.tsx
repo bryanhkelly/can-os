@@ -4,7 +4,7 @@ import { expect, userEvent, within } from "storybook/test";
 import { SelectionCard } from "./selection-card";
 
 const meta = {
-  title: "Workspace/V6.1 Selection Cards",
+  id: "workspace-v6-1-selection-cards", title: "03 Components/Selection cards",
   component: SelectionCard,
   parameters: { layout: "padded" },
   args: {
