@@ -38,16 +38,16 @@ export async function provisionScopedPersonAccount(tx: Tx, input: {
     throw new AuthorizationError("current account Person binding");
   let privateAccessCode:string|undefined;
   if (account) {
-    const grants = await tx.select({personId:accountPersonGrants.personId,role:accountPersonGrants.role,
-      organizationId:accountPersonGrants.organizationId,siteId:accountPersonGrants.siteId})
-      .from(accountPersonGrants).where(eq(accountPersonGrants.accountId,account.id)).limit(101);
-    if (grants.length>100) throw new AuthorizationError("bounded account membership review");
-    if (grants.some(g=>g.personId!==input.personId))
-      throw new AuthorizationError("account email belongs to a different identity");
-    if (input.onlyRole && grants.some(g=>g.role!==input.onlyRole))
-      throw new AuthorizationError("separate student-only account required");
-    if (isDemoAccountEmail(email) && !individual && grants.some(g=>g.organizationId!==input.organizationId || g.siteId!==input.siteId))
-      throw new AuthorizationError("existing identity and membership scope");
+    // Existence checks validate every historical membership without imposing
+    // a maximum number of legitimate memberships on one Person.
+    const [conflict]=await tx.select({id:accountPersonGrants.id})
+      .from(accountPersonGrants).where(and(eq(accountPersonGrants.accountId,account.id),
+        sql`(${accountPersonGrants.personId} IS DISTINCT FROM ${input.personId}::uuid
+          OR (${input.onlyRole??null}::text IS NOT NULL AND ${accountPersonGrants.role} IS DISTINCT FROM ${input.onlyRole??null}::text)
+          OR (${isDemoAccountEmail(email)&&!individual}::boolean AND
+            (${accountPersonGrants.organizationId} IS DISTINCT FROM ${input.organizationId}::uuid OR
+             ${accountPersonGrants.siteId} IS DISTINCT FROM ${input.siteId}::uuid)))`)).limit(1);
+    if(conflict)throw new AuthorizationError("account Person, role or credential scope conflict");
     if (!account.personId) {
       await tx.update(accessAccounts).set({personId:input.personId,updatedAt:new Date()})
         .where(eq(accessAccounts.id,account.id));
