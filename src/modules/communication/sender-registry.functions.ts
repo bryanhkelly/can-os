@@ -16,3 +16,8 @@ export const changeSenderAdministration=createServerFn({method:"POST"}).validato
  setResponseHeader("Cache-Control","private, no-store");
  return (await import("./sender-registry.server")).changeSenderAdministration(data);
 });
+
+export const revokeSenderAdministration=createServerFn({method:"POST"}).validator((input:unknown)=>z.object({expectedId:z.string().uuid(),confirmed:z.literal(true)}).strict().parse(input)).handler(async({data})=>{
+ setResponseHeader("Cache-Control","private, no-store");
+ return (await import("./sender-registry.server")).revokeSenderAdministration(data);
+});
