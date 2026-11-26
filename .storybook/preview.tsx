@@ -30,7 +30,7 @@ const preview: Preview = {
           accentForeground: "#102a26",
         }}><Story /></BrandTheme></div>;
       }
-      return <div data-storybook-theme={context.globals.theme === "dark" ? "dark" : "light"} className={context.globals.theme === "dark" ? "dark min-h-screen bg-background text-foreground" : "min-h-screen bg-background text-foreground"}>
+      return <div data-storybook-theme={context.globals.theme === "dark" ? "dark" : "light"} className={context.globals.theme === "dark" ? "dark bg-background text-foreground" : "bg-background text-foreground"}>
         <Story />
       </div>;
     },

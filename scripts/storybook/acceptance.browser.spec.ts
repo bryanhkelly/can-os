@@ -1,8 +1,17 @@
 import {test,expect,type Page} from "@playwright/test";
 import {readFileSync} from "node:fs";
 
-type IndexEntry={id:string;type:string;title:string;name?:string;exportName?:string};
+type IndexEntry={id:string;type:string;title:string;name?:string;exportName?:string;importPath?:string};
 const index=JSON.parse(readFileSync("storybook-static/index.json","utf8")) as {entries:Record<string,IndexEntry>};
+const registry=JSON.parse(readFileSync("docs/design-coverage/v61-registry.json","utf8")) as {layoutReferences:Record<string,string>};
+function registeredStoryId(reference:string){
+ const [file,name]=reference.split("#");
+ if(!file||!name)throw Error("Invalid layout reference: "+reference);
+ const suffix=name.replace(/([a-z0-9])([A-Z])/g,"$1-$2").replace(/([A-Z])([A-Z][a-z])/g,"$1-$2").toLowerCase();
+ const found=Object.values(index.entries).find(entry=>entry.type==="story"&&entry.importPath?.replace(/^\.\//,"")===file&&(entry.exportName===name||(!entry.exportName&&entry.id.endsWith("--"+suffix))));
+ if(!found)throw Error("Registered layout not built: "+reference);
+ return found.id;
+}
 function storyId(title:string,exportName:string){
  const found=Object.values(index.entries).find(entry=>entry.type==="story"&&entry.title===title&&
    (entry.exportName===exportName||entry.name===exportName.replace(/([a-z])([A-Z])/g,"$1 $2")));
@@ -17,8 +26,8 @@ async function openStory(page:Page,id:string,theme:string){
  // Fonts are the existing explicit exception pending a local asset migration.
  await page.route("**/*",async route=>{
    const url=new URL(route.request().url());
-   if(url.origin==="http://127.0.0.1:6007"&&!/^\/(?:api|_server|_serverFn|rpc|go)(?:\/|$)/i.test(url.pathname))return route.continue();
-   if(url.protocol==="data:"||url.protocol==="blob:"||["fonts.googleapis.com","fonts.gstatic.com"].includes(url.hostname))return route.continue();
+   if(url.origin==="http://127.0.0.1:6007"&&["GET","HEAD"].includes(route.request().method())&&!/^\/(?:api|_server|_serverFn|rpc|go)(?:\/|$)/i.test(url.pathname))return route.continue();
+   if(url.protocol==="data:"||url.protocol==="blob:"||(["GET","HEAD"].includes(route.request().method())&&["fonts.googleapis.com","fonts.gstatic.com"].includes(url.hostname)))return route.continue();
    unexpectedRequests.push(url.origin+url.pathname);return route.abort();
  });
  await page.goto("/iframe.html?id="+encodeURIComponent(id)+"&viewMode=story&globals=theme:"+encodeURIComponent(theme));
@@ -28,6 +37,7 @@ async function openStory(page:Page,id:string,theme:string){
 }
 async function assertCanvas(page:Page,failures:{unexpectedRequests:string[];pageErrors:string[]}){
  await expect(page.locator("#storybook-root")).toBeVisible();
+ await expect(page.locator("#storybook-root > *").first()).toBeVisible();
  const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);
  expect(overflow).toBeLessThanOrEqual(1);
  expect(failures.unexpectedRequests).toEqual([]);
@@ -58,3 +68,20 @@ test("welcome guide is discoverable from the built documentation",async({page},i
  const canvas=page.frameLocator("#storybook-preview-iframe");
  await expect(canvas.getByRole("heading",{name:"Becomuna Design System V6.1"})).toBeVisible();
 });
+
+test("print review preserves exact report values and definitions",async({page},info)=>{
+ const failures=await openStory(page,storyId("V6.1 templates/Reporting/Impact review","PrintReview"),String(info.project.metadata.theme));
+ await expect(page.getByRole("table",{name:"Monthly registrations exact values"})).toBeVisible();
+ await expect(page.getByRole("table",{name:"Community learning impact review metric definitions"})).toBeVisible();
+ await assertCanvas(page,failures);
+});
+
+// The full layout catalog runs at the smallest and a desktop viewport. This is
+// intentionally separate from the broad six-case matrix of critical workflows.
+for(const [layout,reference] of Object.entries(registry.layoutReferences)){
+ test("registered layout: "+layout,async({page},info)=>{
+  test.skip(!["compact-light","desktop-dark"].includes(info.project.name),"Layout smoke checks use compact and desktop projects.");
+  const failures=await openStory(page,registeredStoryId(reference),String(info.project.metadata.theme));
+  await assertCanvas(page,failures);
+ });
+}

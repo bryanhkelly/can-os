@@ -52,3 +52,5 @@ Chromatic baseline approval remains independent. Named Chromatic Modes replace t
 ## Visual configuration enforcement
 
 The project uses named Chromatic Modes only. Story-level theme modes remain supported, and legacy viewport arrays have been converted in the affected story files. The source contract detects accidental reintroduction of a legacy viewport array inside Chromatic configuration. The existing review workflow must still accept actual snapshots.
+
+The Storybook-only coverage explorer consumes the registry directly, with search, layout/review filters, pagination and story references. The independent browser suite now schedules 18 critical-workflow cases, 24 registered-layout smoke cases and one catalog-navigation case across six viewport/theme projects. These are planned automated checks, not a claim that the checks have passed.
