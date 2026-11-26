@@ -2,6 +2,7 @@ import {afterEach,beforeEach,describe,expect,it,vi} from "vitest";
 const mocked=vi.hoisted(()=>({
  execute:vi.fn(),txExecute:vi.fn(),transaction:vi.fn(),resolve:vi.fn(),
 }));
+vi.mock("@/modules/communication/sender-registry.server",()=>({readCampaignSenderRegistry:vi.fn(async()=>null)}));
 vi.mock("@/db/client",()=>({db:{execute:mocked.execute,transaction:mocked.transaction}}));
 vi.mock("@/modules/engagement/engagement-go.server",()=>({resolveGoExperience:mocked.resolve}));
 import {processEngagementCampaignDeliveries,campaignSenderReadiness} from "@/modules/communication/campaign-store.server";
@@ -102,4 +103,11 @@ describe("campaign sender readiness",()=>{
   expect(campaignSenderReadiness().issues).toHaveLength(2);
   expect(campaignSenderReadiness().sender).toBeNull();
  });
+});
+
+it("prefers a governed sender and postal address over legacy deployment defaults",()=>{
+ const result=campaignSenderReadiness({sender_from:"approved@real.org",postal_address:"Approved mailing address"});
+ expect(result.sender?.from).toBe("approved@real.org");
+ expect(result.sender?.address).toBe("Approved mailing address");
+ expect(result.issues).toEqual([]);
 });
