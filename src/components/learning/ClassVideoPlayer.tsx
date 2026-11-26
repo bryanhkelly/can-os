@@ -228,7 +228,7 @@ function ClassVideoPlayerSession({ title, url, loadUrl, resourceId, declaredVide
     <div className={presentation === "classroom" ? "classroom-player-screen" : undefined}>
     {!source && (loadUrl || video) && <Button variant="outline" type="button" disabled={pending}
       data-learning-resource-id={resourceId} onClick={() => void open()}
-      className="flex aspect-video min-h-48 w-full flex-col items-center justify-center gap-4 border bg-muted p-6 text-sm font-semibold hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-50">
+      className="flex aspect-video min-h-48 w-full flex-col items-center justify-center gap-4">
       <Play aria-hidden="true" className="size-12 text-primary"/>
       <span>{pending ? "Loading video..." : "Play video"}</span>
     </Button>}
