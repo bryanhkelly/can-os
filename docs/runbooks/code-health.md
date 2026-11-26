@@ -10,15 +10,16 @@ On a clean checkout of the target release revision:
 ```sh
 git rev-parse HEAD
 npm ci
-npm run quality:inventory
+npm run --silent quality:inventory > /tmp/becomuna-code-health.json
 npm run typecheck:full
 npm test
 ```
 
 The quality inventory reports ESLint complexity, function length, unused
 locals, unreachable code, duplicate imports and script aliases, followed
-by the existing exact-function-body component reuse inventory. Keep the
-actual output with the Git SHA. Treat findings as work items, not as proof
+by the existing exact-function-body component reuse inventory. It emits a single
+JSON document with the revision, working-tree cleanliness and every exact duplicate
+group (not just the first 50). Keep the actual output with the Git SHA. Treat findings as work items, not as proof
 of semantic equivalence or dead public exports.
 
 Resolve duplicate implementations through a single canonical owner where
