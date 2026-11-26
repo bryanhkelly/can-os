@@ -6,9 +6,10 @@
  *
  * Pure local file parsing: no database, network, generated assets or deploy.
  */
-import {readdir, readFile} from "node:fs/promises";
-import {join, relative, resolve, extname} from "node:path";
+import {readFile} from "node:fs/promises";
+import {relative, resolve, extname} from "node:path";
 import ts from "typescript";
+import { collectBuildSourceFiles } from "../lib/build-source-inventory.mjs";
 import { strictRpcShellViolations } from "../lib/strict-rpc-shell.mjs";
 import { duplicateImportBindings } from "../lib/import-binding-conflicts.mjs";
 import { sourceDependencySpecifiers } from "../lib/v61-component-dependencies.mjs";
@@ -28,38 +29,13 @@ const root=resolve(process.cwd());
 // Only runtime and build-tool source blocks a production build. Test suites
 // are parsed by their own test/CI commands, not production asset generation.
 const includeTests=process.argv.includes("--include-tests");
-const roots=includeTests ? ["src","scripts","tests"] : ["src","scripts"];
 const sourceExts=new Map([
   [".ts",ts.ScriptKind.TS], [".tsx",ts.ScriptKind.TSX],
   [".mts",ts.ScriptKind.TS], [".cts",ts.ScriptKind.TS],
   [".js",ts.ScriptKind.JS], [".jsx",ts.ScriptKind.JSX],
   [".mjs",ts.ScriptKind.JS], [".cjs",ts.ScriptKind.JS],
 ]);
-const ignoredDirs=new Set([
-  "node_modules",".git",".output","dist",".next",".vinxi","coverage","playwright-report",
-  "test-results",".tanstack",".wrangler",
-]);
-const files=[];
-async function visit(dir){
-  for(const entry of await readdir(dir,{withFileTypes:true})){
-    if(entry.isDirectory()){
-      if(!ignoredDirs.has(entry.name))await visit(join(dir,entry.name));
-    }else if(entry.isFile() && sourceExts.has(extname(entry.name)) &&
-       entry.name!=="routeTree.gen.ts"){
-      files.push(join(dir,entry.name));
-    }
-  }
-}
-for(const dir of roots)await visit(resolve(root,dir));
-// Build/tooling configs live at the repository root, outside src/ and scripts/.
-// They are executed by Vite, Drizzle, ESLint and Playwright, and malformed
-// imports here caused deploy failures even when src/ alone parsed cleanly.
-for(const entry of await readdir(root,{withFileTypes:true})){
-  if(entry.isFile() && sourceExts.has(extname(entry.name))){
-    files.push(join(root,entry.name));
-  }
-}
-files.sort();
+const files=await collectBuildSourceFiles(root,sourceExts.keys(),includeTests);
 let errors=0;
 for(const filename of files){
   const source=await readFile(filename,"utf8");
