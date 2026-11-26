@@ -28,13 +28,13 @@ export type PlatformOwnerDelegationRequest = z.infer<typeof delegationRequest>;
  * Always recheck the grant, the one-Person invariant, account verification and
  * the session's idle and absolute expiration.
  */
-export async function getVerifiedPlatformOwnerSession(request: Request) {
+export async function getVerifiedPlatformOwnerSession(request: Request, reader: Pick<typeof db,"select"> = db, lock = false) {
   const token = readCookie(request, accessSessionCookie);
   const pepper = process.env.CAN_ACCESS_TOKEN_PEPPER;
   if (!token || !/^[A-Za-z0-9_-]{40,}$/.test(token) || !pepper || pepper.length < 32)
     throw new AuthorizationError("verified Platform Owner session");
   const now = new Date();
-  const [owner] = await db.select({
+  const query = reader.select({
     sessionId: accessSessions.id,
     ownerAccountId: accessSessions.accountId,
     ownerPersonId: accessAccounts.personId,
@@ -42,6 +42,7 @@ export async function getVerifiedPlatformOwnerSession(request: Request) {
     grantId: accountPersonGrants.id,
     grantPersonId: accountPersonGrants.personId,
     accountVerifiedAt: accessAccounts.emailVerifiedAt,
+    authenticationMethod:accessSessions.authenticationMethod,
     privateCredential: sql<boolean>`(${accessAccounts.privateAccessCodeHash} IS NOT NULL)`,
     accountDisabled: accessAccounts.disabled,
     personActive: people.active,
@@ -66,12 +67,14 @@ export async function getVerifiedPlatformOwnerSession(request: Request) {
       isNull(accountPersonGrants.organizationId),
       isNull(accountPersonGrants.siteId),
     )).limit(1);
+  const [owner]=await (lock?query.for("update"):query);
   if (!owner || !owner.ownerPersonId || owner.ownerPersonId !== owner.grantPersonId ||
       !owner.accountVerifiedAt || owner.privateCredential || owner.accountDisabled || !owner.personActive ||
       !isEligiblePrivilegedMailbox(owner.ownerEmail) ||
+      (owner.authenticationMethod!=null && owner.authenticationMethod!=="email_link") ||
       (owner.sessionSharedDevice && now.getTime() - owner.lastActivityAt.getTime() >= 5 * 60_000))
     throw new AuthorizationError("verified Platform Owner identity");
-  await assertRawAccountPerson(owner.ownerAccountId, owner.ownerPersonId);
+  await assertRawAccountPerson(owner.ownerAccountId, owner.ownerPersonId,reader);
   return owner;
 }
 
@@ -234,11 +237,11 @@ export async function rotatePrivateAccountAccessCode(request: Request, raw: unkn
   if(request.headers.get("origin")!==new URL(request.url).origin)
     throw new AuthorizationError("same-origin credential recovery");
   const data=z.object({grantId:uuid,reason:z.string().trim().min(12).max(500),confirm:z.literal(true),operation:z.enum(["enroll","rotate"]).default("rotate")}).strict().parse(raw);
-  const owner=await getVerifiedPlatformOwnerSession(request);
-  assertPlatformOwnerUndelegated(owner);
   const pepper=process.env.CAN_ACCESS_TOKEN_PEPPER;
   if(!pepper||pepper.length<32)throw new Error("Account access is temporarily unavailable");
   return db.transaction(async tx=>{
+    const owner=await getVerifiedPlatformOwnerSession(request,tx,true);
+    assertPlatformOwnerUndelegated(owner);
     const [target]=await tx.select({accountId:accountPersonGrants.accountId,personId:accountPersonGrants.personId,
       role:accountPersonGrants.role}).from(accountPersonGrants)
       .where(and(eq(accountPersonGrants.id,data.grantId),eq(accountPersonGrants.active,true))).limit(1);
