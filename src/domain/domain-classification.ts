@@ -23,3 +23,13 @@ export function classifyOwnedData(ownerDomain: string | null | undefined): "synt
   const domain = normalizeIdentityDomain(ownerDomain);
   return domain === null ? "unknown" : isDemoDomain(domain) ? "synthetic" : "real";
 }
+
+/** Privileged mailbox authentication cannot rely on reserved test/example
+ * identities, even if a historical fixture carries an email verification date.
+ * This does not change Organization data classification. */
+export function isEligiblePrivilegedMailbox(email:string|null|undefined):boolean {
+  const domain=identityEmailDomain(email);
+  if(!domain||isDemoDomain(domain))return false;
+  return !["test","invalid","localhost","example"].includes(domain.split(".").at(-1)!) &&
+    !["example.com","example.net","example.org"].some(base=>domain===base||domain.endsWith("."+base));
+}
