@@ -4,7 +4,7 @@ import { resolveSourceDependency, runtimeDependencySpecifiers, sourceDependencyS
  * sources are examined. Legacy credential compatibility is separately
  * inventoried; it is not represented as compliant business logic. */
 const pureDomain = /^src\/domain\/(?:domain-classification|private-account-authority|access-grant-scope|access-context|individual-staff-handoff|email-delivery-policy)\.ts$/;
-const canonicalIdentity = /^src\/modules\/identity\/(?:session-grants|account-grant-reader|private-account-credential|scoped-person-account|individual-credential-issuer)\.server\.ts$/;
+const canonicalIdentity = /^src\/modules\/identity\/(?:session-grants|account-grant-reader|private-account-credential|scoped-person-account|named-person-account|individual-credential-issuer)\.server\.ts$/;
 const fixturePattern = /valorschool\.demo|barton\.demo|f1000000-0000-4000-8000-00000000000[23]/i;
 const fixtureModule = /^src\/domain\/local-demo-access(?:\.[cm]?[jt]s)?$/;
 
@@ -28,7 +28,17 @@ export function identityArchitectureViolations(file, parsed, ts) {
         failures.push("canonical identity must use domain classification, not fixture identities: "+specifier);
     }
   }
+  // Every production source, not only identity modules, must use the same
+  // provider dispatch. A provider endpoint is infrastructure, not a workflow.
+  for(const specifier of runtimeDependencySpecifiers(parsed,ts)){
+    if(/^resend(?:\/|$)/.test(specifier) && normalized!=="src/modules/communication/resend-email-transport.server.ts")
+      failures.push("Resend provider SDK belongs to the shared email transport");
+  }
   function visit(node) {
+    if ((ts.isStringLiteral(node)||ts.isNoSubstitutionTemplateLiteral(node)) &&
+        /api\.resend\.com\/emails(?:[/?#]|$)/i.test(node.text) &&
+        normalized!=="src/modules/communication/resend-email-transport.server.ts")
+      failures.push("direct Resend email endpoint outside the shared transport");
     if ((isCanonical || isDomain) && (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) &&
         fixturePattern.test(node.text))
       failures.push("institution-specific fixture identifier in canonical identity policy");
