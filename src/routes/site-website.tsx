@@ -4,7 +4,7 @@ import { WebsiteReviewStep } from "@/components/launch-studio/WebsiteReviewStep"
 import { WebsiteBrandIdentityStep } from "@/components/launch-studio/WebsiteBrandIdentityStep";
 import { WebsiteSiteContentStep } from "@/components/launch-studio/WebsiteSiteContentStep";
 import { WebsiteContentConsentStep } from "@/components/launch-studio/WebsiteContentConsentStep";
-import { type SiteBrandConfiguration } from "@/domain/site-brand";
+import { siteBrandConfigurationSchema, type SiteBrandConfiguration } from "@/domain/site-brand";
 import { prepareWebsiteCopyFromSiteInformation } from "@/domain/site-website-story-suggestions";
 import { WebsiteVisualIdentityStep } from "@/components/launch-studio/WebsiteVisualIdentityStep";
 import { brandRecommendedLayout } from "@/domain/site-brand-direction";
@@ -13,6 +13,7 @@ import { WebsiteTemplateGallery } from "@/components/launch-studio/WebsiteTempla
 import { privateWebsitePreviewUrl } from "@/domain/private-website-preview";
 import { schoolBrandDesigns } from "@/domain/school-brand-identity";
 import { Button } from "@/components/ui/button";
+import { launchModuleCompletionV61, type LaunchModuleCompletion } from "@/domain/launch-module-completion-v61";
 import { LaunchSiteFrame } from "@/components/launch-studio/LaunchSiteFrameV61";
 import { SiteGuideV61, type SiteGuideContentV61 } from "@/components/launch-studio/SiteGuideV61";
 import type { FriendlySiteIdentity } from "@/domain/friendly-site-urls";
@@ -94,6 +95,14 @@ export const loadWebsiteHome = (siteId?: string) => {
   )();
 };
 
+/** Reuse the authorized Launch read model for the dedicated website route. */
+export async function loadWebsiteLaunchCompletion(siteId: string): Promise<LaunchModuleCompletion> {
+  const { loadSiteLaunchView } = await import("./launch.site");
+  const result = await loadSiteLaunchView({ siteId, module: "site-profile" });
+  return result.ok && result.data.site?.id === siteId
+    ? launchModuleCompletionV61(result.data.site, result.data.overview) : {};
+}
+
 export const Route = createFileRoute("/site-website")({
   validateSearch:(search:Record<string,unknown>)=>websiteSearchSchema.parse(search),
   loaderDeps:({search})=>({siteId:search.siteId}),
@@ -116,11 +125,12 @@ function WebsiteAddressPreparation({siteId,canPrepare}:{siteId:string;canPrepare
   </section>;
 }
 
-export function WebsiteHome({ outcome, selection, studio = false, friendlyIdentity, onStepChange }: {
+export function WebsiteHome({ outcome, selection, studio = false, friendlyIdentity, completion, onStepChange }: {
   outcome: Awaited<ReturnType<typeof loadWebsiteHome>>;
   selection: { siteId?:string; programId?:string; returnGrantId?:string; returnToHub?:boolean; returnToSettings?:boolean; step?:typeof websiteStudioStepIds[number] };
   studio?: boolean;
   friendlyIdentity?: FriendlySiteIdentity;
+  completion?: LaunchModuleCompletion;
   onStepChange?: (step:number)=>void;
 }) {
   const [localStep,setLocalStep]=useState(0);
@@ -145,7 +155,7 @@ export function WebsiteHome({ outcome, selection, studio = false, friendlyIdenti
     {id:"content",title:"Your Content"}, {id:"review",title:"Review & Finish"},
   ];
   if (studio) return <LaunchSiteFrame
-    site={{id:data.siteId,name:data.siteName}} identity={friendlyIdentity} active="website-brand"
+    site={{id:data.siteId,name:data.siteName}} identity={friendlyIdentity} active="website-brand" completion={completion}
     previewAvailable={Boolean(data.host)}
     previewHref={privateWebsitePreviewUrl(data.siteId)}>
     <PageFrame width="wide" className="launch-studio-page">
@@ -168,7 +178,7 @@ export function WebsiteHome({ outcome, selection, studio = false, friendlyIdenti
                 status:step===index?"current" as const:"upcoming" as const,
               }))}
               onStepChange={id=>changeStep(websiteStudioStepIds.indexOf(id as typeof websiteStudioStepIds[number]))}>
-                <LocalWebsiteCopyEditor data={data} step={step} onStepChange={changeStep} allowPublication={!studio}/>
+                <LocalWebsiteCopyEditor data={data} step={step} onStepChange={changeStep} allowPublication={!studio} friendlyIdentity={friendlyIdentity}/>
               </GuidedSetupShell>
               : <WebsiteAddressPreparation siteId={data.siteId} canPrepare={data.canPrepareWebsite}/>}
           </div>
@@ -271,12 +281,13 @@ async function prepareWebsiteArtwork(file: File): Promise<string> {
 }
 
 function LocalWebsiteCopyEditor({
-  data, step, onStepChange, allowPublication,
+  data, step, onStepChange, allowPublication, friendlyIdentity,
 }: {
   data: Awaited<ReturnType<typeof getPartnerWebsitePreviewView>>;
   step: number;
   onStepChange: (step: number) => void;
   allowPublication: boolean;
+  friendlyIdentity?: FriendlySiteIdentity;
 }) {
   const router = useRouter();
   const [editor, setEditor] = useState(() => {
@@ -385,8 +396,14 @@ function LocalWebsiteCopyEditor({
     setSavedBrandName(brand.configuration.displayName);
   }
 
-  async function saveDraft(mode: "stay" | "exit" = "stay") {
-    if(busy||!data.canEdit||!data.draftStorageReady||revisionConflict)return;
+  const brandValid = siteBrandConfigurationSchema.safeParse(brandConfig(content)).success;
+  const canSave = !busy && data.canEdit && data.draftStorageReady && !revisionConflict && brandValid;
+  const saveBlockReason = !data.canEdit ? "You do not have permission to save this Site."
+    : !data.draftStorageReady ? "Draft storage is unavailable."
+    : revisionConflict ? "Load the latest saved revision before saving."
+    : !brandValid ? "Enter a valid Site display name (1–120 characters) and Brand settings." : "";
+  async function saveDraft(mode: "stay" | "exit" | "finish" = "stay") {
+    if(!canSave)return;
     setError("");
     const submitted=content;
     const outcome=await mutation.run(()=>saveSiteWebsiteAndBrand({data:{
@@ -401,9 +418,15 @@ function LocalWebsiteCopyEditor({
       acceptSavedBrand(outcome.value.brand);
       markSaved(submitted,outcome.value.website.revision);
       if(mode==="stay") return outcome.status==="saved";
-      if(mode==="exit"&&outcome.status==="saved"){
+      if(mode!=="stay"&&outcome.status==="saved"){
         releaseNavigation();
-        try { await router.navigate({ to: "/sites/$siteId", params: { siteId: data.siteId } }); }
+        try {
+          if (mode === "finish" && !allowPublication) {
+            if (friendlyIdentity) await router.navigate({ to: "/o/$organizationSlug/$siteSlug/launch", params: friendlyIdentity, search: { module: "create-outreach" } });
+            else await router.navigate({ to: "/launch/site", search: { siteId: data.siteId, module: "create-outreach" } });
+          } else if (friendlyIdentity) await router.navigate({ to: "/o/$organizationSlug/$siteSlug", params: friendlyIdentity });
+          else await router.navigate({ to: "/sites/$siteId", params: { siteId: data.siteId } });
+        }
         catch(failure) {
           setError(mutationErrorMessage(failure,
             "Website saved, but we could not open your Site Workspace. Try again from the navigation."));
@@ -415,7 +438,7 @@ function LocalWebsiteCopyEditor({
     }
   }
   async function generateContent(advance=false) {
-    if(busy||!data.canEdit||!data.draftStorageReady||revisionConflict)return;
+    if(!canSave)return;
     const consent=content.contentReuseConsent;
     if(consent!=="granted"&&consent!=="denied")return;
     // Save through the existing versioned draft command before reading the brief.
@@ -656,19 +679,20 @@ function LocalWebsiteCopyEditor({
           if(action?.kind==="reload") loadLatestRevision();
           else if(action?.kind==="restore") void restore(action.revision);
         }} />
+      {!canSave && !busy && <p role="status" className="text-sm text-muted-foreground">{saveBlockReason}</p>}
       <ActionFooter layout="inline" className="justify-between border-t border-border/60 pt-5">
         <Button type="button" variant="outline" disabled={busy || step === 0}
           onClick={()=>onStepChange(Math.max(0,step-1))}>Back</Button>
         <div className="flex flex-wrap gap-2">
           <Button variant="ghost" type="button"
-            disabled={busy || !data.canEdit || !data.draftStorageReady || revisionConflict}
+            disabled={!canSave}
             onClick={()=>void saveDraft("exit")}>Save &amp; Exit</Button>
           {step < 5 ? <Button type="button"
-            disabled={busy||(step===3 && ((content.contentReuseConsent??"unselected")==="unselected"||!data.canEdit||!data.draftStorageReady||revisionConflict))}
+            disabled={!canSave||(step===3 && (content.contentReuseConsent??"unselected")==="unselected")}
             onClick={()=>step===3?void generateContent(true):onStepChange(Math.min(5,step+1))}>Continue</Button>
-            : <Button type="button" disabled={busy || !data.canEdit || !data.draftStorageReady || revisionConflict}
-              loading={busy} loadingLabel="Saving private draft…"
-              onClick={()=>void saveDraft("stay")}>Save & Finish</Button>}
+            : <Button type="button" disabled={!canSave}
+              loading={mutation.pending} loadingLabel="Saving private draft…"
+              onClick={()=>void saveDraft("finish")}>Save & Finish</Button>}
         </div>
       </ActionFooter>
     </div>
