@@ -4,7 +4,7 @@ import { WebsiteTemplateGallery } from "./WebsiteTemplateGallery";
 import { sitePaletteIds, siteTypographyIds, type SiteTemplateId, type SitePaletteId, type SiteTypographyId } from "@/domain/site-theme";
 import { Label } from "@/components/ui/label";
 
-const meta = { title: "Workflows/Website Launch Studio",
+const meta = { id: "workflows-website-launch-studio", title: "08 Feature workspaces/Launch Studio/Website template gallery",
   parameters: { layout: "fullscreen" } } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;

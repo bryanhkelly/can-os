@@ -35,7 +35,7 @@ function ClassroomFrame({ children }: { children: ReactNode }) {
   </div>;
 }
 const meta = {
-  title: "Learning/Focused classroom",
+  id: "learning-focused-classroom", title: "08 Feature workspaces/Learning/Focused classroom",
   component: ClassroomWorkspace,
   parameters: { layout: "fullscreen" },
   args: {

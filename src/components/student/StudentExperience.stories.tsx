@@ -27,7 +27,7 @@ const dashboard: StudentDashboardData = {
   ], notices:[{id:"notice",title:"This week's school update",body:"Review the upcoming service schedule with your school.",acknowledged:false}] } },
 };
 const meta = {
-  title:"Student/Refined dashboard",
+  id: "student-refined-dashboard", title: "07 Persona experiences/Student dashboard",
   component:StudentExperience,
   parameters:{layout:"fullscreen"},
   args:{

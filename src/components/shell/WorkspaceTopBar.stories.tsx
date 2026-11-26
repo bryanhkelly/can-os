@@ -5,7 +5,7 @@ import { useState } from "react";
 import { WorkspaceTopBar } from "./WorkspaceTopBar";
 
 const meta = {
-  title: "Shell/Workspace top bar",
+  id: "shell-workspace-top-bar", title: "03 Components/Shell/Workspace top bar",
   component: WorkspaceTopBar,
   args: {
     member: { role: "teacher", firstName: "Avery", lastName: "Teacher", siteId: "east" },

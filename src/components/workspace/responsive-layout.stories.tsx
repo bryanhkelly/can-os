@@ -6,7 +6,7 @@ import { WorkspacePanel } from "./workspace-panel";
 import { DashboardPanel } from "./dashboard-layout";
 import { QueryState } from "./query-state";
 
-const meta = {title:"Workspace/Responsive composition",parameters:{layout:"padded"}} satisfies Meta;
+const meta = {id: "workspace-responsive-composition", title: "11 Accessibility and responsive/Responsive composition",parameters:{layout:"padded"}} satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
 const longTitle = "CommunityLearningCenterWithAnUnusuallyLongUnbrokenName";

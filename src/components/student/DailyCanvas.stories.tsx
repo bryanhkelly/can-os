@@ -6,7 +6,7 @@ const defaultContent: DailyCanvasContent = {
   id: "evergreen", audience: "student", priority: "default",
   headline: "Make today count.", supportingCopy: "Your classes and next steps are ready.", campaignLabel: "Your learning day",
 };
-const meta = { title: "Student/Daily canvas", component: DailyCanvas, parameters: { layout: "fullscreen" } } satisfies Meta<typeof DailyCanvas>;
+const meta = { id: "student-daily-canvas", title: "07 Persona experiences/Student daily canvas", component: DailyCanvas, parameters: { layout: "fullscreen" } } satisfies Meta<typeof DailyCanvas>;
 export default meta;
 type Story = StoryObj<typeof meta>;
 const render: Story["render"] = args => <div className="bg-background p-4 sm:p-8"><DailyCanvas {...args} /></div>;

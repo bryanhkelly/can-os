@@ -140,6 +140,123 @@
         "SiteBrand",
         "InvalidBrandFallsBack"
       ]
+    },
+    {
+      "path": "src/components/communication/MessagesWorkspace.stories.tsx",
+      "previousTitle": "Communication/Messages",
+      "title": "08 Feature workspaces/Communication/Messages",
+      "metaId": "communication-messages",
+      "exports": [
+        "Conversation",
+        "SearchConversations",
+        "Empty",
+        "NewMessageLookup",
+        "Loading",
+        "Unavailable"
+      ]
+    },
+    {
+      "path": "src/components/communication/NotificationFeed.stories.tsx",
+      "previousTitle": "Communication/Notifications",
+      "title": "08 Feature workspaces/Communication/Notifications",
+      "metaId": "communication-notifications",
+      "exports": [
+        "ActivityFeed",
+        "Empty",
+        "Saving"
+      ]
+    },
+    {
+      "path": "src/components/learning/ClassroomWorkspace.stories.tsx",
+      "previousTitle": "Learning/Focused classroom",
+      "title": "08 Feature workspaces/Learning/Focused classroom",
+      "metaId": "learning-focused-classroom",
+      "exports": [
+        "Lesson",
+        "UnavailableCurriculum"
+      ]
+    },
+    {
+      "path": "src/components/student/StudentExperience.stories.tsx",
+      "previousTitle": "Student/Refined dashboard",
+      "title": "07 Persona experiences/Student dashboard",
+      "metaId": "student-refined-dashboard",
+      "exports": [
+        "LiveShapedData",
+        "Empty",
+        "IndependentFailures",
+        "MoreThanTwentyFivePriorities"
+      ]
+    },
+    {
+      "path": "src/components/student/DailyCanvas.stories.tsx",
+      "previousTitle": "Student/Daily canvas",
+      "title": "07 Persona experiences/Student daily canvas",
+      "metaId": "student-daily-canvas",
+      "exports": [
+        "Default",
+        "Verse",
+        "Holiday",
+        "Emergency",
+        "NoCampaign",
+        "ParentNotice",
+        "PrioritySelection",
+        "EditorialActions",
+        "DarkEditorialActions",
+        "SiteEditorialActions"
+      ]
+    },
+    {
+      "path": "src/components/shell/WorkspaceTopBar.stories.tsx",
+      "previousTitle": "Shell/Workspace top bar",
+      "title": "03 Components/Shell/Workspace top bar",
+      "metaId": "shell-workspace-top-bar",
+      "exports": [
+        "ActiveSchool",
+        "NotificationsOpen",
+        "OrganizationScope",
+        "DismissDemoInformation",
+        "OrdinarySessionRefreshError",
+        "DemoWorkspaceChange"
+      ]
+    },
+    {
+      "path": "src/components/shell/WorkspaceContextSwitcher.stories.tsx",
+      "previousTitle": "Shell/Workspace context switcher",
+      "title": "03 Components/Shell/Workspace context switcher",
+      "metaId": "shell-workspace-context-switcher",
+      "exports": [
+        "AuthorizedWorkspaces",
+        "SwitchError"
+      ]
+    },
+    {
+      "path": "src/components/launch-studio/LaunchStudioDestinations.stories.tsx",
+      "previousTitle": "Workflows/Launch Studio/V6.1 governed destination",
+      "title": "08 Feature workspaces/Launch Studio/Governed destination",
+      "metaId": "workflows-launch-studio-v6-1-governed-destination",
+      "exports": [
+        "FinalGate"
+      ]
+    },
+    {
+      "path": "src/components/launch-studio/WebsiteTemplateGallery.stories.tsx",
+      "previousTitle": "Workflows/Website Launch Studio",
+      "title": "08 Feature workspaces/Launch Studio/Website template gallery",
+      "metaId": "workflows-website-launch-studio",
+      "exports": [
+        "SevenWireframes"
+      ]
+    },
+    {
+      "path": "src/components/workspace/responsive-layout.stories.tsx",
+      "previousTitle": "Workspace/Responsive composition",
+      "title": "11 Accessibility and responsive/Responsive composition",
+      "metaId": "workspace-responsive-composition",
+      "exports": [
+        "NarrowWorkspace",
+        "StandardWorkspace"
+      ]
     }
   ]
 }
