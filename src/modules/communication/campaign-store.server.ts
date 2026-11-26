@@ -1,3 +1,4 @@
+import {readEmailConfiguration} from "@/modules/communication/email-configuration.server";
 import { readEmailProviderReceipt } from "@/domain/email-provider-receipt";
 import { submitResendEmail } from "@/modules/communication/resend-email-transport.server";
 import {sql,type SQL} from "drizzle-orm";
@@ -15,15 +16,12 @@ export async function campaignRows<T>(executor:Executor,query:SQL):Promise<T[]>{
 }
 /** Report configuration requirements without exposing credentials or sender details. */
 export function campaignSenderReadiness(){
- const from=process.env.CAN_CAMPAIGN_FROM_EMAIL?.trim();
- const address=process.env.CAN_CAMPAIGN_POSTAL_ADDRESS?.trim();
- const key=process.env.RESEND_API_KEY?.trim();
- const origin=process.env.CAN_ACCESS_PUBLIC_ORIGIN?.trim();
+ const {from,postalAddress:address,apiKey:key,publicOrigin:origin,webhookConfigured}=readEmailConfiguration("campaign");
  const issues:string[]=[];
  if(!from||/[\r\n]/.test(from))issues.push("An approved campaign sender is required.");
  if(!address||address.length>500)issues.push("A valid campaign postal address is required.");
  if(!key)issues.push("The Resend connection is not configured.");
- if(!process.env.RESEND_WEBHOOK_SECRET?.trim())issues.push("Signed Resend delivery events are not configured.");
+ if(!webhookConfigured)issues.push("Signed Resend delivery events are not configured.");
  try{const url=new URL(origin??"");if(url.protocol!=="https:"||url.pathname!=="/"||url.search||url.hash||url.username||url.password)throw new Error();}
  catch{issues.push("A valid public HTTPS origin is required.");}
  return {issues,sender:issues.length===0&&from&&address&&key&&origin?{from,address,key,origin}:null};
