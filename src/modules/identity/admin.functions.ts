@@ -24,7 +24,7 @@ import {
 import { provisionSiteWebsitePublisherRelationship } from "@/modules/sites/site-publisher-invitation.server";
 import { DomainError } from "@/domain/errors";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
-import { matchesDemoCredentialScope } from "./demo-school-tenants.server";
+import { matchesLegacyStaffInvitationScope } from "./demo-school-tenants.server";
 import { verifiedStaffIdentityPredicate } from "./verified-staff-identity.server";
 // The staff-invite flow must not grant student, guardian, or CAN institutional identities.
 const assignableRoles = localStaffInviteRoles;
@@ -234,7 +234,7 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
           throw new AuthorizationError("individually authenticated administrator");
       }
       // Legacy shared credentials retain the exact original tenant boundary.
-      if (localDemoIdentity && !individual && !await matchesDemoCredentialScope(emailNormalized, organizationId, siteId, tx)) {
+      if (localDemoIdentity && !individual && !await matchesLegacyStaffInvitationScope(emailNormalized, organizationId, siteId, tx)) {
         throw new DomainError("FORBIDDEN", "Use governed individual identity enrollment or the original shared credential scope");
       }
       let privateAccessCode:string|undefined;
