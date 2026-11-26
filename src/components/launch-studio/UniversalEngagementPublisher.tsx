@@ -93,7 +93,7 @@ function UniversalEngagementPublisherSession({siteId,packageId,ownerSurface,outr
         const link=await createEngagementGoLink({data:{engagementId:saved.engagementId,versionId:saved.versionId,channel:"email"}});
         setLinks([link]);setEmailLink(link.linkId);
       }
-      setNotice(outreach?"Email invitation prepared. Add recipients below. Nothing has been sent.":"Published immutable engagement v1. You can create independent links for each channel.");
+      setNotice(outreach?"Invitation and email link saved. Recipient preparation is available; sending requires successful verification. No email has been sent.":"Published immutable engagement v1. You can create independent links for each channel.");
     }catch(error){setError(errorMessage(error));}
     finally{pending.current=false;setBusy(false);}
   }
@@ -107,7 +107,7 @@ function UniversalEngagementPublisherSession({siteId,packageId,ownerSurface,outr
       });
       setLinks(current=>[link,...current]);
       if(outreach)setEmailLink(link.linkId);
-      setNotice("Go Link created. Copy its URL to distribute.");
+      setNotice(outreach?"Email link saved. Sending requires successful invitation verification.":"Go Link created. Copy its URL to distribute.");
     }catch(error){setError(errorMessage(error));}
     finally{pending.current=false;setBusy(false);}
   }

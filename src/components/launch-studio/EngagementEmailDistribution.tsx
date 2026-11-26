@@ -26,10 +26,10 @@ function EmailDistributionSession({engagementId,linkId,onClose}:DistributionProp
   const active=useRef(false);
   const pending=useRef(false);
   useEffect(()=>{active.current=true;return()=>{active.current=false;};},[]);
-  useEffect(()=>{let active=true;setDraft(null);setRecipients("");setAuthorized(false);setError("");setNotice("");
+  useEffect(()=>{let active=true;setDraft(null);setAuthorized(false);setError("");setNotice("");
     prepareEngagementEmailDraft({data:{engagementId,linkId}})
       .then(value=>{if(active)setDraft(value);})
-      .catch(()=>{if(active)setError("The saved email invitation could not be verified.");});
+      .catch(()=>{if(active)setError("The saved email invitation could not be verified. You can prepare recipients, but sending and copying remain unavailable. Ask your platform administrator to check the approved public origin and invitation destination.");});
     return()=>{active=false;};
   },[engagementId,linkId,revision]);
   const parsed=parseInvitationRecipients(recipients);
@@ -49,7 +49,7 @@ function EmailDistributionSession({engagementId,linkId,onClose}:DistributionProp
     finally{pending.current=false;if(active.current)setBusy(false);}
   }
   async function copy(){
-    if(pending.current)return;
+    if(!draft||pending.current)return;
     pending.current=true;setCopying(true);setError("");setNotice("");
     try{const current=await prepareEngagementEmailDraft({data:{engagementId,linkId}});
       if(!active.current)return;
@@ -60,17 +60,15 @@ function EmailDistributionSession({engagementId,linkId,onClose}:DistributionProp
   }
   return <WorkspacePanel headingLevel="h3" title="Prepare email invitation" className="mt-4" actions={<Button type="button" variant="ghost" size="sm" onClick={onClose}>Close</Button>}>
     <WorkspaceNotice className="mt-3">For a small external email draft, recipients stay in your browser and are placed in BCC. Native campaign sending below uses saved consented lists and separate provider receipts.</WorkspaceNotice>
-    {draft&&<>
-      <WorkspacePanel headingLevel="h4" title={draft.subject} className="mt-3"><p className="whitespace-pre-wrap [overflow-wrap:anywhere] text-sm">{draft.body}</p></WorkspacePanel>
+    {draft&&<WorkspacePanel headingLevel="h4" title={draft.subject} className="mt-3"><p className="whitespace-pre-wrap [overflow-wrap:anywhere] text-sm">{draft.body}</p></WorkspacePanel>}
+    {!draft&&<QueryState loading={!error?"Verifying saved invitation…":undefined} error={error||undefined} onRetry={()=>setRevision(v=>v+1)}/>}
       <Field className="mt-3" label="Recipient email addresses (up to 20)" description={`${parsed.recipients.length} unique addresses.`}
         error={parsed.invalid.length?"Remove invalid or synthetic addresses.":parsed.tooMany?"Limit is 20 addresses.":undefined}>
         <Textarea value={recipients} maxLength={6000} rows={3} disabled={busy||copying} placeholder="Enter one address per line" onChange={e=>{setRecipients(e.target.value);setAuthorized(false);}}/>
       </Field>
       <label className="mt-3 flex items-start gap-2 text-sm"><Checkbox disabled={busy||copying} checked={authorized} onChange={e=>setAuthorized(e.target.checked)}/>I have permission to contact these recipients for this invitation and will honor their communication preferences.</label>
-      <ActionFooter layout="inline"><Button type="button" disabled={!ready||busy||copying} loading={busy} onClick={()=>void handoff()}>Open email draft</Button><Button type="button" variant="outline" disabled={busy||copying} loading={copying} onClick={()=>void copy()}>Copy invitation</Button></ActionFooter>
-    </>}
-    {!draft&&<QueryState loading={!error?"Verifying saved invitation…":undefined} error={error||undefined} onRetry={()=>setRevision(v=>v+1)}/>}
-    {draft&&<NativeEngagementCampaigns engagementId={engagementId} linkId={linkId} invitationReady/>}
+      <ActionFooter layout="inline"><Button type="button" disabled={!ready||busy||copying} loading={busy} onClick={()=>void handoff()}>Open email draft</Button><Button type="button" variant="outline" disabled={!draft||busy||copying} loading={copying} onClick={()=>void copy()}>Copy invitation</Button></ActionFooter>
+    <NativeEngagementCampaigns engagementId={engagementId} linkId={linkId} invitationReady={!!draft}/>
     {notice&&<WorkspaceNotice tone="success" className="mt-3">{notice}</WorkspaceNotice>}
     {draft&&error&&<WorkspaceNotice tone="danger" className="mt-3">{error}</WorkspaceNotice>}
   </WorkspacePanel>;
