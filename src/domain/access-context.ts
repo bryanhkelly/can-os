@@ -16,7 +16,10 @@ export type SessionPrincipal = {
  sessionId: string;
  activeGrantId: string | null;
 };
+export type SessionAuthenticationMethod = "email_link" | "local_demo_code" | "private_access_code";
 export type AccessContext = CommandContext & {
+ /** Server-derived credential provenance, never accepted from a client command. */
+ authenticationMethod?: SessionAuthenticationMethod | null;
  accountId: string;
  sessionId: string;
  grantId: string;
