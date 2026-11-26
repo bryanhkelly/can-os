@@ -1,4 +1,5 @@
-import { and, asc, eq, gt, isNotNull, isNull, lte, notInArray, or, sql } from "drizzle-orm";
+import { outboundClaimPredicate, outboundLeaseOwnership } from "@/modules/communication/outbound-lease-predicates.server";
+import { and, asc, eq, gt, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import * as s from "@/db/schema";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
@@ -33,9 +34,7 @@ function schoolFamilyReceipt() {
 }
 
 function owned(claim: OutboundClaim) {
-  return and(eq(delivery.id, claim.id),
-    eq(delivery.status, "processing"),
-    eq(delivery.leaseUntil, claim.leaseUntil));
+  return outboundLeaseOwnership(delivery, claim);
 }
 
 /**
@@ -54,13 +53,7 @@ const schoolFamilyAdapter = {
         // Only claim this feature's receipts. A correlated EXISTS avoids
         // locking a shared school bulletin Action during SKIP LOCKED claims.
         schoolFamilyReceipt(),
-        ...(seenIds.length ? [notInArray(delivery.id, [...seenIds])] : []),
-        or(
-          and(eq(delivery.status, "pending"),
-            or(isNull(delivery.nextAttemptAt), lte(delivery.nextAttemptAt, now))),
-          and(eq(delivery.status, "failed"), lte(delivery.nextAttemptAt, now)),
-          and(eq(delivery.status, "processing"), lte(delivery.leaseUntil, now)),
-        ),
+        outboundClaimPredicate(delivery, now, seenIds),
       )).orderBy(asc(delivery.createdAt)).limit(1)
         .for("update", { skipLocked: true });
       if (!row) return null;
