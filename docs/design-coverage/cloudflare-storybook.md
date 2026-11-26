@@ -40,14 +40,14 @@ Use the following settings on the dedicated Worker:
 | Repository | bryanhkelly/can-os |
 | Worker | becomuna-storybook |
 | Production branch | 6.1-storybook-configuration |
-| Root directory | / |
-| Build command | npm run build:storybook:cloudflare |
-| Deploy command | npm run deploy:storybook:cloudflare |
+| Root directory | deploy/storybook |
+| Build command | npm --prefix ../.. ci --include=dev && npm --prefix ../.. run build:storybook:cloudflare |
+| Deploy command | npm --prefix ../.. run deploy:storybook:cloudflare |
 | Preview builds | Disabled |
 | Access | Protect all traffic |
-| Build variable | NODE_VERSION=22 |
+| Build variables | NODE_VERSION=22; SKIP_DEPENDENCY_INSTALL=1 |
 
-Cloudflare defaults to the repository's default branch. If the creation screen does not expose branch selection, create a standalone Hello World Worker with Access enabled first, then connect the repository through Settings > Build and select the Storybook branch before running a build. The Storybook-specific commands exist only on the dedicated branch until explicitly merged. Never substitute the production build or default Wrangler deploy command.
+The dedicated `deploy/storybook/wrangler.jsonc` is a discovery configuration for Workers Builds so Cloudflare identifies the correct Worker, not the application's root Worker. The actual deploy command uses the validated generated package and configuration. Do not deploy the discovery configuration directly. The explicit npm prefix installs the locked dependencies at the repository root; disable Cloudflare automatic dependency installation with the build variable above. Cloudflare defaults to the repository's default branch. If the creation screen does not expose branch selection, create a standalone Hello World Worker with Access enabled first, then connect the repository through Settings > Build and select the Storybook branch before running a build. The Storybook-specific commands exist only on the dedicated branch until explicitly merged. Never substitute the production build or default Wrangler deploy command.
 
 The build script installs Chromium and its system dependencies, runs the portable acceptance gate and prepares the static package. The deploy script rechecks the receipt, package and dedicated Wrangler configuration, and invokes the repository's installed Wrangler without using the application config. If a browser dependency cannot be installed on the managed builder or acceptance fails, deployment must stop. The hosted build is not yet verified. Use a dedicated or suitably scoped Workers build token; no application environment variables are required. The generated Worker configuration disables public hostnames on each deploy. Enable the hostname only with verified all-traffic Access protection.
 

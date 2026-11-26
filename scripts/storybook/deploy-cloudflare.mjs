@@ -30,6 +30,8 @@ try{
  const expectedFiles=manifest.files.filter(file=>!file.path.endsWith(".map"));
  if(!isDeepStrictEqual(staged.files,expectedFiles))throw Error("Preview assets differ from accepted catalog.");
 }finally{rmSync(check,{recursive:true,force:true});}
+const override=process.env.WRANGLER_CI_OVERRIDE_NAME;
+if(override&&override!==expected.name)throw Error("Cloudflare build target mismatch. Refusing to deploy to "+override);
 const wrangler=join(root,"node_modules/wrangler/bin/wrangler.js");
 console.log("Deploying dedicated Worker becomuna-storybook; public URLs disabled.");
 const result=spawnSync(process.execPath,[wrangler,"deploy","--config",config],{cwd:root,stdio:"inherit",windowsHide:true});
