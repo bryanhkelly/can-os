@@ -208,6 +208,7 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
     const actor = await requireRegistrar();
     const { db } = await import("@/db/client");
     const { accessAccounts, accountPersonGrants, organizations, sites } = await import("@/db/schema");
+    const { lockAccountProvisioningEmail, provisioningAccountSelection, readLockedProvisioningAccount } = await import("./account-provisioning-store.server");
     const organizationId = actor.organizationIds[0]!;
     if(actor.grantSiteId && data.siteId!==actor.grantSiteId)
       throw new AuthorizationError("site-limited registrar cannot create sibling school grants");
@@ -221,7 +222,7 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
     const siteId = site.id;
     const emailNormalized = data.email.toLowerCase();
     const invitation = await db.transaction(async tx => {
-      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"person-account:" + emailNormalized}))`);
+      await lockAccountProvisioningEmail(tx, emailNormalized);
       const localDemoIdentity = isDemoAccountEmail(emailNormalized);
       const confirmation = data.privateIdentityConfirmation;
       const individual = localDemoIdentity && !!confirmation;
@@ -238,9 +239,7 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
         throw new DomainError("FORBIDDEN", "Use governed individual identity enrollment or the original shared credential scope");
       }
       let privateAccessCode:string|undefined;
-      let [account] = await tx.select({ id: accessAccounts.id, personId: accessAccounts.personId, disabled: accessAccounts.disabled,
-        privateCredential:sql<boolean>`(${accessAccounts.privateAccessCodeHash} IS NOT NULL)` }).from(accessAccounts)
-        .where(eq(accessAccounts.emailNormalized, emailNormalized)).for("update").limit(1);
+      let [account] = await readLockedProvisioningAccount(tx, emailNormalized);
       if (account?.disabled) throw new DomainError("FORBIDDEN", "Disabled account cannot be invited");
       if (account?.privateCredential && !individual)
         throw new AuthorizationError("explicit individual identity confirmation required");
@@ -251,8 +250,7 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
         privateAccessCode=credential?.privateAccessCode;
         [account] = await tx.insert(accessAccounts).values({ emailNormalized,
           ...(credential?{privateAccessCodeHash:credential.privateAccessCodeHash}:{})
-        }).returning({ id: accessAccounts.id, personId: accessAccounts.personId, disabled: accessAccounts.disabled,
-          privateCredential:sql<boolean>`(${accessAccounts.privateAccessCodeHash} IS NOT NULL)` });
+        }).returning(provisioningAccountSelection);
         await recordAudit(tx, actor, {
           action: "admin.access_account.create", resourceType: "access_account", resourceId: account!.id,
           after: { emailNormalized },
