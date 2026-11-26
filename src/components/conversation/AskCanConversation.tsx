@@ -128,13 +128,12 @@ export function AskCanConversation() {
       {loading && <p role="status" className="text-sm text-muted-foreground">Loading your conversations...</p>}
       {threads.length > 0 && <div className="mt-5 flex flex-wrap gap-2" aria-label="Conversation history">
         {threads.slice(-8).reverse().map(thread => (
-          <Button variant="ghost" key={thread.id} type="button" disabled={busy || loading} aria-pressed={conversationId === thread.id} onClick={() => void openThread(thread.id)}
-            className={" border px-3 py-1 text-xs " +
-              (conversationId === thread.id ? "bg-muted" : "hover:bg-muted")}>
+          <Button variant={conversationId === thread.id ? "secondary" : "outline"} size="sm" key={thread.id} type="button" disabled={busy || loading} aria-pressed={conversationId === thread.id} onClick={() => void openThread(thread.id)}
+            >
             {new Date(thread.lastActiveAt).toLocaleString()}
           </Button>
         ))}
-        <Button variant="outline" type="button" disabled={busy || loading} className=" border px-3 py-1 text-xs"
+        <Button variant="outline" size="sm" type="button" disabled={busy || loading}
           onClick={() => { ++selection.current; setConversationId(undefined); setMessages([]); setError(""); }}>
           New conversation
         </Button>
@@ -189,7 +188,7 @@ export function AskCanConversation() {
                     type="button"
                     disabled={busy}
                     onClick={() => decide(message.actionPreview!.runId, true)}
-                    className=" bg-primary px-4 py-1.5 text-sm text-primary-foreground disabled:opacity-50"
+                    
                   >
                     Confirm
                   </Button>
@@ -197,7 +196,7 @@ export function AskCanConversation() {
                     type="button"
                     disabled={busy}
                     onClick={() => decide(message.actionPreview!.runId, false)}
-                    className=" border px-4 py-1.5 text-sm hover:bg-muted disabled:opacity-50"
+                    
                   >
                     Not now
                   </Button>
