@@ -28,7 +28,6 @@ const categories: Array<{ value: ConcernKind; label: string }> = [
   { value: "self_harm_or_welfare", label: "Self-harm or welfare" },
   { value: "other_or_uncertain", label: "Other or unsure" },
 ];
-const control = "mt-1 min-h-10 w-full  border border-input bg-card px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 const date = (value: Date | string) => new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 
 export function SafeguardingReporter({ workspace, reload }: {
@@ -79,7 +78,7 @@ export function SafeguardingReporter({ workspace, reload }: {
         <form onSubmit={event => void submit(event)} aria-busy={busy}>
           <fieldset disabled={busy} className="grid gap-5">
             <Label className="text-sm font-medium">Is anyone in immediate danger or in need of urgent medical assistance?
-              <Select required className={control} value={immediateDanger} onChange={event => setImmediateDanger(event.target.value as typeof immediateDanger)}>
+              <Select required className="mt-1 w-full" value={immediateDanger} onChange={event => setImmediateDanger(event.target.value as typeof immediateDanger)}>
                 <option value="unsure">Unsure</option><option value="yes">Yes — seek immediate real-world help</option><option value="no">No immediate danger identified</option>
               </Select>
             </Label>
@@ -93,7 +92,7 @@ export function SafeguardingReporter({ workspace, reload }: {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <Label className="text-sm font-medium">How do you know?
-                <Select className={control} value={source} onChange={event => setSource(event.target.value as typeof source)}>
+                <Select className="mt-1 w-full" value={source} onChange={event => setSource(event.target.value as typeof source)}>
                   <option value="direct_observation">I observed it directly</option><option value="student_disclosure">A student disclosed it</option>
                   <option value="third_party_report">Another person reported it</option><option value="uncertain">Source is uncertain</option>
                 </Select>
@@ -103,10 +102,10 @@ export function SafeguardingReporter({ workspace, reload }: {
               </Label>
             </div>
             <Label className="text-sm font-medium">Factual observation or disclosure
-              <Textarea required minLength={10} maxLength={3000} rows={6} className={control} value={factualObservation} onChange={event => setFactualObservation(event.target.value)} placeholder="What happened, where, who was present, and the child's words as closely as you can recall. Separate facts from uncertainty." />
+              <Textarea required minLength={10} maxLength={3000} rows={6} className="mt-1 w-full" value={factualObservation} onChange={event => setFactualObservation(event.target.value)} placeholder="What happened, where, who was present, and the child's words as closely as you can recall. Separate facts from uncertainty." />
             </Label>
             <Label className="text-sm font-medium">Immediate safety steps already taken (optional)
-              <Textarea maxLength={1500} rows={3} className={control} value={immediateActions} onChange={event => setImmediateActions(event.target.value)} />
+              <Textarea maxLength={1500} rows={3} className="mt-1 w-full" value={immediateActions} onChange={event => setImmediateActions(event.target.value)} />
             </Label>
             <WorkspaceNotice>
               Follow directly applicable external-reporting duties without waiting for internal approval. {workspace.policy.externalReportingInstructions} Guardians are never notified automatically.

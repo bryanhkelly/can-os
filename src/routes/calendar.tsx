@@ -454,14 +454,14 @@ function CalendarPage() {
           {manageMode?.id!==selectedEvent.id&&confirmCancelId!==selectedEvent.id&&<div className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" onClick={()=>startManage(selectedEvent,"edit")} className="">Edit details</Button>
             <Button type="button" variant="outline" onClick={()=>startManage(selectedEvent,"reschedule")} className="">Move event</Button>
-            <Button type="button" variant="outline" onClick={()=>setConfirmCancelId(selectedEvent.id)} className=" border-danger/50 text-danger hover:bg-danger/10">Cancel event</Button>
+            <Button type="button" variant="destructive" onClick={()=>setConfirmCancelId(selectedEvent.id)}>Cancel event</Button>
           </div>}
           {manageMode?.id===selectedEvent.id&&manageMode.mode==="edit"&&<div className="space-y-3">
             <Field label="Title" required error={manageAttempted&&editTitle.trim().length<3?"Enter a title with at least 3 characters.":undefined}>
               <Input value={editTitle} onChange={event=>setEditTitle(event.target.value)} minLength={3} maxLength={200} className="" />
             </Field>
             <Field label="Description">
-              <Textarea value={editDescription} onChange={event=>setEditDescription(event.target.value)} maxLength={2000} rows={3} className=" shadow-none" />
+              <Textarea value={editDescription} onChange={event=>setEditDescription(event.target.value)} maxLength={2000} rows={3} />
             </Field>
             <div className="flex gap-2">
               <Button type="button" variant="outline" disabled={saving} onClick={()=>submitManage(selectedEvent)} className="">{saving?"Saving…":"Save"}</Button>
@@ -509,7 +509,7 @@ function CalendarPage() {
 
   return (
     <WorkspaceShell width="wide" eyebrow={isRoomFacilitator ? "My Room" : "Calendar"} title={isRoomFacilitator ? "Room schedule" : "Calendar"} subtitle={isRoomFacilitator ? "School events and events for Sections assigned to your room." : "Site and section events, assignment due dates, and your personal events in one calendar."}
-      actions={data && !isRoomFacilitator && <Button type="button" size="lg" onClick={openEventComposer} className="min-h-12 px-6 text-base shadow-sm"><Plus aria-hidden="true" />Create event</Button>}>
+      actions={data && !isRoomFacilitator && <Button type="button" size="lg" onClick={openEventComposer} ><Plus aria-hidden="true" />Create event</Button>}>
         <div className="mt-5 flex flex-wrap items-center gap-3 border border-border bg-card p-3">
           <nav aria-label="Calendar view" className="flex gap-2 text-sm">
             {calendarViews.map(nextView=><Link key={nextView} to="/calendar" search={{...search,view:nextView,date:nextView==="month"||nextView==="agenda"?search.date:anchorDate,event:undefined}} aria-current={view===nextView?"page":undefined}
@@ -517,10 +517,10 @@ function CalendarPage() {
           </nav>
           <Label className="flex min-h-10 items-center text-sm">
             <span className="sr-only">Search calendar events</span>
-            <Input type="search" value={search.q??""} onChange={event=>void navigate({search:{...search,q:event.target.value||undefined,event:undefined}})} placeholder="Search events" className="min-h-10 w-48  shadow-none" />
+            <Input type="search" value={search.q??""} onChange={event=>void navigate({search:{...search,q:event.target.value||undefined,event:undefined}})} placeholder="Search events" className="w-48" />
           </Label>
           <Label className="flex items-center text-sm">Show
-            <Select value={search.source??""} onChange={event=>void navigate({search:{...search,source:calendarSources.find(source=>source===event.target.value),event:undefined}})} className="ml-2 min-h-10 w-auto max-w-full  shadow-none">
+            <Select value={search.source??""} onChange={event=>void navigate({search:{...search,source:calendarSources.find(source=>source===event.target.value),event:undefined}})} className="ml-2 w-auto max-w-full">
               <option value="">{isRoomFacilitator ? "All room events" : "All event types"}</option>
               <option value="section">Class events</option>{!isRoomFacilitator&&<><option value="assessment">Assignment deadlines</option>
               <option value="personal">Personal</option><option value="study_group">Study groups</option></>}
@@ -528,7 +528,7 @@ function CalendarPage() {
             </Select>
           </Label>
           {sectionOptions.length>0&&<Label className="flex items-center text-sm">Section
-            <Select value={search.section??""} onChange={event=>void navigate({search:{...search,section:event.target.value||undefined,event:undefined}})} className="ml-2 min-h-10 w-auto max-w-full  shadow-none">
+            <Select value={search.section??""} onChange={event=>void navigate({search:{...search,section:event.target.value||undefined,event:undefined}})} className="ml-2 w-auto max-w-full">
               <option value="">All sections</option>
               {sectionOptions.map(section=><option key={section.id} value={section.id}>{section.label}</option>)}
             </Select>
@@ -546,7 +546,7 @@ function CalendarPage() {
           <Button type="button" variant="outline" aria-label={`Previous ${view}`} onClick={() => shiftPeriod(-1)} className=""><ChevronLeft aria-hidden="true" />Prev</Button>
           <h2 className="font-serif text-section">{periodLabel}</h2>
           <Button type="button" variant="outline" aria-label={`Next ${view}`} onClick={() => shiftPeriod(1)} className="">Next<ChevronRight aria-hidden="true" /></Button>
-          <Input type="date" aria-label="Choose calendar date" value={anchorDate} onChange={event=>chooseDate(event.target.value)} className="w-auto  shadow-none" />
+          <Input type="date" aria-label="Choose calendar date" value={anchorDate} onChange={event=>chooseDate(event.target.value)} className="w-auto" />
           {loading && <span className="text-xs text-muted-foreground">Loading…</span>}
         </div>
 
@@ -586,7 +586,7 @@ function CalendarPage() {
                       <div className="mt-2 flex gap-2">
                         <Button type="button" variant="outline" size="sm" onClick={() => startManage(item, "edit")} className="">Edit</Button>
                         <Button type="button" variant="outline" size="sm" onClick={() => startManage(item, "reschedule")} className="">Move</Button>
-                        <Button type="button" variant="outline" size="sm" onClick={() => setConfirmCancelId(item.id)} className=" border-danger/50 text-danger hover:bg-danger/10">Cancel event</Button>
+                        <Button type="button" variant="destructive" size="sm" onClick={() => setConfirmCancelId(item.id)}>Cancel event</Button>
                       </div>
                     )}
 
@@ -608,7 +608,7 @@ function CalendarPage() {
                         </Label>
                         <Label className="block text-xs">
                           Description
-                          <Textarea value={editDescription} onChange={(event) => setEditDescription(event.target.value)} maxLength={2000} rows={2} className="mt-1 min-h-20  shadow-none" />
+                          <Textarea value={editDescription} onChange={(event) => setEditDescription(event.target.value)} maxLength={2000} rows={2} className="mt-1" />
                         </Label>
                       </div>
                     )}

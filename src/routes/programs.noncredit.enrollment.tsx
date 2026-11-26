@@ -158,7 +158,7 @@ function NoncreditPublicationSession({scope}:{scope:string}){
                 setDeliveryMode(allowedPhysical?"facilitated":"independent");
                 setAdditionalSites([]);
               }}
-              className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
+              className="mt-2 min-h-11 w-full">
               <option value="">Choose an approved program release</option>
               {candidates.map(item=><option key={candidateKey(item)} value={candidateKey(item)}>
                 {item.trainingTitle} · {item.deploymentName} · {item.providerName}
@@ -191,7 +191,7 @@ function NoncreditPublicationSession({scope}:{scope:string}){
           {deliveryMode==="independent"&&<div>
             <Label htmlFor="nc-online-site" className="block text-sm font-semibold">Authorized Site for online delivery (required)</Label>
             <Select id="nc-online-site" required value={siteId} onChange={event=>setSiteId(event.target.value)}
-              className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
+              className="mt-2 min-h-11 w-full">
               <option value="">Choose an authorized Site</option>
               {selected?.digitalSiteOptions.filter(site=>!publicSiteId||site.id===preferredSiteId).map(site=>
                 <option key={site.id} value={site.id}>{site.name}</option>)}
@@ -201,7 +201,7 @@ function NoncreditPublicationSession({scope}:{scope:string}){
           {deliveryMode==="facilitated"&&<div>
             <Label htmlFor="nc-site" className="block text-sm font-semibold">Authorized hosting Site</Label>
             <Select id="nc-site" required value={siteId} onChange={event=>{setSiteId(event.target.value);setAdditionalSites([]);}}
-              className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
+              className="mt-2 min-h-11 w-full">
               <option value="">Choose a deployment Site</option>
               {selected?.siteOptions.filter(site=>!publicSiteId||site.id===preferredSiteId).map(site=><option key={site.id} value={site.id}>{site.name}</option>)}
             </Select>
@@ -226,27 +226,27 @@ function NoncreditPublicationSession({scope}:{scope:string}){
           <div className="grid gap-4 sm:grid-cols-2">
             <Label className="block text-sm font-semibold">Registration opens
               <Input type="datetime-local" required value={opensAt} onChange={event=>setOpensAt(event.target.value)}
-                className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
+                className="mt-2 min-h-11 w-full"/>
             </Label>
             <Label className="block text-sm font-semibold">Registration closes
               <Input type="datetime-local" required value={closesAt} onChange={event=>setClosesAt(event.target.value)}
-                className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
+                className="mt-2 min-h-11 w-full"/>
             </Label>
           </div>
           <Label className="block text-sm font-semibold">Maximum registrations
             <Input type="number" min={1} max={1000000} step={1} required value={maxParticipants}
               onChange={event=>setMaxParticipants(event.target.value)}
-              className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
+              className="mt-2 min-h-11 w-full"/>
           </Label>
           <Label className="block text-sm font-semibold">Participation terms version
             <Input type="text" required minLength={3} maxLength={80} value={consentVersion}
               onChange={event=>setConsentVersion(event.target.value)} placeholder="e.g. training-policy-v1"
-              className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
+              className="mt-2 min-h-11 w-full"/>
           </Label>
           <Label className="block text-sm font-semibold">Approved terms shown to each participant
             <Textarea required minLength={25} maxLength={4000} rows={7} value={consentText}
               onChange={event=>setConsentText(event.target.value)}
-              className="mt-2 w-full border border-border bg-background px-3 py-3 text-sm"
+              className="mt-2 w-full"
               placeholder="Provide the actual approved enrollment, participation and data-use terms for this training. Do not include unapproved claims."/>
           </Label>
           <p className="text-xs leading-6 text-muted-foreground">
@@ -274,13 +274,12 @@ function NoncreditPublicationSession({scope}:{scope:string}){
             <div className="flex flex-wrap gap-3">
               <Link to="/learn/enroll" search={{release:row.id}}
                 className="text-xs font-semibold text-primary underline underline-offset-4">Learner link</Link>
-              <Button variant="ghost" type="button" className="text-xs font-semibold text-primary underline underline-offset-4"
+              <Button variant="ghost" size="sm" type="button"
                 onClick={()=>setManagedRelease(id=>id===row.id?null:row.id)}>
                 {managedRelease===row.id?"Hide roster":"Roster & sessions"}
               </Button>
-              {row.status==="published"&&<Button variant="ghost" type="button" disabled={busy}
-                onClick={()=>void close(row.id)}
-                className="text-xs font-semibold text-destructive underline underline-offset-4">Close registration</Button>}
+              {row.status==="published"&&<Button variant="destructive" size="sm" type="button" disabled={busy}
+                onClick={()=>void close(row.id)}>Close registration</Button>}
             </div>
           </div>)}
           {!published.length&&<p className="py-4 text-sm text-muted-foreground">No published releases match this selection.</p>}
