@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 import { readEmailProviderMessageId, readEmailProviderReceipt } from "@/domain/email-provider-receipt";
 
 describe("email provider receipt evidence", () => {
-  it.each([null, undefined, false, 0, "", [], {}, { id: null }, { id: 42 }, { id: "" }])(
-    "does not infer provider evidence from %j", body => {
+  it.each([null, undefined, false, 0, "", [], {}, { id: null }, { id: 42 }, { id: "" }]
+    .map(body => ({ body })))(
+    "does not infer provider evidence from $body", ({ body }) => {
       expect(readEmailProviderMessageId(body)).toBeUndefined();
     },
   );
