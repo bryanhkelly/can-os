@@ -1,4 +1,5 @@
-import { identityEmailDomain, isDemoAccountEmail } from "@/domain/domain-classification";
+import { bindAuthorizedAccountPerson } from "./named-person-account.server";
+import { isDemoAccountEmail } from "@/domain/domain-classification";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { issuePrivateAccountCredential } from "./private-account-credential.server";
@@ -206,7 +207,7 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
     assertSafeguardingStaffInviteSite(data.role, data.siteId);
     const actor = await requireRegistrar();
     const { db } = await import("@/db/client");
-    const { people, accessAccounts, accountPersonGrants, organizations, sites } = await import("@/db/schema");
+    const { accessAccounts, accountPersonGrants, organizations, sites } = await import("@/db/schema");
     const organizationId = actor.organizationIds[0]!;
     if(actor.grantSiteId && data.siteId!==actor.grantSiteId)
       throw new AuthorizationError("site-limited registrar cannot create sibling school grants");
@@ -220,7 +221,7 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
     const siteId = site.id;
     const emailNormalized = data.email.toLowerCase();
     const invitation = await db.transaction(async tx => {
-      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"staff-invitation:" + emailNormalized}))`);
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"person-account:" + emailNormalized}))`);
       const localDemoIdentity = isDemoAccountEmail(emailNormalized);
       const confirmation = data.privateIdentityConfirmation;
       const individual = localDemoIdentity && !!confirmation;
@@ -264,33 +265,15 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
               OR ${accountPersonGrants.siteId} IS DISTINCT FROM ${siteId}::uuid)`)).limit(1);
         if (foreign.length) throw new DomainError("FORBIDDEN", "An existing identity belongs to another school");
       }
-      const linkedPeople = await tx.select({ personId: accountPersonGrants.personId })
-        .from(accountPersonGrants).where(and(
-          eq(accountPersonGrants.accountId, account!.id),
-        )).limit(101);
-      if (linkedPeople.length > 100) throw new DomainError("CONFLICT", "Account memberships exceed the safe identity reconciliation limit.");
-      const distinctPeople = [...new Set(linkedPeople.map(grant => grant.personId))];
-      // A verified mailbox alone cannot resolve multiple different real Person
-      // records. Require operator review instead of choosing an arbitrary one.
-      if (distinctPeople.length > 1 || (account!.personId && distinctPeople.some(id => id !== account!.personId)))
-        throw new DomainError("CONFLICT", "This account has multiple Person records. Reconcile identity before inviting staff.");
-      let personId = account!.personId ?? distinctPeople[0];
-      if (!personId) {
-        const [person] = await tx.insert(people).values({
-          legalFirstName: data.firstName, legalLastName: data.lastName, email: emailNormalized, domain: identityEmailDomain(emailNormalized),
-        }).returning({ id: people.id });
-        personId = person!.id;
-        await recordAudit(tx, actor, {
-          action: "admin.person.create", resourceType: "person", resourceId: personId,
-          after: { firstName: data.firstName, lastName: data.lastName, email: emailNormalized },
-        });
-      }
-      const [currentPerson] = await tx.select({active:people.active}).from(people).where(eq(people.id,personId)).limit(1);
-      if(!currentPerson?.active)throw new AuthorizationError("active staff Person");
-      if (!account!.personId) {
-        await tx.update(accessAccounts).set({ personId, updatedAt: new Date() })
-          .where(eq(accessAccounts.id, account!.id));
-      }
+      if(!account)throw new Error("Staff Account could not be provisioned");
+      const identity=await bindAuthorizedAccountPerson(tx,account,{
+        email:emailNormalized,firstName:data.firstName,lastName:data.lastName,
+      });
+      const personId=identity.personId;
+      if(identity.personCreated)await recordAudit(tx,actor,{
+        action:"admin.person.create",resourceType:"person",resourceId:personId,
+        after:{firstName:data.firstName,lastName:data.lastName,email:emailNormalized},
+      });
       if (individual) {
         await recordAudit(tx, actor, {
           action:"identity.staff_individual_confirmation",resourceType:"access_account",resourceId:account!.id,
