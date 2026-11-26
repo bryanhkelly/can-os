@@ -46,7 +46,9 @@ const [counts] = await sql`
       AND p.active AND NOT a.disabled
       AND a.email_verified_at IS NOT NULL AND a.email_normalized NOT LIKE '%.demo'
       AND a.private_access_code_hash IS NULL
-      AND split_part(a.email_normalized,'@',2) !~ '(^|[.])(test|invalid|localhost|example)
+      AND split_part(a.email_normalized,'@',2) !~ '(^|[.])(test|invalid|localhost|example)$'
+      AND split_part(a.email_normalized,'@',2) !~ '(^|[.])example[.](com|net|org)$'
+   ) AS verified_owners
 `;
 const [inventory] = await sql`
  WITH account_state AS (
@@ -73,20 +75,5 @@ const [inventory] = await sql`
 const ready=counts.enabled_legacy_accounts===0 &&
  counts.unexpired_legacy_sessions===0 && counts.verified_owners>0;
 console.log(JSON.stringify({status:ready?"eligible_for_retirement_review":"blocked",...counts,inventory,
- limitation:"Counts do not establish secure credential handoff or successful sign-in; require separate operator evidence before retirement."},null,2));
-process.exitCode=ready?0:1;
-
-      AND split_part(a.email_normalized,'@',2) !~ '(^|[.])example[.](com|net|org)
-`;
-const ready=counts.enabled_legacy_accounts===0 &&
- counts.unexpired_legacy_sessions===0 && counts.verified_owners>0;
-console.log(JSON.stringify({status:ready?"eligible_for_retirement_review":"blocked",...counts,
- limitation:"Counts do not establish secure credential handoff or successful sign-in; require separate operator evidence before retirement."},null,2));
-process.exitCode=ready?0:1;
-) AS verified_owners
-`;
-const ready=counts.enabled_legacy_accounts===0 &&
- counts.unexpired_legacy_sessions===0 && counts.verified_owners>0;
-console.log(JSON.stringify({status:ready?"eligible_for_retirement_review":"blocked",...counts,
  limitation:"Counts do not establish secure credential handoff or successful sign-in; require separate operator evidence before retirement."},null,2));
 process.exitCode=ready?0:1;
