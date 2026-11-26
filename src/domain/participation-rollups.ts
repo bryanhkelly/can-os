@@ -25,6 +25,19 @@ export type ReportingScopeProof={
   verifiedOrganizationIds:ReadonlySet<string>;
   verifiedSiteIds:ReadonlySet<string>;
 };
+export type ReportingPopulation={
+  ownerDomains:ReadonlyMap<string,string|null>;
+  classification:"all"|"real"|"synthetic"|"unknown";
+};
+export function matchesReportingPopulation(
+  fact:Pick<ParticipationReportingFact,"operatingOrganizationId">,
+  population:ReportingPopulation,
+):boolean{
+  if(!population.ownerDomains.has(fact.operatingOrganizationId))
+    throw new Error("Operating Organization classification evidence missing");
+  return population.classification==="all" ||
+    classifyOwnedData(population.ownerDomains.get(fact.operatingOrganizationId))===population.classification;
+}
 export type ParticipationCount={
   registrations:number;uniquePeople:number;active:number;withdrawn:number;
 };
@@ -62,7 +75,8 @@ function group(
   for(const fact of facts){
     const id=key(fact);
     if(!id)continue;
-    grouped.set(id,[...(grouped.get(id)??[]),fact]);
+    const existing=grouped.get(id);
+    if(existing)existing.push(fact);else grouped.set(id,[fact]);
   }
   return [...grouped].sort(([a],[b])=>a.localeCompare(b))
     .map(([id,rows])=>({id,...count(rows)}));
@@ -71,7 +85,7 @@ export function rollupAuthorizedParticipation(
   facts:readonly ParticipationReportingFact[],
   proof:ReportingScopeProof,
   period:{from:string;to:string;asOf:string},
-  population?:{ownerDomains:ReadonlyMap<string,string|null>;classification:"all"|"real"|"synthetic"|"unknown"},
+  population?:ReportingPopulation,
 ){
   assertAuthorizedReportFacts(facts,proof);
   const from=Date.parse(period.from),to=Date.parse(period.to),asOf=Date.parse(period.asOf);
@@ -80,8 +94,8 @@ export function rollupAuthorizedParticipation(
   const inPeriod=facts.filter(f=>{
     const at=Date.parse(f.registeredAt);
     if(!Number.isFinite(at))throw new Error("Invalid canonical registration date");
-    return at>=from&&at<to&&at<=asOf && (!population || population.classification==="all" ||
-      classifyOwnedData(population.ownerDomains.get(f.operatingOrganizationId))===population.classification);
+    const populationMatch=!population||matchesReportingPopulation(f,population);
+    return at>=from&&at<to&&at<=asOf&&populationMatch;
   });
   const totals=count(inPeriod);
   const sites=group(inPeriod,x=>x.deliverySiteId);
