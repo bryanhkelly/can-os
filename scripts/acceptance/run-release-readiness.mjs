@@ -66,7 +66,7 @@ if(profile==="pilot"){
     "tests/unit/domain-classification.test.ts","tests/unit/session-credential-policy.test.ts","tests/unit/individual-staff-handoff.test.ts","tests/unit/resend-email-transport.test.ts",
     "tests/unit/private-account-code-recovery.test.ts","tests/unit/demo-session-isolation.test.ts",
     "tests/unit/demo-sign-in.test.ts","tests/unit/student-access-link-outcome.test.ts",
-    "tests/unit/account-activity-source-contract.test.ts","tests/unit/participation-rollups.test.ts",
+    "tests/unit/account-activity-source-contract.test.ts","tests/unit/participation-rollups.test.ts","tests/unit/relationship-registration-projection.test.ts",
     "tests/unit/synthetic-real-workflow-parity-v61.test.ts"]);
   run("Pilot publication, participant outcomes, distribution and Site Intelligence",["exec","--","vitest","run",
     "tests/unit/release-11232026-training-launch-contract.test.ts",
