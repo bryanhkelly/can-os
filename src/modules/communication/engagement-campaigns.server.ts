@@ -18,7 +18,7 @@ import {accessAccounts,organizations} from "@/db/schema";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {authorizeEngagementDistribution,readAuthorizedEngagementInvitation} from "@/modules/engagement/engagement-registry.server";
 import {campaignOwnerScope,parseCampaignRecipients,campaignRecipientLimit} from "@/domain/campaign-policy";
-import {campaignRows,campaignSender,campaignSenderReadiness} from "./campaign-store.server";
+import {campaignRows,campaignSender,campaignSenderReadiness,processEngagementCampaignDeliveries} from "./campaign-store.server";
 async function scope(engagementId:string){
  setResponseHeader("Cache-Control","private, no-store");
  const actor=await getCommandContext(getRequest());
@@ -73,7 +73,7 @@ export const queueEngagementCampaign = async (data: z.output<typeof queueEngagem
  const sender=campaignSender();if(!sender)throw new Error("Campaign sender and postal address are not configured.");
  const draft=await readAuthorizedEngagementInvitation(data.engagementId,data.linkId,s.actor);
  const scheduledAt=new Date(data.scheduledAt);if(scheduledAt.getTime()>Date.now()+90*86400000)throw new Error("Schedule within 90 days.");
- return db.transaction(async tx=>{
+ const queued=await db.transaction(async tx=>{
  // Serialize on the same identity as the unique constraint, even when two
  // requests reuse an idempotency key with different recipient lists.
  const requestLock=JSON.stringify(["engagement-campaign",s.ownerScope,data.requestId]);
@@ -94,6 +94,11 @@ export const queueEngagementCampaign = async (data: z.output<typeof queueEngagem
    await emitReportableChange(tx,{eventType:EventTypes.SiteCampaignQueued,sourceId:campaign.id,sourceVersion:"queued",occurredAt:new Date(),actorPersonId:s.actor.actorPersonId,dimensions:{organizationId:s.record.organizationId,siteId:s.record.siteId},payload:{engagementId:data.engagementId,linkId:data.linkId,recipientCount:inserted.length,scheduledAt:scheduledAt.toISOString()}});
  return {id:campaign.id};
  });
+ // Queue is durable before attempting provider delivery. The scheduler owns recovery.
+ if(scheduledAt.getTime()<=Date.now()){
+  try{await processEngagementCampaignDeliveries(2,queued.id);}catch{ /* Leave persisted work for the scheduler. */ }
+ }
+ return queued;
  };
 export const cancelEngagementCampaign = async (data: z.output<typeof cancelEngagementCampaignInput>) =>{
  const s=await scope(data.engagementId);
