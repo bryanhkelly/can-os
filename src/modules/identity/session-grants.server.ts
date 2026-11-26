@@ -2,7 +2,7 @@ import { db } from "@/db/client";
 import { privateAccountGrantEligible } from "@/domain/private-account-authority";
 import { hasValidAccessGrantScope } from "@/domain/access-grant-scope";
 import { AuthorizationError } from "@/domain/command-context";
-import { isDemoAccountEmail } from "@/domain/local-demo-access";
+import { isDemoAccountEmail } from "@/domain/domain-classification";
 import { assertRawAccountPerson } from "./unambiguous-adult-account.server";
 import { listActiveAccountGrants, type GrantReader } from "./account-grant-reader.server";
 import { readLegacyCredentialGrants } from "./legacy-shared-credential-grants.server";
