@@ -48,8 +48,8 @@ export function SharedPhotoPicker({value,onChange,disabled,recommendedTemplate="
         const src=sharedPhotoUrl(ref);
         if(failed.includes(src))return null;
         const selected=value?.template===family&&value.role===role;
-        return <Button key={src} type="button" variant="outline" aria-pressed={selected} disabled={disabled}
-          className="h-auto flex-col items-stretch whitespace-normal p-2" onClick={()=>onChange(ref)}>
+        return <Button key={src} type="button" variant={selected?"secondary":"outline"} aria-pressed={selected} disabled={disabled}
+          className="h-auto flex-col items-stretch whitespace-normal" onClick={()=>onChange(ref)}>
           <img src={src} alt={sharedPhotoDisclosure} loading="lazy" className="aspect-video w-full object-cover" onError={()=>setFailed(old=>[...old,src])}/>
           <span className="capitalize">{role.replaceAll("_"," ")}{selected?" · Selected":""}</span>
         </Button>;

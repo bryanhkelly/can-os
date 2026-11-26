@@ -35,7 +35,7 @@ export function WebsiteReviewStep({
       <Button asChild variant="outline" size="lg">
         <a href={privateWebsitePreviewUrl(data.siteId)} target="_blank" rel="noopener noreferrer">Open private preview</a>
       </Button>
-      {data.currentRevision>0&&<Button type="button" variant="outline" className="min-h-11 border"
+      {data.currentRevision>0&&<Button type="button" variant="outline" className="min-h-11"
         onClick={()=>void navigator.clipboard.writeText(
           new URL(privateWebsitePreviewUrl(data.siteId),window.location.origin).href,
         ).then(()=>onShareMessage("Preview link copied. Reviewers must sign in with their own authorized Site account."))
