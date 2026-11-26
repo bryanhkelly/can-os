@@ -2,15 +2,13 @@ import { GEOGRAPHIC_JOB_MAX_ATTEMPTS, GEOGRAPHIC_JOB_LEASE_SECONDS, geographicJo
 import {sql,type SQL} from "drizzle-orm";
 import {db} from "@/db/client";
 import {physicalSiteAddressSchema,siteAddressEditorDraft} from "@/domain/site-setup-configuration";
-import {type GeographicResolution,type GeographicAreaFact,type CommunityProfile} from "@/domain/geographic-intelligence";
+import {CENSUS_GEOGRAPHY_YEAR,type GeographicResolution,type GeographicAreaFact,type CommunityProfile} from "@/domain/geographic-intelligence";
 import {createCensusGeographyProvider,type GeographyProvider} from "./census-geography-provider.server";
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Reader=Pick<typeof db,"execute">;
 async function rows<T>(reader:Reader,query:SQL):Promise<T[]>{
  return (await reader.execute(query)).rows as unknown as T[];
 }
-// Explicit release dataset. Refresh with a reviewed version change, not an unversioned moving query.
-const ACS_YEAR=2024;
 type Work={site_id:string;organization_id:string;generation:string;lease_id:string;attempts:number;address:unknown;eligible:boolean};
 async function claimSite():Promise<Work|undefined>{
  return db.transaction(async tx=>{
@@ -61,7 +59,7 @@ async function finishSite(work:Work,status:"resolved"|"unresolved"|"unsupported"
     await tx.execute(sql`INSERT INTO public.site_geographic_memberships VALUES(${version.id},${id}) ON CONFLICT DO NOTHING`);
     if(["county","metro","micro"].includes(area.kind)){
      await tx.execute(sql`INSERT INTO public.geographic_profile_jobs(area_version_id,year)
-       VALUES(${id},${ACS_YEAR}) ON CONFLICT DO NOTHING`);
+       VALUES(${id},${CENSUS_GEOGRAPHY_YEAR}) ON CONFLICT DO NOTHING`);
     }
    }
    // Only express relationships that are valid for the whole area, not point overlap.
