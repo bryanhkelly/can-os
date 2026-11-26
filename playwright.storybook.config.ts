@@ -12,7 +12,7 @@ export default defineConfig({
  workers:process.env.CI?2:undefined,
  retries:process.env.CI?1:0,
  timeout:30_000,
- reporter:[["list"],["html",{outputFolder:"acceptance-artifacts/storybook-browser-report",open:"never"}]],
+ reporter:[["list"],["json",{outputFile:"acceptance-artifacts/storybook-browser-results.json"}],["html",{outputFolder:"acceptance-artifacts/storybook-browser-report",open:"never"}]],
  outputDir:"acceptance-artifacts/storybook-browser-results",
  use:{baseURL:"http://127.0.0.1:6007",browserName:"chromium",trace:"retain-on-failure",screenshot:"only-on-failure",reducedMotion:"reduce",locale:"en-US",timezoneId:"UTC"},
  projects:[

@@ -52,3 +52,7 @@ Run `npm run check:storybook:catalog` before review. All story families must use
 From a clean checkout, install dependencies with `npm ci` and Chromium with `npx playwright install chromium`. Run `npm run storybook:acceptance`. Each stage records its local log, the exact Git commit and the tested static output digest in `acceptance-artifacts/storybook-release/receipt.json`. The runner does not forward application environment variables or provider keys. Failed or incomplete acceptance cannot prepare a private preview package.
 
 After a passing receipt, `npm run storybook:prepare-private-preview` prepares only the checked static files, excludes separate source maps and adds preview security headers. This is not visual approval or production authorization, and does not deploy anything. Use a separate private hosting project, verify anonymous access to the manager, iframe and static assets is denied, and keep receipts and logs outside the published directory. Never use the production application project.
+
+## Browser evidence for review
+
+The static browser matrix now retains a rendered PNG for each successful exercised canvas as well as failure traces and screenshots. The HTML report links the review images; the JSON report supports machine inspection. These images must still be reviewed by a human against the design contract and visual baseline. They do not replace authenticated route acceptance. The receipt links to run-specific stage logs, so an incomplete new run cannot silently borrow an older run's logs.

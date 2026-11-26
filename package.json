@@ -162,7 +162,8 @@
     "check:storybook:fonts": "node scripts/storybook/check-fonts.mjs",
     "check:storybook:catalog": "node scripts/storybook/check-catalog.mjs",
     "storybook:acceptance": "node scripts/storybook/run-acceptance.mjs",
-    "storybook:prepare-private-preview": "node scripts/storybook/prepare-private-preview.mjs"
+    "storybook:prepare-private-preview": "node scripts/storybook/prepare-private-preview.mjs",
+    "pretest:storybook": "npm run assets:prepare"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

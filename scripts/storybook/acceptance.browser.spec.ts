@@ -21,7 +21,12 @@ function storyId(title:string,exportName:string){
 async function openStory(page:Page,id:string,theme:string){
  const unexpectedRequests:string[]=[];
  const pageErrors:string[]=[];
+ const failedAssets:string[]=[];
  page.on("pageerror",error=>pageErrors.push(error.message));
+ page.on("response",response=>{
+  const url=new URL(response.url());
+  if(url.origin==="http://127.0.0.1:6007"&&response.status()>=400)failedAssets.push(response.status()+" "+url.pathname);
+ });
  // No application RPC, private data, remote images or provider calls.
  // Fonts are bundled locally; no third-party network access is expected.
  await page.route("**/*",async route=>{
@@ -39,15 +44,22 @@ async function openStory(page:Page,id:string,theme:string){
    if(![...document.fonts].some(face=>face.family.replace(/["']/g,"")===family&&face.status==="loaded"))throw Error("Bundled font unavailable: "+family);
   }
  });
- return {unexpectedRequests,pageErrors};
+ return {unexpectedRequests,pageErrors,failedAssets};
 }
-async function assertCanvas(page:Page,failures:{unexpectedRequests:string[];pageErrors:string[]}){
+async function assertCanvas(page:Page,failures:{unexpectedRequests:string[];pageErrors:string[];failedAssets:string[]}){
  await expect(page.locator("#storybook-root")).toBeVisible();
  await expect(page.locator("#storybook-root > *").first()).toBeVisible();
  const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);
  expect(overflow).toBeLessThanOrEqual(1);
  expect(failures.unexpectedRequests).toEqual([]);
  expect(failures.pageErrors).toEqual([]);
+ expect(failures.failedAssets).toEqual([]);
+ await expect(page.locator("body")).not.toHaveClass(/sb-show-(?:errordisplay|nopreview)/);
+ // Preserve real browser renders for independent review, not just failure screenshots.
+ // These images are synthetic Storybook evidence, not authenticated application acceptance.
+ const path=test.info().outputPath("review-render.png");
+ await page.screenshot({path,fullPage:true,animations:"disabled"});
+ await test.info().attach("review-render",{path,contentType:"image/png"});
 }
 test("launch journey remains responsive and gated",async({page},info)=>{
  const theme=String(info.project.metadata.theme);
@@ -107,4 +119,12 @@ test("mutation recovery never repeats a confirmed write",async({page},info)=>{
  await expect(page.getByText("Read attempts: 2")).toBeVisible();
  await expect(page.getByText("Fixture saved successfully.")).toBeVisible();
  await assertCanvas(page,failures);
+});
+
+test("curated template media is available without a live provider",async({request},info)=>{
+ test.skip(info.project.name!=="desktop-dark","Static asset availability does not depend on viewport.");
+ const response=await request.get("/school-template-previews/v1/bright/hero.jpg");
+ expect(response.ok()).toBeTruthy();
+ expect(response.headers()["content-type"]).toContain("image/jpeg");
+ expect((await response.body()).length).toBeGreaterThan(0);
 });

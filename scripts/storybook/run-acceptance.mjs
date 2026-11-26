@@ -9,9 +9,11 @@ const git=(...args)=>execFileSync("git",args,{cwd:root,encoding:"utf8"}).trim();
 const commit=git("rev-parse","HEAD");
 const clean=()=>git("status","--porcelain","--untracked-files=normal")==="";
 if(!clean())throw Error("Commit your changes before creating an exact-commit acceptance receipt.");
-const out=join(root,"acceptance-artifacts/storybook-release"),logs=join(out,"logs");
+const out=join(root,"acceptance-artifacts/storybook-release");
+const runId=new Date().toISOString().replace(/[^0-9]/g,"")+"-"+process.pid;
+const logs=join(out,"runs",runId,"logs");
 mkdirSync(logs,{recursive:true});
-const receipt={version:1,commit,status:"running",startedAt:new Date().toISOString(),node:process.versions.node,platform:process.platform,stages:[],staticDigest:null};
+const receipt={version:1,commit,runId,status:"running",startedAt:new Date().toISOString(),node:process.versions.node,platform:process.platform,stages:[],staticDigest:null};
 const file=join(out,"receipt.json");
 const write=()=>writeFileSync(file,JSON.stringify(receipt,null,2)+"\n");
 write();
@@ -33,7 +35,7 @@ function run(name){
  try{result=spawnSync(command,args,{cwd:root,env,stdio:["ignore",fd,fd],windowsHide:true});}
  finally{closeSync(fd);}
  const status=result?.status===0?"passed":"failed";
- receipt.stages.push({name,status,exitCode:result?.status??null,durationMs:Date.now()-started,log:"logs/"+name+".log"});
+ receipt.stages.push({name,status,exitCode:result?.status??null,durationMs:Date.now()-started,log:"runs/"+runId+"/logs/"+name+".log"});
  write();
  if(status!=="passed")throw Error("Acceptance failed at "+name+". See "+logfile);
 }
