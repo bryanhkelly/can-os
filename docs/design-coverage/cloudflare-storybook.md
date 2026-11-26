@@ -8,14 +8,16 @@ From a clean checkout of the reviewed Storybook branch, using an authenticated C
 
 ```sh
 npm ci
-npx playwright install chromium
+npm run storybook:check-playwright
+node node_modules/playwright/cli.js install chromium
+npm run storybook:check-browser
 npm run storybook:acceptance
 npm run storybook:prepare-cloudflare
 ```
 
 On Linux, install Playwright OS dependencies if needed (`npx playwright install --with-deps chromium`). The acceptance receipt must be for the exact checkout and the static output must match its fingerprint. The packager writes a separate Wrangler JSON configuration alongside a commit-specific assets directory under `acceptance-artifacts/storybook-release/`. It excludes source maps and carries static security headers. A single root rewrite serves the Storybook manager at `/`; the iframe retains its exact `/iframe.html` URL and unknown paths do not fall back to the manager.
 
-Run the exact `npx wrangler deploy --config ...` command printed by the packager. Authenticate Wrangler locally with `npx wrangler login` if necessary. Never use the production application's deploy script or root Wrangler configuration.
+Run `npm run deploy:storybook:cloudflare` to revalidate the receipt, configuration and assets before deployment. Authenticate Wrangler locally with `npx wrangler login` if necessary. Never use the production application's deploy script or root Wrangler configuration.
 
 ## Enable private review access
 
@@ -59,3 +61,9 @@ References:
 ## Browser version consistency
 
 Playwright and @playwright/test are pinned to the same version and the lockfile has one playwright-core runtime. Managed builds check the actual resolution paths before downloading Chromium using the explicitly selected local CLI. Vitest and Playwright Test then use that same browser revision. A runtime mismatch is a build failure, not a reason to install multiple revisions.
+
+## On-demand acceptance runner
+
+The Storybook Cloudflare release workflow installs the locked Playwright runtime and its Linux dependencies, checks browser rendering, runs acceptance and packages the exact tested static assets. The workflow defaults to acceptance only. Enable the deploy input to deploy from the same job after successful acceptance. Set repository secrets STORYBOOK_CLOUDFLARE_API_TOKEN (dedicated scoped Worker deployment token) and STORYBOOK_CLOUDFLARE_ACCOUNT_ID for deployment. Secrets are passed only to the deployment step. No application secrets are needed.
+
+GitHub requires a workflow_dispatch workflow to exist on the default branch before it can be manually dispatched. Until the reviewed branch is merged, use the documented local or managed Cloudflare build. Once the runner is available and validated, disconnect automatic Cloudflare Workers Builds for this dedicated Worker if using runner-based deployment, to prevent competing deployments. Do not disconnect the production application Worker. Verify all-traffic Cloudflare Access before enabling any hostname.
