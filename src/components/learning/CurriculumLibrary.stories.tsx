@@ -26,7 +26,7 @@ const marketplace: Marketplace = {
 };
 
 const meta = {
-  title: "Learning/Curriculum",
+  id: "learning-curriculum", title: "08 Feature workspaces/Learning/Curriculum",
   component: CurriculumLibrary,
   args: { marketplaces: [marketplace] },
   decorators: [(Story) => {

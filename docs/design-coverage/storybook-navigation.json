@@ -573,6 +573,169 @@
         "StudentProfile",
         "StaffQualification"
       ]
+    },
+    {
+      "path": "src/components/learning/ClassOfferingTermsFields.stories.tsx",
+      "previousTitle": "Learning/Shared Class Offering terms",
+      "title": "08 Feature workspaces/Learning/Class Offering terms",
+      "metaId": "learning-shared-class-offering-terms",
+      "exports": [
+        "PrivateAssignmentDraft"
+      ]
+    },
+    {
+      "path": "src/components/learning/ClassParticipationAcknowledgments.stories.tsx",
+      "previousTitle": "Learning/Shared Class participation",
+      "title": "08 Feature workspaces/Learning/Class participation",
+      "metaId": "learning-shared-class-participation",
+      "exports": [
+        "IndependentAcknowledgments"
+      ]
+    },
+    {
+      "path": "src/components/learning/ClassVideoPlayer.stories.tsx",
+      "previousTitle": "Learning/Class video player",
+      "title": "08 Feature workspaces/Learning/Class video player",
+      "metaId": "learning-class-video-player",
+      "exports": [
+        "LinkedVideo",
+        "PrivateVideo",
+        "InvalidPrivateSource",
+        "ExternalOnly"
+      ]
+    },
+    {
+      "path": "src/components/learning/CredentialDeliveryHistory.stories.tsx",
+      "previousTitle": "Learning/Credential delivery history",
+      "title": "08 Feature workspaces/Learning/Credential delivery history",
+      "metaId": "learning-credential-delivery-history",
+      "exports": [
+        "ProviderTransportHistory",
+        "NoDeliveryRecords"
+      ]
+    },
+    {
+      "path": "src/components/learning/CurriculumLibrary.stories.tsx",
+      "previousTitle": "Learning/Curriculum",
+      "title": "08 Feature workspaces/Learning/Curriculum",
+      "metaId": "learning-curriculum",
+      "exports": [
+        "SelectedCurriculum",
+        "NoSelection",
+        "LicenseUnavailable"
+      ]
+    },
+    {
+      "path": "src/components/learning/DiscussionComposer.stories.tsx",
+      "previousTitle": "Student/Shared discussion composer",
+      "title": "08 Feature workspaces/Learning/Discussion composer",
+      "metaId": "student-shared-discussion-composer",
+      "exports": [
+        "NewPost",
+        "Reply",
+        "Pending"
+      ]
+    },
+    {
+      "path": "src/components/learning/LearningQuestionnaire.stories.tsx",
+      "previousTitle": "V6.1 learning/Questionnaire",
+      "title": "08 Feature workspaces/Learning/Questionnaire",
+      "metaId": "v6-1-learning-questionnaire",
+      "exports": [
+        "IndependentQuestionnaires",
+        "RequiredQuestion"
+      ]
+    },
+    {
+      "path": "src/components/links/GoDestinationChoiceField.stories.tsx",
+      "previousTitle": "Workflows/Go Links/Destination choice",
+      "title": "04 Application patterns/Go Links/Destination choice",
+      "metaId": "workflows-go-links-destination-choice",
+      "exports": [
+        "Available",
+        "Selected",
+        "Empty",
+        "UnavailableSelection",
+        "Disabled"
+      ]
+    },
+    {
+      "path": "src/components/links/GoLinkLifecycleActions.stories.tsx",
+      "previousTitle": "Workflows/Go Links/Lifecycle actions",
+      "title": "04 Application patterns/Go Links/Lifecycle actions",
+      "metaId": "workflows-go-links-lifecycle-actions",
+      "exports": [
+        "Active",
+        "Paused",
+        "Revoked",
+        "Busy",
+        "RevokeOnly"
+      ]
+    },
+    {
+      "path": "src/components/operations/AppointmentExpiryField.stories.tsx",
+      "previousTitle": "Operations/Appointment expiry",
+      "title": "08 Feature workspaces/Operations/Appointment expiry",
+      "metaId": "operations-appointment-expiry",
+      "exports": [
+        "Default",
+        "Disabled"
+      ]
+    },
+    {
+      "path": "src/components/operations/LaunchPortfolio.stories.tsx",
+      "previousTitle": "Operations/Launch portfolio",
+      "title": "08 Feature workspaces/Operations/Launch portfolio",
+      "metaId": "operations-launch-portfolio",
+      "exports": [
+        "BlockingRequirements",
+        "JourneyUnavailable"
+      ]
+    },
+    {
+      "path": "src/components/operations/SiteStaffingFeedback.stories.tsx",
+      "previousTitle": "Operations/Site staffing feedback",
+      "title": "08 Feature workspaces/Operations/Site staffing feedback",
+      "metaId": "operations-site-staffing-feedback",
+      "exports": [
+        "Recorded",
+        "RefreshRequired",
+        "RefreshPending",
+        "CommandFailed"
+      ]
+    },
+    {
+      "path": "src/components/operations/SiteTodayPriorities.stories.tsx",
+      "previousTitle": "Operations/Site Today priorities",
+      "title": "08 Feature workspaces/Operations/Site Today priorities",
+      "metaId": "operations-site-today-priorities",
+      "exports": [
+        "StaffingAndAttendanceExceptions",
+        "QuietDay"
+      ]
+    },
+    {
+      "path": "src/components/platform/PlatformAccountHealth.stories.tsx",
+      "previousTitle": "Platform/Account health",
+      "title": "08 Feature workspaces/Platform/Account health",
+      "metaId": "platform-account-health",
+      "exports": [
+        "Inventory",
+        "EmptyInventory",
+        "Unavailable"
+      ]
+    },
+    {
+      "path": "src/components/profiles/ProfilePhotoEditor.stories.tsx",
+      "previousTitle": "V6.1 templates/People/Profile picture",
+      "title": "08 Feature workspaces/People/Profile picture",
+      "metaId": "v6-1-templates-people-profile-picture",
+      "exports": [
+        "Empty",
+        "RemovalFailure",
+        "Cropping",
+        "InvalidFile"
+      ]
     }
   ]
 }

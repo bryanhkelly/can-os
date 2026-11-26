@@ -40,7 +40,7 @@ const launches: Launch[] = [
 ];
 
 const meta = {
-  title: "Operations/Launch portfolio",
+  id: "operations-launch-portfolio", title: "08 Feature workspaces/Operations/Launch portfolio",
   parameters: { layout: "fullscreen" },
 } satisfies Meta;
 export default meta;

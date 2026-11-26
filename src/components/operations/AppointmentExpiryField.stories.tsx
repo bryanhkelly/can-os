@@ -4,7 +4,7 @@ import { expect, fireEvent, within } from "storybook/test";
 import { AppointmentExpiryField } from "./AppointmentExpiryField";
 
 const meta = {
-  title: "Operations/Appointment expiry",
+  id: "operations-appointment-expiry", title: "08 Feature workspaces/Operations/Appointment expiry",
   component: AppointmentExpiryField,
   args: { label: "Appointment ends", value: "", onChange: () => {} },
 } satisfies Meta<typeof AppointmentExpiryField>;

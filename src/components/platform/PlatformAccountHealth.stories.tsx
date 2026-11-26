@@ -13,7 +13,7 @@ const health: AccountHealth = {
   rows: [row, { ...row, kind: "demo", accounts: 4, activeGrants: 5, scopeMismatches: 1 }],
 };
 const meta = {
-  title: "Platform/Account health",
+  id: "platform-account-health", title: "08 Feature workspaces/Platform/Account health",
   component: PlatformAccountHealth,
   args: { health },
   parameters: { chromatic: { modes: {

@@ -4,7 +4,7 @@ import { expect, userEvent, within } from "storybook/test";
 import { ClassOfferingTermsFields, initialClassOfferingTermsForm } from "./ClassOfferingTermsFields";
 
 const meta = {
-  title: "Learning/Shared Class Offering terms",
+  id: "learning-shared-class-offering-terms", title: "08 Feature workspaces/Learning/Class Offering terms",
   parameters: { layout: "padded" },
 } satisfies Meta;
 export default meta;

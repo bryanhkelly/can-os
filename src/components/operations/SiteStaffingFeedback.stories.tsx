@@ -3,7 +3,7 @@ import { expect, fn, within } from "storybook/test";
 import { SiteStaffingFeedback } from "./SiteStaffingFeedback";
 
 const meta = {
-  title: "Operations/Site staffing feedback",
+  id: "operations-site-staffing-feedback", title: "08 Feature workspaces/Operations/Site staffing feedback",
   parameters: { chromatic: { modes: {
     light: { theme: "light" }, dark: { theme: "dark" }, site: { theme: "site" },
   } } },
