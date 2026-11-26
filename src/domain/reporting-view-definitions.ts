@@ -1,9 +1,9 @@
 import { buildCurrentReportingMetricRegistry, requireMetricContract, NONCREDIT_PILOT_DEFINITION_VERSION, type SourceMetricContract } from "./reporting-metric-registry";
-import { CAMPAIGN_METRIC_VERSION, type CampaignMetricKey } from "./campaign-metrics";
+import { CAMPAIGN_METRIC_VERSION, CAMPAIGN_METRIC_DEFINITIONS, type CampaignMetricKey } from "./campaign-metrics";
 import { GO_LINK_EVIDENCE_VERSION } from "./go-link-evidence-metrics";
 
 /** Static allowlisted definitions. No executable SQL, user-supplied identifiers or cross-scope queries. */
-export const campaignReportKeys=["total","pending","accepted","delivered","bounced","complained","failed","unconfirmed","suppressed","cancelled"] as const satisfies readonly CampaignMetricKey[];
+export const campaignReportKeys: readonly CampaignMetricKey[] = CAMPAIGN_METRIC_DEFINITIONS.map(definition => definition.key);
 export const pilotOutcomeKeys=["registrations","engagedParticipants","knowledgeCheckPasses","confirmedNoncreditCompletions"] as const;
 export const goReportKeys=["observedRedirects30d","linkOpens30d","pageViews30d","redirectResponses30d","unclassifiedEntries30d","referralNoncreditRegistrations30d"] as const;
 function resolveDefinitions(namespace:string,keys:readonly string[],version:string):readonly SourceMetricContract[]{
