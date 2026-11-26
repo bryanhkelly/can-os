@@ -412,11 +412,11 @@ export async function selectAccessGrant(sessionId:string,accountId:string,grantI
   // Independently verify the entire real account inside the locked session
   // transaction. Filtered invitation grants cannot conceal a second Person.
   const activePersonIds=demoAccountSwitching?[]:(
-   await tx.select({personId:accountPersonGrants.personId}).from(accountPersonGrants)
+   await tx.selectDistinct({personId:accountPersonGrants.personId}).from(accountPersonGrants)
     .where(and(eq(accountPersonGrants.accountId,accountId),
-      eq(accountPersonGrants.active,true))).limit(101)
+      eq(accountPersonGrants.active,true))).limit(2)
   ).map(row=>row.personId);
-  if(!demoAccountSwitching&&activePersonIds.length>100)
+  if(!demoAccountSwitching&&activePersonIds.length>1)
    throw new AuthorizationError("account Person reconciliation");
   const grant=assertMembershipSwitchIdentity({
    accountId,accountPersonId:session.personId,targetGrantId:grantId,
