@@ -86,7 +86,7 @@ export const OrdinarySessionRefreshError: Story = {
 };
 
 export const DemoWorkspaceChange: Story = {
-  render: args => {
+  render: function DemoWorkspaceChangeRender(args) {
     const [member, setMember] = useState(args.member);
     return <>
       <WorkspaceTopBar {...args} member={member} demoAccountSwitching />
