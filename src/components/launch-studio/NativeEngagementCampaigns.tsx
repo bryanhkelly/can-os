@@ -10,13 +10,15 @@ import {readEngagementCampaignWorkspace,saveCampaignRecipientList,queueEngagemen
 import {CampaignListMembers} from "./CampaignListMembers";
 import {parseCampaignRecipients,parseCampaignRecipientCsv} from "@/domain/campaign-policy";
 type Workspace=Awaited<ReturnType<typeof readEngagementCampaignWorkspace>>;
-type CampaignProps={engagementId:string;linkId:string;invitationReady:boolean};
+type CampaignProps={engagementId:string;linkId:string;invitationReady:boolean;recipientDraft?:string;onRecipientDraftChange?:(value:string)=>void};
 export function NativeEngagementCampaigns(props:CampaignProps){
  return <NativeCampaignSession key={JSON.stringify([props.engagementId,props.linkId])} {...props}/>;
 }
-function NativeCampaignSession({engagementId,linkId,invitationReady}:CampaignProps){
+function NativeCampaignSession({engagementId,linkId,invitationReady,recipientDraft,onRecipientDraftChange}:CampaignProps){
  const [data,setData]=useState<Workspace|null>(null),[error,setError]=useState(""),[notice,setNotice]=useState("");
- const [name,setName]=useState(""),[raw,setRaw]=useState(""),[source,setSource]=useState(""),[attested,setAttested]=useState(false);
+ const [name,setName]=useState(""),[localRaw,setLocalRaw]=useState(""),[source,setSource]=useState(""),[attested,setAttested]=useState(false);
+ const raw=recipientDraft??localRaw;
+ const setRaw=onRecipientDraftChange??setLocalRaw;
  const [list,setList]=useState(""),[when,setWhen]=useState(""),[confirmed,setConfirmed]=useState(false),[busy,setBusy]=useState(false),[refresh,setRefresh]=useState(0);
  const [manageList,setManageList]=useState(false);
  const [importing,setImporting]=useState(false),[importError,setImportError]=useState("");
@@ -40,14 +42,14 @@ function NativeCampaignSession({engagementId,linkId,invitationReady}:CampaignPro
  useEffect(()=>{if(!invitationReady){setConfirmed(false);requestId.current=null;}},[invitationReady]);
  const parsed=parseCampaignRecipients(raw);
  const valid=!!name.trim()&&source.trim().length>=5&&attested&&parsed.recipients.length>0&&!parsed.invalid.length&&!parsed.tooMany;
- return <WorkspacePanel headingLevel="h3" title="Email campaigns" className="mt-4"><div className="space-y-4">
+ return <WorkspacePanel headingLevel="h3" title="Send email" className="mt-4"><div className="space-y-4">
  {!data&&<QueryState loading={!error?"Loading campaigns…":undefined} error={error||undefined} onRetry={()=>setRefresh(v=>v+1)}/>}
  {!invitationReady&&<WorkspaceNotice tone="attention">The invitation must be verified before a campaign can be queued. You can still prepare and save consented recipient lists when the campaign workspace is available.</WorkspaceNotice>}
- {data&&!data.senderReady&&<WorkspaceNotice>Sending is unavailable until an authorized campaign sender, postal address, provider and signed delivery webhook are configured.</WorkspaceNotice>}
+ {data&&!data.senderReady&&<WorkspaceNotice>Email sending is unavailable. {data.senderIssues?.join(" ") || "Ask your platform administrator to review the sender configuration."}</WorkspaceNotice>}
  {data&&<RecordFacts columns={1} items={[{label:"Campaign sender",value:data.senderLabel}]}/>}
  {!data&&<p className="text-sm text-muted-foreground">You can enter addresses now. Saving requires a successfully loaded campaign workspace.</p>}
  <Field label="Recipient list name"><Input value={name} maxLength={120} disabled={busy} onChange={e=>setName(e.target.value)}/></Field>
- <Field label="Consented email addresses" description={parsed.recipients.length+" unique addresses; up to 1,000 per list"} error={parsed.invalid.length?"Remove invalid or synthetic addresses.":parsed.tooMany?"List exceeds the current limit.":undefined}>
+ <Field label="Recipient email addresses" description={parsed.recipients.length+" unique addresses; up to 1,000 per list"} error={parsed.invalid.length?"Remove invalid or synthetic addresses.":parsed.tooMany?"List exceeds the current limit.":undefined}>
  <Textarea placeholder="Enter one email address per line" value={raw} rows={4} maxLength={256000} disabled={busy||importing} onChange={e=>{setRaw(e.target.value);setAttested(false);}}/></Field>
  <Field label="Import email CSV" description="Optional single email column, with or without an email header. Review addresses and confirm consent before saving."><Input type="file" accept=".csv,text/csv" disabled={busy||importing} onChange={e=>{const file=e.currentTarget.files?.[0];e.currentTarget.value="";if(file)void importCsv(file);}}/></Field>
  {importError&&<WorkspaceNotice tone="danger">{importError}</WorkspaceNotice>}
