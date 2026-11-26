@@ -20,6 +20,20 @@ function runNode(script, args = []) {
   return result;
 }
 
+// The inventory is evidence tied to the actual working tree, not a release gate.
+function gitValue(args) {
+  const result = spawnSync("git", args, {
+    cwd: root, encoding: "utf8", maxBuffer: 16 * 1024 * 1024,
+  });
+  return result.status === 0 ? result.stdout.trim() : null;
+}
+
+const revision = gitValue(["rev-parse", "HEAD"]);
+const workingTreeStatus = gitValue(["status", "--porcelain"]);
+const architecture = runNode("scripts/report-component-architecture.mjs", ["--all"]);
+if (architecture.status !== 0) throw new Error("Architecture inventory did not complete");
+const reuse = JSON.parse(architecture.stdout);
+
 const lint = runNode("node_modules/eslint/bin/eslint.js", [
   "src", "--format", "json",
   "--rule", 'complexity: ["warn", 15]',
@@ -57,12 +71,16 @@ const historicalCandidates = Object.entries(packageJson.scripts)
   .map(([name, command]) => ({ name, command }));
 
 console.log(JSON.stringify({
-  schemaVersion: 1,
+  schemaVersion: 2,
+  revision,
+  workingTreeClean: workingTreeStatus === null ? null : workingTreeStatus.length === 0,
+  generatedAt: new Date().toISOString(),
   scope: "ESLint-covered src files and package scripts",
   lintExitCode: lint.status,
   files: lintFiles.length,
   countsByRule,
   findings,
+  reuse,
   tooling: {
     scriptCount: Object.keys(packageJson.scripts).length,
     duplicateCommands,
@@ -71,7 +89,7 @@ console.log(JSON.stringify({
   limitations: [
     "Unused local findings are not proof that exported modules or dynamic consumers are dead.",
     "Complexity and size warnings identify candidates; they do not mandate arbitrary function splitting.",
-    "Run architecture:inventory for the existing duplicate-body report.",
+    "Exact-function fingerprints do not measure all semantic duplication.",
     "No test coverage, typecheck, security, visual or runtime acceptance is implied.",
   ],
 }, null, 2));
