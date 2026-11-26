@@ -42,3 +42,9 @@ Registry output now includes missing requirements per route and a summary by arc
 ## Storybook reference experience
 
 Storybook now has a branded manager, five editorial guide pages, a six-preset responsive viewport toolbar and one fixture alias map shared by Vite and Vitest. Existing story IDs and legacy Chromatic viewport baselines are retained wherever possible. The guide pages use the existing MDX/docs addon; no new packages are required. The manager identity is Becomuna, while production component styling remains V6.1.
+
+## Storybook build acceptance
+
+Use `npm run verify:storybook` to run contract tests, Vitest browser stories, the static build, generated-index validation and independent Playwright smoke tests. The index must contain all registered stories and all five editorial guides. Playwright exercises representative journeys in six device/theme combinations; browser reports are retained as review artifacts. Story fixtures never prove a production mutation.
+
+Chromatic baseline approval remains independent. The inherited legacy width strategy is retained; stories must not combine legacy viewports and Modes on the same effective configuration. Local fonts remain an outstanding reproducibility improvement.

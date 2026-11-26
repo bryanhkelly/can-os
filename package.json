@@ -150,7 +150,11 @@
     "verify:pilot:noncredit-schema": "node scripts/acceptance/check-noncredit-pilot-readiness.mjs",
     "verify:pilot:noncredit-regression": "node scripts/acceptance/test-noncredit-assessment-provisioning-qa.mjs",
     "verify:release": "node scripts/acceptance/run-release-readiness.mjs",
-    "design:source": "node scripts/check-design-system.mjs --source-only"
+    "design:source": "node scripts/check-design-system.mjs --source-only",
+    "storybook:inventory": "node scripts/storybook/check-index.mjs",
+    "test:storybook:browser": "playwright test --config playwright.storybook.config.ts",
+    "test:storybook:contracts": "node --test scripts/storybook/index-contract.test.mjs scripts/lib/v61-experience-registry.test.mjs",
+    "verify:storybook": "npm run test:storybook:contracts && npm run test:storybook && npm run build-storybook && npm run storybook:inventory && npm run test:storybook:browser"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

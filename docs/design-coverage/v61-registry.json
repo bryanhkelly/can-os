@@ -1287,7 +1287,8 @@
       ],
       "stories": [
         "src/components/launch-studio/LaunchStudio.stories.tsx#Entry",
-        "src/components/workspace/studio-layout.stories.tsx#Editable"
+        "src/components/workspace/studio-layout.stories.tsx#Editable",
+        "src/components/workspace/launch-pilot-journey.stories.tsx#CompleteJourney"
       ],
       "evidence": {
         "responsive": null,
@@ -1529,7 +1530,8 @@
         "src/components/launch-studio/LaunchStudio.stories.tsx#Entry",
         "src/components/workspace/outcome-milestones.stories.tsx#Mixed",
         "src/components/workspace/studio-layout.stories.tsx#Editable",
-        "src/components/workspace/distribution-dialog.stories.tsx#ShareAndReturn"
+        "src/components/workspace/distribution-dialog.stories.tsx#ShareAndReturn",
+        "src/components/workspace/launch-pilot-journey.stories.tsx#CompleteJourney"
       ],
       "evidence": {
         "responsive": null,

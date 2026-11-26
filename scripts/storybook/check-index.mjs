@@ -1,0 +1,12 @@
+import {readFileSync,mkdirSync,writeFileSync} from "node:fs";
+import {fileURLToPath} from "node:url";
+import {resolve} from "node:path";
+import {checkStorybookIndex} from "./index-contract.mjs";
+const root=fileURLToPath(new URL("../../",import.meta.url));
+const index=JSON.parse(readFileSync(resolve(root,"storybook-static/index.json"),"utf8"));
+const registry=JSON.parse(readFileSync(resolve(root,"docs/design-coverage/v61-registry.json"),"utf8"));
+const report=checkStorybookIndex(index,registry);
+mkdirSync(resolve(root,"acceptance-artifacts"),{recursive:true});
+writeFileSync(resolve(root,"acceptance-artifacts/storybook-index.json"),JSON.stringify(report,null,2)+"\n");
+console.log(JSON.stringify(report,null,2));
+if(report.errors.length)process.exitCode=1;

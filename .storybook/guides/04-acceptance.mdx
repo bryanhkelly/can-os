@@ -7,6 +7,8 @@ import { Meta } from '@storybook/addon-docs/blocks';
 | Gate | Command or artifact |
 | --- | --- |
 | Local catalog | `npm run storybook` |
+| Built index validation | `npm run storybook:inventory` |
+| Independent browser acceptance | `npm run test:storybook:browser` |
 | Static build | `npm run build-storybook` |
 | Interaction and accessibility | `npm run test:storybook` |
 | Route and layout coverage | `node scripts/check-v61-experience-coverage.mjs` |
@@ -18,3 +20,5 @@ Accessibility checks are errors by default. Any exception must be narrowly scope
 The route registry starts with candidate layout assignments. Do not mark a route verified until its real rendering, authorizations and acceptance evidence have been checked.
 
 Storybook build or CI failure is not a passing gate. Missing runner logs or absent visual credentials are blockers, not grounds for auto-approval.
+
+The browser matrix exercises six named device and theme combinations, checks rendered overflow, unexpected network access and runtime exceptions, and verifies keyboard focus in the representative launch journey. It is not an authenticated application journey.
