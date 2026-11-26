@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeIdentityDomain, identityEmailDomain, isDemoDomain, classifyOwnedData } from "@/domain/domain-classification";
+import { normalizeIdentityDomain, identityEmailDomain, isDemoDomain, classifyOwnedData, isEligiblePrivilegedMailbox } from "@/domain/domain-classification";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { isDemoSchoolDomain } from "@/domain/school-setup";
 import { suppressDemoEmailDelivery } from "@/domain/email-delivery-policy";
@@ -27,6 +27,11 @@ describe("canonical identity domains", () => {
       expect(isDemoDomain(domain)).toBe(false);
     },
   );
+  it("rejects reserved fixture mailboxes for privileged platform authentication without changing domain classification",()=>{
+    for(const email of ["person@school.demo","teacher@example.test","staff@example.invalid","owner@example.com","owner@sub.example.org","owner@localhost","owner@ school.org"])expect(isEligiblePrivilegedMailbox(email)).toBe(false);
+    expect(isEligiblePrivilegedMailbox("owner@institution.edu")).toBe(true);
+    expect(classifyOwnedData("example.test")).toBe("real");
+  });
   it("classifies operational data by its owner, preserving unknowns", () => {
     expect(classifyOwnedData("training.school.demo")).toBe("synthetic");
     expect(classifyOwnedData("school.org")).toBe("real");
