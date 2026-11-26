@@ -1,4 +1,5 @@
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { lockAccountProvisioningEmail, readLockedProvisioningAccount } from "./account-provisioning-store.server";
+import { and, eq, isNull } from "drizzle-orm";
 import type { db } from "@/db/client";
 import { accessAccounts, accountPersonGrants, people } from "@/db/schema";
 import { normalizeAccessEmail } from "@/domain/access-tokens";
@@ -16,12 +17,10 @@ export async function provisionNamedMailboxPerson(tx:Tx,input:{
   const email=normalizeAccessEmail(input.email);
   if(isDemoAccountEmail(email)||!identityEmailDomain(email)||email.endsWith(".invalid"))
     throw new AuthorizationError("mailbox credential required");
-  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"person-account:"+email}))`);
+  await lockAccountProvisioningEmail(tx, email);
   const created=await tx.insert(accessAccounts).values({emailNormalized:email})
     .onConflictDoNothing().returning({id:accessAccounts.id});
-  const [account]=await tx.select({id:accessAccounts.id,personId:accessAccounts.personId,
-    disabled:accessAccounts.disabled,privateCredential:sql<boolean>`(${accessAccounts.privateAccessCodeHash} IS NOT NULL)`})
-    .from(accessAccounts).where(eq(accessAccounts.emailNormalized,email)).for("update").limit(1);
+  const [account]=await readLockedProvisioningAccount(tx, email);
   if(!account||account.disabled||account.privateCredential)
     throw new AuthorizationError("current mailbox account");
   const identity=await bindAuthorizedAccountPerson(tx,account,{...input,email});
