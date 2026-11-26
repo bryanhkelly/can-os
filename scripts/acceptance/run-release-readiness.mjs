@@ -62,6 +62,12 @@ if(profile==="pilot"){
   run("Lint and V6.1 design-system coverage",["run","lint"]);
   run("V6.1 independent visual evidence",["run","design:coverage","--","--strict"]);
   run("Canonical reporting foundation",["run","test:reporting:foundation"]);
+  run("Individual credential and identity parity regressions",["exec","--","vitest","run",
+    "tests/unit/domain-classification.test.ts","tests/unit/individual-staff-handoff.test.ts",
+    "tests/unit/private-account-code-recovery.test.ts","tests/unit/demo-session-isolation.test.ts",
+    "tests/unit/demo-sign-in.test.ts","tests/unit/student-access-link-outcome.test.ts",
+    "tests/unit/account-activity-source-contract.test.ts","tests/unit/participation-rollups.test.ts",
+    "tests/unit/synthetic-real-workflow-parity-v61.test.ts"]);
   run("Pilot publication, participant outcomes, distribution and Site Intelligence",["exec","--","vitest","run",
     "tests/unit/release-11232026-training-launch-contract.test.ts",
     "tests/unit/noncredit-completion.test.ts","tests/unit/noncredit-pilot-outcomes.test.ts",
@@ -94,6 +100,7 @@ if(profile==="pilot"){
 }
 if(enabled("--database")&&process.env.DATABASE_URL){
   run("Deployment database schema and privileges (read only)",["run","db:check:friendly-urls:deploy"],process.env);
+  run("Identity and credential migration prerequisites (read only)",["exec","--","node","scripts/acceptance/check-one-person-deploy-schema.mjs"],process.env);
 }else block("Deployment database schema and privileges","Requires --database and exact deployment DATABASE_URL");
 if(enabled("--browser")&&process.env.TEST_DATABASE_URL){
   run("Isolated browser security acceptance",["run","test:e2e:release-security"],{...browserEnv,DATABASE_URL:process.env.TEST_DATABASE_URL,CAN_ADMISSIONS_TEST_BRANCH_ID:process.env.CAN_ADMISSIONS_TEST_BRANCH_ID??process.env.CAN_E2E_TEST_BRANCH_ID??process.env.CAN_PILOT_QA_BRANCH_ID});
