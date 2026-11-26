@@ -258,6 +258,7 @@ export async function redeemOneTimeAccess(rawToken:string,device?:SessionDeviceC
   const [session]=await tx.insert(accessSessions).values({
    accountId:account.id,secretHash:hashAccessSecret(secret,secretPepper()),
    activeGrantId:activeGrant.id,expiresAt:new Date(now.getTime()+SESSION_LIFETIME_MS),
+   authenticationMethod:"email_link",
    ...(device?device:{}),
   }).returning({id:accessSessions.id});
   if(!session)throw new Error("Unable to establish session");
