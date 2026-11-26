@@ -1,3 +1,4 @@
+import { submitResendEmail } from "@/modules/communication/resend-email-transport.server";
 /**
  * Server-only transactional email for in-app notifications.
  * Mirrors the Resend fetch pattern in identity/resend-access-mail.server.ts,
@@ -97,27 +98,18 @@ async function sendNotificationEmailCore(
         content: attachment.content, content_type: attachment.contentType })),
       ...(logoAttachment ? [logoAttachment] : []),
     ];
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      signal: AbortSignal.timeout(20_000),
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
-      },
-      body: JSON.stringify({
-        from,
-        to: [message.to],
-        subject: message.subject,
-        text,
-        html: message.html ?? renderSchoolEmail({ brand, text, actionUrl }),
-        ...(attachments.length ? { attachments } : {}),
-        ...(message.providerReceipt ? { tags: [
-          { name: "can_source", value: message.providerReceipt.source },
-          { name: "can_receipt", value: message.providerReceipt.receiptId },
-        ] } : {}),
-      }),
-    });
+    const response = await submitResendEmail({
+      from,
+      to: [message.to],
+      subject: message.subject,
+      text,
+      html: message.html ?? renderSchoolEmail({ brand, text, actionUrl }),
+      ...(attachments.length ? { attachments } : {}),
+      ...(message.providerReceipt ? { tags: [
+        { name: "can_source", value: message.providerReceipt.source },
+        { name: "can_receipt", value: message.providerReceipt.receiptId },
+      ] } : {}),
+    },apiKey,idempotencyKey);
     if (!response.ok) {
       console.log(
         `[notification-email] Resend delivery failed with status ${response.status}`,
