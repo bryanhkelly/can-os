@@ -4,7 +4,8 @@ import { db } from "@/db/client";
 import {
   accessAccountSignups, accessAccounts, accountPersonGrants, people, schoolSetupSignups,
 } from "@/db/schema";
-import { normalizeAccessEmail, issueOpaqueSecret, hashPrivateAccessCode } from "@/domain/access-tokens";
+import { issuePrivateAccountCredential } from "./private-account-credential.server";
+import { normalizeAccessEmail } from "@/domain/access-tokens";
 import { personalCanSignupSchema } from "@/domain/personal-account-signup";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { safeAccessReturnTo } from "@/domain/access-navigation";
@@ -78,8 +79,7 @@ export async function requestPersonalCanAccount(input: unknown,
  * new Account. An existing invitation, Account, or revoked identity cannot be
  * claimed through registration. No Organization or membership is inferred. */
 async function provisionPrivatePersonalSignup(data: ReturnType<typeof personalCanSignupSchema.parse>, email:string) {
-  const privateAccessCode = issueOpaqueSecret();
-  const privateAccessCodeHash = hashPrivateAccessCode(privateAccessCode,process.env.CAN_ACCESS_TOKEN_PEPPER??"");
+  const {privateAccessCode,privateAccessCodeHash}=issuePrivateAccountCredential();
   return db.transaction(async tx=>{
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"personal-signup:" + email}))`);
     const now=new Date();
