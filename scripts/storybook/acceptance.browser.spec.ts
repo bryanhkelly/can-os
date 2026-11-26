@@ -70,7 +70,7 @@ test("welcome guide is discoverable from the built documentation",async({page},i
 });
 
 test("print review preserves exact report values and definitions",async({page},info)=>{
- const failures=await openStory(page,storyId("V6.1 templates/Reporting/Impact review","PrintReview"),String(info.project.metadata.theme));
+ const failures=await openStory(page,registeredStoryId("src/components/workspace/report-document.stories.tsx#PrintReview"),String(info.project.metadata.theme));
  await expect(page.getByRole("table",{name:"Monthly registrations exact values"})).toBeVisible();
  await expect(page.getByRole("table",{name:"Community learning impact review metric definitions"})).toBeVisible();
  await assertCanvas(page,failures);

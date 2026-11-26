@@ -13,7 +13,7 @@ const report:ReportDocument={version:1,definitionId:"synthetic-impact-review-v1"
     {id:"target",kind:"progress",label:"Participant-hour target",value:875,target:800,format:"hours",description:"Illustrative target, not an approved commitment."},
     {id:"notes",kind:"note",text:"Registrations, distinct people and recorded outcomes have different counting rules. This is a presentation fixture, not verified impact."},
   ]};
-const meta={title:"V6.1 templates/Reporting/Impact review",component:ReportDocumentView,args:{report},
+const meta={id: "v6-1-templates-reporting-impact-review", title: "05 Page layouts/Reporting/Impact review",component:ReportDocumentView,args:{report},
   parameters:{chromatic:{modes: chromaticWidthModes([390,768,1024,1440])}},
   decorators:[Story=><div className="mx-auto max-w-6xl bg-background p-4 sm:p-6"><Story/></div>]} satisfies Meta<typeof ReportDocumentView>;
 export default meta;

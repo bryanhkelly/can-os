@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge, WorkspacePanel } from "@/components/workspace";
 import { BrandTheme } from "./brand-theme";
 
-const meta = { title: "Branding/Controlled tokens" } satisfies Meta;
+const meta = { id: "branding-controlled-tokens", title: "01 Foundations/Controlled brand tokens" } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
 

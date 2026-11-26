@@ -6,7 +6,7 @@ import { ChecklistWorkspaceShell } from "./checklist-workspace-shell";
 import { GuidedSetupShell } from "./guided-setup-shell";
 import { SplitReviewShell } from "./split-review-shell";
 
-const meta = { title: "Workflows/Patterns" } satisfies Meta;
+const meta = { id: "workflows-patterns", title: "05 Page layouts/Guided setup and review" } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
 

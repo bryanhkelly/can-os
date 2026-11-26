@@ -4,7 +4,7 @@ import { expect, userEvent, within } from "storybook/test";
 import { Button } from "./button";
 
 const meta = {
-  title: "Foundations/Button",
+  id: "foundations-button", title: "02 Primitives/Button",
   component: Button,
   args: { children: "Continue" },
 } satisfies Meta<typeof Button>;

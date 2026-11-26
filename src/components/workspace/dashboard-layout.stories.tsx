@@ -6,7 +6,7 @@ import { DashboardLayout, DashboardPanel, DashboardShortcut } from "./dashboard-
 import { StatCard } from "./stat-card";
 import { StatusBadge } from "./workspace-panel";
 
-const meta = { title: "V6.1 templates/Role dashboards", parameters: { layout: "fullscreen" } } satisfies Meta;
+const meta = { id: "v6-1-templates-role-dashboards", title: "05 Page layouts/Role dashboards", parameters: { layout: "fullscreen" } } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
 const now = new Date("2026-11-03T12:00:00Z");

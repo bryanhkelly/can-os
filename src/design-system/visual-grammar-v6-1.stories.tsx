@@ -5,7 +5,7 @@ import { StatusBadge, WorkspacePanel } from "@/components/workspace/workspace-pa
 import { DashboardPanel } from "@/components/workspace/dashboard-layout";
 import { StatCard } from "@/components/workspace/stat-card";
 
-const meta = { title: "V6.1 foundations/Visual grammar", parameters: { layout: "fullscreen" } } satisfies Meta;
+const meta = { id: "v6-1-foundations-visual-grammar", title: "01 Foundations/Visual grammar", parameters: { layout: "fullscreen" } } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
 

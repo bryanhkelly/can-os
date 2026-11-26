@@ -1,0 +1,145 @@
+{
+  "version": 1,
+  "note": "Explicit meta IDs retain existing story URLs after navigation moves. Built-index verification is required for baseline continuity.",
+  "migrations": [
+    {
+      "path": "src/components/ui/button.stories.tsx",
+      "previousTitle": "Foundations/Button",
+      "title": "02 Primitives/Button",
+      "metaId": "foundations-button",
+      "exports": [
+        "Variants",
+        "Loading",
+        "KeyboardFocus",
+        "UnavailableSaveActions"
+      ]
+    },
+    {
+      "path": "src/components/ui/field.stories.tsx",
+      "previousTitle": "Foundations/Fields and choices",
+      "title": "02 Primitives/Fields and choices",
+      "metaId": "foundations-fields-and-choices",
+      "exports": [
+        "Default",
+        "Validation",
+        "Pending",
+        "LongLabel",
+        "DarkValidation",
+        "ExplicitControlAssociations",
+        "ControlledReview"
+      ]
+    },
+    {
+      "path": "src/components/ui/form-controls.stories.tsx",
+      "previousTitle": "Foundations/Form controls",
+      "title": "02 Primitives/Form controls",
+      "metaId": "foundations-form-controls",
+      "exports": [
+        "Default",
+        "Validation",
+        "Disabled"
+      ]
+    },
+    {
+      "path": "src/components/ui/modal.stories.tsx",
+      "previousTitle": "Foundations/Modal",
+      "title": "02 Primitives/Modal",
+      "metaId": "foundations-modal",
+      "exports": [
+        "KeyboardAndDismissal"
+      ]
+    },
+    {
+      "path": "src/components/ui/table.stories.tsx",
+      "previousTitle": "V6.1 foundations/Semantic tables",
+      "title": "02 Primitives/Semantic tables",
+      "metaId": "v6-1-foundations-semantic-tables",
+      "exports": [
+        "ResponsiveGradebookSemantics",
+        "ReadOnlyEvidence"
+      ]
+    },
+    {
+      "path": "src/components/workspace/directory-table.stories.tsx",
+      "previousTitle": "Foundations/Directory table",
+      "title": "03 Components/Directory table",
+      "metaId": "foundations-directory-table",
+      "exports": [
+        "SortingAndPaging",
+        "Loading",
+        "Empty",
+        "ErrorWithRetry",
+        "DarkDirectory",
+        "DirectoryComposition",
+        "NoRecords",
+        "NoMatches",
+        "ReusableFilterBar"
+      ]
+    },
+    {
+      "path": "src/components/workspace/report-document.stories.tsx",
+      "previousTitle": "V6.1 templates/Reporting/Impact review",
+      "title": "05 Page layouts/Reporting/Impact review",
+      "metaId": "v6-1-templates-reporting-impact-review",
+      "exports": [
+        "Dashboard",
+        "PrintReview",
+        "InvalidDefinition",
+        "NarrowMetrics",
+        "DarkReview",
+        "BrandedReview"
+      ]
+    },
+    {
+      "path": "src/components/workspace/report-analytics.stories.tsx",
+      "previousTitle": "V6.1 foundations/Data Visualization/Analytical components",
+      "title": "03 Components/Reporting/Analytical components",
+      "metaId": "v6-1-foundations-data-visualization-analytical-components",
+      "exports": [
+        "Interactive",
+        "Dark",
+        "SiteBrand"
+      ]
+    },
+    {
+      "path": "src/components/workspace/dashboard-layout.stories.tsx",
+      "previousTitle": "V6.1 templates/Role dashboards",
+      "title": "05 Page layouts/Role dashboards",
+      "metaId": "v6-1-templates-role-dashboards",
+      "exports": [
+        "StudentHome",
+        "SiteLeader"
+      ]
+    },
+    {
+      "path": "src/components/workflow/workflow-patterns.stories.tsx",
+      "previousTitle": "Workflows/Patterns",
+      "title": "05 Page layouts/Guided setup and review",
+      "metaId": "workflows-patterns",
+      "exports": [
+        "GuidedSetup",
+        "ChecklistWorkspace",
+        "SplitReview"
+      ]
+    },
+    {
+      "path": "src/design-system/visual-grammar-v6-1.stories.tsx",
+      "previousTitle": "V6.1 foundations/Visual grammar",
+      "title": "01 Foundations/Visual grammar",
+      "metaId": "v6-1-foundations-visual-grammar",
+      "exports": [
+        "ColorAndTypography"
+      ]
+    },
+    {
+      "path": "src/design-system/brand-theme.stories.tsx",
+      "previousTitle": "Branding/Controlled tokens",
+      "title": "01 Foundations/Controlled brand tokens",
+      "metaId": "branding-controlled-tokens",
+      "exports": [
+        "SiteBrand",
+        "InvalidBrandFallsBack"
+      ]
+    }
+  ]
+}

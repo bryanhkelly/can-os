@@ -10,7 +10,7 @@ import { Label } from "./label";
 import { Textarea } from "./textarea";
 
 const meta = {
-  title: "Foundations/Fields and choices",
+  id: "foundations-fields-and-choices", title: "02 Primitives/Fields and choices",
   parameters: { chromatic: { modes: { light: { theme: "light" }, dark: { theme: "dark" }, site: { theme: "site" } } } },
 } satisfies Meta;
 export default meta;

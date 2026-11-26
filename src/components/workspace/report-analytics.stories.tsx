@@ -19,7 +19,7 @@ function AnalyticsFixture(){
     <ReportMetricCard item={{id:"selected",label:row?row.label+" registrations":"Choose a Site",value:row?.value??null}}/>
   </div>;
 }
-const meta={title:"V6.1 foundations/Data Visualization/Analytical components",component:AnalyticsFixture,
+const meta={id: "v6-1-foundations-data-visualization-analytical-components", title: "03 Components/Reporting/Analytical components",component:AnalyticsFixture,
   parameters:{chromatic:{modes:{light:{theme:"light"},dark:{theme:"dark"},site:{theme:"site"}}}}} satisfies Meta<typeof AnalyticsFixture>;
 export default meta;
 type Story=StoryObj<typeof meta>;

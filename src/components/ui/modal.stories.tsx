@@ -5,7 +5,7 @@ import { Button } from "./button";
 import { Modal } from "./modal";
 
 const meta = {
-  title: "Foundations/Modal",
+  id: "foundations-modal", title: "02 Primitives/Modal",
   parameters: { layout: "centered" },
 } satisfies Meta;
 export default meta;
