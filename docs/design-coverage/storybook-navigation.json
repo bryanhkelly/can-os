@@ -736,6 +736,120 @@
         "Cropping",
         "InvalidFile"
       ]
+    },
+    {
+      "path": "src/components/shell/WorkspaceSearchDialog.stories.tsx",
+      "previousTitle": "Shell/Workspace search dialog",
+      "title": "03 Components/Shell/Workspace search dialog",
+      "metaId": "shell-workspace-search-dialog",
+      "exports": [
+        "KeyboardNavigation",
+        "NoResults",
+        "SearchUnavailable",
+        "Loading",
+        "DarkSearch"
+      ]
+    },
+    {
+      "path": "src/components/shell/ShellAlignment.stories.tsx",
+      "previousTitle": "Shell/Layout alignment",
+      "title": "11 Accessibility and responsive/Shell alignment",
+      "metaId": "shell-layout-alignment",
+      "exports": [
+        "WorkspacePage",
+        "WidePage",
+        "RoleHome",
+        "WithSharedCredentialNotice",
+        "CollapsibleSidebar"
+      ]
+    },
+    {
+      "path": "src/components/workflow/recorded-time.stories.tsx",
+      "previousTitle": "Foundations/Recorded time",
+      "title": "03 Components/Recorded time",
+      "metaId": "foundations-recorded-time",
+      "exports": [
+        "SameSourceInstant",
+        "UnverifiedInstant"
+      ]
+    },
+    {
+      "path": "src/components/workflow/status-timeline.stories.tsx",
+      "previousTitle": "Foundations/Status timeline",
+      "title": "04 Application patterns/Status timeline",
+      "metaId": "foundations-status-timeline",
+      "exports": [
+        "RecordedDecisions",
+        "NoRecordedEvents",
+        "SiteLocalAuditTime"
+      ]
+    },
+    {
+      "path": "src/components/workflow/user-flow-map.stories.tsx",
+      "previousTitle": "V6.1 templates/Process and user-flow maps",
+      "title": "05 Page layouts/Process and user-flow maps",
+      "metaId": "v6-1-templates-process-and-user-flow-maps",
+      "exports": [
+        "ChurchToSchoolLaunch",
+        "StudentLearningJourney"
+      ]
+    },
+    {
+      "path": "src/components/workflow/workflow-workspace.stories.tsx",
+      "previousTitle": "V6.1 templates/User and workflow flows",
+      "title": "05 Page layouts/User and workflow flows",
+      "metaId": "v6-1-templates-user-and-workflow-flows",
+      "exports": [
+        "AdmissionsApplication",
+        "SchoolLaunch",
+        "ProgressOnly"
+      ]
+    },
+    {
+      "path": "src/components/workspace/action-dialog.stories.tsx",
+      "previousTitle": "Workspace/Action dialog",
+      "title": "04 Application patterns/Action dialog",
+      "metaId": "workspace-action-dialog",
+      "exports": [
+        "NestedConfirmation",
+        "PendingCannotDismiss"
+      ]
+    },
+    {
+      "path": "src/components/workspace/context-tray.stories.tsx",
+      "previousTitle": "Foundations/Context tray",
+      "title": "03 Components/Context tray",
+      "metaId": "foundations-context-tray",
+      "exports": [
+        "RetainedRecovery"
+      ]
+    },
+    {
+      "path": "src/components/workspace/dashboard-widgets.stories.tsx",
+      "previousTitle": "V6.1 templates/Dashboard widgets",
+      "title": "03 Components/Dashboard widgets",
+      "metaId": "v6-1-templates-dashboard-widgets",
+      "exports": [
+        "StudentDashboardWidgets",
+        "MissingData"
+      ]
+    },
+    {
+      "path": "src/components/workspace/dashboard-home.stories.tsx",
+      "previousTitle": "V6.1 templates/Shared dashboard homes",
+      "title": "05 Page layouts/Shared dashboard homes",
+      "metaId": "v6-1-templates-shared-dashboard-homes",
+      "exports": [
+        "Teacher",
+        "Family",
+        "Operations",
+        "SiteLeader",
+        "OnsiteStaff",
+        "Specialist",
+        "Counselor",
+        "NetworkPartner",
+        "NetworkSteward"
+      ]
     }
   ]
 }

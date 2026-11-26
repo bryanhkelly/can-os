@@ -3,7 +3,7 @@ import { expect, within } from "storybook/test";
 import { StatusTimeline } from "./status-timeline";
 
 const meta = {
-  title: "Foundations/Status timeline",
+  id: "foundations-status-timeline", title: "04 Application patterns/Status timeline",
   component: StatusTimeline,
 } satisfies Meta<typeof StatusTimeline>;
 export default meta;

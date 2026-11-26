@@ -4,7 +4,7 @@ import { StatusBadge } from "@/components/workspace/workspace-panel";
 import { Button } from "@/components/ui/button";
 import { fn } from "storybook/test";
 
-const meta = { title: "V6.1 templates/User and workflow flows", parameters: { layout: "fullscreen" } } satisfies Meta;
+const meta = { id: "v6-1-templates-user-and-workflow-flows", title: "05 Page layouts/User and workflow flows", parameters: { layout: "fullscreen" } } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
 

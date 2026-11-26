@@ -31,7 +31,7 @@ function Shell({ children, sharedCredentialSwitching = false }: { children: Reac
 }
 
 const meta = {
-  title: "Shell/Layout alignment",
+  id: "shell-layout-alignment", title: "11 Accessibility and responsive/Shell alignment",
   parameters: { layout: "fullscreen" },
   decorators: [Story => {
     const router = createRouter({
