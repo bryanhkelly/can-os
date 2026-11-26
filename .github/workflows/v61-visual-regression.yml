@@ -62,22 +62,17 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - run: npm run storybook:doctor
       - run: npx playwright install --with-deps chromium
-      - run: npm run check:storybook:catalog
-      - run: npm run check:storybook:fonts
-      - run: npm run check:storybook:visual-config
-      - run: npm run test:storybook:contracts
-      - run: npm run test:storybook
-      - run: npm run build-storybook
-      - run: npm run storybook:inventory
-      - run: npm run test:storybook:browser
+      - run: npm run storybook:acceptance
       - name: Preserve Storybook browser and index diagnostics
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: v61-storybook-acceptance-${{ github.run_attempt }}
           path: |
+            acceptance-artifacts/storybook-release/receipt.json
+            acceptance-artifacts/storybook-release/logs/
+            acceptance-artifacts/storybook-release/tested-static-manifest.json
             acceptance-artifacts/storybook-index.json
             acceptance-artifacts/storybook-browser-report/
             acceptance-artifacts/storybook-browser-results/

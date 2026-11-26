@@ -7,6 +7,8 @@ import { fixtureIsolationPlugin } from "./.storybook/fixture-isolation-plugin";
 import { storybookFixtureAliases } from "./.storybook/fixture-aliases";
 
 export default defineConfig({
+  envDir: false,
+  envPrefix: "STORYBOOK_FIXTURE_",
   plugins: [
     fixtureIsolationPlugin(),
     tailwindcss(),

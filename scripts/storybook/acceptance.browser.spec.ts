@@ -91,3 +91,20 @@ for(const [layout,reference] of Object.entries(registry.layoutReferences)){
   await assertCanvas(page,failures);
  });
 }
+
+test("generation read recovery is distinct from failed processing",async({page},info)=>{
+ test.skip(!["compact-light","desktop-dark"].includes(info.project.name),"Critical recovery is exercised in compact and desktop modes.");
+ const failures=await openStory(page,registeredStoryId("src/components/launch-studio/SiteGenerationStatus.stories.tsx#ConfirmedButReadUnavailable"),String(info.project.metadata.theme));
+ await expect(page.getByText("Last request: Completed with follow-up")).toBeVisible();
+ await expect(page.getByText("The stored package could not be loaded.")).toBeVisible();
+ await assertCanvas(page,failures);
+});
+test("mutation recovery never repeats a confirmed write",async({page},info)=>{
+ test.skip(!["compact-light","desktop-dark"].includes(info.project.name),"Critical recovery is exercised in compact and desktop modes.");
+ const failures=await openStory(page,registeredStoryId("src/components/workspace/mutation-feedback.stories.tsx#RetryReadWithoutDuplicateWrite"),String(info.project.metadata.theme));
+ // The story play function uses the actual command/read adapter contract.
+ await expect(page.getByText("Command attempts: 1")).toBeVisible();
+ await expect(page.getByText("Read attempts: 2")).toBeVisible();
+ await expect(page.getByText("Fixture saved successfully.")).toBeVisible();
+ await assertCanvas(page,failures);
+});
