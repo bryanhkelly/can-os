@@ -100,3 +100,15 @@ export async function hasApprovedDemoPersonalCredential(accountId:string,email:s
     .where(and(eq(accessAccountSignups.accountId,accountId),isNotNull(accessAccountSignups.consumedAt))).limit(1);
   return Boolean(signup);
 }
+
+/** Existing shared-code invitation policy. A disabled historical registration
+ * also blocks the fixed fixture, even when its original binding predates the
+ * registry. Ordinary verified and individual credential invitations do not
+ * depend on this compatibility service. */
+export async function matchesLegacyStaffInvitationScope(
+  email:string, organizationId:string, siteId:string, reader:Reader=db,
+):Promise<boolean>{
+  const [binding]=await reader.select({enabled:demoSchoolTenants.enabled})
+    .from(demoSchoolTenants).where(eq(demoSchoolTenants.organizationId,organizationId)).limit(1);
+  return (!binding||binding.enabled) && await matchesDemoCredentialScope(email,organizationId,siteId,reader);
+}
