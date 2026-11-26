@@ -8,6 +8,7 @@ import { readCookie } from "@/domain/session-cookies";
 import { roleCapabilities } from "@/domain/access-context";
 import { platformOwnerMayActAs, ownerDelegationLifetimeMs } from "@/domain/platform-owner-delegation";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
+import { isEligiblePrivilegedMailbox } from "@/domain/domain-classification";
 import { readOwnerDelegationGrants } from "./session-grants.server";
 import { assertRawAccountPerson } from "./unambiguous-adult-account.server";
 import { writeAudit } from "@/platform/mutation";
@@ -66,7 +67,7 @@ export async function getVerifiedPlatformOwnerSession(request: Request) {
     )).limit(1);
   if (!owner || !owner.ownerPersonId || owner.ownerPersonId !== owner.grantPersonId ||
       !owner.accountVerifiedAt || owner.privateCredential || owner.accountDisabled || !owner.personActive ||
-      isDemoAccountEmail(owner.ownerEmail) ||
+      !isEligiblePrivilegedMailbox(owner.ownerEmail) ||
       (owner.sessionSharedDevice && now.getTime() - owner.lastActivityAt.getTime() >= 5 * 60_000))
     throw new AuthorizationError("verified Platform Owner identity");
   await assertRawAccountPerson(owner.ownerAccountId, owner.ownerPersonId);
