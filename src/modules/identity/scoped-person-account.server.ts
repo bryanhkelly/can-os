@@ -1,3 +1,4 @@
+import { lockAccountProvisioningEmail, provisioningAccountSelection, readLockedProvisioningAccount } from "./account-provisioning-store.server";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import type { db } from "@/db/client";
 import { accessAccounts, accountPersonGrants, people } from "@/db/schema";
@@ -28,10 +29,8 @@ export async function provisionScopedPersonAccount(tx: Tx, input: {
   allowIndividualCredential?: boolean;
 }) {
   const email = normalizeAccessEmail(input.email);
-  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"person-account:" + email}))`);
-  let [account] = await tx.select({id:accessAccounts.id,personId:accessAccounts.personId,
-    disabled:accessAccounts.disabled,privateCredential:sql<boolean>`(${accessAccounts.privateAccessCodeHash} IS NOT NULL)`}).from(accessAccounts)
-    .where(eq(accessAccounts.emailNormalized,email)).for("update").limit(1);
+  await lockAccountProvisioningEmail(tx, email);
+  let [account] = await readLockedProvisioningAccount(tx, email);
   const individual = isDemoAccountEmail(email) && (account?.privateCredential === true || (!account && input.allowIndividualCredential === true));
   if (!individual) await assertScopedCredential(tx,email,input.organizationId,input.siteId);
   if (account?.disabled || (account?.personId && account.personId!==input.personId) || (account?.privateCredential && account.personId!==input.personId))
@@ -57,8 +56,7 @@ export async function provisionScopedPersonAccount(tx: Tx, input: {
     privateAccessCode=credential?.privateAccessCode;
     [account] = await tx.insert(accessAccounts).values({emailNormalized:email,personId:input.personId,
       ...(credential?{privateAccessCodeHash:credential.privateAccessCodeHash}:{})})
-      .returning({id:accessAccounts.id,personId:accessAccounts.personId,disabled:accessAccounts.disabled,
-        privateCredential:sql<boolean>`(${accessAccounts.privateAccessCodeHash} IS NOT NULL)`});
+      .returning(provisioningAccountSelection);
   }
   if (!account) throw new Error("Account could not be provisioned");
   const domain = identityEmailDomain(email);
