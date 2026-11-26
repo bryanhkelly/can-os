@@ -6,6 +6,7 @@ import { storybookFixtureAliases } from "./.storybook/fixture-aliases";
 
 // Storybook must not initialize the application SSR, deployment, or route plugins.
 export default defineConfig({
+  publicDir: false, // Copy only explicitly reviewed staticDirs.
   plugins: [fixtureIsolationPlugin(), tailwindcss(), react()],
   resolve: {
     tsconfigPaths: true,
