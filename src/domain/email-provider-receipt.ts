@@ -2,7 +2,10 @@
  * Preserve the opaque identifier exactly; never trim, coerce or invent it. */
 export function isEmailProviderMessageId(value: unknown): value is string {
   return typeof value === "string" && value.length >= 8 && value.length <= 256 &&
-    !/[\s\x00-\x1f\x7f]/u.test(value);
+    !/\s/u.test(value) && [...value].every(character => {
+    const code = character.charCodeAt(0);
+    return code >= 32 && code !== 127;
+  });
 }
 
 /** Provider acceptance and confirmed delivery are different states. */
