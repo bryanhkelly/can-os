@@ -114,3 +114,43 @@ On the dedicated QA branch `br-spring-frog-arnmih9w`, both diagnostic SQL querie
 Rehearsal order: configure isolated runtime and prepare the existing draft answer keys using the canonical encryption helper; ingest the existing synthetic recordings through the native upload workflow; obtain actual independent QA academic/rights/accessibility decisions; publish the primary track, Course, Offering and training under the existing governance path; authorize deployment/adoption, assessment administrations, automatic completion policy and identified survey campaign; activate exactly one matching self-paced Class; publish/open the registration release and create its governed direct Go link. Establish distinct reviewed adult learner, unrelated learner and provider identities through approved identity workflows; obtain current QA sessions. Run strict preflight and `npm run test:e2e:noncredit:api`; use a separate fresh fixture for browser/media acceptance. Do not insert learner outcome evidence, forge reviews or use production credentials.
 
 The diagnostic source and exact-class preflight tightening are committed; only the inventory SQL has been executed against Neon in this pass. Full exact-revision Node/Playwright execution remains outstanding.
+
+
+### Permanent QA rehearsal runner (November 27)
+
+Use a **separate clean checkout** of the release branch, not the normal development checkout containing production or development environment files. The initial implementation is deliberately pinned to the existing dedicated Neon branch `br-spring-frog-arnmih9w`. Run Node 22+ and install the checked-in dependencies and Chromium first.
+
+```sh
+npm ci
+npx playwright install chromium
+npm run qa:pilot -- init
+```
+
+The initializer creates an ignored `.env.pilot-qa` with separate random access peppers and assessment encryption key. It refuses to overwrite an existing file. Preserve those values across fixture preparation and runtime execution; rotating a key invalidates existing sealed items or sessions. On Windows restrict the file ACL to the QA operator. Do not commit, paste or include its contents in artifacts.
+
+Fill in the isolated database URL, the **production hostname only** for the existing isolation comparison, and the dedicated restricted authentication login URL. The optional operations login must be the separate restricted `can_os_canonical_ops_app` on the same QA database; its role is not provisioned by this runner. For QA content and identity evidence use the dedicated private R2 bucket `can-os-pilot-qa` and a bucket-scoped credential. No real partner files or production storage credentials. Configure these through the approved DBA/storage operator path, not in source.
+
+```sh
+npm run qa:pilot -- readiness
+npm run qa:pilot -- keys
+```
+
+Readiness is a presence/shape check and branch-attested inventory, not publication approval. It is expected to exit nonzero until the fixture and sessions exist. The keys command seals the five existing QA draft items with the runtime key via the production crypto helper. It does not publish an assessment. It refuses a different branch, item set, or incompatible existing key. No credentials, sessions or approval records are minted by this script.
+
+#### Rehearsal completion sequence
+
+- Use the canonical signup/session workflow with individually controlled QA inboxes; verify each distinct adult learner, provider, author and reviewer through the existing workflow. Assign only the required roles. Tag synthetic Persons and Organizations `qa_only=true` and `intended_branch=br-spring-frog-arnmih9w` after verifying the exact records in the isolated branch. Do not use fixed school demo accounts, copy production sessions, create a second Person, fabricate birth-date review, or hand-insert session bearers.
+- Upload the seven existing synthetic MP4s and VTTs through the native private provider-media workflow. Complete independent academic, rights and accessibility reviews and publish each asset; bind coverage to the primary track. Complete actual track and Offering review/publication.
+- Publish the two assessment versions/forms, open exactly one administration per phase for the same deployment/course/provider, publish the approved automatic completion policy, and activate the exact identified feedback campaign.
+- Approve Site adoption, activate exactly one self-paced Class, publish/open registration, then publish a governed direct adult-training engagement Go link.
+- Generate the JSON fixture from the current published records using the command below. Place the emitted single JSON line in `CAN_PILOT_QA_FIXTURE_JSON` in the private local environment file. Obtain three fresh verified CAN sessions through the real application and set the three local session entries. The runner does not emit or provision session tokens.
+
+```sh
+npm run qa:pilot -- fixture
+npm run qa:pilot -- readiness
+npm run qa:pilot -- api
+```
+
+The API and browser journeys both **consume a fresh fixture**; do not run them sequentially on the same used training. A separately approved fresh fixture and the strict test configuration are required for the browser run. The convenience fixture generator currently supports only the original seven-lesson reference; generalized fresh-fixture authoring and provisioning remain follow-up work. The QA wrapper uses the exact clean checkout SHA, an explicit environment allowlist, no inherited app/provider credentials, and refuses normal Vite environment files. It attests the dedicated database and configured restricted login branch before starting a child process. It does not deploy Cloudflare, configure R2 credentials, or independently prove bucket access. Do not point a QA deployment at a production database, production R2, or production delivery providers.
+
+Current November 27 inventory on the isolated branch: one draft training, seven course lessons, five draft shared assessment items, zero published primary lesson coverage, zero sealed keys, zero open administrations, zero policies, zero active survey campaigns, zero active Classes, zero open releases, one verified tagged account and zero current tagged sessions. All six new fixture-generator SQL queries were executed read-only against the QA schema; zero qualifying published records are expected. No application test, provider upload, publication, or independent approval was completed by this source work. No production data was modified.
