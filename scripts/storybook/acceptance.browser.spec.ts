@@ -160,3 +160,15 @@ for(const variant of ["Comparison","Mobile"] as const){
   await assertCanvas(page,failures);
  });
 }
+
+
+test("adoption dashboard exposes route review filters and exact counts",async({page},info)=>{
+ const failures=await openStory(page,registeredStoryId("src/components/workspace/design-adoption.stories.tsx#RegistryOverview"),String(info.project.metadata.theme));
+ await expect(page.getByRole("heading",{name:"Design system adoption"})).toBeVisible();
+ await expect(page.getByRole("table",{name:"Layout coverage counts"})).toBeVisible();
+ const queue=page.getByRole("region",{name:"Route review queue"});
+ await queue.getByRole("combobox",{name:"Review filter"}).selectOption("all");
+ await expect(queue.getByRole("status")).toContainText("Showing 1–");
+ await expect(queue.getByRole("table",{name:"Route review records"})).toBeVisible();
+ await assertCanvas(page,failures);
+});
