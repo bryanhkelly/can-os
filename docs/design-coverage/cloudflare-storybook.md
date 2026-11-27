@@ -74,7 +74,7 @@ GitHub requires a workflow_dispatch workflow to exist on the default branch befo
 
 Run `npm run storybook:quality:audit` on the isolated Storybook worktree after installing the locked dependencies and Chromium. This is a diagnostic command, not a deployment command. It executes source contracts, the complete interaction suite, static build and inventory, static asset safety, and independent browser checks where prerequisites permit. It continues after failed diagnostic stages and records blocked stages explicitly. The report groups failures by accessibility rule, observed color pair and runtime/interaction signature, with distinct affected-story counts. Groups can overlap and must not be treated as proven root causes.
 
-The complete consolidated report is `acceptance-artifacts/storybook-quality/report.json`; timestamped raw logs and test results are retained under `acceptance-artifacts/storybook-quality/runs/`. GitHub PR checks run the same command and preserve its evidence. No credentials or deployment are required. A diagnostic pass cannot substitute for the exact-commit release receipt or reviewed visual evidence.
+The complete consolidated report is `acceptance-artifacts/storybook-quality/report.json`; timestamped raw logs and test results are retained under `acceptance-artifacts/storybook-quality/runs/`. GitHub PR checks run the same command and preserve its evidence. The consolidated report also includes the AST accessible-action source review (candidates for manual verification, not a substitute for axe or an automatic failure count). No credentials or deployment are required. A diagnostic pass cannot substitute for the exact-commit release receipt or reviewed visual evidence.
 
 ### Release tiers
 
@@ -82,3 +82,5 @@ The complete consolidated report is `acceptance-artifacts/storybook-quality/repo
 - Governed release: require all existing acceptance stages, the exact-commit receipt and matching asset digest, as well as the repository visual regression review. Only then prepare and deploy the dedicated Worker. Keep public access disabled until Cloudflare Access protection is verified.
 
 Keep remediation on the Storybook branch until the draft PR is ready for review. Do not merge or deploy while the diagnostic run is failing or its evidence is missing.
+
+The preview package may be prepared again for the same commit only when its static files and all security metadata match the accepted output byte-for-byte. The deploy script checks the same contract, including the exact CSP and redirect file, immediately before invoking Wrangler. If a package is stale or altered, preparation and deployment stop; retain it for investigation and use a freshly accepted package instead. The build and interaction runner share one explicit TanStack server dependency exclusion list.
