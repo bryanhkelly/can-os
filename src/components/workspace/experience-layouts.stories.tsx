@@ -36,7 +36,9 @@ function PublicFixture(){
 }
 export const PublicRegistration:Story={render:()=> <PublicFixture/>,play:async({canvasElement})=>{
  const c=within(canvasElement);await expect(c.getByRole("button",{name:"Express interest"})).toBeDisabled();
- await userEvent.type(c.getByRole("textbox",{name:"Email address"}),"example@example.com");
+ const email=c.getByRole("textbox",{name:/^Email address\s*\(required\)$/});
+ await expect(email).toBeRequired();
+ await userEvent.type(email,"example@example.com");
  await userEvent.click(c.getByRole("button",{name:"Express interest"}));
  await expect(c.getByText("Example interest received. No enrollment was created.")).toBeVisible();
 }};
