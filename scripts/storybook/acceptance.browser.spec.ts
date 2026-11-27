@@ -1,5 +1,6 @@
 import {test,expect,type Page} from "@playwright/test";
 import {readFileSync} from "node:fs";
+import {execFileSync} from "node:child_process";
 import {findStoryEntry} from "./index-contract.mjs";
 
 type IndexEntry={id:string;type:string;title:string;name?:string;exportName?:string;importPath?:string};
@@ -170,5 +171,20 @@ test("adoption dashboard exposes route review filters and exact counts",async({p
  await queue.getByRole("combobox",{name:"Review filter"}).selectOption("all");
  await expect(queue.getByRole("status")).toContainText("Showing 1–");
  await expect(queue.getByRole("table",{name:"Route review records"})).toBeVisible();
+ await assertCanvas(page,failures);
+});
+
+
+test("component impact dashboard identifies exact catalog source and dependent routes",async({page},info)=>{
+ const failures=await openStory(page,registeredStoryId("src/components/workspace/design-impact.stories.tsx#Inventory"),String(info.project.metadata.theme));
+ const commit=execFileSync("git",["rev-parse","HEAD"],{encoding:"utf8"}).trim();
+ const identity=page.getByRole("region",{name:"Source identity"});
+ await expect(identity.getByText(commit,{exact:true})).toBeVisible();
+ const inventory=page.getByRole("region",{name:"Component inventory"});
+ await inventory.getByRole("textbox",{name:"Find component"}).fill("src/components/ui/button.tsx");
+ await expect(inventory.getByRole("status")).toContainText("of 1 modules");
+ const details=page.getByRole("region",{name:"Selected component impact"});
+ await expect(details.getByRole("table",{name:"Affected source routes"})).toBeVisible();
+ await expect(details.getByRole("rowheader").first()).toBeVisible();
  await assertCanvas(page,failures);
 });
