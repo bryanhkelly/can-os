@@ -113,3 +113,17 @@ export const ControlledReview: Story = {
     await expect(action).toBeEnabled();
   },
 };
+
+export const ChildRequiredAndDisabledValue: Story = {
+  render: () => <div className="max-w-xl space-y-4 bg-background p-6">
+    <Field label="Reference"><Input required /></Field>
+    <Field label="Recorded reference"><Input disabled value="REF-123" readOnly /></Field>
+  </div>,
+  play: async ({ canvas }) => {
+    await expect(canvas.getByRole("textbox", { name: "Reference (required)" })).toBeRequired();
+    const recorded = canvas.getByRole("textbox", { name: "Recorded reference" });
+    await expect(recorded).toBeDisabled();
+    await expect(recorded).toHaveValue("REF-123");
+    await expect(recorded).toHaveStyle({ opacity: "1" });
+  },
+};
