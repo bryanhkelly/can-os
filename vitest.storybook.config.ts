@@ -34,6 +34,9 @@ export default defineConfig({
       },
     },
     name: "storybook",
+    // Preserve complete structured failure evidence, not only the console tail.
+    reporters: ["default", "json"],
+    outputFile: { json: "acceptance-artifacts/storybook-interaction-results.json" },
     browser: {
       enabled: true,
       headless: true,
