@@ -141,3 +141,22 @@ test("filled actions preserve semantic color pairs on native pointer hover",asyn
  }
  await assertCanvas(page,failures);
 });
+
+// Verify the actual lazy Recharts adapter in the compiled catalog, including
+// geometry and exact-value access at ordinary and narrow container widths.
+for(const variant of ["Comparison","Mobile"] as const){
+ test("report chart renders positive geometry: "+variant,async({page},info)=>{
+  const failures=await openStory(page,registeredStoryId("src/components/workspace/report-chart.stories.tsx#"+variant),String(info.project.metadata.theme));
+  const chart=page.locator("[data-report-chart=comparison]");
+  const table=chart.getByRole("table",{name:"Pilot participation exact values"});
+  await expect(table).toBeVisible();
+  await expect(table.getByRole("rowheader",{name:"Completed"})).toBeVisible();
+  await expect(table.getByText("69",{exact:true})).toBeVisible();
+  const svg=chart.locator("[data-report-chart-plot] .recharts-surface");
+  await expect(svg).toBeVisible({timeout:15_000});
+  await expect.poll(async()=>{const box=await svg.boundingBox();return Boolean(box&&box.width>0&&box.height>0);}).toBe(true);
+  await expect(chart.getByText("Chart unavailable. Exact values are below.")).toHaveCount(0);
+  await expect.poll(()=>chart.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
+  await assertCanvas(page,failures);
+ });
+}
