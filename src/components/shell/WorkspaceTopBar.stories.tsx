@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, userEvent, within } from "storybook/test";
-import { createMemoryHistory, createRootRoute, createRouter, RouterProvider } from "@tanstack/react-router";
+import { FixtureRouter } from "../../../.storybook/fixture-router";
 import { useState } from "react";
 import { WorkspaceTopBar } from "./WorkspaceTopBar";
 
@@ -16,14 +16,7 @@ const meta = {
     onOpenNotifications: fn(), onOpenAccount: fn(),
   },
   parameters: { layout: "fullscreen" },
-  decorators: [Story => {
-    const root = createRootRoute({ component: Story });
-    const router = createRouter({
-      routeTree: root,
-      history: createMemoryHistory({ initialEntries: ["/"] }),
-    });
-    return <RouterProvider router={router} />;
-  }],
+  decorators: [Story => <FixtureRouter><Story /></FixtureRouter>],
 } satisfies Meta<typeof WorkspaceTopBar>;
 export default meta;
 type Story = StoryObj<typeof meta>;
