@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect } from "storybook/test";
 import { Button } from "@/components/ui/button";
 import { StatusBadge, WorkspacePanel } from "@/components/workspace";
 import { BrandTheme } from "./brand-theme";
@@ -21,4 +22,27 @@ export const InvalidBrandFallsBack: Story = {
       <Button>Readable primary action</Button>
     </WorkspacePanel></div>
   </BrandTheme>,
+};
+
+function ScopedEyebrows() {
+  return <div className="space-y-4 bg-background p-4">
+    <div className="dark bg-background p-4 text-foreground"><p className="can-eyebrow">Dark workspace label</p></div>
+    <BrandTheme brand={{ primary: "#075b50", primaryForeground: "#ffffff", accent: "#e5f4f0", accentForeground: "#102a26" }}>
+      <p className="can-eyebrow">Institutional workspace label</p>
+      <BrandTheme className="dark" brand={{ primary: "#075b50", primaryForeground: "#ffffff", accent: "#e5f4f0", accentForeground: "#102a26" }}>
+        <p className="can-eyebrow">Dark institutional workspace label</p>
+        <Button>Dark institutional action</Button>
+      </BrandTheme>
+    </BrandTheme>
+  </div>;
+}
+export const NestedThemeContrast: Story = {
+  globals: { theme: "light" },
+  render: () => <ScopedEyebrows />,
+  play: async ({ canvas }) => {
+    await expect(canvas.getByText("Dark workspace label")).toHaveStyle({ color: "rgb(184, 208, 255)" });
+    await expect(canvas.getByText("Institutional workspace label")).toHaveStyle({ color: "rgb(7, 91, 80)" });
+    await expect(canvas.getByText("Dark institutional workspace label")).toHaveStyle({ color: "rgb(184, 208, 255)" });
+    await expect(canvas.getByRole("button", { name: "Dark institutional action" })).toHaveStyle({ backgroundColor: "rgb(138, 180, 255)" });
+  },
 };
