@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, userEvent } from "storybook/test";
 import { useState } from "react";
 import { useRouter } from "@tanstack/react-router";
+import { Button } from "@/components/ui/button";
 import { FixtureRouter } from "../../../.storybook/fixture-router";
 import { DetailNavigation, SectionTab } from "./workspace-panel";
 
@@ -65,7 +66,7 @@ function RouterIdentity({ revision }: { revision: number }) {
 function RouterStabilityExample() {
   const [revision, setRevision] = useState(0);
   return <div className="bg-background p-5">
-    <button type="button" onClick={() => setRevision(value => value + 1)}>Update fixture data</button>
+    <Button onClick={() => setRevision(value => value + 1)}>Update fixture data</Button>
     <FixtureRouter initialPath="/"><RouterIdentity revision={revision} /></FixtureRouter>
   </div>;
 }
