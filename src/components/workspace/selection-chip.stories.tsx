@@ -44,6 +44,8 @@ export const Compact: Story = {
     const learners=canvas.getByRole("button",{name:"English language learners"});
     await expect(adults).toHaveAttribute("aria-pressed","true");
     await expect(learners).toHaveAttribute("aria-pressed","false");
+    // Measure the same loaded typeface before and after changing state.
+    await document.fonts.ready;
     const width=learners.getBoundingClientRect().width;
     await userEvent.click(learners);
     await expect(learners).toHaveAttribute("aria-pressed","true");
