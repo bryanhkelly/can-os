@@ -22,13 +22,13 @@ export function engineeringSnapshot(projectRoot=root){
  // absolute checkout path, source text, environment variables or credentials.
  return {schemaVersion:1,designSystem:"V6.1",source:identity,impact};
 }
-export function engineeringInventoryPlugin(){
+export function engineeringInventoryPlugin({projectRoot=root}={}){
  let snapshot;
  return {name:"becomuna-storybook-engineering-inventory",
   resolveId(id){return id===inventoryModuleId?"\0"+id:null;},
   load(id){
    if(id!=="\0"+inventoryModuleId)return null;
-   snapshot??=engineeringSnapshot();
+   snapshot??=engineeringSnapshot(projectRoot);
    return "export default "+JSON.stringify(snapshot)+";";
   }
  };
