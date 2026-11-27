@@ -18,6 +18,15 @@ describe("controlled institutional branding", () => {
     expect(brandThemeStyle(brand)["--brand-primary"]).toBe(brand.primary);
   });
 
+  it("rejects brand actions that pass on white but fail on shared muted surfaces", () => {
+    const candidate = { primary: "#1769ef", primaryForeground: "#ffffff", accent: "#ffffff", accentForeground: "#101d39" };
+    expect(contrastRatio(candidate.primary, "#ffffff")).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(candidate.primary, "#eef2f7")).toBeLessThan(4.5);
+    const resolved = resolveBrandTokens(candidate);
+    expect(resolved.tokens).toEqual(defaultBrandTokens);
+    expect(resolved.issues).toContain("primary on muted must reach 4.5:1");
+  });
+
   it("rejects low contrast and malformed inputs as a complete set", () => {
     const lowContrast = resolveBrandTokens({ primary: "#ffffff", primaryForeground: "#ffffff" });
     expect(lowContrast.tokens).toEqual(defaultBrandTokens);
