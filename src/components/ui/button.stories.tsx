@@ -64,3 +64,19 @@ export const UnavailableSaveActions: Story = {
     await expect(link).toHaveClass("bg-muted");
   },
 };
+
+/** Filled actions retain their audited foreground/background pair on hover. */
+export const FilledHoverContrast: Story = {
+  render: () => <div className="flex flex-wrap gap-3 bg-background p-6"><Button>Continue</Button><Button variant="destructive">Delete draft</Button></div>,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    for (const name of ["Continue", "Delete draft"]) {
+      const button = canvas.getByRole("button", { name });
+      const before = getComputedStyle(button).backgroundColor;
+      const ink = getComputedStyle(button).color;
+      await userEvent.hover(button);
+      await expect(button).toHaveStyle({ backgroundColor: before, color: ink, textDecorationLine: "underline" });
+      await userEvent.unhover(button);
+    }
+  },
+};
