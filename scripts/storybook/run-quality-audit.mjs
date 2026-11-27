@@ -4,12 +4,16 @@ import {resolve,join} from "node:path";
 import {fileURLToPath} from "node:url";
 import {aggregateFailures,markdownReport} from "./quality-triage.mjs";
 import {staticManifest} from "./static-manifest.mjs";
+import {interactionEvidenceErrors,browserEvidenceErrors} from "./test-evidence.mjs";
 const root=fileURLToPath(new URL("../../",import.meta.url));
 const base=join(root,"acceptance-artifacts","storybook-quality");
 const runId=new Date().toISOString().replace(/[^0-9]/g,"")+"-"+process.pid;
 const out=join(base,"runs",runId);
 mkdirSync(out,{recursive:true});
-const commit=execFileSync("git",["rev-parse","HEAD"],{cwd:root,encoding:"utf8"}).trim();
+const git=(...args)=>execFileSync("git",args,{cwd:root,encoding:"utf8"}).trim();
+const commit=git("rev-parse","HEAD");
+const clean=()=>git("status","--porcelain","--untracked-files=normal")==="";
+const initiallyClean=clean();
 const allowed=new Set(["PATH","PATHEXT","HOME","USERPROFILE","SYSTEMROOT","WINDIR","TEMP","TMP","TMPDIR","APPDATA","LOCALAPPDATA","PROGRAMDATA","SYSTEMDRIVE","COMSPEC","HOMEDRIVE","HOMEPATH","LANG","LC_ALL","CI","PLAYWRIGHT_BROWSERS_PATH","XDG_CACHE_HOME"]);
 const env=Object.fromEntries(Object.entries(process.env).filter(([key])=>allowed.has(key.toUpperCase())));
 env.TZ="UTC";
@@ -59,6 +63,8 @@ if(existsSync(interactionFile)){
   copyFileSync(interactionFile,join(out,"interactions.json"));
   const interactionResults=JSON.parse(readFileSync(interactionFile,"utf8"));
   triage=aggregateFailures(interactionResults);
+  const evidenceErrors=interactionEvidenceErrors(interactionResults);
+  if(evidenceErrors.length)stages.push({name:"interaction-evidence",status:"failed",error:evidenceErrors.join("; ")});
   interactionFailures=interactionResults.testResults.filter(f=>f.status==="failed"||f.assertionResults?.some(t=>t.status==="failed")).map(f=>({name:f.name,status:f.status,message:f.message,assertionResults:(f.assertionResults??[]).filter(t=>t.status==="failed")}));
   writeFileSync(join(out,"triage.json"),JSON.stringify(triage,null,2)+"\n");
  }catch(error){stages.push({name:"interaction-evidence",status:"failed",error:error.message});}
@@ -75,9 +81,18 @@ for(const [file,name] of [[indexFile,"index.json"],[browserFile,"browser.json"]]
 const failureLogs=Object.fromEntries(stages.filter(s=>s.status==="failed"&&s.log).map(s=>[s.name,readFileSync(join(out,s.log),"utf8").slice(-16000)]));
 let browserResults=null;
 if(existsSync(browserFile)){
- try{browserResults=JSON.parse(readFileSync(browserFile,"utf8"));}
+ try{
+  browserResults=JSON.parse(readFileSync(browserFile,"utf8"));
+  const evidenceErrors=browserEvidenceErrors(browserResults);
+  if(evidenceErrors.length)stages.push({name:"browser-evidence",status:"failed",error:evidenceErrors.join("; ")});
+ }
  catch(error){stages.push({name:"browser-evidence",status:"failed",error:error.message});}
+}else stages.push({name:"browser-evidence",status:"blocked",error:"No fresh browser results"});
+if(manifest){
+ try{if(staticManifest(join(root,"storybook-static")).digest!==manifest.digest)throw Error("Static assets changed during audit");}
+ catch(error){stages.push({name:"static-integrity",status:"failed",error:error.message});}
 }
+if(!initiallyClean||!clean()||git("rev-parse","HEAD")!==commit)stages.push({name:"source-integrity",status:"failed",error:"Audit source was dirty or changed; not ready for governed acceptance"});
 const report={kind:"diagnostic-only",commit,runId,stages,interactionTriage:triage,interactionFailures,browserResults,sourceAccessibility,failureLogs,staticDigest:manifest?.digest??null,readyForGovernedAcceptance:stages.every(s=>s.status==="passed")&&triage!==null&&triage.failedStories===0&&triage.reportedFailedTests===0&&browserResults!==null&&manifest!==null};
 writeFileSync(join(out,"report.json"),JSON.stringify(report,null,2)+"\n");
 const summary=["# Storybook bulk quality audit","","Commit: "+commit,"","Diagnostic only; not a publication receipt.","","| Stage | Status |","| --- | --- |",...stages.map(s=>"| "+s.name+" | "+s.status+" |"),"",sourceAccessibility?"Accessible-name source candidates (manual review): "+sourceAccessibility.candidates.length:"No fresh source-accessibility evidence.","",triage?markdownReport(triage):"No interaction evidence available."].join("\n");
