@@ -31,6 +31,7 @@ function GalleryFixture() {
           {siteTypographyIds.map(id=><option key={id} value={id}>{id}</option>)}
         </select></div>
     </div>
+    <h2 className="sr-only">Website layout preview</h2>
     <WebsiteTemplateGallery schoolName="Rivermere Academy" value={template} onChange={setTemplate}
       paletteId={palette} typographyId={typography} />
     <p role="status" className="mt-6 border border-border bg-card p-4 text-xs text-muted-foreground">
