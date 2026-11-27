@@ -39,7 +39,12 @@ export const Facilities: Story = {
     await expect(canvas.getByRole("heading", { name: "Facilities & Resources" })).toBeInTheDocument();
     // Prepare modules live in the persistent Launch sidebar, not a duplicated
     // navigation inside the center pane of this story.
-    await expect(canvas.getByRole("heading", { name: "The decision to make" })).toBeInTheDocument();
+    await expect(canvas.getByRole("heading", { name: "Learning environment" })).toBeVisible();
+    await expect(canvas.getByRole("heading", { name: "Physical spaces, capacity & equipment" })).toBeVisible();
+    const guide=within(canvas.getByRole("region", { name: "Site Guide" }));
+    await expect(guide.getByRole("heading", { name: "Worth considering" })).toBeVisible();
+    await expect(guide.getByRole("heading", { name: "How this connects" })).toBeVisible();
+    await expect(canvas.getByRole("button", { name: "Reload saved environment" })).toBeVisible();
     await expect(canvas.queryByText("100%")).not.toBeInTheDocument();
   },
 };
