@@ -12,6 +12,7 @@ const allowedBranch = "br-spring-frog-arnmih9w";
 const secret = () => randomBytes(32).toString("hex");
 const modes = {
   readiness: ["scripts/acceptance/diagnose-noncredit-pilot-qa.mjs"],
+  regression: ["scripts/acceptance/test-noncredit-assessment-provisioning-qa.mjs"],
   keys: ["--import", "tsx", "scripts/acceptance/prepare-pilot1-rehearsal-keys.ts"],
   fixture: ["scripts/acceptance/build-pilot1-qa-fixture.mjs"],
   api: ["node_modules/@playwright/test/cli.js", "test", "--config", "playwright.noncredit-pilot-api.config.ts"],
@@ -66,7 +67,7 @@ function localConfiguration() {
 }
 try {
   const mode=process.argv[2];
-  if(process.argv.length!==3) fail("Use exactly one QA action: init, readiness, keys, fixture, api, browser.");
+  if(process.argv.length!==3) fail("Use exactly one QA action: init, readiness, regression, keys, fixture, api, browser.");
   if(mode==="init") init();
   else {
     if(!Object.hasOwn(modes,mode)) fail("Unknown QA action.");
