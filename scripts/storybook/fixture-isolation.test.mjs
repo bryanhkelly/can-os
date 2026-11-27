@@ -32,3 +32,18 @@ const cases=[
   ]
 ];
 for(const [path,expected] of cases)test("module boundary: "+path,()=>assert.equal(fixtureImportViolation(path),expected));
+
+import {unavailableRpcAliases,resolveUnavailableRpc,unavailableRpcSource} from "../../.storybook/fixture-unavailable-rpc.mjs";
+test("explicit fixture RPC modules reject all calls, never return success",async()=>{
+ for(const [path,id] of Object.entries(unavailableRpcAliases)){
+  const resolved=resolveUnavailableRpc(id);
+  assert.ok(resolved,path);
+  const source=unavailableRpcSource(resolved);
+  assert.ok(source,path);
+  const module=await import("data:text/javascript;base64,"+Buffer.from(source).toString("base64"));
+  for(const endpoint of Object.values(module))await assert.rejects(endpoint(),/no live service was called/);
+ }
+ assert.equal(resolveUnavailableRpc("virtual:storybook-unavailable-rpc/modules/unknown.functions"),null);
+ assert.equal(unavailableRpcSource("\0virtual:storybook-unavailable-rpc/modules/unknown.functions"),null);
+ assert.equal(fixtureImportViolation("/repo/src/modules/identity/platform-owner-delegation.functions.ts"),"unmocked application RPC");
+});
