@@ -21,7 +21,7 @@ export function ReportRankedComparison({title,description,rows,format="count",se
             {row.value!==null&&<div aria-hidden="true" className="mt-2 h-2 w-full bg-muted print:hidden"><div className="h-full bg-[var(--report-series-1)]" style={{width:maximum?row.value/maximum*100+"%":"0%"}}/></div>}
           </TableRowHead>
           <TableCell className="text-right tabular-nums">{formatReportValue(row.value,format)}</TableCell>
-          {onSelect&&<TableCell><Button type="button" size="sm" variant="outline" className="aria-pressed:border-primary aria-pressed:bg-accent aria-pressed:text-primary" aria-pressed={selectedId===row.id} aria-label={"Filter report to "+row.label} onClick={()=>onSelect(row.id)}>Filter</Button></TableCell>}
+          {onSelect&&<TableCell><Button type="button" size="sm" variant={selectedId===row.id?"outline-selected":"outline"} aria-pressed={selectedId===row.id} aria-label={"Filter report to "+row.label} onClick={()=>onSelect(row.id)}>Filter</Button></TableCell>}
         </TableRow>)}</TableBody>
       </Table>}
   </DashboardPanel>;
