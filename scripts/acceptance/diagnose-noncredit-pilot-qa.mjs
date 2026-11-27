@@ -2,7 +2,7 @@
 import { existsSync } from "node:fs";
 import { loadEnvFile } from "node:process";
 import { neon } from "@neondatabase/serverless";
-import { verifyAdmissionsNeonBranch } from "../verify-admissions-neon-branch.mjs";
+import { checkPilotMigrationParity } from "./check-pilot-migration-parity.mjs";
 
 if (existsSync(".env.local")) loadEnvFile(".env.local");
 const env = process.env;
@@ -42,9 +42,12 @@ for (const [name,ok] of Object.entries(checks)) console.log((ok ? "PRESENT " : "
 
 const dbKeys = ["APP_ENV","NODE_ENV","CAN_TEST_DB_WRITES_ENABLED","TEST_DATABASE_URL","CAN_APPLICATION_DB_HOST","CAN_PILOT_QA_BRANCH_ID"];
 let inventoryReady = false;
+let migrationReady = false;
 if (dbKeys.every(key => checks[key])) {
   try {
-    await verifyAdmissionsNeonBranch({...env,CAN_ADMISSIONS_TEST_BRANCH_ID:branch});
+    const parity = await checkPilotMigrationParity(env);
+    migrationReady = parity.ready;
+    console.log("Exact migration parity:",JSON.stringify(parity,null,2));
     const sql = neon(env.TEST_DATABASE_URL);
     const rows = await sql`
       WITH qa AS (
@@ -103,8 +106,8 @@ if (dbKeys.every(key => checks[key])) {
 } else {
   console.log("BLOCKED: database inventory requires the six isolated database settings above.");
 }
-if (!Object.values(checks).every(Boolean) || !inventoryReady) {
-  console.log("BLOCKED: runtime configuration or candidate inventory incomplete.");
+if (!Object.values(checks).every(Boolean) || !inventoryReady || !migrationReady) {
+  console.log("BLOCKED: runtime configuration, exact migration parity or candidate inventory incomplete.");
   process.exitCode = 1;
 } else {
   console.log("CANDIDATE ONLY: run the strict fixture preflight and HTTP/browser tests; this inventory is not acceptance.");
