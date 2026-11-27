@@ -22,11 +22,28 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - run: npm ci --include=dev
-      - run: npm run storybook:check-playwright
-      - run: node node_modules/playwright/cli.js install --with-deps chromium
+      - name: Install locked dependencies and capture setup evidence
+        id: install
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p acceptance-artifacts/storybook-quality
+          npm ci --include=dev 2>&1 | tee acceptance-artifacts/storybook-quality/npm-install.log
+      - name: Install browser and OS libraries
+        id: browser_install
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run storybook:check-playwright 2>&1 | tee acceptance-artifacts/storybook-quality/playwright-setup.log
+          node node_modules/playwright/cli.js install --with-deps chromium 2>&1 | tee acceptance-artifacts/storybook-quality/browser-install.log
       - name: Run all independent diagnostic stages
         run: npm run storybook:quality:audit
+      - name: Require successful browser setup
+        if: always() && steps.install.outcome == 'success'
+        env:
+          BROWSER_SETUP: ${{ steps.browser_install.outcome }}
+        run: test "$BROWSER_SETUP" = success
       - name: Publish quality summary
         if: always()
         shell: bash
