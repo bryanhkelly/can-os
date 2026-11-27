@@ -42,6 +42,20 @@ function run(name){
   // Hosted builders cannot inspect a local log after a failed ephemeral build.
   const tail=readFileSync(logfile,"utf8").split(/\r?\n/).slice(-80).join("\n");
   console.error("Failed acceptance stage: "+name+"\n"+tail);
+  if(name==="interactions"){
+   try{
+    const report=JSON.parse(readFileSync(join(root,"acceptance-artifacts/storybook-interaction-results.json"),"utf8"));
+    console.error("Interaction failures (complete identities):");
+    for(const suite of report.testResults??[]){
+     const failed=(suite.assertionResults??[]).filter(assertion=>assertion.status==="failed");
+     if(suite.status==="failed"&&!failed.length)console.error(suite.name+" — suite import/runtime failure: "+String(suite.message??"").slice(0,600));
+     for(const assertion of failed){
+      const message=String(assertion.failureMessages?.[0]??"").replace(/\\x1b\\[[0-9;]*m/g,"").split("\n").filter(line=>line.trim()).slice(0,5).join("\n");
+      console.error(suite.name+" # "+(assertion.fullName??assertion.title)+"\n"+message.slice(0,1000));
+     }
+    }
+   }catch(error){console.error("Structured interaction diagnostics unavailable: "+String(error));}
+  }
   throw Error("Acceptance failed at "+name+". See "+logfile);
  }
 }
