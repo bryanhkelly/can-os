@@ -782,3 +782,7 @@ and path containment. It does not decode all image content, authenticate the
 reviewer, prove correct rendering, or replace accessibility and authenticated
 journey acceptance. Use actual browser evidence; never populate the manifest
 with synthetic fixtures or placeholder screenshots.
+
+### Accessible interaction states
+
+Filled primary and destructive buttons retain their validated foreground and background colors on hover; a text underline distinguishes the hover state without diluting contrast. Native disabled and loading states continue to use the canonical muted styling and do not underline. Shared table column headers default to `scope="col"`; use `TableRowHead` for row headings or explicitly set scope where a more complex table requires it. Institutional action colors must reach 4.5:1 on card, canvas, accent and muted surfaces before the complete brand token set is accepted.
