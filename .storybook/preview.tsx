@@ -1,8 +1,18 @@
+import { useState, type ReactNode } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { WorkspaceSessionContext } from "../src/components/shell/workspace-session-context";
 import type { Preview } from "@storybook/react-vite";
 import { BrandTheme } from "../src/design-system/brand-theme";
 import "../src/styles.css";
 import "./assets/fonts/fonts.css";
 import { viewports, baselineModes } from "./viewports";
+
+function FixtureProviders({ children }: { children: ReactNode }) {
+  // Each story gets its own query cache and an explicitly signed-out synthetic
+  // session. Never mount the live session provider, polling or activity RPC.
+  const [client] = useState(() => new QueryClient({defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false, gcTime: 0 }, mutations: { retry: false } }}));
+  return <QueryClientProvider client={client}><WorkspaceSessionContext.Provider value={{session:null,error:null}}>{children}</WorkspaceSessionContext.Provider></QueryClientProvider>;
+}
 
 const preview: Preview = {
   globalTypes: {
@@ -22,6 +32,7 @@ const preview: Preview = {
   },
   initialGlobals: { theme: "light" },
   decorators: [
+    Story => <FixtureProviders><Story /></FixtureProviders>,
     (Story, context) => {
       if (context.globals.theme === "site") {
         return <div data-storybook-theme="site"><BrandTheme brand={{
