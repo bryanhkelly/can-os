@@ -5,6 +5,7 @@ import {fileURLToPath} from "node:url";
 import {releaseErrors} from "./release-contract.mjs";
 import {staticManifest} from "./static-manifest.mjs";
 import {cloudflarePreviewConfig} from "./cloudflare-preview-config.mjs";
+import {verifyPreviewPackage,writePreviewMetadata} from "./preview-package.mjs";
 const root=fileURLToPath(new URL("../../",import.meta.url));
 const out=join(root,"acceptance-artifacts/storybook-release");
 const source=join(root,"storybook-static"),receipt=JSON.parse(readFileSync(join(out,"receipt.json"),"utf8"));
@@ -15,7 +16,10 @@ if(errors.length)throw Error(errors.join("\n"));
 const cloudflare=process.argv.includes("--cloudflare");
 const prefix=cloudflare?"cloudflare-preview-":"private-preview-";
 const destination=join(out,prefix+head.slice(0,12));
-if(existsSync(destination))throw Error("Private preview package already exists: "+destination);
+if(existsSync(destination)){
+ verifyPreviewPackage(destination,manifest,cloudflare);
+ console.log("Reusing verified private preview package: "+destination);
+}else{
 const staging=mkdtempSync(join(out,".private-preview-"));
 try{
  for(const file of manifest.files){
@@ -23,22 +27,12 @@ try{
   const target=join(staging,file.path);mkdirSync(dirname(target),{recursive:true});
   copyFileSync(join(source,file.path),target);
  }
- const staged=staticManifest(staging);
- const expected=manifest.files.filter(file=>!file.path.endsWith(".map"));
- if(JSON.stringify(staged.files)!==JSON.stringify(expected))throw Error("Copied static output changed");
- writeFileSync(join(staging,"_headers"),`/*
-  X-Content-Type-Options: nosniff
-  Referrer-Policy: no-referrer
-  X-Robots-Tag: noindex, nofollow, noarchive
-  Permissions-Policy: camera=(), microphone=(), geolocation=()
-  Content-Security-Policy: connect-src 'self'; form-action 'none'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; frame-src 'self' blob:; font-src 'self' data:; img-src 'self' data: blob:; media-src 'self' data: blob:; worker-src 'self' blob:
-`);
- // Preserve the Storybook iframe.html path and map only the root to the manager.
- if(cloudflare)writeFileSync(join(staging,"_redirects"),"/ /index.html 200\n");
- writeFileSync(join(staging,"robots.txt"),"User-agent: *\nDisallow: /\n");
+ writePreviewMetadata(staging,cloudflare);
+ verifyPreviewPackage(staging,manifest,cloudflare);
  renameSync(staging,destination);
- writeFileSync(join(out,prefix+head.slice(0,12)+".json"),JSON.stringify({commit:head,sourceStaticDigest:manifest.digest,sourceMapsExcluded:true,publication:"not deployed",access:"Private project required for production and previews",receipt:"receipt.json"},null,2)+"\n");
 }catch(error){rmSync(staging,{recursive:true,force:true});throw error;}
+}
+writeFileSync(join(out,prefix+head.slice(0,12)+".json"),JSON.stringify({commit:head,sourceStaticDigest:manifest.digest,sourceMapsExcluded:true,publication:"not deployed",access:"Private project required for production and previews",receipt:"receipt.json"},null,2)+"\n");
 if(cloudflare){
  const configPath=join(out,"wrangler.storybook-"+head.slice(0,12)+".json");
  writeFileSync(configPath,JSON.stringify(cloudflarePreviewConfig(head),null,2)+"\n");
