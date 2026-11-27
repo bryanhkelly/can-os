@@ -36,6 +36,9 @@ export default defineConfig({
       },
     },
     name: "storybook",
+    // Limit competing browser contexts and cold transforms on local runners.
+    // Every test still runs; do not mask nondeterminism with retries.
+    maxWorkers: 2,
     // Preserve complete structured failure evidence, not only the console tail.
     reporters: ["default", "json"],
     outputFile: { json: "acceptance-artifacts/storybook-interaction-results.json" },
