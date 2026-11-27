@@ -65,6 +65,11 @@ export const RadioCheckboxAndDisabled: Story = {
     const summer = canvas.getByRole("checkbox", { name: /Summer & Breaks/ });
     await userEvent.click(summer);
     await expect(summer).toBeChecked();
-    await expect(canvas.getByRole("checkbox", { name: /Grades 9–12/ })).toBeDisabled();
+    const unavailable = canvas.getByRole("checkbox", { name: /Grades 9–12/ });
+    await expect(unavailable).toBeDisabled();
+    const card = unavailable.closest("label");
+    if (!card) throw new Error("Expected a labelled selection card");
+    await expect(card).toHaveStyle({ opacity: "1" });
+    await expect(within(card).getByText(/School-year authorization required/)).toBeVisible();
   },
 };
