@@ -11,7 +11,16 @@ test("static fixture serving allows assets, never falls back to an application o
  await writeFile(join(root,"index.json"),'{"entries":{}}');
  await writeFile(join(root,"index.html"),"<html>fixture</html>");
  await writeFile(join(dir,"private.txt"),"private");
- await symlink(join(dir,"private.txt"),join(root,"escape.txt"));
+ // Windows directory junctions exercise realpath containment without requiring
+ // administrator privileges or Developer Mode for file symlinks.
+ const escapePath=process.platform==="win32"?"/escape/private.txt":"/escape.txt";
+ if(process.platform==="win32"){
+  const outside=join(dir,"outside");await mkdir(outside);
+  await writeFile(join(outside,"private.txt"),"private");
+  await symlink(outside,join(root,"escape"),"junction");
+ }else{
+  await symlink(join(dir,"private.txt"),join(root,"escape.txt"));
+ }
  const server=await createStorybookStaticServer(root);
  try{
   await new Promise(resolve=>server.listen(0,"127.0.0.1",resolve));
@@ -24,7 +33,7 @@ test("static fixture serving allows assets, never falls back to an application o
   assert.equal((await fetch(base+"/api/private")).status,404);
   assert.equal((await fetch(base+"/missing")).status,404);
   assert.equal((await fetch(base+"/index.json",{method:"POST"})).status,405);
-  assert.equal((await fetch(base+"/escape.txt")).status,404);
+  assert.equal((await fetch(base+escapePath)).status,404);
   assert.equal((await fetch(base+"/index.html",{method:"HEAD"})).status,200);
   const code=await new Promise((resolve,reject)=>{const req=request({hostname:"127.0.0.1",port,path:"/%2e%2e/private.txt"},res=>{res.resume();resolve(res.statusCode);});req.on("error",reject);req.end();});
   assert.equal(code,400);
