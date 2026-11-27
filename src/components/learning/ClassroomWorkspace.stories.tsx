@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, within } from "storybook/test";
 import { useState, type ReactNode } from "react";
-import { createMemoryHistory, createRootRoute, createRouter, RouterProvider } from "@tanstack/react-router";
+import { FixtureRouter } from "../../../.storybook/fixture-router";
 import type { ClassContent } from "@/domain/class-content";
 import { DomainError } from "@/domain/errors";
 import { WorkspacePanel } from "@/components/workspace";
@@ -56,10 +56,7 @@ const meta = {
         discussion={<p className="text-sm text-muted-foreground">No lesson discussion has been opened.</p>}/>
     </div>,
   },
-  decorators: [Story => {
-    const root = createRootRoute({ component: () => <ClassroomFrame><Story/></ClassroomFrame> });
-    return <RouterProvider router={createRouter({ routeTree: root, history: createMemoryHistory({ initialEntries: ["/"] }) })}/>;
-  }],
+  decorators: [Story => <FixtureRouter><ClassroomFrame><Story /></ClassroomFrame></FixtureRouter>],
 } satisfies Meta<typeof ClassroomWorkspace>;
 export default meta;
 type Story = StoryObj<typeof meta>;
