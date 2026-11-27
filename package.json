@@ -169,7 +169,8 @@
     "deploy:storybook:cloudflare": "node scripts/storybook/deploy-cloudflare.mjs",
     "storybook:check-browser": "node scripts/storybook/check-browser.mjs",
     "storybook:check-playwright": "node scripts/storybook/check-playwright.mjs",
-    "storybook:quality:triage": "node scripts/storybook/quality-triage.mjs"
+    "storybook:quality:triage": "node scripts/storybook/quality-triage.mjs",
+    "storybook:quality:audit": "node scripts/storybook/run-quality-audit.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
