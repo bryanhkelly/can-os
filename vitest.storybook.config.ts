@@ -5,10 +5,12 @@ import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath, URL } from "node:url";
 import { fixtureIsolationPlugin } from "./.storybook/fixture-isolation-plugin";
 import { storybookFixtureAliases } from "./.storybook/fixture-aliases";
+import { storybookServerDependencyExclusions } from "./.storybook/fixture-dependencies";
 
 export default defineConfig({
   envDir: false,
   envPrefix: "STORYBOOK_FIXTURE_",
+  publicDir: false,
   plugins: [
     fixtureIsolationPlugin(),
     tailwindcss(),
@@ -23,13 +25,13 @@ export default defineConfig({
   // when no story imports them. TanStack Start server exports require the app
   // plugin and must not enter the browser optimizer.
   optimizeDeps: {
-    exclude: ["@tanstack/react-start", "@tanstack/react-start/server", "@tanstack/react-start-server", "@tanstack/start-server-core"],
+    exclude: storybookServerDependencyExclusions,
   },
   test: {
     deps: {
       optimizer: {
         client: {
-          exclude: ["@tanstack/react-start", "@tanstack/react-start/server", "@tanstack/react-start-server", "@tanstack/start-server-core"],
+          exclude: storybookServerDependencyExclusions,
         },
       },
     },
