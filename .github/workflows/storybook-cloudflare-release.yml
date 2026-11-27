@@ -51,4 +51,9 @@ jobs:
             acceptance-artifacts/storybook-release/receipt.json
             acceptance-artifacts/storybook-release/tested-static-manifest.json
             acceptance-artifacts/storybook-release/runs/
+            acceptance-artifacts/storybook-interaction-results.json
+            acceptance-artifacts/storybook-index.json
+            acceptance-artifacts/storybook-browser-results.json
+            acceptance-artifacts/storybook-browser-report/
+            acceptance-artifacts/storybook-browser-results/
           if-no-files-found: warn
