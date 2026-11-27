@@ -33,8 +33,8 @@ export function adoptionSummary(registry: AdoptionRegistry) {
     return {...route, linked, boundary, complete: !boundary && missing.length === 0,
       layoutKey: boundary ? "boundary" : knownLayout ? route.layout! : "unclassified", missing};
   });
-  const groups = [...Object.entries(registry.layouts), ["unclassified","Unclassified routes"], ["boundary","Reviewed non-page boundaries"]]
-    .map(([key,label]) => {
+  const groupDefinitions: [string,string][] = [...Object.entries(registry.layouts), ["unclassified","Unclassified routes"], ["boundary","Reviewed non-page boundaries"]];
+  const groups = groupDefinitions.map(([key,label]) => {
       const items = rows.filter(row => row.layoutKey === key);
       return {key, label, total:items.length, linked:items.filter(row => row.linked).length,
         complete:items.filter(row => row.complete).length, boundary:items.filter(row => row.boundary).length,
