@@ -30,12 +30,12 @@ export function SelectionCard({
     "min-w-0 cursor-pointer border bg-card text-sm focus-within:ring-2 focus-within:ring-ring",
     "focus-within:ring-offset-1",
     compact ? "flex min-h-11 items-start gap-3 p-3" : "flex min-h-20 items-start gap-3 p-4",
-    disabled ? "cursor-not-allowed border-border bg-muted/30 opacity-60" :
+    disabled ? "cursor-not-allowed border-border bg-muted text-muted-foreground" :
       checked ? "border-primary bg-accent" : "border-border hover:border-primary/60",
     className,
   )}>
     {kind === "checkbox" ? <Checkbox value={value} name={name} checked={checked} disabled={disabled} onChange={handleChange} className="mt-0.5"/> : <Radio value={value} name={name} checked={checked} disabled={disabled} onChange={handleChange} className="mt-0.5"/>}
-    {icon && <span aria-hidden="true" className="shrink-0 text-primary">{icon}</span>}
+    {icon && <span aria-hidden="true" className={cn("shrink-0", disabled ? "text-muted-foreground" : "text-primary")}>{icon}</span>}
     <span className="min-w-0">
       <span className="block font-semibold">{title}</span>
       {detail && <span className="mt-1 block text-xs leading-5 text-muted-foreground">{detail}</span>}
