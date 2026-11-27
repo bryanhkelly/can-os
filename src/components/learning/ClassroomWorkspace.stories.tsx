@@ -65,6 +65,11 @@ export const Lesson: Story = {
     const canvas = within(canvasElement);
     const sidebar = canvas.getByRole("complementary", { name: "Workspace sidebar" });
     await expect(sidebar).not.toHaveTextContent("Jordan Learner");
+    const toggle = within(sidebar).getByRole("button", { name: "Expand workspace sidebar" });
+    const controlledId = toggle.getAttribute("aria-controls");
+    if (!controlledId) throw new Error("Sidebar toggle must identify its controlled element");
+    await expect(toggle.ownerDocument.getElementById(controlledId)).toBeInTheDocument();
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
     await expect(canvas.getByRole("heading", { level: 1, name: "Algebra II" })).toBeVisible();
     await expect(canvas.getByRole("heading", { level: 2, name: lesson.title })).toBeVisible();
   },
