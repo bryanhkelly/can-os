@@ -83,7 +83,7 @@
     "design:inventory": "node scripts/report-design-system-adoption.mjs",
     "design:routes": "node scripts/audit-v61-routes.mjs",
     "design:coverage": "node scripts/check-v61-coverage.mjs",
-    "test:design-audit": "node --test scripts/lib/v61-source-audit.test.mjs scripts/lib/v61-component-dependencies.test.mjs scripts/codemods/v61-canonical-control-transform.test.mjs scripts/lib/source-module-resolution.test.mjs scripts/lib/strict-rpc-shell.test.mjs",
+    "test:design-audit": "node --test scripts/lib/v61-source-audit.test.mjs scripts/lib/v61-component-dependencies.test.mjs scripts/codemods/v61-canonical-control-transform.test.mjs scripts/lib/source-module-resolution.test.mjs scripts/lib/strict-rpc-shell.test.mjs scripts/lib/v61-impact-report.test.mjs",
     "lint:fix": "eslint . --fix",
     "build:cloudflare": "vite build --config vite.cloudflare.config.ts",
     "deploy:cloudflare": "npm run db:check:friendly-urls:deploy && node scripts/acceptance/check-one-person-deploy-schema.mjs && npm run build:cloudflare && wrangler deploy",
@@ -171,7 +171,8 @@
     "storybook:check-playwright": "node scripts/storybook/check-playwright.mjs",
     "storybook:quality:triage": "node scripts/storybook/quality-triage.mjs",
     "storybook:quality:audit": "node scripts/storybook/run-quality-audit.mjs",
-    "storybook:quality:source-accessibility": "node scripts/storybook/source-accessibility.mjs"
+    "storybook:quality:source-accessibility": "node scripts/storybook/source-accessibility.mjs",
+    "design:impact": "node scripts/report-v61-impact.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
