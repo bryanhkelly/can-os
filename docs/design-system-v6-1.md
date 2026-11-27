@@ -401,9 +401,9 @@ build so layout and accessibility assertions exercise generated utility styles.
 | Ink | `#101d39` | Main typography and values |
 | Muted ink | `#52627c` | Help, sublabels, timestamps |
 | Stroke | `#e2e8f0` | Neutral borders |
-| Primary blue | `#1769ef` | Primary CTA, focus, navigation, active links |
-| Verified success | `#16845b` | Confirmed positive outcomes only |
-| Attention | `#b86b00` | Required review/deadline risk |
+| Primary blue | `#135fdb` | Primary CTA, focus, navigation, active links |
+| Verified success | `#10724d` | Confirmed positive outcomes only |
+| Attention | `#985700` | Required review/deadline risk |
 | Danger | `#c93232` | Confirmed blocking/critical problems |
 
 Never use brand hues to infer review, authorization, enrollment, learning mastery, compliance or opening permissions. Dark and site-branded themes retain meaningful semantic contrast.
