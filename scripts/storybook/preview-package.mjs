@@ -5,15 +5,16 @@ import {staticManifest} from "./static-manifest.mjs";
 
 // The same metadata is checked at preparation and immediately before deploy.
 // robots.txt is not access control; keep the Worker private.
+export const previewSecurityHeaders=Object.freeze({
+ "X-Content-Type-Options":"nosniff",
+ "Referrer-Policy":"no-referrer",
+ "X-Robots-Tag":"noindex, nofollow, noarchive",
+ "Permissions-Policy":"camera=(), microphone=(), geolocation=()",
+ "Content-Security-Policy":"connect-src 'self'; form-action 'none'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; frame-src 'self' blob:; font-src 'self' data:; img-src 'self' data: blob:; media-src 'self' data: blob:; worker-src 'self' blob:",
+});
 export function previewMetadata(cloudflare){
  const files={
-  "_headers":`/*
-  X-Content-Type-Options: nosniff
-  Referrer-Policy: no-referrer
-  X-Robots-Tag: noindex, nofollow, noarchive
-  Permissions-Policy: camera=(), microphone=(), geolocation=()
-  Content-Security-Policy: connect-src 'self'; form-action 'none'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; frame-src 'self' blob:; font-src 'self' data:; img-src 'self' data: blob:; media-src 'self' data: blob:; worker-src 'self' blob:
-`,
+  "_headers":"/*\n"+Object.entries(previewSecurityHeaders).map(([name,value])=>"  "+name+": "+value).join("\n")+"\n",
   "robots.txt":"User-agent: *\nDisallow: /\n"
  };
  if(cloudflare)files._redirects="/ /index.html 200\n";
