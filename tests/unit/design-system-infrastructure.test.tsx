@@ -27,6 +27,16 @@ describe("controlled institutional branding", () => {
     expect(resolved.issues).toContain("primary on muted must reach 4.5:1");
   });
 
+  it("rejects accents that fail on shared secondary copy despite passing the brand pairs", () => {
+    const candidate = { primary: "#101d39", primaryForeground: "#ffffff", accent: "#b8b8b8", accentForeground: "#101d39" };
+    expect(contrastRatio(candidate.primary, candidate.accent)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(candidate.accentForeground, candidate.accent)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio("#52627c", candidate.accent)).toBeLessThan(4.5);
+    const result = resolveBrandTokens(candidate);
+    expect(result.tokens).toEqual(defaultBrandTokens);
+    expect(result.issues).toContain("mutedForeground on accent must reach 4.5:1");
+  });
+
   it("rejects low contrast and malformed inputs as a complete set", () => {
     const lowContrast = resolveBrandTokens({ primary: "#ffffff", primaryForeground: "#ffffff" });
     expect(lowContrast.tokens).toEqual(defaultBrandTokens);
