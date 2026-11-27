@@ -60,7 +60,7 @@ const checkSemantics = async (canvasElement: HTMLElement) => {
   await expect(canvas.getAllByRole("columnheader")).toHaveLength(4);
   await expect(canvas.getByRole("region", { name: "Site participation totals" })).toHaveAttribute("tabindex", "0");
   await expect(canvas.getByRole("navigation", { name: "Related evidence destinations" })).toBeVisible();
-  await expect(canvas.getByRole("navigation", { name: "Evidence pages" })).toBeVisible();
+  await expect(canvas.getByRole("navigation", { name: "Evidence pages pagination" })).toBeVisible();
   await expect(canvas.getByRole("button", { name: "Newer" })).toBeDisabled();
   await expect(canvas.getByRole("button", { name: "Older" })).toBeDisabled();
 };
