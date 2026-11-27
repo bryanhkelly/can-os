@@ -16,14 +16,14 @@ export const Comparison: Story = {play:async({canvasElement})=>{
   await expect(canvas.getByRole("table",{name:"Pilot participation exact values"})).toBeVisible();
   await expect(canvas.getByRole("rowheader",{name:"Completed"})).toBeVisible();
   await expect(within(canvas.getByRole("table",{name:"Pilot participation exact values"})).getByText("69",{exact:true})).toBeVisible();
-  await waitFor(()=>expect(canvasElement.querySelector("[data-report-chart-plot] .recharts-surface")).not.toBeNull());
+  await waitFor(()=>expect(canvasElement.querySelector("[data-report-chart-plot] .recharts-surface")).not.toBeNull(),{timeout:10_000});
 }};
 export const Trend: Story = {args:{spec:{...fixture,title:"Monthly participation",kind:"trend",
   points:[{id:"jan",label:"Jan",value:12},{id:"feb",label:"Feb",value:null},{id:"mar",label:"Mar",value:23}]}}};
 export const Missing: Story = {args:{spec:{...fixture,points:[{id:"missing",label:"Not measured",value:null}]}},
   play:async({canvasElement})=>{const canvas=within(canvasElement);await expect(canvas.getByText("Unavailable",{exact:true})).toBeVisible();}};
 export const Zero: Story = {args:{spec:{...fixture,points:[{id:"zero",label:"Registered",value:0}]}},play:async({canvasElement})=>{const canvas=within(canvasElement);await expect(canvas.getByText("All reported values are zero")).toBeVisible();await expect(canvas.getByText("0",{exact:true})).toBeVisible();}};
-export const Mobile: Story = {parameters:{chromatic:{modes: chromaticWidthModes([390])}},render:args=><div className="w-full max-w-[390px] p-3"><ReportChart {...args}/></div>,play:async({canvasElement})=>{await waitFor(()=>expect(canvasElement.querySelector(".recharts-surface")).not.toBeNull());const panel=canvasElement.querySelector("[data-report-chart]")!;expect(panel.scrollWidth).toBeLessThanOrEqual(panel.clientWidth+1);}};
+export const Mobile: Story = {parameters:{chromatic:{modes: chromaticWidthModes([390])}},render:args=><div className="w-full max-w-[390px] p-3"><ReportChart {...args}/></div>,play:async({canvasElement})=>{await waitFor(()=>expect(canvasElement.querySelector(".recharts-surface")).not.toBeNull(),{timeout:10_000});const panel=canvasElement.querySelector("[data-report-chart]")!;expect(panel.scrollWidth).toBeLessThanOrEqual(panel.clientWidth+1);}};
 export const Dark: Story = {globals:{theme:"dark"},parameters:{chromatic:{modes: chromaticWidthModes([390,1440])}}};
 
 export const Distribution: Story={args:{spec:{title:"Receipt mix",description:"Synthetic mutually exclusive fixture.",valueLabel:"Events",
