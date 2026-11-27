@@ -45,11 +45,13 @@ const browserReady=run("browser-preflight","storybook:check-browser",[],!consist
 for(const [name,script] of [["doctor","storybook:doctor"],["catalog","check:storybook:catalog"],["fonts","check:storybook:fonts"],["visual-config","check:storybook:visual-config"],["contracts","test:storybook:contracts"]])run(name,script);
 run("route-registry",null,["scripts/check-v61-experience-coverage.mjs"]);
 run("interactions","test:storybook",[],!browserReady);
-let triage=null;
+let triage=null,interactionFailures=[];
 if(existsSync(interactionFile)){
  try{
   copyFileSync(interactionFile,join(out,"interactions.json"));
-  triage=aggregateFailures(JSON.parse(readFileSync(interactionFile,"utf8")));
+  const interactionResults=JSON.parse(readFileSync(interactionFile,"utf8"));
+  triage=aggregateFailures(interactionResults);
+  interactionFailures=interactionResults.testResults.filter(f=>f.status==="failed"||f.assertionResults?.some(t=>t.status==="failed")).map(f=>({name:f.name,status:f.status,message:f.message,assertionResults:(f.assertionResults??[]).filter(t=>t.status==="failed")}));
   writeFileSync(join(out,"triage.json"),JSON.stringify(triage,null,2)+"\n");
  }catch(error){stages.push({name:"interaction-evidence",status:"failed",error:error.message});}
 }else stages.push({name:"interaction-evidence",status:"blocked",error:"No fresh interaction JSON was produced"});
@@ -57,10 +59,17 @@ const built=run("build","build-storybook");
 run("index","storybook:inventory",[],!built);
 run("browser","test:storybook:browser",[],!built||!browserReady);
 for(const [file,name] of [[indexFile,"index.json"],[browserFile,"browser.json"]])if(existsSync(file))copyFileSync(file,join(out,name));
-const report={kind:"diagnostic-only",commit,runId,stages,interactionTriage:triage,readyForGovernedAcceptance:stages.every(s=>s.status==="passed")&&triage!==null&&triage.failedStories===0};
+const failureLogs=Object.fromEntries(stages.filter(s=>s.status==="failed"&&s.log).map(s=>[s.name,readFileSync(join(out,s.log),"utf8").slice(-16000)]));
+let browserResults=null;
+if(existsSync(browserFile)){
+ try{browserResults=JSON.parse(readFileSync(browserFile,"utf8"));}
+ catch(error){stages.push({name:"browser-evidence",status:"failed",error:error.message});}
+}
+const report={kind:"diagnostic-only",commit,runId,stages,interactionTriage:triage,interactionFailures,browserResults,failureLogs,readyForGovernedAcceptance:stages.every(s=>s.status==="passed")&&triage!==null&&triage.failedStories===0};
 writeFileSync(join(out,"report.json"),JSON.stringify(report,null,2)+"\n");
 const summary=["# Storybook bulk quality audit","","Commit: "+commit,"","Diagnostic only; not a publication receipt.","","| Stage | Status |","| --- | --- |",...stages.map(s=>"| "+s.name+" | "+s.status+" |"),"",triage?markdownReport(triage):"No interaction evidence available."].join("\n");
 writeFileSync(join(out,"report.md"),summary+"\n");
 writeFileSync(join(base,"latest.json"),JSON.stringify({commit,runId,report:"runs/"+runId+"/report.json"},null,2)+"\n");
+writeFileSync(join(base,"report.json"),JSON.stringify(report,null,2)+"\n");
 console.log(summary+"\nFull diagnostic evidence: "+out);
 if(!report.readyForGovernedAcceptance)process.exitCode=1;
