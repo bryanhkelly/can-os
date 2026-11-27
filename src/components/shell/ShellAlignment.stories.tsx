@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, userEvent, within } from "storybook/test";
-import { createMemoryHistory, createRootRoute, createRouter, RouterProvider } from "@tanstack/react-router";
+import { FixtureRouter } from "../../../.storybook/fixture-router";
 import { useState, type ReactNode } from "react";
 import { DashboardHome, DashboardPanel, DashboardShortcut, WorkspaceShell } from "@/components/workspace";
 import { WorkspaceSidebar } from "./WorkspaceSidebar";
@@ -33,13 +33,7 @@ function Shell({ children, sharedCredentialSwitching = false }: { children: Reac
 const meta = {
   id: "shell-layout-alignment", title: "11 Accessibility and responsive/Shell alignment",
   parameters: { layout: "fullscreen" },
-  decorators: [Story => {
-    const router = createRouter({
-      routeTree: createRootRoute({ component: Story }),
-      history: createMemoryHistory({ initialEntries: [path] }),
-    });
-    return <RouterProvider router={router} />;
-  }],
+  decorators: [Story => <FixtureRouter initialPath={path}><Story /></FixtureRouter>],
 } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
