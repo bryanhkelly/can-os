@@ -8,7 +8,7 @@ const roster=[{registrationId:"r1",displayName:"Example learner",status:"withdra
 const confirm=fn();
 function Fixture({busy=false,empty=false}:{busy?:boolean;empty?:boolean}){
  const [target,setTarget]=useState<string|null>(null),[reason,setReason]=useState("");
- return <WorkspaceShell title="Noncredit cohort operations" width="wide"><NoncreditParticipantRoster roster={empty?[]:roster} busy={busy} seatTarget={target} seatReason={reason} onStartRelease={setTarget} onReasonChange={setReason} onConfirmRelease={id=>{confirm(id,reason);setTarget(null);}} onCancelRelease={()=>setTarget(null)}/></WorkspaceShell>;
+ return <WorkspaceShell title="Noncredit cohort operations" width="wide"><h2 className="sr-only">Cohort participant operations</h2><NoncreditParticipantRoster roster={empty?[]:roster} busy={busy} seatTarget={target} seatReason={reason} onStartRelease={setTarget} onReasonChange={setReason} onConfirmRelease={id=>{confirm(id,reason);setTarget(null);}} onCancelRelease={()=>setTarget(null)}/></WorkspaceShell>;
 }
 const meta={title:"08 Feature workspaces/Noncredit participant roster",component:Fixture} satisfies Meta<typeof Fixture>;
 export default meta;
