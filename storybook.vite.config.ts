@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import { engineeringInventoryPlugin } from "./.storybook/engineering-inventory.mjs";
 import { fixtureIsolationPlugin } from "./.storybook/fixture-isolation-plugin";
 import { storybookFixtureAliases } from "./.storybook/fixture-aliases";
 import { storybookServerDependencyExclusions } from "./.storybook/fixture-dependencies";
@@ -12,7 +13,7 @@ export default defineConfig({
   build: { sourcemap: false },
   optimizeDeps: { exclude: storybookServerDependencyExclusions },
   publicDir: false, // Copy only explicitly reviewed staticDirs.
-  plugins: [fixtureIsolationPlugin(), tailwindcss(), react()],
+  plugins: [fixtureIsolationPlugin(), engineeringInventoryPlugin(), tailwindcss(), react()],
   resolve: {
     tsconfigPaths: true,
     alias: storybookFixtureAliases,
