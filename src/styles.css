@@ -447,8 +447,9 @@
 }
 .can-dashboard-hero::before {
   content:""; position:absolute; inset:0; z-index:-1;
-  background:linear-gradient(90deg,rgba(248,250,255,.92),rgba(248,250,255,.75) 45%,rgba(248,250,255,.04) 85%);
+  background:linear-gradient(90deg,rgba(248,250,255,.94),rgba(248,250,255,.88) 45%,rgba(248,250,255,.72) 100%);
 }
+.can-dashboard-hero .student-dashboard-date { color: var(--editorial-action-foreground); }
 .can-dashboard-hero h1 {
   margin:12px 0 9px; font-family:var(--font-serif); font-weight:400;
   font-size:clamp(43px,4.2vw,61px); letter-spacing:-.45px; line-height:1.02;
