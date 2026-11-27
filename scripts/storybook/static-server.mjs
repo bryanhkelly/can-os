@@ -2,6 +2,8 @@ import {createServer} from "node:http";
 import {createReadStream} from "node:fs";
 import {stat,realpath} from "node:fs/promises";
 import {resolve,relative,isAbsolute,extname,sep} from "node:path";
+import {isSafeStaticPath} from "./release-contract.mjs";
+import {previewSecurityHeaders} from "./preview-package.mjs";
 
 const types={
  ".html":"text/html; charset=utf-8",".js":"text/javascript; charset=utf-8",".mjs":"text/javascript; charset=utf-8",
@@ -21,8 +23,7 @@ export async function createStorybookStaticServer(directory){
  if(!index.isFile())throw Error("Build Storybook before serving it.");
  return createServer(async(req,res)=>{
    res.setHeader("Cache-Control","no-store");
-   res.setHeader("X-Content-Type-Options","nosniff");
-   res.setHeader("Content-Security-Policy","connect-src 'self'; form-action 'none'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; font-src 'self' data:; img-src 'self' data: blob:; media-src 'self' data: blob:");
+   for(const [name,value] of Object.entries(previewSecurityHeaders))res.setHeader(name,value);
    function reply(code,message){res.writeHead(code,{"Content-Type":"text/plain; charset=utf-8"});res.end(message);}
    if(!["GET","HEAD"].includes(req.method??"")){res.setHeader("Allow","GET, HEAD");return reply(405,"Method not allowed");}
    try{
@@ -31,10 +32,14 @@ export async function createStorybookStaticServer(directory){
     const path=decodeURIComponent(raw);
     if(!path.startsWith("/")||path.includes("\\")||path.includes("\0")||path.split("/").some(segment=>segment.startsWith(".")))return reply(400,"Invalid path");
     if(/^\/(?:api|_server|_serverFn|rpc|go)(?:\/|$)/i.test(path))return reply(404,"Not found");
-    const target=resolve(root,"."+ (path==="/"?"/index.html":path));
+    const requested=path==="/"?"index.html":path.slice(1);
+    if(!isSafeStaticPath(requested)||requested.endsWith(".map"))return reply(404,"Not found");
+    const target=resolve(root,requested);
     if(!within(root,target))return reply(404,"Not found");
     const file=await realpath(target);
     if(!within(root,file))return reply(404,"Not found");
+    const actual=relative(root,file).replaceAll("\\","/");
+    if(!isSafeStaticPath(actual)||actual.endsWith(".map"))return reply(404,"Not found");
     const info=await stat(file);
     if(!info.isFile())return reply(404,"Not found");
     const contentType=types[extname(file).toLowerCase()]??"application/octet-stream";
