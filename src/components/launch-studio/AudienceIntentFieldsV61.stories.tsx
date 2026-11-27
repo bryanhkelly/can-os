@@ -51,7 +51,7 @@ export const Typical: Story={
     await expect(refugees).toHaveAttribute("aria-pressed","false");
     await userEvent.click(refugees);
     await expect(refugees).toHaveAttribute("aria-pressed","true");
-    await expect(canvas.getByRole("status")).toHaveTextContent("7 selected");
+    await expect(canvas.getByRole("status", { name: "Audience selection count" })).toHaveTextContent("7 selected");
   },
 };
 export const AllAudiences: Story={render:()=> <Review initial={sitePlanningAudienceIds}/>};
