@@ -62,7 +62,9 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - run: npm run storybook:check-playwright
+      - run: node node_modules/playwright/cli.js install --with-deps chromium
+      - run: npm run storybook:check-browser
       - run: npm run storybook:acceptance
       - name: Preserve Storybook browser and index diagnostics
         if: ${{ !cancelled() }}
