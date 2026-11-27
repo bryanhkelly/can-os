@@ -786,3 +786,5 @@ with synthetic fixtures or placeholder screenshots.
 ### Accessible interaction states
 
 Filled primary and destructive buttons retain their validated foreground and background colors on hover; a text underline distinguishes the hover state without diluting contrast. Native disabled and loading states continue to use the canonical muted styling and do not underline. Shared table column headers default to `scope="col"`; use `TableRowHead` for row headings or explicitly set scope where a more complex table requires it. Institutional action colors must reach 4.5:1 on card, canvas, accent and muted surfaces before the complete brand token set is accepted.
+
+Disabled selection cards and disabled text actions preserve readable explanatory text using the muted semantic foreground instead of reducing whole-control opacity. Outline buttons use the contrast-checked input boundary token; decorative panel borders retain the quieter stroke token. Modal keyboard traversal excludes native disabled, hidden, inert and visibility-hidden controls while retaining discoverable focusable `aria-disabled` controls.
