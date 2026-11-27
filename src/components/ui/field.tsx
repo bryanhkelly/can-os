@@ -30,7 +30,7 @@ export function Field({ label, description, error, required, children, className
   ])].join(" ") || undefined;
   return <div className={cn("min-w-0 space-y-2", className)}>
     <Label htmlFor={id} className={error ? "text-destructive" : undefined}>
-      {label}{isRequired && <span className="ml-1 text-xs text-muted-foreground">(required)</span>}
+      {label}{isRequired && <span className="ml-1 text-xs text-muted-foreground">{" (required)"}</span>}
     </Label>
     {cloneElement(children, {
       id,
