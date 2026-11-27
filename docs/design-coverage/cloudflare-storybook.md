@@ -33,9 +33,11 @@ Do not treat noindex or robots.txt as authentication. Do not publish an unverifi
 
 Expected hostname pattern: `becomuna-storybook.<account-subdomain>.workers.dev`. Confirm the actual hostname and protection in Cloudflare.
 
-## Cloudflare Workers Builds
+## Historical Cloudflare Workers Builds configuration — do not reconnect
 
-Use the following settings on the dedicated Worker:
+The following is retained for historical reference only. The managed builder failed because Chromium requires unavailable Linux libraries. Keep the Git repository disconnected from this Worker and use an independent runner. Do not retry the managed build.
+
+Previous settings:
 
 | Field | Value |
 | --- | --- |
@@ -67,3 +69,16 @@ Playwright and @playwright/test are pinned to the same version and the lockfile 
 The Storybook Cloudflare release workflow installs the locked Playwright runtime and its Linux dependencies, checks browser rendering, runs acceptance and packages the exact tested static assets. The workflow defaults to acceptance only. Enable the deploy input to deploy from the same job after successful acceptance. Set repository secrets STORYBOOK_CLOUDFLARE_API_TOKEN (dedicated scoped Worker deployment token) and STORYBOOK_CLOUDFLARE_ACCOUNT_ID for deployment. Secrets are passed only to the deployment step. No application secrets are needed.
 
 GitHub requires a workflow_dispatch workflow to exist on the default branch before it can be manually dispatched. Until the reviewed branch is merged, use the documented local or managed Cloudflare build. Once the runner is available and validated, disconnect automatic Cloudflare Workers Builds for this dedicated Worker if using runner-based deployment, to prevent competing deployments. Do not disconnect the production application Worker. Verify all-traffic Cloudflare Access before enabling any hostname.
+
+## Bulk quality remediation (no deployment)
+
+Run `npm run storybook:quality:audit` on the isolated Storybook worktree after installing the locked dependencies and Chromium. This is a diagnostic command, not a deployment command. It executes source contracts, the complete interaction suite, static build and inventory, static asset safety, and independent browser checks where prerequisites permit. It continues after failed diagnostic stages and records blocked stages explicitly. The report groups failures by accessibility rule, observed color pair and runtime/interaction signature, with distinct affected-story counts. Groups can overlap and must not be treated as proven root causes.
+
+The complete consolidated report is `acceptance-artifacts/storybook-quality/report.json`; timestamped raw logs and test results are retained under `acceptance-artifacts/storybook-quality/runs/`. GitHub PR checks run the same command and preserve its evidence. No credentials or deployment are required. A diagnostic pass cannot substitute for the exact-commit release receipt or reviewed visual evidence.
+
+### Release tiers
+
+- Engineering review: local Storybook only while unresolved failures remain. Use the existing development server or isolated static fixture server for synthetic review. Do not publish a remote engineering preview until a separate private hosting target and security controls have been reviewed.
+- Governed release: require all existing acceptance stages, the exact-commit receipt and matching asset digest, as well as the repository visual regression review. Only then prepare and deploy the dedicated Worker. Keep public access disabled until Cloudflare Access protection is verified.
+
+Keep remediation on the Storybook branch until the draft PR is ready for review. Do not merge or deploy while the diagnostic run is failing or its evidence is missing.
