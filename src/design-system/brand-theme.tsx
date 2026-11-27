@@ -24,12 +24,13 @@ export function resolveBrandTokens(input: Partial<BrandTokens> = {}) {
     if (!/^#[0-9a-f]{6}$/i.test(value)) issues.push(`${name} must be a six-digit hex color`);
   }
   if (issues.length === 0) {
-    const pairs: Array<[keyof BrandTokens, keyof BrandTokens | "card" | "canvas", string, string]> = [
+    const pairs: Array<[keyof BrandTokens, keyof BrandTokens | "card" | "canvas" | "muted", string, string]> = [
       ["primaryForeground", "primary", tokens.primaryForeground, tokens.primary],
       ["accentForeground", "accent", tokens.accentForeground, tokens.accent],
       ["primary", "accent", tokens.primary, tokens.accent],
       ["primary", "card", tokens.primary, "#ffffff"],
       ["primary", "canvas", tokens.primary, "#f6f8fb"],
+      ["primary", "muted", tokens.primary, "#eef2f7"],
     ];
     for (const [foreground, background, first, second] of pairs) {
       if (contrastRatio(first, second) < 4.5) issues.push(`${foreground} on ${background} must reach 4.5:1`);
