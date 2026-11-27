@@ -120,7 +120,8 @@ export const ChildRequiredAndDisabledValue: Story = {
     <Field label="Recorded reference"><Input disabled value="REF-123" readOnly /></Field>
   </div>,
   play: async ({ canvas }) => {
-    await expect(canvas.getByRole("textbox", { name: "Reference (required)" })).toBeRequired();
+    const reference = canvas.getByRole("textbox", { name: /^Reference\s*\(required\)$/ });
+    await expect(reference).toBeRequired();
     const recorded = canvas.getByRole("textbox", { name: "Recorded reference" });
     await expect(recorded).toBeDisabled();
     await expect(recorded).toHaveValue("REF-123");
