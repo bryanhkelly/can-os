@@ -63,7 +63,7 @@ export function inspectAccessibleActions(source,path){
  function visit(node){
   if(ts.isJsxOpeningElement(node)||ts.isJsxSelfClosingElement(node)){
    const tag=node.tagName.getText(file);
-   const action=nativeActions.has(tag)||canonicalActions.has(tag);
+   const action=(nativeActions.has(tag)||canonicalActions.has(tag))&&(tag!=="a"||Boolean(attr(node,"href"))||literal(attr(node,"role"))==="button");
    const spread=node.attributes.properties.some(ts.isJsxSpreadAttribute);
    // A slotted link may supply its name via the child. Dynamic props and
    // children require rendered inspection, not a guessed source violation.
