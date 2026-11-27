@@ -153,7 +153,7 @@
     "design:source": "node scripts/check-design-system.mjs --source-only",
     "storybook:inventory": "node scripts/storybook/check-index.mjs",
     "test:storybook:browser": "playwright test --config playwright.storybook.config.ts",
-    "test:storybook:contracts": "node --import tsx --test scripts/storybook/index-contract.test.mjs scripts/lib/v61-experience-registry.test.mjs scripts/storybook/static-server.test.mjs scripts/storybook/fixture-isolation.test.mjs scripts/storybook/release-contract.test.mjs scripts/storybook/static-manifest.test.mjs scripts/storybook/cloudflare-preview-config.test.mjs scripts/storybook/quality-triage.test.mjs scripts/storybook/semantic-contrast.test.mjs scripts/storybook/preview-package.test.mjs scripts/storybook/source-accessibility.test.mjs scripts/storybook/test-evidence.test.mjs scripts/storybook/adoption-summary.test.mjs",
+    "test:storybook:contracts": "node --import tsx --test scripts/storybook/index-contract.test.mjs scripts/lib/v61-experience-registry.test.mjs scripts/storybook/static-server.test.mjs scripts/storybook/fixture-isolation.test.mjs scripts/storybook/release-contract.test.mjs scripts/storybook/static-manifest.test.mjs scripts/storybook/cloudflare-preview-config.test.mjs scripts/storybook/quality-triage.test.mjs scripts/storybook/semantic-contrast.test.mjs scripts/storybook/preview-package.test.mjs scripts/storybook/source-accessibility.test.mjs scripts/storybook/test-evidence.test.mjs scripts/storybook/adoption-summary.test.mjs scripts/storybook/engineering-inventory.test.mjs",
     "verify:storybook": "npm run storybook:acceptance",
     "check:storybook:visual-config": "node scripts/storybook/check-visual-config.mjs",
     "storybook:doctor": "node scripts/storybook/doctor.mjs",
