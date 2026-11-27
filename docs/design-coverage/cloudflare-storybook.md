@@ -4,7 +4,7 @@ Target Worker: `becomuna-storybook`. Do not reuse the `can-os` Worker, its confi
 
 ## Local deployment
 
-From a clean checkout of the reviewed Storybook branch, using an authenticated Cloudflare account:
+From a clean checkout of the reviewed release commit (main is the authoritative branch after PR review), using an authenticated Cloudflare account:
 
 ```sh
 npm ci
@@ -68,7 +68,7 @@ Playwright and @playwright/test are pinned to the same version and the lockfile 
 
 The Storybook Cloudflare release workflow installs the locked Playwright runtime and its Linux dependencies, checks browser rendering, runs acceptance and packages the exact tested static assets. The workflow defaults to acceptance only. Enable the deploy input to deploy from the same job after successful acceptance. Set repository secrets STORYBOOK_CLOUDFLARE_API_TOKEN (dedicated scoped Worker deployment token) and STORYBOOK_CLOUDFLARE_ACCOUNT_ID for deployment. Secrets are passed only to the deployment step. No application secrets are needed.
 
-GitHub requires a workflow_dispatch workflow to exist on the default branch before it can be manually dispatched. Until the reviewed branch is merged, use the documented local or managed Cloudflare build. Once the runner is available and validated, disconnect automatic Cloudflare Workers Builds for this dedicated Worker if using runner-based deployment, to prevent competing deployments. Do not disconnect the production application Worker. Verify all-traffic Cloudflare Access before enabling any hostname.
+GitHub requires a workflow_dispatch workflow to exist on the default branch before it can be manually dispatched. Until the reviewed branch is merged, use the documented independent local runner, not the managed Cloudflare builder. Once merged, acceptance-only runs can be dispatched on a branch; hosted deployment is restricted to main and explicit deploy input. Keep automatic Cloudflare Workers Builds disconnected for the dedicated Worker to prevent competing deployments. Do not disconnect the production application Worker. Verify all-traffic Cloudflare Access before enabling any hostname.
 
 ## Bulk quality remediation (no deployment)
 
@@ -81,7 +81,7 @@ The complete consolidated report is `acceptance-artifacts/storybook-quality/repo
 - Engineering review: local Storybook only while unresolved failures remain. Use the existing development server or isolated static fixture server for synthetic review. Do not publish a remote engineering preview until a separate private hosting target and security controls have been reviewed.
 - Governed release: require all existing acceptance stages, the exact-commit receipt and matching asset digest, as well as the repository visual regression review. Only then prepare and deploy the dedicated Worker. Keep public access disabled until Cloudflare Access protection is verified.
 
-Keep remediation on the Storybook branch until the draft PR is ready for review. Do not merge or deploy while the diagnostic run is failing or its evidence is missing.
+Maintain changes through normal reviewed pull requests to main. Do not merge or deploy while required checks are failing or evidence is missing. A Storybook pass is not production application acceptance.
 
 The preview package may be prepared again for the same commit only when its static files and all security metadata match the accepted output byte-for-byte. The deploy script checks the same contract, including the exact CSP and redirect file, immediately before invoking Wrangler. If a package is stale or altered, preparation and deployment stop; retain it for investigation and use a freshly accepted package instead. The build and interaction runner share one explicit TanStack server dependency exclusion list.
 
@@ -90,3 +90,17 @@ Both the release and bulk audit runners require fresh, nonempty structured test 
 The loopback static server and deployment package share an exact security-header definition. The server rejects private file patterns and source maps, as well as application RPC paths and directory traversal. The CI diagnostic workflow preserves dependency and browser-install logs and can continue source/build diagnostics if browser setup fails, but that setup failure still prevents a passing CI result.
 
 The interaction suite records Vite overlay details as runtime errors (not product scrollability violations). Stories use isolated per-mount query caches and a signed-out synthetic session context. Explicit unavailable-RPC fixtures return rejected promises, never synthetic success; unknown server imports remain prohibited. A dedicated successful synthetic fixture is required to demonstrate a successful data operation.
+
+## Main integration and release operations
+
+Before integrating shared component changes, run the existing production engineering gate from the exact clean candidate checkout:
+
+```sh
+npm run verify:release -- --profile=engineering
+npm run storybook:acceptance
+```
+The engineering profile checks both production bundles, full TypeScript, source architecture, lint and unit tests. It does not deploy, migrate or prove authenticated journeys. Capture its exact-SHA evidence and the Storybook receipt separately. Review affected production workflows and visual evidence before merging. Do not bypass required GitHub checks.
+
+The permanent PR quality job is no longer limited to the original configuration branch. The independent release workflow deploys from main only, on explicit dispatch. The live Worker remains independent of application hosting. The bootstrap deploy deliberately disables the workers.dev hostname and preview URLs; until a separately validated version-only rollout procedure exists, use the documented Access verification and hostname reactivation steps for a subsequent update. Do not set workers_dev=true automatically or assume Access persists without checking. Cloudflare separates version upload and promotion from trigger updates (https://developers.cloudflare.com/workers/versions-and-deployments/deployment-management/); validate that procedure with the locked Wrangler version and disabled version/preview URLs before adopting it.
+
+In Storybook, open **12 Engineering and acceptance / Design system adoption**. The dashboard reads the checked-in route registry at build time, not production data. It distinguishes linked stories, complete review declarations, outstanding routes and reviewed non-page boundaries. A complete declaration is not independent proof of runtime conformance. Use the route review queue and layout filter to plan coverage, then link actual evidence in the registry. The existing source and visual inventory commands remain the authoritative diagnostics for source debt and reviewed visual evidence.
