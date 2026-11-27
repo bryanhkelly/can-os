@@ -24,6 +24,8 @@ export function writePreviewMetadata(root,cloudflare){
   writeFileSync(join(root,name),value,{flag:"wx"});
 }
 export function verifyPreviewPackage(root,accepted,cloudflare){
+ const rootInfo=lstatSync(root);
+ if(!rootInfo.isDirectory()||rootInfo.isSymbolicLink())throw Error("Preview root must be a real directory");
  const metadata=previewMetadata(cloudflare);
  for(const [name,value] of Object.entries(metadata)){
   const path=join(root,name);
