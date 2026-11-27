@@ -40,11 +40,18 @@ function run(name,script,args=[],skip=false){
 const interactionFile=join(root,"acceptance-artifacts","storybook-interaction-results.json");
 const indexFile=join(root,"acceptance-artifacts","storybook-index.json");
 const browserFile=join(root,"acceptance-artifacts","storybook-browser-results.json");
-for(const file of [interactionFile,indexFile,browserFile])rmSync(file,{force:true});
+const sourceA11yFile=join(base,"source-accessibility.json");
+for(const file of [interactionFile,indexFile,browserFile,sourceA11yFile])rmSync(file,{force:true});
 const consistency=run("playwright","storybook:check-playwright");
 const browserReady=run("browser-preflight","storybook:check-browser",[],!consistency);
 for(const [name,script] of [["doctor","storybook:doctor"],["catalog","check:storybook:catalog"],["fonts","check:storybook:fonts"],["visual-config","check:storybook:visual-config"],["contracts","test:storybook:contracts"]])run(name,script);
 run("route-registry",null,["scripts/check-v61-experience-coverage.mjs"]);
+run("source-accessibility","storybook:quality:source-accessibility");
+let sourceAccessibility=null;
+if(existsSync(sourceA11yFile)){
+ try{sourceAccessibility=JSON.parse(readFileSync(sourceA11yFile,"utf8"));copyFileSync(sourceA11yFile,join(out,"source-accessibility.json"));}
+ catch(error){stages.push({name:"source-accessibility-evidence",status:"failed",error:error.message});}
+}else stages.push({name:"source-accessibility-evidence",status:"blocked",error:"No fresh source inventory"});
 run("interactions","test:storybook",[],!browserReady);
 let triage=null,interactionFailures=[];
 if(existsSync(interactionFile)){
@@ -71,9 +78,9 @@ if(existsSync(browserFile)){
  try{browserResults=JSON.parse(readFileSync(browserFile,"utf8"));}
  catch(error){stages.push({name:"browser-evidence",status:"failed",error:error.message});}
 }
-const report={kind:"diagnostic-only",commit,runId,stages,interactionTriage:triage,interactionFailures,browserResults,failureLogs,staticDigest:manifest?.digest??null,readyForGovernedAcceptance:stages.every(s=>s.status==="passed")&&triage!==null&&triage.failedStories===0&&triage.reportedFailedTests===0&&browserResults!==null&&manifest!==null};
+const report={kind:"diagnostic-only",commit,runId,stages,interactionTriage:triage,interactionFailures,browserResults,sourceAccessibility,failureLogs,staticDigest:manifest?.digest??null,readyForGovernedAcceptance:stages.every(s=>s.status==="passed")&&triage!==null&&triage.failedStories===0&&triage.reportedFailedTests===0&&browserResults!==null&&manifest!==null};
 writeFileSync(join(out,"report.json"),JSON.stringify(report,null,2)+"\n");
-const summary=["# Storybook bulk quality audit","","Commit: "+commit,"","Diagnostic only; not a publication receipt.","","| Stage | Status |","| --- | --- |",...stages.map(s=>"| "+s.name+" | "+s.status+" |"),"",triage?markdownReport(triage):"No interaction evidence available."].join("\n");
+const summary=["# Storybook bulk quality audit","","Commit: "+commit,"","Diagnostic only; not a publication receipt.","","| Stage | Status |","| --- | --- |",...stages.map(s=>"| "+s.name+" | "+s.status+" |"),"",sourceAccessibility?"Accessible-name source candidates (manual review): "+sourceAccessibility.candidates.length:"No fresh source-accessibility evidence.","",triage?markdownReport(triage):"No interaction evidence available."].join("\n");
 writeFileSync(join(out,"report.md"),summary+"\n");
 writeFileSync(join(base,"latest.json"),JSON.stringify({commit,runId,report:"runs/"+runId+"/report.json"},null,2)+"\n");
 writeFileSync(join(base,"report.json"),JSON.stringify(report,null,2)+"\n");
