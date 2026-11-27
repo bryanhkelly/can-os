@@ -1,4 +1,4 @@
-import {lstatSync,readFileSync,readdirSync,writeFileSync} from "node:fs";
+import {lstatSync,readFileSync,writeFileSync} from "node:fs";
 import {join} from "node:path";
 import {isDeepStrictEqual} from "node:util";
 import {staticManifest} from "./static-manifest.mjs";
