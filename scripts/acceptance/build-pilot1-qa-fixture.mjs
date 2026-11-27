@@ -32,12 +32,16 @@ async function main(){
  assert.equal(releases.length,1,"Exactly one fresh published QA release required");
  const r=releases[0];
  const links=await sql`
-  SELECT code FROM public.site_go_links WHERE organization_id=${r.registering_organization_id}::uuid
-   AND site_id=${r.site_id}::uuid AND status='active'
-   AND (starts_at IS NULL OR starts_at<=now()) AND (expires_at IS NULL OR expires_at>now())
-   AND destination#>>'{execution,mode}'='redirect'
-   AND destination#>>'{execution,destination,kind}'='adult-training'
-   AND destination#>>'{execution,destination,releaseId}'=${r.id}
+  SELECT g.code FROM public.site_go_links g
+   JOIN public.engagement_definition_versions v ON v.id=g.engagement_version_id
+   JOIN public.engagement_definitions d ON d.id=v.engagement_id
+   WHERE g.organization_id=${r.registering_organization_id}::uuid
+   AND g.site_id=${r.site_id}::uuid AND g.status='active'
+   AND d.status='active' AND d.organization_id=g.organization_id AND d.site_id=g.site_id
+   AND (g.starts_at IS NULL OR g.starts_at<=now()) AND (g.expires_at IS NULL OR g.expires_at>now())
+   AND v.content#>>'{execution,mode}'='redirect'
+   AND v.content#>>'{execution,destination,kind}'='adult-training'
+   AND v.content#>>'{execution,destination,releaseId}'=${r.id}
  `;
  assert.equal(links.length,1,"Exactly one direct adult-training QA Go link required");
  const tracks=await sql`
@@ -45,7 +49,7 @@ async function main(){
   WHERE tv.course_version_id=${r.course_version_id}::uuid AND tv.lifecycle='published' AND tv.track_kind='primary'
  `;
  assert.equal(tracks.length,1,"Exactly one published primary instructor track required");
- const lessons=await sql`SELECT title FROM public.course_lessons WHERE course_version_id=${r.course_version_id}::uuid ORDER BY lesson_order,id`;
+ const lessons=await sql`SELECT l.title FROM public.course_lessons l JOIN public.course_units u ON u.id=l.course_unit_id WHERE l.course_version_id=${r.course_version_id}::uuid ORDER BY u.sequence_no,l.lesson_order,l.id`;
  assert.equal(lessons.length,7,"Seven reference lessons required");
  assert.equal(new Set(lessons.map(l=>l.title)).size,7,"Distinct reference lesson titles required");
  async function labels(version,baseline){
