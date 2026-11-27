@@ -85,6 +85,7 @@
 }
 
 :root {
+  color-scheme: light;
   --radius: 0px;
   --shell-pad: 1.5rem;
   /* Shell geometry: the sidebar brand block and the top bar share one height so
@@ -209,6 +210,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --background: #101728;
   --stone-warm: #182238;
   --foreground: #f4f7fc;
@@ -349,7 +351,7 @@
   color: inherit;
 }
 .student-day-hero a.bg-white {
-  color: var(--foreground);
+  color: var(--editorial-action-foreground);
 }
 .student-day-hero-landscape {
   background:
@@ -423,6 +425,9 @@
 .can-editorial-primary:hover { filter:brightness(.96); }
 .can-editorial-secondary { color:#ffffff; border:1px solid rgba(255,255,255,.65); }
 .can-editorial-secondary:hover { background:rgba(255,255,255,.12); }
+.student-day-hero[data-safety="true"] .can-editorial-secondary { color:var(--destructive-foreground); border-color:currentColor; }
+.student-day-hero[data-safety="true"] .can-editorial-secondary:hover { background:transparent; text-decoration:underline; }
+.student-day-hero[data-safety="true"] :is(.can-editorial-primary,.can-editorial-secondary):focus-visible { outline-color:var(--destructive-foreground); }
 .can-editorial-primary:focus-visible, .can-editorial-secondary:focus-visible { outline:2px solid #ffffff; outline-offset:4px; }
 /* All presentation surface radii inherit the zero-radius system. */
 .can-dashboard { font-family:var(--font-sans); }
