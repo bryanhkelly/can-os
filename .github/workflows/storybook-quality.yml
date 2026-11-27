@@ -2,6 +2,17 @@ name: Storybook bulk quality audit
 on:
   pull_request:
     branches: [main]
+    paths:
+      - 'src/**'
+      - '.storybook/**'
+      - 'scripts/storybook/**'
+      - 'scripts/lib/v61-*'
+      - 'scripts/check-v61-experience-coverage.mjs'
+      - 'docs/design-coverage/**'
+      - 'public/school-template-previews/**'
+      - '**/*storybook*'
+      - 'package*.json'
+      - 'tsconfig*.json'
   workflow_dispatch:
 permissions:
   contents: read
@@ -10,7 +21,6 @@ concurrency:
   cancel-in-progress: true
 jobs:
   diagnose:
-    if: github.ref == 'refs/heads/6.1-storybook-configuration' || github.head_ref == '6.1-storybook-configuration'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
@@ -26,7 +36,7 @@ jobs:
         id: install
         shell: bash
         run: |
-          set -o pipefail
+          set -euo pipefail
           mkdir -p acceptance-artifacts/storybook-quality
           npm ci --include=dev 2>&1 | tee acceptance-artifacts/storybook-quality/npm-install.log
       - name: Install browser and OS libraries
