@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect } from "storybook/test";
 import { Button } from "@/components/ui/button";
-import { StatusBadge, WorkspacePanel } from "@/components/workspace";
+import { StatusBadge, WorkspacePanel } from "@/components/workspace/workspace-panel";
 import { BrandTheme } from "./brand-theme";
 
 const meta = { id: "branding-controlled-tokens", title: "01 Foundations/Controlled brand tokens" } satisfies Meta;
