@@ -28,7 +28,8 @@ test("unexpected files and missing catalog entries fail closed",async()=>withCat
  await rm(join(dir,"assets/.env"));await rm(join(dir,"iframe.html"));
  assert.throws(()=>staticManifest(dir),/Missing static catalog entry/);
 }));
-test("static file symlinks are not followed", {skip:process.platform==="win32"?"Windows symlink permission is not assumed":false},async()=>withCatalog(async dir=>{
- await symlink(join(dir,"index.html"),join(dir,"assets/alias.html"));
+test("static links and Windows junctions are not followed",async()=>withCatalog(async dir=>{
+ if(process.platform==="win32")await symlink(join(dir,"assets"),join(dir,"alias"),"junction");
+ else await symlink(join(dir,"index.html"),join(dir,"assets/alias.html"));
  assert.throws(()=>staticManifest(dir),/Symlink in static output/);
 }));
