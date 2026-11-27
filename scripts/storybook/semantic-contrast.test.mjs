@@ -17,7 +17,7 @@ for(const scope of [":root",".dark"])test("semantic contrast: "+scope,()=>{
   const ratio=contrastRatio(colors[f],colors[b]);
   if(ratio<min)violations.push(f+" on "+b+": "+ratio.toFixed(3)+" < "+min);
  }
- for(const f of ["primary","foreground","muted-foreground","success","warning","danger","info","destructive"])for(const b of surfaces)check(f,b,4.5);
+ for(const f of ["primary","foreground","muted-foreground","success","warning","danger","info","destructive","workspace-accent-ink"])for(const b of surfaces)check(f,b,4.5);
  for(const f of ["input","ring"])for(const b of surfaces)check(f,b,3);
  for(const [f,b] of [["primary-foreground","primary"],["destructive-foreground","destructive"],["secondary-foreground","secondary"],["accent-foreground","accent"],["card-foreground","card"],["popover-foreground","popover"],["sidebar-primary","sidebar"],["sidebar-primary-foreground","sidebar-primary"],["sidebar-accent-foreground","sidebar-accent"],["workspace-accent-ink","workspace-accent-soft"]])check(f,b,4.5);
  assert.deepEqual(violations,[]);
@@ -28,4 +28,13 @@ test("fallback brand matches the audited light semantic tokens",()=>{
  const values=Object.fromEntries([...section.matchAll(/(\w+):\s*"(#[0-9a-f]{6})"/gi)].map(m=>[m[1],m[2]]));
  const light=palette(":root");
  for(const [key,token] of [["primary","primary"],["primaryForeground","primary-foreground"],["accent","accent"],["accentForeground","accent-foreground"]])assert.equal(values[key],light[token],key);
+});
+
+test("scoped theme aliases are recomputed rather than inheriting light-mode colors",()=>{
+ for(const scope of [":root",".dark",'[data-can-brand="true"]','.dark [data-can-brand="true"], .dark[data-can-brand="true"]']){
+  const section=css.split("\n"+scope+" {")[1]?.split("\n}")[0];
+  assert.ok(section,scope);
+  assert.match(section,/--eyebrow-color:\s*var\(--workspace-accent-ink\)/,scope);
+  assert.match(section,/--workspace-accent:\s*var\(--(?:brand-)?primary\)/,scope);
+ }
 });
