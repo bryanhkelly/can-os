@@ -45,6 +45,7 @@ function run(name){
   throw Error("Acceptance failed at "+name+". See "+logfile);
  }
 }
+let phase="initialization";
 try{
  const interactions=join(root,"acceptance-artifacts/storybook-interaction-results.json");
  const browser=join(root,"acceptance-artifacts/storybook-browser-results.json");
@@ -52,6 +53,7 @@ try{
  for(const path of [interactions,browser,inventory,join(out,"tested-static-manifest.json")])rmSync(path,{force:true});
  let builtDigest=null;
  for(const stage of requiredStages){
+  phase=stage;
   run(stage);
   if(stage==="interactions"){
    const errors=interactionEvidenceErrors(JSON.parse(readFileSync(interactions,"utf8")));
@@ -63,11 +65,12 @@ try{
    if(errors.length)throw Error(errors.join("\n"));
   }
  }
+ phase="final-integrity";
  if(!clean()||git("rev-parse","HEAD")!==commit)throw Error("Source changed during acceptance");
  const manifest=staticManifest(join(root,"storybook-static"));
  if(!builtDigest||manifest.digest!==builtDigest)throw Error("Static assets changed after compilation during acceptance");
  receipt.staticDigest=manifest.digest;receipt.staticFiles=manifest.files.length;receipt.status="passed";
  writeFileSync(join(out,"tested-static-manifest.json"),JSON.stringify(manifest,null,2)+"\n");
-}catch(error){receipt.status="failed";console.error(error.message);process.exitCode=1;}
+}catch(error){receipt.status="failed";receipt.failure={phase,message:error instanceof Error?error.message:String(error)};console.error(receipt.failure.message);process.exitCode=1;}
 finally{receipt.finishedAt=new Date().toISOString();write();}
 console.log("Acceptance receipt: "+file);
