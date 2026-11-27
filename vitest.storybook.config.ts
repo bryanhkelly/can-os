@@ -3,6 +3,7 @@ import { playwright } from "@vitest/browser-playwright";
 import { storybookTest } from "@storybook/addon-vitest/vitest-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath, URL } from "node:url";
+import { engineeringInventoryPlugin } from "./.storybook/engineering-inventory.mjs";
 import { fixtureIsolationPlugin } from "./.storybook/fixture-isolation-plugin";
 import { storybookFixtureAliases } from "./.storybook/fixture-aliases";
 import { storybookServerDependencyExclusions } from "./.storybook/fixture-dependencies";
@@ -13,6 +14,7 @@ export default defineConfig({
   publicDir: false,
   plugins: [
     fixtureIsolationPlugin(),
+    engineeringInventoryPlugin(),
     tailwindcss(),
     storybookTest({
       configDir: fileURLToPath(new URL("./.storybook", import.meta.url)),
