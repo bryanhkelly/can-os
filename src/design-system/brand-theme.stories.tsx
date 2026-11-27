@@ -46,3 +46,14 @@ export const NestedThemeContrast: Story = {
     await expect(canvas.getByRole("button", { name: "Dark institutional action" })).toHaveStyle({ backgroundColor: "rgb(138, 180, 255)" });
   },
 };
+
+export const SharedAccentCopyFallback: Story = {
+  render: () => <BrandTheme brand={{ primary: "#101d39", primaryForeground: "#ffffff", accent: "#b8b8b8", accentForeground: "#101d39" }}>
+    <div className="bg-accent p-4"><p className="text-foreground">Selected program</p><p className="text-muted-foreground">Required supporting details</p></div>
+  </BrandTheme>,
+  play: async ({ canvas }) => {
+    const copy = canvas.getByText("Required supporting details");
+    await expect(copy).toHaveStyle({ color: "rgb(82, 98, 124)" });
+    await expect(copy.parentElement).toHaveStyle({ backgroundColor: "rgb(234, 241, 255)" });
+  },
+};
