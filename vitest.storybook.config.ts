@@ -19,7 +19,20 @@ export default defineConfig({
   resolve: {
     alias: storybookFixtureAliases,
   },
+  // Vitest may pre-bundle exports of installed application dependencies even
+  // when no story imports them. TanStack Start server exports require the app
+  // plugin and must not enter the browser optimizer.
+  optimizeDeps: {
+    exclude: ["@tanstack/react-start", "@tanstack/react-start/server", "@tanstack/react-start-server", "@tanstack/start-server-core"],
+  },
   test: {
+    deps: {
+      optimizer: {
+        client: {
+          exclude: ["@tanstack/react-start", "@tanstack/react-start/server", "@tanstack/react-start-server", "@tanstack/start-server-core"],
+        },
+      },
+    },
     name: "storybook",
     browser: {
       enabled: true,
