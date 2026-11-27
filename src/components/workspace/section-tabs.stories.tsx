@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect } from "storybook/test";
-import { createMemoryHistory, createRootRoute, createRouter, RouterProvider } from "@tanstack/react-router";
+import { FixtureRouter } from "../../../.storybook/fixture-router";
 import { DetailNavigation, SectionTab } from "./workspace-panel";
 
 const tabs = [["overview", "Overview"], ["calendar", "Calendar"], ["announcements", "Announcements"]] as const;
@@ -12,10 +12,7 @@ function RecordTabs({ tab, variant = "default" }: { tab: string; variant?: "defa
   </div>;
 }
 
-const withLocation = (path: string) => (Story: () => React.JSX.Element) => {
-  const root = createRootRoute({ component: Story });
-  return <RouterProvider router={createRouter({ routeTree: root, history: createMemoryHistory({ initialEntries: [path] }) })} />;
-};
+const withLocation = (path: string) => (Story: () => React.JSX.Element) => <FixtureRouter initialPath={path}><Story /></FixtureRouter>;
 
 const meta = { id: "v6-1-templates-section-tabs", title: "03 Components/Section tabs", component: RecordTabs, parameters: { layout: "fullscreen" } } satisfies Meta<typeof RecordTabs>;
 export default meta;
