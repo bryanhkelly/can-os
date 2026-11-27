@@ -50,7 +50,7 @@ function run(name){
      const failed=(suite.assertionResults??[]).filter(assertion=>assertion.status==="failed");
      if(suite.status==="failed"&&!failed.length)console.error(suite.name+" — suite import/runtime failure: "+String(suite.message??"").slice(0,600));
      for(const assertion of failed){
-      const message=String(assertion.failureMessages?.[0]??"").replace(/\\x1b\\[[0-9;]*m/g,"").split("\n").filter(line=>line.trim()).slice(0,5).join("\n");
+      const message=String(assertion.failureMessages?.[0]??"").replace(/\x1b\[[0-9;]*m/g,"").split("\n").filter(line=>line.trim()).slice(0,5).join("\n");
       console.error(suite.name+" # "+(assertion.fullName??assertion.title)+"\n"+message.slice(0,1000));
      }
     }
