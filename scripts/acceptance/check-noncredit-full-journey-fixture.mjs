@@ -126,7 +126,7 @@ const rows=await sql`
    AND EXISTS(SELECT 1 FROM public.site_go_links g WHERE g.code=${fixture.goCode}
      AND g.organization_id=r.registering_organization_id AND g.site_id=r.site_id
      AND g.status='active' AND (g.starts_at IS NULL OR g.starts_at<=now()) AND (g.expires_at IS NULL OR g.expires_at>now()))
-   AND EXISTS(SELECT 1 FROM public.classes cls WHERE cls.site_id=r.site_id AND cls.deployment_id=r.deployment_id AND cls.adoption_id=r.adoption_id AND cls.offering_version_id=r.offering_version_id AND cls.course_version_id=r.course_version_id AND cls.state='active' AND cls.delivery_mode='self_paced')
+   AND (SELECT count(*) FROM public.classes cls WHERE cls.site_id=r.site_id AND cls.deployment_id=r.deployment_id AND cls.adoption_id=r.adoption_id AND cls.offering_version_id=r.offering_version_id AND cls.course_version_id=r.course_version_id AND cls.operating_organization_id=r.registering_organization_id AND cls.state='active' AND cls.delivery_mode='self_paced')=1
 `;
 assert.equal(rows.length,1,"Fresh independently approved QA release with branch-bound organization and policy required");
 const row=rows[0];
