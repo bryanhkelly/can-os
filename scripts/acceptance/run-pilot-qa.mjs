@@ -17,7 +17,8 @@ const modes = {
   api: ["node_modules/@playwright/test/cli.js", "test", "--config", "playwright.noncredit-pilot-api.config.ts"],
   browser: ["node_modules/@playwright/test/cli.js", "test", "--config", "playwright.noncredit-pilot-journey.config.ts"],
 };
-const fail = message => { throw new Error(message); };
+class QAConfigurationError extends Error {}
+const fail = message => { throw new QAConfigurationError(message); };
 function init() {
   if (existsSync(file)) fail("QA environment file already exists; preserve its keys. Never regenerate keys for a populated fixture.");
   const config = {
@@ -78,11 +79,14 @@ try {
       const {neon}=await import("@neondatabase/serverless");
       for(const key of ["CAN_CANONICAL_AUTH_DATABASE_URL","CAN_CANONICAL_OPERATIONS_DATABASE_URL"]){
         if(!env[key]) {
-          if(mode==="api"||mode==="browser") fail(key+" is required for QA runtime.");
+          if(key==="CAN_CANONICAL_AUTH_DATABASE_URL" && (mode==="api"||mode==="browser")) fail(key+" is required for QA runtime.");
           continue;
         }
-        const [identity]=await neon(env[key])`SELECT current_setting('neon.project_id',true) AS project,current_setting('neon.branch_id',true) AS branch`;
-        if(identity?.project!=="sweet-hall-62441909"||identity?.branch!==allowedBranch) fail("Secondary QA database attestation failed: "+key);
+        const expectedLogin=key==="CAN_CANONICAL_AUTH_DATABASE_URL"?"can_os_canonical_auth_app":"can_os_canonical_ops_app";
+        const url=new URL(env[key]);
+        if(url.username!==expectedLogin||!url.password||!["postgres:","postgresql:"].includes(url.protocol)||["user","role","options"].some(k=>url.searchParams.has(k))) fail("Restricted QA login required: "+key);
+        const [identity]=await neon(env[key])`SELECT current_setting('neon.project_id',true) AS project,current_setting('neon.branch_id',true) AS branch,session_user AS login`;
+        if(identity?.project!=="sweet-hall-62441909"||identity?.branch!==allowedBranch||identity?.login!==expectedLogin) fail("Secondary QA database attestation failed: "+key);
       }
     }
     const result=spawnSync(process.execPath,modes[mode],{cwd:root,env,stdio:"inherit"});
@@ -90,6 +94,6 @@ try {
   }
 } catch(error) {
   // Only emit our own known errors; driver errors can contain connection URLs.
-  console.error("QA command blocked. Check the isolated configuration, clean checkout, dependencies and branch attestation.");
+  console.error(error instanceof QAConfigurationError ? "BLOCKED: "+error.message : "QA command blocked. Check the isolated configuration, clean checkout, dependencies and branch attestation.");
   process.exitCode=1;
 }
