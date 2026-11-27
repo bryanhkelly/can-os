@@ -20,7 +20,9 @@ export function aggregateFailures(report){
    if(test.status!=="failed")continue;
    const story=path+" # "+(test.fullName??test.title??i);failed.add(story);
    const message=normalize((test.failureMessages??[]).join("\n"));
-   const rules=[...new Set([...message.matchAll(/\(([a-z][a-z0-9-]+)\)"|rules\/axe\/[^/]+\/([a-z][a-z0-9-]+)/g)].map(m=>m[1]??m[2]))];
+   const overlay=/vite-error-overlay|Storybook Vite runtime error overlay:/i.test(message);
+   if(overlay)add("fixture/runtime","Vite error overlay (inspect underlying runtime diagnostic)",story,message.slice(0,2400));
+   const rules=[...new Set([...message.matchAll(/rules\/axe\/[^/]+\/([a-z][a-z0-9-]+)/g)].map(m=>m[1]))].filter(rule=>!(overlay&&rule==="scrollable-region-focusable"));
    if(rules.length){
     for(const rule of rules){
      if(rule==="color-contrast"){
@@ -30,7 +32,7 @@ export function aggregateFailures(report){
      }else add("accessibility",rule,story,message.slice(0,1200));
     }
    }
-   if(!rules.length||/TestingLibraryElementError|AssertionError:|TypeError:|ReferenceError:|Storybook fixture isolation:/i.test(message)){
+   if((!rules.length&&!overlay)||/TestingLibraryElementError|AssertionError:|TypeError:|ReferenceError:|Storybook fixture isolation:/i.test(message)){
     const line=message.split("\n").find(x=>/TestingLibraryElementError|AssertionError:|TypeError:|ReferenceError:|Storybook fixture isolation:|Error:/.test(x))??message.split("\n")[0]??"Unclassified";
     const category=/fixture isolation|Cannot resolve|Could not resolve|Failed to fetch dynamically|No QueryClient|RouterProvider|context provider/i.test(message)?"fixture/runtime":"interaction";
     add(category,line.trim().slice(0,180)||"Unclassified",story,message.slice(0,1200));
