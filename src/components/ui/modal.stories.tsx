@@ -25,6 +25,7 @@ function ModalExample() {
         <div className="flex flex-wrap gap-3">
           <Button variant="outline" onClick={() => setOpen(false)}>Close dialog</Button>
           <Button onClick={() => setOpen(false)}>Done</Button>
+          <Button className="invisible" onClick={() => setOpen(false)}>Hidden action</Button>
         </div>
       </div>
     </Modal>
@@ -38,7 +39,15 @@ export const KeyboardAndDismissal: Story = {
     await userEvent.click(canvas.getByRole("button", { name: "Open review dialog" }));
     const dialog = await canvas.findByRole("dialog", { name: "Example review dialog" });
     await expect(dialog).toBeVisible();
+    const first = within(dialog).getByRole("button", { name: "Close dialog" });
+    const last = within(dialog).getByRole("button", { name: "Done" });
+    last.focus();
+    await userEvent.tab();
+    await expect(first).toHaveFocus();
+    await userEvent.tab({ shift: true });
+    await expect(last).toHaveFocus();
     await userEvent.keyboard("{Escape}");
+    await expect(canvas.getByRole("button", { name: "Open review dialog" })).toHaveFocus();
     await expect(canvas.queryByRole("dialog", { name: "Example review dialog" })).not.toBeInTheDocument();
   },
 };
