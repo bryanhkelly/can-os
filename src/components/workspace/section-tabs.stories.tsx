@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect } from "storybook/test";
+import { expect, userEvent } from "storybook/test";
+import { useState } from "react";
+import { useRouter } from "@tanstack/react-router";
 import { FixtureRouter } from "../../../.storybook/fixture-router";
 import { DetailNavigation, SectionTab } from "./workspace-panel";
 
@@ -52,5 +54,27 @@ export const RecordSections: Story = {
     for (const link of links) await expect(link.getBoundingClientRect().height).toBeGreaterThanOrEqual(44);
     links[0]!.focus();
     await expect(links[0]).toHaveFocus();
+  },
+};
+
+function RouterIdentity({ revision }: { revision: number }) {
+  const router = useRouter();
+  const [initialRouter] = useState(() => router);
+  return <p role="status">Revision {revision}: {router === initialRouter ? "same router" : "replaced router"}</p>;
+}
+function RouterStabilityExample() {
+  const [revision, setRevision] = useState(0);
+  return <div className="bg-background p-5">
+    <button type="button" onClick={() => setRevision(value => value + 1)}>Update fixture data</button>
+    <FixtureRouter initialPath="/"><RouterIdentity revision={revision} /></FixtureRouter>
+  </div>;
+}
+export const FixtureRouterPreservesState: Story = {
+  args: { tab: "overview" },
+  render: () => <RouterStabilityExample />,
+  play: async ({ canvas }) => {
+    await expect(canvas.getByRole("status")).toHaveTextContent("Revision 0: same router");
+    await userEvent.click(canvas.getByRole("button", { name: "Update fixture data" }));
+    await expect(canvas.getByRole("status")).toHaveTextContent("Revision 1: same router");
   },
 };
