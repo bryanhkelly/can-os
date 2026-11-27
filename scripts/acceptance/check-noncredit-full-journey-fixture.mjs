@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import {neon,Pool} from "@neondatabase/serverless";
 import {createHash} from "node:crypto";
-import {verifyAdmissionsNeonBranch} from "../verify-admissions-neon-branch.mjs";
+import {checkPilotMigrationParity} from "./check-pilot-migration-parity.mjs";
 
 // No writes. The only accepted fixture is explicitly marked for this exact
 // dedicated QA branch, with a fresh approved, independent training release.
@@ -9,7 +9,8 @@ const env=process.env;
 const branch=env.CAN_PILOT_QA_BRANCH_ID;
 if(!branch||branch==="br-restless-sea-ar9ooo55"||branch==="br-bitter-feather-ar0u63x7")
   throw Error("Dedicated QA branch required");
-await verifyAdmissionsNeonBranch({...env,CAN_ADMISSIONS_TEST_BRANCH_ID:branch});
+const parity=await checkPilotMigrationParity(env);
+if(!parity.ready){console.error(JSON.stringify(parity,null,2));throw Error("QA migration parity required before any application acceptance");}
 const fixture=JSON.parse(env.CAN_PILOT_QA_FIXTURE_JSON??"{}");
 assert.match(fixture.releaseId,/^[0-9a-f-]{36}$/i);
 assert.match(fixture.goCode,/^[A-Za-z0-9_-]{12}$/);
