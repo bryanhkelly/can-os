@@ -2,17 +2,6 @@ name: Storybook bulk quality audit
 on:
   pull_request:
     branches: [main]
-    paths:
-      - 'src/**'
-      - '.storybook/**'
-      - 'scripts/storybook/**'
-      - 'scripts/lib/v61-*'
-      - 'scripts/check-v61-experience-coverage.mjs'
-      - 'docs/design-coverage/**'
-      - 'public/school-template-previews/**'
-      - '**/*storybook*'
-      - 'package*.json'
-      - 'tsconfig*.json'
   workflow_dispatch:
 permissions:
   contents: read
