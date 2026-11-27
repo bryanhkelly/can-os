@@ -2,8 +2,6 @@ name: Storybook bulk quality audit
 on:
   pull_request:
     branches: [main]
-  push:
-    branches: [6.1-storybook-configuration]
   workflow_dispatch:
 permissions:
   contents: read
@@ -27,58 +25,16 @@ jobs:
       - run: npm ci --include=dev
       - run: npm run storybook:check-playwright
       - run: node node_modules/playwright/cli.js install --with-deps chromium
-      - run: npm run storybook:check-browser
-      - name: Source and contract checks
-        id: contracts
-        continue-on-error: true
+      - name: Run all independent diagnostic stages
+        run: npm run storybook:quality:audit
+      - name: Publish quality summary
+        if: always()
         shell: bash
         run: |
-          mkdir -p acceptance-artifacts/storybook-quality
-          status=0
-          for script in storybook:doctor check:storybook:catalog check:storybook:fonts check:storybook:visual-config test:storybook:contracts; do
-            npm run "$script" > "acceptance-artifacts/storybook-quality/${script//:/-}.log" 2>&1 || status=1
-          done
-          node scripts/check-v61-experience-coverage.mjs > acceptance-artifacts/storybook-quality/route-registry.log 2>&1 || status=1
-          exit "$status"
-      - name: Full interaction suite
-        id: interactions
-        continue-on-error: true
-        shell: bash
-        run: |
-          set -o pipefail
-          npm run test:storybook 2>&1 | tee acceptance-artifacts/storybook-quality/interactions.log
-      - name: Aggregate complete interaction evidence
-        id: triage
-        if: always() && steps.interactions.outcome != 'skipped'
-        continue-on-error: true
-        shell: bash
-        run: |
-          npm run storybook:quality:triage
-          cat acceptance-artifacts/storybook-quality/triage.md >> "$GITHUB_STEP_SUMMARY"
-      - name: Static build (independent of interactions)
-        id: build
-        if: always() && steps.interactions.outcome != 'skipped'
-        continue-on-error: true
-        shell: bash
-        run: |
-          set -o pipefail
-          npm run build-storybook 2>&1 | tee acceptance-artifacts/storybook-quality/build.log
-      - name: Catalog inventory
-        id: inventory
-        if: always() && steps.build.outcome == 'success'
-        continue-on-error: true
-        shell: bash
-        run: |
-          set -o pipefail
-          npm run storybook:inventory 2>&1 | tee acceptance-artifacts/storybook-quality/inventory.log
-      - name: Independent browser acceptance
-        id: browser
-        if: always() && steps.build.outcome == 'success'
-        continue-on-error: true
-        shell: bash
-        run: |
-          set -o pipefail
-          npm run test:storybook:browser 2>&1 | tee acceptance-artifacts/storybook-quality/browser.log
+          if [ -f acceptance-artifacts/storybook-quality/latest.json ]; then
+            run=$(node -p "JSON.parse(require('fs').readFileSync('acceptance-artifacts/storybook-quality/latest.json','utf8')).runId")
+            cat "acceptance-artifacts/storybook-quality/runs/$run/report.md" >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Preserve full quality evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -92,20 +48,3 @@ jobs:
             acceptance-artifacts/storybook-browser-report/
             acceptance-artifacts/storybook-browser-results/
           if-no-files-found: warn
-      - name: Require complete passing diagnostic stages
-        if: always()
-        env:
-          CONTRACTS: ${{ steps.contracts.outcome }}
-          INTERACTIONS: ${{ steps.interactions.outcome }}
-          TRIAGE: ${{ steps.triage.outcome }}
-          BUILD: ${{ steps.build.outcome }}
-          INVENTORY: ${{ steps.inventory.outcome }}
-          BROWSER: ${{ steps.browser.outcome }}
-        shell: bash
-        run: |
-          for stage in CONTRACTS INTERACTIONS TRIAGE BUILD INVENTORY BROWSER; do
-            echo "$stage: ${!stage}" >> "$GITHUB_STEP_SUMMARY"
-          done
-          for stage in CONTRACTS INTERACTIONS TRIAGE BUILD INVENTORY BROWSER; do
-            test "${!stage}" = success || exit 1
-          done
