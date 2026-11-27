@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, userEvent, within } from "storybook/test";
-import { createMemoryHistory, createRootRoute, createRouter, RouterProvider } from "@tanstack/react-router";
+import { FixtureRouter } from "../../../.storybook/fixture-router";
 import { WorkspaceSidebar } from "@/components/shell/WorkspaceSidebar";
 import { workspaceLinks } from "@/components/shell/workspace-navigation.registry";
 import { StudentExperience } from "./StudentExperience";
@@ -44,13 +44,10 @@ const meta = {
     },
     dashboard,
   },
-  decorators:[Story=>{
-    const root=createRootRoute({component:()=> <div className="min-h-screen lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]">
-      <WorkspaceSidebar member={{role:"student"}} links={workspaceLinks.student} activePath="/home" />
-      <div className="min-w-0"><header className="border-b bg-card px-6 py-4 text-xs">Student workspace · Synthetic browser fixture</header><Story /></div>
-    </div>});
-    return <RouterProvider router={createRouter({routeTree:root,history:createMemoryHistory({initialEntries:["/"]})})} />;
-  }],
+  decorators: [Story => <FixtureRouter><div className="min-h-screen lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]">
+    <WorkspaceSidebar member={{role:"student"}} links={workspaceLinks.student} activePath="/home" />
+    <div className="min-w-0"><header className="border-b bg-card px-6 py-4 text-xs">Student workspace · Synthetic browser fixture</header><Story /></div>
+  </div></FixtureRouter>],
 } satisfies Meta<typeof StudentExperience>;
 export default meta;
 type Story=StoryObj<typeof meta>;
