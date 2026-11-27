@@ -27,7 +27,7 @@ export const Proposal:Story={args:common,render:()=> <ProposalPreview/>,play:asy
   const canvas=within(canvasElement);
   const submit=canvas.getByRole("button",{name:"Request relationship"});
   await expect(submit).toBeDisabled();
-  await userEvent.selectOptions(canvas.getByRole("combobox",{name:"Organization"}),recipient.id);
+  await userEvent.selectOptions(canvas.getByRole("combobox",{name:/^Organization\s*\(required\)$/}),recipient.id);
   await userEvent.click(canvas.getByRole("checkbox",{name:"Registrations"}));
   await expect(submit).toBeEnabled();
   await userEvent.click(submit);
