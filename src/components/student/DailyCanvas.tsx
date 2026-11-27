@@ -60,9 +60,9 @@ export function DailyCanvas({ content, audience, operationalSummary, primaryActi
     <div className="relative max-w-2xl">
       <p className="can-editorial-label text-xs font-semibold uppercase tracking-eyebrow">{safety ? "Urgent school notice" : content?.campaignLabel ?? (audience === "student" ? "Your learning day" : "Your school day")}</p>
       <h2 className="mt-3 font-serif text-4xl leading-tight tracking-tight sm:text-5xl">{content?.headline ?? "Make today count."}</h2>
-      {content?.supportingCopy && <p className="mt-3 max-w-xl text-sm leading-7 text-white/90 sm:text-base">{content.supportingCopy}</p>}
+      {content?.supportingCopy && <p className="mt-3 max-w-xl text-sm leading-7 text-inherit sm:text-base">{content.supportingCopy}</p>}
       {!safety && content?.verseText && <blockquote className="mt-4 border-l-2 border-white/70 pl-4 text-sm italic">{content.verseText}{content.verseReference && <footer className="mt-1 text-xs not-italic">{content.verseReference}</footer>}</blockquote>}
-      {operationalSummary && <div className="mt-5 text-sm font-medium text-white">{operationalSummary}</div>}
+      {operationalSummary && <div className="mt-5 text-sm font-medium text-inherit">{operationalSummary}</div>}
       {(primaryAction || secondaryAction) && <div className="mt-5 flex flex-wrap items-center gap-3">{primaryAction}{secondaryAction}</div>}
     </div>
   </section>;
