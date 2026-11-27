@@ -1,6 +1,6 @@
 import { useState, type ComponentProps } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { createMemoryHistory, createRootRoute, createRouter, RouterProvider } from "@tanstack/react-router";
+import { FixtureRouter } from "../../../.storybook/fixture-router";
 import { expect, userEvent, within } from "storybook/test";
 import { LaunchStudioChrome, LaunchStudioShell, JourneyWelcome } from "./LaunchStudioShell";
 import { LaunchStudioOverview } from "./LaunchStudioOverviewV61";
@@ -10,11 +10,7 @@ import { LaunchConfigurationForm } from "@/components/operations/LaunchConfigura
 const meta = {
   id: "workflows-launch-studio", title: "08 Feature workspaces/Launch Studio/Overview and shell",
   parameters: { layout: "fullscreen" },
-  decorators: [Story => {
-    const router = createRouter({ routeTree: createRootRoute({ component: Story }),
-      history: createMemoryHistory({ initialEntries: ["/launch"] }) });
-    return <RouterProvider router={router} />;
-  }],
+  decorators: [Story => <FixtureRouter initialPath="/launch"><Story /></FixtureRouter>],
 } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
