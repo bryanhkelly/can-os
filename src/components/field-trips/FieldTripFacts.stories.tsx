@@ -3,7 +3,7 @@ import { expect } from "storybook/test";
 import { FieldTripFacts } from "./FieldTripFacts";
 
 const meta = {
-  title: "Field trips/Shared trip facts",
+  id: "field-trips-shared-trip-facts", title: "08 Feature workspaces/Field trips/Shared trip facts",
   parameters: { chromatic: { modes: {
     light: { theme: "light" }, dark: { theme: "dark" }, site: { theme: "site" },
   } } },

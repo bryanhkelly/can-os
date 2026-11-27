@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { DirectoryTable } from "@/components/workspace";
+import { DirectoryTable, ActionStateIndicator } from "@/components/workspace";
 import type { getNoncreditReleaseOperations } from "@/modules/enrollment/noncredit-cohort-operations.functions";
 
 type CohortOperations = Awaited<ReturnType<typeof getNoncreditReleaseOperations>>;
@@ -39,16 +39,17 @@ export function NoncreditParticipantRoster({
                 {["withdrawn","cancelled"].includes(person.status)&&!person.seatReleased&&
                   person.completionOutcome!=="completed"&&
                   <div className="mt-2">
-                    <Button variant="ghost" size="sm" type="button" className="underline"
+                    <Button variant="ghost" size="sm" type="button" className="underline" disabled={busy}
                       onClick={()=>onStartRelease(person.registrationId)}>
                       Review capacity release
                     </Button>
                     {seatTarget===person.registrationId&&<div className="mt-2 space-y-2 border border-border p-2">
                       <Label className="block text-xs font-medium">Reason for releasing the seat
-                        <Textarea value={seatReason} maxLength={500} onChange={event=>onReasonChange(event.target.value)}
+                        <Textarea value={seatReason} maxLength={500} disabled={busy} onChange={event=>onReasonChange(event.target.value)}
                           className="mt-2 min-w-48" rows={2}
                           placeholder="Describe verified withdrawal and seat-release reason"/>
                       </Label>
+                      {!busy&&seatReason.trim().length<15&&<ActionStateIndicator state={{kind:"blocked",detail:"Enter a reason with at least 15 characters."}}/>}
                       <div className="flex flex-wrap gap-2">
                         <Button size="sm" disabled={busy||seatReason.trim().length<15}
                           onClick={()=>void onConfirmRelease(person.registrationId)}>Confirm release</Button>

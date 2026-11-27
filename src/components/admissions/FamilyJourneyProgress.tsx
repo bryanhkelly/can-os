@@ -1,9 +1,8 @@
-export interface FamilyJourneyMilestone { label: string; complete: boolean; detail?: string }
-export function FamilyJourneyProgress({milestones}:{milestones:readonly FamilyJourneyMilestone[]}) {
- return <ol aria-label="Family onboarding progress" className="space-y-2">
-  {milestones.map((step,index)=><li key={index} className="flex gap-3  border p-3 text-sm">
-   <span aria-label={step.complete?"Complete":"Pending"}>{step.complete?"✓":"○"}</span>
-   <div><strong>{step.label}</strong>{step.detail&&<p className="text-xs text-muted-foreground">{step.detail}</p>}</div>
-  </li>)}
- </ol>;
+import {OutcomeMilestoneList} from "@/components/workspace/outcome-milestones";
+export interface FamilyJourneyMilestone { label:string; complete:boolean; detail?:string }
+/** Only the existing family reader determines completion. */
+export function FamilyJourneyProgress({milestones}:{milestones:readonly FamilyJourneyMilestone[]}){
+ return <OutcomeMilestoneList label="Family onboarding progress" items={milestones.map((step,index)=>({
+  id:step.label+":"+index,title:step.label,detail:step.detail,state:step.complete?"complete":"pending",
+ }))}/>;
 }

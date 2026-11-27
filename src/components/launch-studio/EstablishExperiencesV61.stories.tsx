@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { emptySiteProgramsAudiencesV61, type SiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
 import { EstablishExperiencesV61, type ExperiencesStageV61 } from "./EstablishExperiencesV61";
 
-const meta={title:"Launch Studio/Shape/Experiences",parameters:{layout:"fullscreen"}} satisfies Meta;
+const meta={id: "launch-studio-shape-experiences", title: "08 Feature workspaces/Launch Studio/Shape/Experiences",parameters:{layout:"fullscreen"}} satisfies Meta;
 export default meta;
 type Story=StoryObj<typeof meta>;
 const base:SiteProgramsAudiencesV61={...emptySiteProgramsAudiencesV61(),

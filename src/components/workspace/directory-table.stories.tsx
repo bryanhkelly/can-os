@@ -12,7 +12,7 @@ import { CreateAction } from "./create-action";
 import { PageNavigation } from "./page-navigation";
 
 const meta = {
-  title: "Foundations/Directory table",
+  id: "foundations-directory-table", title: "03 Components/Directory table",
   parameters: { chromatic: { modes: { light: { theme: "light" }, dark: { theme: "dark" }, site: { theme: "site" } } } },
 } satisfies Meta;
 export default meta;

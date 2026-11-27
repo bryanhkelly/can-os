@@ -3,7 +3,7 @@ import { expect, within } from "storybook/test";
 import { DeliveryReceiptFacts } from "./DeliveryReceiptFacts";
 
 const meta={
-  title:"Communication/Delivery receipt facts",
+  id: "communication-delivery-receipt-facts", title: "08 Feature workspaces/Communication/Delivery receipt facts",
   component:DeliveryReceiptFacts,
 } satisfies Meta<typeof DeliveryReceiptFacts>;
 export default meta;

@@ -3,7 +3,7 @@ import { siteTemplateCatalog } from "@/domain/public-site-templates";
 import type { SiteTemplateId, SitePaletteId, SiteTypographyId, SiteFontId } from "@/domain/site-theme";
 import { publicSitePagePaths, type PublicSitePath } from "@/domain/public-site-paths";
 import { Button } from "@/components/ui/button";
-import { SelectionCard } from "@/components/workspace";
+import { SelectionCard } from "@/components/workspace/selection-card";
 import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";

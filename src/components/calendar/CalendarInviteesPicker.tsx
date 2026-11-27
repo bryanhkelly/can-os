@@ -1,8 +1,7 @@
 import { type Dispatch, type SetStateAction } from "react";
-import { Checkbox } from "@/components/ui/choice";
+import { EntitySelectionResults } from "@/components/workspace/entity-picker";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { countCalendarInvitees } from "@/domain/calendar-invitees";
 import type { listCalendarInviteOptions } from "@/modules/calendar/calendar.functions";
 
@@ -75,23 +74,13 @@ export function CalendarInviteesPicker({
                 {!loading && <div className="mt-3 max-h-64 space-y-4 overflow-y-auto border-y border-border py-3">
                   {visibleInviteGroups.length > 0 && <fieldset className="space-y-2">
                     <legend className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Groups</legend>
-                    {visibleInviteGroups.map(group => <Label key={group.id} className="flex cursor-pointer items-start gap-3 py-1 text-sm">
-                      <Checkbox className="mt-0.5 size-4 accent-primary" checked={inviteGroupIds.includes(group.id)}
-                        onChange={event => setInviteGroupIds(ids => event.target.checked
-                          ? [...ids, group.id] : ids.filter(id => id !== group.id))} />
-                      <span className="min-w-0"><span className="block font-medium">{group.title}</span>
-                        <span className="block text-xs text-muted-foreground">{group.members.length} eligible {group.members.length === 1 ? "member" : "members"}</span></span>
-                    </Label>)}
+                    <EntitySelectionResults multiple options={visibleInviteGroups.map(group=>({id:group.id,label:group.title,detail:group.members.length+" eligible "+(group.members.length===1?"member":"members")}))}
+                      selected={inviteGroupIds} onToggle={(id,checked)=>setInviteGroupIds(ids=>checked?[...new Set([...ids,id])]:ids.filter(value=>value!==id))}/>
                   </fieldset>}
                   <fieldset className="space-y-2">
                     <legend className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">People</legend>
-                    {visibleInvitePeople.map(contact => <Label key={contact.personId} className="flex cursor-pointer items-start gap-3 py-1 text-sm">
-                      <Checkbox className="mt-0.5 size-4 accent-primary" checked={inviteePersonIds.includes(contact.personId)}
-                        onChange={event => setInviteePersonIds(ids => event.target.checked
-                          ? [...ids, contact.personId] : ids.filter(id => id !== contact.personId))} />
-                      <span className="min-w-0"><span className="block font-medium">{contact.name}</span>
-                        <span className="block text-xs text-muted-foreground">{contact.label}</span></span>
-                    </Label>)}
+                    <EntitySelectionResults multiple options={visibleInvitePeople.map(contact=>({id:contact.personId,label:contact.name,detail:contact.label}))}
+                      selected={inviteePersonIds} onToggle={(id,checked)=>setInviteePersonIds(ids=>checked?[...new Set([...ids,id])]:ids.filter(value=>value!==id))}/>
                     {!visibleInvitePeople.length && <p className="text-sm text-muted-foreground">No matching people in your authorized address list.</p>}
                   </fieldset>
                   {!visibleInviteGroups.length && !visibleInvitePeople.length && inviteSearch &&

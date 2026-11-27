@@ -3,7 +3,7 @@ import { MasterDetailWorkspace, MasterDetailListItem } from "./master-detail-wor
 import { StatusBadge } from "./workspace-panel";
 import { Button } from "@/components/ui/button";
 
-const meta = { title: "V6.1 templates/Master detail explorer", parameters: { layout: "fullscreen" } } satisfies Meta;
+const meta = { id: "v6-1-templates-master-detail-explorer", title: "05 Page layouts/Master detail explorer", parameters: { layout: "fullscreen" } } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
 

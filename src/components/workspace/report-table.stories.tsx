@@ -1,3 +1,4 @@
+import {chromaticWidthModes} from "../../../.storybook/viewports";
 import * as React from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, userEvent, within } from "storybook/test";
@@ -7,7 +8,7 @@ import { DirectoryWindowPagination } from "./directory-window-pagination";
 import { Button } from "@/components/ui/button";
 
 const meta = {
-  title: "Foundations/V6.1 reporting tables and navigation",
+  id: "foundations-v6-1-reporting-tables-and-navigation", title: "03 Components/Reporting/Tables and navigation",
   parameters: {
     chromatic: { modes: { light: { theme: "light" }, dark: { theme: "dark" } } },
   },
@@ -59,19 +60,19 @@ const checkSemantics = async (canvasElement: HTMLElement) => {
   await expect(canvas.getAllByRole("columnheader")).toHaveLength(4);
   await expect(canvas.getByRole("region", { name: "Site participation totals" })).toHaveAttribute("tabindex", "0");
   await expect(canvas.getByRole("navigation", { name: "Related evidence destinations" })).toBeVisible();
-  await expect(canvas.getByRole("navigation", { name: "Evidence pages" })).toBeVisible();
+  await expect(canvas.getByRole("navigation", { name: "Evidence pages pagination" })).toBeVisible();
   await expect(canvas.getByRole("button", { name: "Newer" })).toBeDisabled();
   await expect(canvas.getByRole("button", { name: "Older" })).toBeDisabled();
 };
 
-export const Desktop: Story = { parameters: { chromatic: { viewports: [1440] } }, render: () => <ReportingExample />, play: async ({ canvasElement }) => checkSemantics(canvasElement) };
+export const Desktop: Story = { parameters: { chromatic: { modes: chromaticWidthModes([1440]) } }, render: () => <ReportingExample />, play: async ({ canvasElement }) => checkSemantics(canvasElement) };
 export const Tablet: Story = {
-  parameters: { chromatic: { viewports: [768] } },
+  parameters: { chromatic: { modes: chromaticWidthModes([768]) } },
   render: () => <ReportingExample />,
   play: async ({ canvasElement }) => checkSemantics(canvasElement),
 };
 export const Mobile: Story = {
-  parameters: { chromatic: { viewports: [390] } },
+  parameters: { chromatic: { modes: chromaticWidthModes([390]) } },
   render: () => <div className="max-w-[390px]"><ReportingExample /></div>,
   play: async ({ canvasElement }) => {
     await checkSemantics(canvasElement);
@@ -83,7 +84,7 @@ export const Mobile: Story = {
 };
 export const Dark: Story = {
   globals: { theme: "dark" },
-  parameters: { chromatic: { viewports: [390, 1440] } },
+  parameters: { chromatic: { modes: chromaticWidthModes([390, 1440]) } },
   render: () => <ReportingExample />,
   play: async ({ canvasElement }) => checkSemantics(canvasElement),
 };

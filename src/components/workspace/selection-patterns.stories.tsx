@@ -5,7 +5,7 @@ import { SelectionCard } from "./selection-card";
 import { SelectionChip, SelectionChipGroup } from "./selection-chip";
 import { StatusBadge } from "./workspace-panel";
 
-const meta = {title:"Workspace/Selection Patterns",parameters:{layout:"padded"}} satisfies Meta;
+const meta = {id: "workspace-selection-patterns", title: "04 Application patterns/Selection patterns",parameters:{layout:"padded"}} satisfies Meta;
 export default meta;
 type Story=StoryObj<typeof meta>;
 function Comparison(){

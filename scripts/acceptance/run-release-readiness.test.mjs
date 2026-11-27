@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 
 const runner = fileURLToPath(new URL("./run-release-readiness.mjs", import.meta.url));
 
-function runFixture(t, failure = "") {
+function runFixture(t, failure = "", useNpmEntry = false) {
   const root = mkdtempSync(join(tmpdir(), "release-runner-test-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const checkout = join(root, "checkout");
@@ -39,6 +39,7 @@ process.exit(args.join(" ") === process.env.RELEASE_TEST_FAILURE ? 17 : 0);
     cwd: checkout,
     env: { ...process.env, PATH: bin + delimiter + process.env.PATH,
       TMPDIR: root, TMP: root, TEMP: root,
+      npm_execpath: useNpmEntry ? mock : "",
       RELEASE_TEST_CALLS: callsPath, RELEASE_TEST_FAILURE: failure },
     encoding: "utf8",
   });
@@ -76,4 +77,12 @@ test("a failed locked install blocks every subsequent executable check", t => {
   assert.equal(evidence.results[0]?.status, "failed");
   assert.ok(evidence.results.length > 1);
   assert.ok(evidence.results.slice(1).every(gate => gate.status === "blocked"));
+});
+
+test("npm entry invocation preserves exact arguments without a shell", t => {
+ const { result, evidence, calls } = runFixture(t, "", true);
+ assert.equal(result.status,0,result.stderr);
+ assert.equal(evidence.status,"engineering_checks_passed");
+ assert.ok(calls.some(args=>args.join(" ")==="run typecheck:full"));
+ assert.ok(calls.some(args=>args.join(" ")==="run build:cloudflare"));
 });

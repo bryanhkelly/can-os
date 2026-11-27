@@ -4,7 +4,7 @@ import { Label } from "./label";
 import { Select } from "./select";
 import { Textarea } from "./textarea";
 
-const meta = { title: "Foundations/Form controls" } satisfies Meta;
+const meta = { id: "foundations-form-controls", title: "02 Primitives/Form controls" } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
 

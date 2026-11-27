@@ -251,15 +251,16 @@ export function analyzeSource(source, path, options = {}) {
   };
 }
 
-export function discoverTsx(dir) {
+export function discoverTsx(dir, { storiesOnly = false } = {}) {
   if (!existsSync(dir)) return [];
   const found = [];
   function visit(location) {
     for (const item of readdirSync(location, { withFileTypes: true })) {
       const absolute = join(location, item.name);
       if (item.isDirectory()) visit(absolute);
-      else if (item.isFile() && /\.[jt]sx$/.test(item.name) &&
-          !ignoredFile.test(item.name)) found.push(absolute);
+      else if (item.isFile() && (storiesOnly
+          ? /\.stories\.[jt]sx?$/.test(item.name)
+          : /\.[jt]sx$/.test(item.name) && !ignoredFile.test(item.name))) found.push(absolute);
     }
   }
   visit(dir);
@@ -269,7 +270,7 @@ function within(path, parent) {
   return path === parent || path.startsWith(parent + sep);
 }
 
-export function createInventory(projectRoot) {
+export function createInventory(projectRoot, { includeStoryImpact = false } = {}) {
   const root = resolve(projectRoot);
   const src = join(root, "src"), routesDir = join(src, "routes");
   const componentsDir = join(src, "components");
@@ -372,6 +373,8 @@ export function createInventory(projectRoot) {
       file !== entry && /\.[jt]sx?$/.test(file));
     return {
       files: reachable.length,
+      componentFiles: reachable.filter(file => within(file, componentsDir) && /\.[jt]sx$/.test(file) && !ignoredFile.test(file)).length,
+      ...(includeStoryImpact ? { paths: reachable.map(file => relative(root, file).replaceAll("\\", "/")).sort() } : {}),
       native: reachable.reduce((n, file) => n + inspect(file).native.length, 0),
       corners: reachable.reduce((n, file) => n + inspect(file).corners.length, 0),
       appearance: reachable.reduce((n, file) => n + inspect(file).appearance.length, 0),
@@ -387,7 +390,9 @@ export function createInventory(projectRoot) {
       directNative: audit.native.length, directCorners: audit.corners.length,
       directAppearance: audit.appearance.length, reachableAppearance: dependencies.appearance,
       directSyntaxErrors: audit.syntaxErrors.length, reachableSyntaxErrors: dependencies.syntaxErrors,
-      reachableComponentFiles: dependencies.files,
+      reachableComponentFiles: dependencies.componentFiles,
+      reachableSourceFiles: dependencies.files,
+      ...(includeStoryImpact ? { reachableFiles: dependencies.paths } : {}),
       reachableNative: dependencies.native, reachableCorners: dependencies.corners,
       sourceClean: audit.native.length === 0 && audit.corners.length === 0 && audit.appearance.length === 0 && audit.syntaxErrors.length === 0,
       composedSourceClean: audit.native.length + audit.corners.length +
@@ -397,6 +402,9 @@ export function createInventory(projectRoot) {
   });
   return {
     root, routes: rows,
+    ...(includeStoryImpact ? { storyDependencies: discoverTsx(src, { storiesOnly: true }).map(file => ({
+      file: relative(root, file).replaceAll("\\", "/"), reachableFiles: composed(file).paths,
+    })) } : {}),
     totals: {
       routes: routes.length,
       directlyClean: rows.filter(row => row.sourceClean).length,

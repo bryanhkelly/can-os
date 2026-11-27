@@ -3,7 +3,7 @@ import { DashboardProgress, DashboardTimeline, DashboardPreviewList, DashboardMe
 import { DashboardPanel } from "./dashboard-layout";
 import { StatusBadge } from "./workspace-panel";
 
-const meta = { title: "V6.1 templates/Dashboard widgets", parameters: { layout: "fullscreen" } } satisfies Meta;
+const meta = { id: "v6-1-templates-dashboard-widgets", title: "03 Components/Dashboard widgets", parameters: { layout: "fullscreen" } } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
 

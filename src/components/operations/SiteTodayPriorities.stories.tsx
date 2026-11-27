@@ -29,7 +29,7 @@ const items: DailyAttentionItem[] = [
 ];
 
 const meta = {
-  title: "Operations/Site Today priorities",
+  id: "operations-site-today-priorities", title: "08 Feature workspaces/Operations/Site Today priorities",
   component: SiteTodayPriorities,
   parameters: { layout: "fullscreen" },
 } satisfies Meta<typeof SiteTodayPriorities>;

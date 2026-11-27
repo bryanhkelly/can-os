@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, userEvent, within, fn } from "storybook/test";
 import { EvidenceReviewForm } from "./EvidenceReviewForm";
-const meta = { title: "Evidence/Review form", component: EvidenceReviewForm,
+const meta = { id: "evidence-review-form", title: "04 Application patterns/Evidence/Review form", component: EvidenceReviewForm,
   args: { onReview: async () => {} } } satisfies Meta<typeof EvidenceReviewForm>;
 export default meta;
 type Story = StoryObj<typeof meta>;

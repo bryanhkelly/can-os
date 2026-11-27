@@ -8,7 +8,7 @@ const choices:GoDestinationChoice[]=[
   {destination:{kind:"site-page",page:"contact"},title:"Contact the Site",description:"Published page"},
 ];
 const meta={
-  title:"Workflows/Go Links/Destination choice",
+  id: "workflows-go-links-destination-choice", title: "04 Application patterns/Go Links/Destination choice",
   component:GoDestinationChoiceField,
   args:{choices,value:null,onChange:fn()},
   decorators:[Story=><div className="max-w-md bg-background p-4"><Story/></div>],

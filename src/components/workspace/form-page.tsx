@@ -28,17 +28,25 @@ export function FormSection({ title, description, children, className, columns =
  * Consistent submit/cancel footer: the primary submit first, then Cancel as a
  * quiet link back to the context the user came from.
  */
-export function FormActions({ submitLabel, pendingLabel, pending, disabled, cancel }: {
+export function FormActions({ submitLabel, pendingLabel, pending, disabled, cancel, blockedReason }: {
   submitLabel: string;
   pendingLabel: string;
   pending: boolean;
   disabled?: boolean;
   cancel?: ReactElement | null | false;
+  /** Explain an externally owned prerequisite without reimplementing validation. */
+  blockedReason?: string;
 }) {
-  return <ActionFooter layout="form">
-    <Button type="submit" size="lg" loading={pending} loadingLabel={pendingLabel} disabled={pending || disabled}>{submitLabel}</Button>
-    {cancel && <Button asChild variant="ghost" size="lg" disabled={pending}>{cancel}</Button>}
-  </ActionFooter>;
+  const reasonId=useId();
+  const showReason=Boolean(disabled&&!pending&&blockedReason);
+  return <>
+    <ActionFooter layout="form">
+      <Button type="submit" size="lg" loading={pending} loadingLabel={pendingLabel} disabled={pending || disabled}
+        aria-describedby={showReason?reasonId:undefined}>{submitLabel}</Button>
+      {cancel && <Button asChild variant="ghost" size="lg" disabled={pending}>{cancel}</Button>}
+    </ActionFooter>
+    {showReason&&<p id={reasonId} className="mt-2 text-sm text-muted-foreground" role="status">{blockedReason}</p>}
+  </>;
 }
 
 /**

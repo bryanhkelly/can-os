@@ -11,7 +11,7 @@ const sample:ReportingRelationship={...scope,id:id(3),recipientOrganizationId:re
   ownerOrganizationId:id(4),relationshipKind:"funding",metrics:[{metricKey:metric.metricKey,definitionVersion:metric.definitionVersion}],
   validThrough:null,proposedByPersonId:id(5),proposedAt:"2026-11-24T09:00:00Z",status:"pending",
   acceptedAt:null,acceptedByPersonId:null};
-const meta={title:"V6.1/Reporting/Organization relationships",component:ReportingRelationshipPanel} satisfies Meta<typeof ReportingRelationshipPanel>;
+const meta={id: "v6-1-reporting-organization-relationships", title: "08 Feature workspaces/Reporting/Organization relationships",component:ReportingRelationshipPanel} satisfies Meta<typeof ReportingRelationshipPanel>;
 export default meta;
 type Story=StoryObj<typeof meta>;
 const common:ReportingRelationshipPanelProps={scope,entries:[],recipients:[recipient],metrics:[metric],
@@ -27,7 +27,7 @@ export const Proposal:Story={args:common,render:()=> <ProposalPreview/>,play:asy
   const canvas=within(canvasElement);
   const submit=canvas.getByRole("button",{name:"Request relationship"});
   await expect(submit).toBeDisabled();
-  await userEvent.selectOptions(canvas.getByRole("combobox",{name:"Organization"}),recipient.id);
+  await userEvent.selectOptions(canvas.getByRole("combobox",{name:/^Organization\s*\(required\)$/}),recipient.id);
   await userEvent.click(canvas.getByRole("checkbox",{name:"Registrations"}));
   await expect(submit).toBeEnabled();
   await userEvent.click(submit);

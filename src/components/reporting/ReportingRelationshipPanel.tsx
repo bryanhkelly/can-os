@@ -4,7 +4,10 @@ import {Field} from "@/components/ui/field";
 import {Select} from "@/components/ui/select";
 import {Checkbox} from "@/components/ui/choice";
 import {Label} from "@/components/ui/label";
-import {ActionFooter,EmptyState,StatusBadge,WorkspaceNotice} from "@/components/workspace";
+import {ActionFooter} from "@/components/workspace/action-footer";
+import {EmptyState} from "@/components/workspace/empty-state";
+import {StatusBadge} from "@/components/workspace/workspace-panel";
+import {WorkspaceNotice} from "@/components/workspace/notice";
 import type {RelationshipAction,RelationshipMetric,RelationshipProposal,ReportingRelationship} from "@/domain/bottom-up-reporting-relationships";
 
 const relationshipLabels={

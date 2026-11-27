@@ -1,0 +1,66 @@
+name: Storybook bulk quality audit
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: storybook-quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies and capture setup evidence
+        id: install
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p acceptance-artifacts/storybook-quality
+          npm ci --include=dev 2>&1 | tee acceptance-artifacts/storybook-quality/npm-install.log
+      - name: Install browser and OS libraries
+        id: browser_install
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run storybook:check-playwright 2>&1 | tee acceptance-artifacts/storybook-quality/playwright-setup.log
+          node node_modules/playwright/cli.js install --with-deps chromium 2>&1 | tee acceptance-artifacts/storybook-quality/browser-install.log
+      - name: Run all independent diagnostic stages
+        run: npm run storybook:quality:audit
+      - name: Require successful browser setup
+        if: always() && steps.install.outcome == 'success'
+        env:
+          BROWSER_SETUP: ${{ steps.browser_install.outcome }}
+        run: test "$BROWSER_SETUP" = success
+      - name: Publish quality summary
+        if: always()
+        shell: bash
+        run: |
+          if [ -f acceptance-artifacts/storybook-quality/latest.json ]; then
+            run=$(node -p "JSON.parse(require('fs').readFileSync('acceptance-artifacts/storybook-quality/latest.json','utf8')).runId")
+            cat "acceptance-artifacts/storybook-quality/runs/$run/report.md" >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Preserve full quality evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: storybook-quality-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            acceptance-artifacts/storybook-quality/
+            acceptance-artifacts/storybook-interaction-results.json
+            acceptance-artifacts/storybook-index.json
+            acceptance-artifacts/storybook-browser-results.json
+            acceptance-artifacts/storybook-browser-report/
+            acceptance-artifacts/storybook-browser-results/
+          if-no-files-found: warn

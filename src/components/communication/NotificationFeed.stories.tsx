@@ -17,7 +17,7 @@ function Example({ empty = false, busy = false }: { empty?: boolean; busy?: bool
       onReadAll={() => setItems(current => current.map(item => item.status === "unread" ? { ...item, status: "read" } : item))} />
   </div>;
 }
-const meta = { title: "Communication/Notifications", component: Example } satisfies Meta<typeof Example>;
+const meta = { id: "communication-notifications", title: "08 Feature workspaces/Communication/Notifications", component: Example } satisfies Meta<typeof Example>;
 export default meta;
 type Story = StoryObj<typeof meta>;
 export const ActivityFeed: Story = {

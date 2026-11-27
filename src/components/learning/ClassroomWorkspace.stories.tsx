@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, within } from "storybook/test";
 import { useState, type ReactNode } from "react";
-import { createMemoryHistory, createRootRoute, createRouter, RouterProvider } from "@tanstack/react-router";
+import { FixtureRouter } from "../../../.storybook/fixture-router";
 import type { ClassContent } from "@/domain/class-content";
 import { DomainError } from "@/domain/errors";
 import { WorkspacePanel } from "@/components/workspace";
@@ -35,7 +35,7 @@ function ClassroomFrame({ children }: { children: ReactNode }) {
   </div>;
 }
 const meta = {
-  title: "Learning/Focused classroom",
+  id: "learning-focused-classroom", title: "08 Feature workspaces/Learning/Focused classroom",
   component: ClassroomWorkspace,
   parameters: { layout: "fullscreen" },
   args: {
@@ -56,10 +56,7 @@ const meta = {
         discussion={<p className="text-sm text-muted-foreground">No lesson discussion has been opened.</p>}/>
     </div>,
   },
-  decorators: [Story => {
-    const root = createRootRoute({ component: () => <ClassroomFrame><Story/></ClassroomFrame> });
-    return <RouterProvider router={createRouter({ routeTree: root, history: createMemoryHistory({ initialEntries: ["/"] }) })}/>;
-  }],
+  decorators: [Story => <FixtureRouter><ClassroomFrame><Story /></ClassroomFrame></FixtureRouter>],
 } satisfies Meta<typeof ClassroomWorkspace>;
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -68,6 +65,11 @@ export const Lesson: Story = {
     const canvas = within(canvasElement);
     const sidebar = canvas.getByRole("complementary", { name: "Workspace sidebar" });
     await expect(sidebar).not.toHaveTextContent("Jordan Learner");
+    const toggle = within(sidebar).getByRole("button", { name: "Expand workspace sidebar" });
+    const controlledId = toggle.getAttribute("aria-controls");
+    if (!controlledId) throw new Error("Sidebar toggle must identify its controlled element");
+    await expect(toggle.ownerDocument.getElementById(controlledId)).toBeInTheDocument();
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
     await expect(canvas.getByRole("heading", { level: 1, name: "Algebra II" })).toBeVisible();
     await expect(canvas.getByRole("heading", { level: 2, name: lesson.title })).toBeVisible();
   },

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { createMemoryHistory, createRootRoute, createRouter, RouterProvider } from "@tanstack/react-router";
+import { FixtureRouter } from "../../../.storybook/fixture-router";
 import { expect, within } from "storybook/test";
 import { CurriculumLibrary } from "./CurriculumLibrary";
 import { WorkspaceShell } from "@/components/workspace/workspace-shell";
@@ -26,17 +26,14 @@ const marketplace: Marketplace = {
 };
 
 const meta = {
-  title: "Learning/Curriculum",
+  id: "learning-curriculum", title: "08 Feature workspaces/Learning/Curriculum",
   component: CurriculumLibrary,
   args: { marketplaces: [marketplace] },
-  decorators: [(Story) => {
-    const root = createRootRoute({ component: () => (
-      <WorkspaceShell title="Curriculum" width="wide" subtitle="Your selected curriculum and published courses, all in one place.">
-        <div className="pt-6"><Story /></div>
-      </WorkspaceShell>
-    ) });
-    return <RouterProvider router={createRouter({ routeTree: root, history: createMemoryHistory({ initialEntries: ["/"] }) })} />;
-  }],
+  decorators: [Story => <FixtureRouter>
+    <WorkspaceShell title="Curriculum" width="wide" subtitle="Your selected curriculum and published courses, all in one place.">
+      <div className="pt-6"><Story /></div>
+    </WorkspaceShell>
+  </FixtureRouter>],
 } satisfies Meta<typeof CurriculumLibrary>;
 export default meta;
 type Story = StoryObj<typeof meta>;

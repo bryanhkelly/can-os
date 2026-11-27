@@ -1,0 +1,29 @@
+import { Meta } from '@storybook/addon-docs/blocks';
+import * as ActionStories from '../../src/components/workspace/action-state.stories';
+import * as MilestoneStories from '../../src/components/workspace/outcome-milestones.stories';
+import { Canvas } from '@storybook/addon-docs/blocks';
+
+<Meta title="04 Application patterns/Interaction contract" />
+
+# Design for the entire operation
+
+Every workflow must communicate the next meaningful outcome, not just the next form.
+
+- Explain what is required when an action is blocked.
+- Prevent duplicate commands while processing.
+- Preserve edits on failure. Distinguish command failure from refresh failure after a successful write.
+- Show completion only after authoritative confirmation.
+- Separate configuration, authorization, publication, delivery, attendance and measured outcomes.
+- Preserve context and explain unavailable or partial data.
+
+<Canvas of={ActionStories.StateMatrix} />
+
+## Outcomes and milestones
+
+Use an embedded milestone list for a record, or the panel composition for a workspace. Missing evidence is never equivalent to completion.
+
+<Canvas of={MilestoneStories.Mixed} />
+
+## Real command recovery pattern
+
+The Mutation feedback family uses the application's actual mutation runner with controlled local fixtures. The interactive stories assert that a failed read after a successful command is recovered with a read-only retry, and that a failed command preserves the input. Use FormActions with a blocked reason when a form's owning workflow knows why saving is disabled.

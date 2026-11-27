@@ -4,7 +4,7 @@ import { expect, userEvent, within } from "storybook/test";
 import { ClassParticipationAcknowledgments } from "./ClassParticipationAcknowledgments";
 
 const meta = {
-  title: "Learning/Shared Class participation",
+  id: "learning-shared-class-participation", title: "08 Feature workspaces/Learning/Class participation",
   parameters: { layout: "padded" },
 } satisfies Meta;
 export default meta;
