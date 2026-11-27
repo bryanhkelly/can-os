@@ -11,7 +11,7 @@ export interface BrandTokens {
 }
 
 export const defaultBrandTokens: BrandTokens = {
-  primary: "#1769ef",
+  primary: "#135fdb",
   primaryForeground: "#ffffff",
   accent: "#eaf1ff",
   accentForeground: "#101d39",
