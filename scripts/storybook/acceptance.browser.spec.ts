@@ -1,5 +1,6 @@
 import {test,expect,type Page} from "@playwright/test";
 import {readFileSync} from "node:fs";
+import {findStoryEntry} from "./index-contract.mjs";
 
 type IndexEntry={id:string;type:string;title:string;name?:string;exportName?:string;importPath?:string};
 const index=JSON.parse(readFileSync("storybook-static/index.json","utf8")) as {entries:Record<string,IndexEntry>};
@@ -7,14 +8,12 @@ const registry=JSON.parse(readFileSync("docs/design-coverage/v61-registry.json",
 function registeredStoryId(reference:string){
  const [file,name]=reference.split("#");
  if(!file||!name)throw Error("Invalid layout reference: "+reference);
- const suffix=name.replace(/([a-z0-9])([A-Z])/g,"$1-$2").replace(/([A-Z])([A-Z][a-z])/g,"$1-$2").toLowerCase();
- const found=Object.values(index.entries).find(entry=>entry.type==="story"&&entry.importPath?.replace(/^\.\//,"")===file&&(entry.exportName===name||(!entry.exportName&&entry.id.endsWith("--"+suffix))));
+ const found=findStoryEntry(Object.values(index.entries),{path:file,exportName:name}) as IndexEntry | undefined;
  if(!found)throw Error("Registered layout not built: "+reference);
  return found.id;
 }
 function storyId(title:string,exportName:string){
- const found=Object.values(index.entries).find(entry=>entry.type==="story"&&entry.title===title&&
-   (entry.exportName===exportName||entry.name===exportName.replace(/([a-z])([A-Z])/g,"$1 $2")));
+ const found=findStoryEntry(Object.values(index.entries),{title,exportName}) as IndexEntry | undefined;
  if(!found)throw Error("Required acceptance story missing: "+title+" / "+exportName);
  return found.id;
 }
