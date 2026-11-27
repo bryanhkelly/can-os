@@ -37,3 +37,17 @@ export const EditorialActions: Story = {
 };
 export const DarkEditorialActions: Story = { ...EditorialActions, globals: { theme: "dark" } };
 export const SiteEditorialActions: Story = { ...EditorialActions, globals: { theme: "site" } };
+
+export const DarkEmergency: Story = {
+  ...Emergency,
+  globals: { theme: "dark" },
+  play: async ({ canvas }) => {
+    const region = canvas.getByRole("region", { name: "Urgent school notice" });
+    const copy = canvas.getByText("Please follow official school instructions for next steps.");
+    const summary = canvas.getByText("School-day updates take priority over campaigns.");
+    const ink = getComputedStyle(region).color;
+    await expect(copy).toHaveStyle({ color: ink });
+    await expect(summary).toHaveStyle({ color: ink });
+    await expect(region).toHaveStyle({ color: "rgb(16, 29, 57)", backgroundColor: "rgb(255, 133, 133)" });
+  },
+};
