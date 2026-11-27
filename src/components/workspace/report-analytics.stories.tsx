@@ -30,6 +30,8 @@ export const Interactive:Story={play:async({canvasElement})=>{
  await userEvent.click(canvas.getByRole("button",{name:"Filter report to Site B"}));
  await expect(canvas.getByText("Site B registrations")).toBeVisible();
  await expect(canvas.getByRole("button",{name:"Filter report to Site B"})).toHaveAttribute("aria-pressed","true");
+ await expect(canvas.getByRole("button",{name:"Filter report to Site B"})).toHaveClass("border-primary","bg-accent","text-primary");
+ await expect(canvas.getByRole("button",{name:"Filter report to Site A"})).toHaveClass("border-input");
 }};
 export const Dark:Story={globals:{theme:"dark"}};
 export const SiteBrand:Story={globals:{theme:"site"}};
