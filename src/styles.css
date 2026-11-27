@@ -119,7 +119,7 @@
   --popover-foreground: #101d39;
 
   /* Blue is reserved for primary actions, active navigation, and information. */
-  --primary: #1769ef;
+  --primary: #135fdb;
   --primary-foreground: #ffffff;
 
   /* V6.1 analytical marks are independent of interaction, status and Site brand.
@@ -145,21 +145,21 @@
 
   --border: #e2e8f0;
   --input: #cbd5e1;
-  --ring: #1769ef;
+  --ring: #135fdb;
 
-  --success: #16845b;
-  --warning: #b86b00;
+  --success: #10724d;
+  --warning: #985700;
   --danger: #c93232;
-  --info: #1769ef;
+  --info: #135fdb;
 
   --sidebar: #ffffff;
   --sidebar-foreground: #101d39;
-  --sidebar-primary: #1769ef;
+  --sidebar-primary: #135fdb;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #eaf1ff;
   --sidebar-accent-foreground: #101d39;
   --sidebar-border: #e2e8f0;
-  --sidebar-ring: #1769ef;
+  --sidebar-ring: #135fdb;
 }
 
 /* Scoped, contrast-checked institutional/site branding. Dark mode keeps the
