@@ -114,6 +114,9 @@ export const CollapsibleSidebar: Story = {
     const sidebar = canvas.getByRole("complementary", { name: "Workspace sidebar" });
     const toggle = canvas.getByRole("button", { name: "Collapse navigation" });
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    const controlledId = toggle.getAttribute("aria-controls");
+    if (!controlledId) throw new Error("Sidebar toggle must identify its controlled navigation");
+    await expect(toggle.ownerDocument.getElementById(controlledId)).toContainElement(within(sidebar).getByRole("navigation", { name: "CAN OS primary navigation" }));
     // The control sits at the far left of the brand bar, before the wordmark.
     const brand = sidebar.firstElementChild as HTMLElement;
     await expect(brand.firstElementChild).toBe(toggle);
@@ -121,6 +124,7 @@ export const CollapsibleSidebar: Story = {
     await userEvent.click(toggle);
     const expand = canvas.getByRole("button", { name: "Expand navigation" });
     await expect(expand).toHaveAttribute("aria-expanded", "false");
+    await expect(expand).toHaveAttribute("aria-controls", controlledId);
     await expectShellGrid(canvasElement, 4.5);
     const nav = canvas.getByRole("navigation", { name: "CAN OS primary navigation" });
     await expect(within(nav).getByRole("link", { name: "Home" })).toBeVisible();
