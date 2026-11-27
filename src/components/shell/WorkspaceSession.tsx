@@ -1,12 +1,12 @@
-import { useContext, useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { getWorkspaceSession, type WorkspaceSessionResult } from "@/modules/identity/workspace-session.functions";
 import { defaultStudentDisplayPreferences } from "@/domain/student-display-preferences";
 import { currentPageSignInUrl, isPublicCanPath } from "@/domain/auth-route-policy";
-import { WorkspaceSessionContext } from "./workspace-session-context";
+import { WorkspaceSessionContext, useWorkspaceSession } from "./workspace-session-context";
 import {registerAccessClient,isSharedDeviceMode,clearLearnerBrowserState,observeSessionHandoffs} from "@/domain/session-client";
 
-export { useActiveWorkspaceMember } from "./workspace-session-context";
+export { useActiveWorkspaceMember, useWorkspaceSession } from "./workspace-session-context";
 
 export function workspaceSessionQueryOptions() {
   return queryOptions({
@@ -114,12 +114,6 @@ export function WorkspaceSessionProvider({ initial, children }: {
   if (changed) return <p role="status" className="p-6">Refreshing workspace...</p>;
   const value = error ? { ...data, error: "Unable to refresh your workspace session. Please try again." } : data;
   return <WorkspaceSessionContext.Provider value={value}>{children}</WorkspaceSessionContext.Provider>;
-}
-
-export function useWorkspaceSession() {
-  const value = useContext(WorkspaceSessionContext);
-  if (!value) throw new Error("Workspace session provider is required.");
-  return value;
 }
 
 export function useStudentDisplayPreferences() {
