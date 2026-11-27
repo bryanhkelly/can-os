@@ -3,6 +3,7 @@ import {mkdirSync,writeFileSync,openSync,closeSync,readFileSync,rmSync,existsSyn
 import {resolve,join} from "node:path";
 import {fileURLToPath} from "node:url";
 import {aggregateFailures,markdownReport} from "./quality-triage.mjs";
+import {staticManifest} from "./static-manifest.mjs";
 const root=fileURLToPath(new URL("../../",import.meta.url));
 const base=join(root,"acceptance-artifacts","storybook-quality");
 const runId=new Date().toISOString().replace(/[^0-9]/g,"")+"-"+process.pid;
@@ -56,8 +57,13 @@ if(existsSync(interactionFile)){
  }catch(error){stages.push({name:"interaction-evidence",status:"failed",error:error.message});}
 }else stages.push({name:"interaction-evidence",status:"blocked",error:"No fresh interaction JSON was produced"});
 const built=run("build","build-storybook");
+let manifest=null;
+if(built){
+ try{manifest=staticManifest(join(root,"storybook-static"));stages.push({name:"static-safety",status:"passed"});}
+ catch(error){stages.push({name:"static-safety",status:"failed",error:error.message});}
+}else stages.push({name:"static-safety",status:"blocked"});
 run("index","storybook:inventory",[],!built);
-run("browser","test:storybook:browser",[],!built||!browserReady);
+run("browser","test:storybook:browser",[],!manifest||!browserReady);
 for(const [file,name] of [[indexFile,"index.json"],[browserFile,"browser.json"]])if(existsSync(file))copyFileSync(file,join(out,name));
 const failureLogs=Object.fromEntries(stages.filter(s=>s.status==="failed"&&s.log).map(s=>[s.name,readFileSync(join(out,s.log),"utf8").slice(-16000)]));
 let browserResults=null;
@@ -65,7 +71,7 @@ if(existsSync(browserFile)){
  try{browserResults=JSON.parse(readFileSync(browserFile,"utf8"));}
  catch(error){stages.push({name:"browser-evidence",status:"failed",error:error.message});}
 }
-const report={kind:"diagnostic-only",commit,runId,stages,interactionTriage:triage,interactionFailures,browserResults,failureLogs,readyForGovernedAcceptance:stages.every(s=>s.status==="passed")&&triage!==null&&triage.failedStories===0};
+const report={kind:"diagnostic-only",commit,runId,stages,interactionTriage:triage,interactionFailures,browserResults,failureLogs,staticDigest:manifest?.digest??null,readyForGovernedAcceptance:stages.every(s=>s.status==="passed")&&triage!==null&&triage.failedStories===0&&triage.reportedFailedTests===0&&browserResults!==null&&manifest!==null};
 writeFileSync(join(out,"report.json"),JSON.stringify(report,null,2)+"\n");
 const summary=["# Storybook bulk quality audit","","Commit: "+commit,"","Diagnostic only; not a publication receipt.","","| Stage | Status |","| --- | --- |",...stages.map(s=>"| "+s.name+" | "+s.status+" |"),"",triage?markdownReport(triage):"No interaction evidence available."].join("\n");
 writeFileSync(join(out,"report.md"),summary+"\n");
