@@ -171,6 +171,7 @@
   --accent: var(--brand-accent);
   --accent-foreground: var(--brand-accent-foreground);
   --ring: var(--brand-primary);
+  --eyebrow-color: var(--workspace-accent-ink);
   --workspace-accent: var(--brand-primary);
   --workspace-accent-soft: var(--brand-accent);
   --workspace-accent-ink: var(--brand-primary);
@@ -216,6 +217,8 @@
   --foreground: #f4f7fc;
   --ink: #f4f7fc;
   --ink-soft: #b6c2d6;
+  --eyebrow-color: var(--workspace-accent-ink);
+  --workspace-accent: var(--primary);
   --workspace-accent-soft: #1c3157;
   --workspace-accent-ink: #b8d0ff;
 
@@ -266,13 +269,14 @@
   --sidebar-ring: #8ab4ff;
 }
 
-.dark [data-can-brand="true"] {
+.dark [data-can-brand="true"], .dark[data-can-brand="true"] {
   --primary: #8ab4ff;
   --primary-foreground: #101d39;
   --accent: #1c3157;
   --accent-foreground: #f4f7fc;
   --ring: #8ab4ff;
-  --workspace-accent: #8ab4ff;
+  --eyebrow-color: var(--workspace-accent-ink);
+  --workspace-accent: var(--primary);
   --workspace-accent-soft: #1c3157;
   --workspace-accent-ink: #b8d0ff;
   --sidebar-primary: #8ab4ff;
@@ -566,8 +570,8 @@
   .classroom-tools > section { margin-top:0; }
 }
 @media (max-width:1023px) {
-  .classroom-sidebar-expanded #classroom-primary-links nav span:not(.sr-only) { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
-  .classroom-sidebar-expanded #classroom-primary-links nav a { justify-content:center; padding-inline:4px; }
+  .classroom-sidebar-expanded [data-classroom-primary-links] nav span:not(.sr-only) { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+  .classroom-sidebar-expanded [data-classroom-primary-links] nav a { justify-content:center; padding-inline:4px; }
 }
 @media (max-width:760px) {
   .classroom-navigation { grid-template-columns:58px minmax(0,1fr); }
