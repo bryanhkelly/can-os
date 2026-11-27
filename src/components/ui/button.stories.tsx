@@ -36,6 +36,7 @@ export const KeyboardFocus: Story = {
   </div>,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    await expect(canvas.getByRole("button", { name: "Second action" })).toHaveClass("border-input");
     await userEvent.tab();
     await expect(canvas.getByRole("button", { name: "First action" })).toHaveFocus();
     await userEvent.tab();
@@ -57,7 +58,9 @@ export const UnavailableSaveActions: Story = {
     await expect(disabled).toBeDisabled();
     await expect(disabled).toHaveClass("bg-muted", "text-muted-foreground");
     await expect(disabled).not.toHaveClass("bg-primary");
-    await expect(canvas.getByRole("button", { name: "Save & Exit" })).toBeDisabled();
+    const exit = canvas.getByRole("button", { name: "Save & Exit" });
+    await expect(exit).toBeDisabled();
+    await expect(exit).toHaveStyle({ opacity: "1" });
     const link = canvas.getByRole("link", { name: "Unavailable link" });
     await expect(link).toHaveAttribute("aria-disabled", "true");
     await expect(link).toHaveAttribute("tabindex", "-1");
