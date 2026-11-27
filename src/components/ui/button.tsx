@@ -10,11 +10,11 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        default: "bg-primary text-primary-foreground hover:underline underline-offset-4",
         secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/75",
         outline: "border border-border bg-card text-foreground hover:bg-muted",
         ghost: "text-foreground hover:bg-muted",
-        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+        destructive: "bg-destructive text-destructive-foreground hover:underline underline-offset-4",
         "selection-chip": "border border-input bg-card text-foreground hover:bg-muted",
         "selection-chip-selected": "border border-primary bg-accent text-primary hover:bg-accent",
         "selection-chip-recommended": "border border-primary/60 bg-accent/50 text-primary hover:bg-accent",
@@ -47,7 +47,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const inactive = disabled || loading;
     const filled = !variant || variant === "default" || variant === "secondary" || variant === "destructive";
     const classes = cn(buttonVariants({ variant, size }), className,
-      inactive && (filled ? "bg-muted text-muted-foreground hover:bg-muted" : "text-muted-foreground opacity-60"));
+      inactive && (filled ? "bg-muted text-muted-foreground hover:bg-muted hover:no-underline" : "text-muted-foreground opacity-60 hover:no-underline"));
     // Radix Slot requires one element and doesn't confer native button
     // disabled semantics on an <a>. Give slotted actions the same pending
     // guard as native buttons, without emitting an invalid disabled attribute.
