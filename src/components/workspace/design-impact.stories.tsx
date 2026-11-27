@@ -21,10 +21,11 @@ function ImpactDashboard(){
  const [page,setPage]=useState(0);
  const [selected,setSelected]=useState<string|null>(null);
  const [routePage,setRoutePage]=useState(0);
+ const [storyPage,setStoryPage]=useState(0);
  const filtered=report.components.filter(row=>(scope==="all"||row.shared)&&(scope!=="gaps"||(row.routeCount>0&&row.storyFamilyCount===0))&&row.path.toLowerCase().includes(query.trim().toLowerCase()));
  const current=filtered.find(row=>row.path===selected)??filtered[0];
  const routes=current?.routePaths.slice(routePage*pageSize,(routePage+1)*pageSize)??[];
- const reset=()=>{setPage(0);setRoutePage(0);setSelected(null);};
+ const reset=()=>{setPage(0);setRoutePage(0);setStoryPage(0);setSelected(null);};
  return <WorkspaceShell eyebrow="Engineering and acceptance" title="Component change impact" subtitle="Static dependency inventory · V6.1" width="wide">
   <div className="mt-6 space-y-5">
    <DashboardPanel title="Source identity" description="This describes the source used to generate the catalog, not a publication or approval receipt.">
@@ -33,7 +34,7 @@ function ImpactDashboard(){
    </DashboardPanel>
    <WorkspaceNotice>Static imports indicate potential change impact, not proof of runtime use or individual story coverage.</WorkspaceNotice>
    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-    <StatCard label="Registered source routes" value={report.routeCount}/>
+    <StatCard label="Discovered source routes" value={report.routeCount}/>
     <StatCard label="Component modules" value={report.componentModuleCount}/>
     <StatCard label="Story families" value={report.storyFamilyCount}/>
     <StatCard label="Shared route dependencies without a story family" value={report.sharedWithoutStoryFamilies}/>
@@ -46,7 +47,7 @@ function ImpactDashboard(){
     <p role="status" className="my-3 text-sm text-muted-foreground">{filtered.length? "Showing "+(page*pageSize+1)+"–"+Math.min((page+1)*pageSize,filtered.length)+" of "+filtered.length+" modules":"No modules match this filter."}</p>
     <Table aria-label="Component dependency counts" scrollLabel="Scrollable component dependency counts">
      <TableHeader><TableRow><TableHead>Module</TableHead><TableHead>Routes</TableHead><TableHead>Story families</TableHead><TableHead>Inspect</TableHead></TableRow></TableHeader>
-     <TableBody>{filtered.slice(page*pageSize,(page+1)*pageSize).map(row=><TableRow key={row.path}><TableRowHead className="break-all">{row.path}</TableRowHead><TableCell>{row.routeCount}</TableCell><TableCell>{row.storyFamilyCount}</TableCell><TableCell><Button size="sm" variant={current?.path===row.path?"outline-selected":"outline"} aria-pressed={current?.path===row.path} aria-label={"Inspect "+row.path} onClick={()=>{setSelected(row.path);setRoutePage(0);}}>Inspect</Button></TableCell></TableRow>)}</TableBody>
+     <TableBody>{filtered.slice(page*pageSize,(page+1)*pageSize).map(row=><TableRow key={row.path}><TableRowHead className="break-all">{row.path}</TableRowHead><TableCell>{row.routeCount}</TableCell><TableCell>{row.storyFamilyCount}</TableCell><TableCell><Button size="sm" variant={current?.path===row.path?"outline-selected":"outline"} aria-pressed={current?.path===row.path} aria-label={"Inspect "+row.path} onClick={()=>{setSelected(row.path);setRoutePage(0);setStoryPage(0);}}>Inspect</Button></TableCell></TableRow>)}</TableBody>
     </Table>
     <div className="mt-3"><DirectoryWindowPagination label="Component inventory" pageIndex={page} hasMore={(page+1)*pageSize<filtered.length} onPageChange={setPage}/></div>
    </DashboardPanel>
@@ -63,7 +64,8 @@ function ImpactDashboard(){
     </Table>
     <div className="mt-3"><DirectoryWindowPagination label="Affected routes" pageIndex={routePage} hasMore={(routePage+1)*pageSize<current.routeCount} onPageChange={setRoutePage}/></div>
     <h3 className="mb-2 mt-5 font-semibold">Importing story families</h3>
-    {current.storyFamilies.length?<ul className="space-y-1 text-sm">{current.storyFamilies.map(path=><li key={path} className="break-all">{path}</li>)}</ul>:<p className="text-sm text-muted-foreground">No importing story family identified.</p>}
+    {current.storyFamilies.length?<ul className="space-y-1 text-sm">{current.storyFamilies.slice(storyPage*pageSize,(storyPage+1)*pageSize).map(path=><li key={path} className="break-all">{path}</li>)}</ul>:<p className="text-sm text-muted-foreground">No importing story family identified.</p>}
+    {current.storyFamilies.length>pageSize&&<div className="mt-3"><DirectoryWindowPagination label="Importing story families" pageIndex={storyPage} hasMore={(storyPage+1)*pageSize<current.storyFamilyCount} onPageChange={setStoryPage}/></div>}
    </DashboardPanel>}
    <DashboardPanel title="Inventory limitations"><ul className="space-y-2 text-sm text-muted-foreground">{report.limitations.map(item=><li key={item}>{item}</li>)}</ul></DashboardPanel>
   </div>
@@ -87,5 +89,6 @@ export const Inventory:Story={play:async({canvasElement})=>{
  await userEvent.type(query,"no-such-module-for-acceptance");
  await expect(inventory.getByRole("status")).toHaveTextContent("No modules match");
  await expect(canvas.queryByRole("region",{name:"Selected component impact"})).not.toBeInTheDocument();
+ await userEvent.clear(query);
 }};
 export const Dark:Story={globals:{theme:"dark"}};
