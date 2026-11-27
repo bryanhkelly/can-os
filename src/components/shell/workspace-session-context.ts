@@ -10,3 +10,10 @@ export function useActiveWorkspaceMember() {
   if (!session?.authenticated) return null;
   return session.grants.find(grant => grant.id === session.activeGrantId) ?? null;
 }
+
+/** Strict session access without importing the live session provider or RPC. */
+export function useWorkspaceSession() {
+  const value = useContext(WorkspaceSessionContext);
+  if (!value) throw new Error("Workspace session provider is required.");
+  return value;
+}
