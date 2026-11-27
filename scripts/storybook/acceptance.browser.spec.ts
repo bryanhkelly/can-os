@@ -127,3 +127,17 @@ test("curated template media is available without a live provider",async({reques
  expect(response.headers()["content-type"]).toContain("image/jpeg");
  expect((await response.body()).length).toBeGreaterThan(0);
 });
+
+// Actual CSS :hover must be exercised by a native browser pointer. Synthetic
+// Storybook user events need not activate CSS media/pseudo-class behavior.
+test("filled actions preserve semantic color pairs on native pointer hover",async({page},info)=>{
+ const failures=await openStory(page,registeredStoryId("src/components/ui/button.stories.tsx#FilledHoverContrast"),String(info.project.metadata.theme));
+ for(const name of ["Continue","Delete draft"]){
+  const button=page.getByRole("button",{name,exact:true});
+  await page.mouse.move(0,0);
+  const before=await button.evaluate(el=>{const s=getComputedStyle(el);return {background:s.backgroundColor,color:s.color};});
+  await button.hover();
+  await expect.poll(()=>button.evaluate(el=>{const s=getComputedStyle(el);return {background:s.backgroundColor,color:s.color,decoration:s.textDecorationLine};})).toEqual({...before,decoration:"underline"});
+ }
+ await assertCanvas(page,failures);
+});
