@@ -402,16 +402,16 @@ export async function setGrantActiveService(context:Actor,request:Request,raw:un
           if(!site)throw new AuthorizationError("current grant Site ownership");
         }
       }
-      if(grant.active===data.active)return {grantId:grant.id,active:data.active};
       const now=new Date();
+      // Clean up historic stale bearers on both deactivation and restoration.
+      if(!data.active||!grant.active)await tx.update(accessSessions).set({revokedAt:now,updatedAt:now})
+        .where(and(sql`${accessSessions.revokedAt} IS NULL`,or(eq(accessSessions.activeGrantId,grant.id),eq(accessSessions.delegatedGrantId,grant.id))));
+      if(grant.active===data.active)return {grantId:grant.id,active:data.active};
       const [updated] = await tx.update(accountPersonGrants)
         .set({ active: data.active, updatedAt: now })
         .where(eq(accountPersonGrants.id, grant.id))
         .returning({ id: accountPersonGrants.id });
       if (!updated) throw new Error("Grant could not be updated");
-      // Never resurrect a previously authenticated bearer by restoring its grant.
-      if(!data.active)await tx.update(accessSessions).set({revokedAt:now,updatedAt:now})
-        .where(and(sql`${accessSessions.revokedAt} IS NULL`,or(eq(accessSessions.activeGrantId,grant.id),eq(accessSessions.delegatedGrantId,grant.id))));
       await recordAudit(tx, actor, {
         action: "admin.grant.set_active", resourceType: "account_person_grant", resourceId: grant.id,
         before: { active: grant.active }, after: { active: data.active },
