@@ -338,3 +338,21 @@ test('program launch commands do not collapse evidence submission, review and ac
  assert.equal(bodies.submit.safeParse({journeyRequirementId:id,statement:'Reviewed documentation',decision:'accepted'}).success,false);
  assert.equal(bodies.activate.safeParse({programId:id,overrideReadiness:true}).success,false);
 });
+
+test('Site V6.1 planning separates existing Programs from private intent and requires a revision',async()=>{
+ await withServer('0',async(url,document)=>{
+  const id='00000000-0000-4000-8000-000000000001';
+  for(const [method,route] of [["GET","/api/v1/sites/{siteId}/information"],["POST","/api/v1/sites/{siteId}/information"],["GET","/api/v1/sites/{siteId}/programs"],["GET","/api/v1/sites/{siteId}/programs-audiences"],["POST","/api/v1/sites/{siteId}/programs-audiences"]]){
+   assert.ok(document.paths[route][method.toLowerCase()].security);
+   const response=await fetch(url+route.replace('{siteId}',id),method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);
+  }
+ });
+ const {informationBody,audiencesBody}=require('../dist/site-planning.contracts');
+ const expectedRevision='2026-11-28T00:00:00Z';
+ assert.equal(informationBody.safeParse({expectedRevision,section:'environment',environment:{delivery:'digital',physicalSpaceArrangement:''}}).success,true);
+ assert.equal(informationBody.safeParse({expectedRevision,siteId:'forged',section:'environment',environment:{delivery:'digital',physicalSpaceArrangement:''}}).success,false);
+ const intent={interestIds:[],timingIds:[],audienceIds:[],startingFocus:null,customExperiences:['one','two','three','four','five','six']};
+ assert.equal(audiencesBody.safeParse({expectedRevision,intent}).success,false);
+ assert.equal(audiencesBody.safeParse({intent:{...intent,customExperiences:[]}}).success,false);
+});

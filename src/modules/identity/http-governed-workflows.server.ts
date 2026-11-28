@@ -34,6 +34,8 @@ import {getMyNativeTeachingClassesService,getNativeTeacherTodayService} from "@/
 import {getNativeClassTeacherHomeworkService,getNativeClassTeacherMissingWorkService,getNativeClassTeacherOpenFollowUpsService,createNativeClassMissingWorkFollowUpService,getNativeClassTeacherHomeworkHistoryService,returnNativeClassPracticeFeedbackService,getNativeClassTeacherAssessmentsService,getNativeClassTeacherHistoricalWorkService} from "@/modules/classes/native-class-teacher-homework.server";
 import {getMyNativeGuardianLearnersService,requestNativeGuardianClassApprovalService,getMyNativeGuardianClassApprovalsService,acceptNativeGuardianClassApprovalService,withdrawMyGuardianNativeClassEnrollmentService,getMyNativeGuardianClassEnrollmentsService,getGuardianCommunitySummaryService} from "@/modules/classes/native-class-guardian-enrollment.server";
 import {startLaunchService,completeLaunchRequirementService,submitLaunchEvidenceService,reviewLaunchEvidenceService,activateLaunchService,scheduleLaunchOrientationService} from "@/modules/programs/launch-commands.server";
+import {readSiteInformationV61Service,saveSiteInformationV61Service} from "@/modules/programs/site-information-v61.server";
+import {readExistingSiteProgramsV61Service,readSiteProgramsAudiencesV61Service,saveSiteProgramsAudiencesV61Service} from "@/modules/programs/site-programs-audiences-v61.server";
 export type WorkflowMode="planning"|"canonical"|"can"|"learner";
 /** Existing independent native reviewer credentials remain distinct from CAN.
  * No fallback, new role, token or grant is manufactured by this adapter. */
@@ -42,6 +44,11 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
  const context=await (mode==="planning"?getBlueprintPlanningContext(request):mode==="canonical"?getCanonicalCommandContext(request):mode==="learner"?getInstructionalLearnerContext(request):getIdentityContext(request));
  if(!context.actorPersonId)throw new AuthorizationError("verified Person");
  return {
+  readSiteInformationV61:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Site planning context");return readSiteInformationV61Service(request,raw);},
+  saveSiteInformationV61:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Site planning context");return saveSiteInformationV61Service(request,raw);},
+  readExistingSiteProgramsV61:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Site planning context");return readExistingSiteProgramsV61Service(request,raw);},
+  readSiteProgramsAudiencesV61:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Site planning context");return readSiteProgramsAudiencesV61Service(request,raw);},
+  saveSiteProgramsAudiencesV61:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Site planning context");return saveSiteProgramsAudiencesV61Service(request,raw);},
   startLaunch:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("launch command context");return startLaunchService(request,raw);},
   completeLaunchRequirement:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("launch command context");return completeLaunchRequirementService(request,raw);},
   submitLaunchEvidence:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("launch command context");return submitLaunchEvidenceService(request,raw);},
