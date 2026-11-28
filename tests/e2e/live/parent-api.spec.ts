@@ -59,7 +59,10 @@ test("ordinary parent sessions isolate academic and family API reads ("+fixture.
    }
    expect((await qaSession(context)).activeGrantId).toBe(parent.grantId);
    const page=await pilotRpcPage(context);pages.set(parent.email,page);
-   const home=children.parse(await rpc(page,"familyHome","getFamilyHome"));
+   const homeRaw=await rpc(page,"familyHome","getFamilyHome");
+   const home=children.parse(homeRaw);
+   const community=z.object({community:z.object({available:z.literal(true),learners:native})}).parse(homeRaw);
+   expect(community.community.learners.map(c=>c.learnerPersonId).sort()).toEqual([...parent.nativeChildren].sort());
    expect(home.children.map(c=>c.studentPersonId).sort()).toEqual([...parent.schoolChildren].sort());
    const picker=students.parse(await rpc(page,"familyAcademics","getGuardianStudents"));
    expect(picker.students.map(c=>c.studentPersonId).sort()).toEqual([...parent.schoolChildren].sort());

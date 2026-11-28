@@ -384,3 +384,24 @@ export const getMyNativeGuardianClassEnrollments=createServerFn({method:"GET"})
    return results;
   });
  });
+
+/** Family Home reuses the same independently authorized community read model.
+ * No academic, health, or school attendance permission is inferred from
+ * enrollment consent. A failed source is not an empty family. */
+export const getGuardianCommunitySummary=createServerFn({method:"GET"})
+ .handler(async()=>{
+  guard();
+  const [learners,requests,enrollments]=await Promise.all([
+   getMyNativeGuardianLearners(),getMyNativeGuardianClassApprovals(),
+   getMyNativeGuardianClassEnrollments(),
+  ]);
+  const authorized=new Set(learners.map(row=>row.learnerPersonId));
+  return {
+   learners,
+   approvals:requests.filter(row=>authorized.has(row.learnerPersonId)).map(row=>({
+    approvalRequestId:row.approvalRequestId,learnerPersonId:row.learnerPersonId,
+    classTitle:row.classTitle,state:row.state,acceptedEnrollmentId:row.acceptedEnrollmentId,
+   })),
+   enrollments:enrollments.filter(row=>authorized.has(row.learnerPersonId)),
+  };
+ });

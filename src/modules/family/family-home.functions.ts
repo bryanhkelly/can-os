@@ -13,11 +13,11 @@ import { guardianAssignmentAction, latestGuardianAttempts, guardianAssignmentSum
  * Every row is derived from the verified guardian session plus active
  * GuardianRelationship records; the browser never supplies person IDs.
  */
-async function guardianActor() {
+async function guardianActor(requireSchoolScope=true) {
  const context = await getCommandContext(getRequest());
  setResponseHeader("Cache-Control","private, no-store");
  assertCapability(context, "student:related-read");
- if (context.role !== "guardian" || !context.actorPersonId || !context.scope.siteIds?.length) {
+ if (context.role !== "guardian" || !context.actorPersonId || (requireSchoolScope&&!context.scope.siteIds?.length)) {
   throw new AuthorizationError("guardian family membership");
  }
  return context;
@@ -93,10 +93,10 @@ async function activeSectionIds(s: Schema, studentProfileId: string, siteIds: st
 }
 
 export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () => {
- const context = await guardianActor();
- const siteIds = context.scope.siteIds!;
+ const context = await guardianActor(false);
+ const siteIds = context.scope.siteIds??[];
  const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
- const students = await guardianStudents(s, context.actorPersonId!, siteIds,context.scope.programIds??[]);
+ const students = siteIds.length?await guardianStudents(s, context.actorPersonId!, siteIds,context.scope.programIds??[]):[];
  const now = new Date();
  // Mirror the attendance workspace's 45-day review window.
  const absenceWindow = new Date(now.getTime() - 45 * 24 * 60 * 60 * 1000);
@@ -213,7 +213,10 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
     "needs_attention" as const : sectionIds.length === 0 ? "awaiting_courses" as const : "on_track" as const,
   };
  }));
- return { children };
+ const {getGuardianCommunitySummary}=await import("@/modules/classes/native-class-guardian-enrollment.functions");
+ const community=await getGuardianCommunitySummary().then(data=>({available:true as const,...data}),
+  ()=>({available:false as const,learners:[],approvals:[],enrollments:[]}));
+ return { children,community };
 });
 
 /** Needs You aggregates guardian-owned work across every child in the household. */
