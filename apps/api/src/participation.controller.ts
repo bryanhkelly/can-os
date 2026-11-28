@@ -7,6 +7,7 @@ import {validated} from './learning.contracts';
 import {problemOpenApiSchema} from './contracts';
 import {docs,registrationReceipt,enrollmentResult,readyReceipt,emptyCommand,readyDoc,emptyDoc} from './participation.contracts';
 import {waitlistJoinInput,waitlistCancelInput,withdrawRegistrationInput,waitlistQuery,waitlistJoinResult,waitlistCancelResult,withdrawRegistrationResult,waitlistPageResult,participationDocs as p} from './participation.contracts';
+import * as admission from './participation.contracts';
 function Command(mode:WorkflowMode){
  return applyDecorators(GovernedWorkflowOperation(mode),HttpCode(200),ApiHeader({name:'Origin',required:true}),ApiCookieAuth('session'),...(mode==='canonical'?[ApiCookieAuth('nativeSession')]:[]),
  ...[400,401,403,409,415,500,503].map(status=>ApiResponse({status,content:{'application/problem+json':{schema:problemOpenApiSchema}}})));
@@ -104,5 +105,76 @@ export class ParticipationController{
  withdrawRegistration(@Req() req:FastifyRequest,@Body() body:unknown){
   const input=validated(withdrawRegistrationInput,body),workflow=verifiedWorkflow(req);
   return this.identity.runWorkflow(async()=>withdrawRegistrationResult.parse(await workflow.withdrawMyNoncreditRegistration(input)));
+ }
+
+ @Get('admission-offer-options')
+ @GovernedWorkflowOperation('can','GET')
+ @ApiCookieAuth('session')
+ @ApiOperation({operationId:'getAdmissionOfferOptions',summary:'Registrar reads school years for an exact scoped application'})
+ @ApiQuery({name:'applicationId',required:false,type:String,format:'uuid'})
+ @ApiQuery({name:'siteId',required:false,type:String,format:'uuid'})
+ @ApiQuery({name:'programId',required:false,type:String,format:'uuid'})
+ @ApiOkResponse({schema:admission.admissionDocs.options})
+ @ApiResponse({status:400,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:401,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:403,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:503,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ getAdmissionOfferOptions(@Req() req:FastifyRequest,@Query() query:unknown){
+  const input=validated(admission.admissionOptionsInput,query),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.admissionOptionsResult.parse(await workflow.getAdmissionOfferOptions(input)));
+ }
+ @Post('admission-offers')
+ @Command('can')
+ @ApiOperation({operationId:'issueAdmissionOffer',summary:'Issue an offer from the scoped application; no enrollment activation'})
+ @ApiBody({schema:admission.admissionDocs.issue})
+ @ApiOkResponse({schema:admission.admissionDocs.offerReceipt})
+ issueAdmissionOffer(@Req() req:FastifyRequest,@Body() body:unknown){
+  const input=validated(admission.issueOfferInput,body),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.offerReceipt.parse(await workflow.issueAdmissionOffer(input)));
+ }
+ @Post('admission-offer-responses')
+ @Command('can')
+ @ApiOperation({operationId:'respondToAdmissionOffer',summary:'Verified guardian accepts or declines the exact offer; does not activate enrollment'})
+ @ApiBody({schema:admission.admissionDocs.respond})
+ @ApiOkResponse({schema:admission.admissionDocs.offerReceipt})
+ respondToAdmissionOffer(@Req() req:FastifyRequest,@Body() body:unknown){
+  const input=validated(admission.respondOfferInput,body),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.offerReceipt.parse(await workflow.respondToAdmissionOffer(input)));
+ }
+ @Post('admission-enrollment-activations')
+ @Command('can')
+ @ApiOperation({operationId:'activateOfferedEnrollment',summary:'Registrar activates a previously accepted offer after existing readiness checks'})
+ @ApiBody({schema:admission.admissionDocs.activate})
+ @ApiOkResponse({schema:admission.admissionDocs.activationReceipt})
+ activateOfferedEnrollment(@Req() req:FastifyRequest,@Body() body:unknown){
+  const input=validated(admission.activateOfferInput,body),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.activationReceipt.parse(await workflow.activateOfferedEnrollment(input)));
+ }
+ @Post('admission-offer-withdrawals')
+ @Command('can')
+ @ApiOperation({operationId:'withdrawIssuedAdmissionOffer',summary:'Registrar withdraws an unaccepted issued offer with audited reason'})
+ @ApiBody({schema:admission.admissionDocs.withdraw})
+ @ApiOkResponse({schema:admission.admissionDocs.offerReceipt})
+ withdrawIssuedAdmissionOffer(@Req() req:FastifyRequest,@Body() body:unknown){
+  const input=validated(admission.withdrawOfferInput,body),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.offerReceipt.parse(await workflow.withdrawIssuedAdmissionOffer(input)));
+ }
+ @Post('class-enrollment-withdrawals')
+ @Command('canonical')
+ @ApiOperation({operationId:'withdrawMyNativeClassEnrollment',summary:'Adult learner withdraws only their own eligible Class placement'})
+ @ApiBody({schema:admission.admissionDocs.classWithdraw})
+ @ApiOkResponse({schema:admission.admissionDocs.classExitReceipt})
+ withdrawMyNativeClassEnrollment(@Req() req:FastifyRequest,@Body() body:unknown){
+  const input=validated(admission.classWithdrawInput,body),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.classExitReceipt.parse(await workflow.withdrawMyNativeClassEnrollment(input)));
+ }
+ @Post('class-enrollment-cancellations')
+ @Command('canonical')
+ @ApiOperation({operationId:'cancelNativeClassEnrollment',summary:'Exact-Site manager cancels an eligible Class placement with existing policy'})
+ @ApiBody({schema:admission.admissionDocs.classCancel})
+ @ApiOkResponse({schema:admission.admissionDocs.classExitReceipt})
+ cancelNativeClassEnrollment(@Req() req:FastifyRequest,@Body() body:unknown){
+  const input=validated(admission.classCancelInput,body),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.classExitReceipt.parse(await workflow.cancelNativeClassEnrollment(input)));
  }
 }
