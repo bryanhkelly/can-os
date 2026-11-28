@@ -44,3 +44,25 @@ export const emptyDoc={type:'object' as const,additionalProperties:false};
 export const submissionBodyDoc={type:'object' as const,additionalProperties:false,required:['responseText'],properties:{responseText:{type:'string' as const,minLength:5,maxLength:20000}}};
 export const completionDoc={type:'object' as const,additionalProperties:false,required:['recorded','alreadyCompleted'],properties:{recorded:{type:'boolean' as const,enum:[true]},alreadyCompleted:{type:'boolean' as const}}};
 export const submissionResultDoc={type:'object' as const,additionalProperties:false,required:['submissionId','alreadySubmitted'],properties:{submissionId:id,alreadySubmitted:{type:'boolean' as const}}};
+
+const iso=z.string().datetime();
+const video=z.object({url:z.string(),title:z.string(),reviewStatus:z.string()}).strict();
+const lesson=z.object({unitId:uuid,unitTitle:z.string(),unitOrder:z.number().int(),lessonId:uuid,lessonTitle:z.string(),lessonOrder:z.number().int(),progressStatus:z.string().nullable(),observedAt:iso.nullable(),lessonBody:z.string(),videoResources:z.array(video).max(10)}).strict();
+const outcome=z.object({id:uuid,kind:z.string(),result:z.string(),recordedAt:iso}).strict();
+const award=z.object({kind:z.string(),issuedAt:iso,revokedAt:iso.nullable()}).strict();
+export const workspaceSchema=z.object({
+ classId:uuid,classEnrollmentId:uuid,courseAttemptId:uuid,classTitle:z.string(),courseVersionId:uuid,
+ enrollmentStatus:z.string(),creditMode:z.string(),lessons:z.array(lesson).max(500),outcomes:z.array(outcome).max(100),awards:z.array(award).max(100),
+}).strict();
+const signedInteger={type:'integer' as const};
+const requiredDate={type:'string' as const,format:'date-time'};
+const nullableText={type:'string' as const,nullable:true};
+const obj=<T extends Record<string,unknown>>(properties:T)=>({type:'object' as const,additionalProperties:false,required:Object.keys(properties),properties});
+const videoDoc=obj({url:title,title,reviewStatus:title});
+const lessonDoc=obj({unitId:id,unitTitle:title,unitOrder:signedInteger,lessonId:id,lessonTitle:title,lessonOrder:signedInteger,progressStatus:nullableText,observedAt:date,lessonBody:title,videoResources:{type:'array' as const,maxItems:10,items:videoDoc}});
+const outcomeDoc=obj({id,kind:title,result:title,recordedAt:requiredDate});
+const awardDoc=obj({kind:title,issuedAt:requiredDate,revokedAt:date});
+export const workspaceDoc=obj({
+ classId:id,classEnrollmentId:id,courseAttemptId:id,classTitle:title,courseVersionId:id,enrollmentStatus:title,creditMode:title,
+ lessons:{type:'array' as const,maxItems:500,items:lessonDoc},outcomes:{type:'array' as const,maxItems:100,items:outcomeDoc},awards:{type:'array' as const,maxItems:100,items:awardDoc},
+});
