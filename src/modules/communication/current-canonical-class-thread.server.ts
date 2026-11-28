@@ -1,9 +1,10 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, gt, isNull, lte, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   canonicalClasses,canonicalClassEnrollments,canonicalClassStaffAssignments,
   learnerCourseAttempts,
 } from "@/db/canonical-v301";
+import { currentClassAuthority } from "@/modules/classes/native-class-authority.server";
 import { AuthorizationError } from "@/domain/command-context";
 import type { getCommandContext } from "@/modules/identity/command-context.server";
 
@@ -34,6 +35,7 @@ export async function assertCurrentCanonicalClassThread(
      !actor.scope.organizationIds?.includes(cls.operatingOrganizationId))
     throw new AuthorizationError("current Class Site and organization");
   if(actor.role==="student"){
+    if(!actor.capabilities.has("student:read"))throw new AuthorizationError("current learner discussion capability");
     const [member]=await db.select({id:canonicalClassEnrollments.id})
       .from(canonicalClassEnrollments)
       .innerJoin(learnerCourseAttempts,
@@ -47,14 +49,19 @@ export async function assertCurrentCanonicalClassThread(
     return;
   }
   if(actor.role==="teacher"){
+    if(!actor.capabilities.has("teacher:read"))throw new AuthorizationError("current teacher discussion capability");
+    const now=new Date();
     const [staff]=await db.select({id:canonicalClassStaffAssignments.id})
       .from(canonicalClassStaffAssignments)
       .where(and(eq(canonicalClassStaffAssignments.classId,cls.id),
         eq(canonicalClassStaffAssignments.personId,actor.actorPersonId),
         eq(canonicalClassStaffAssignments.roleCode,"teacher"),
-        eq(canonicalClassStaffAssignments.state,"approved")))
+        eq(canonicalClassStaffAssignments.state,"approved"),
+        lte(canonicalClassStaffAssignments.beginsAt,now),
+        or(isNull(canonicalClassStaffAssignments.endsAt),gt(canonicalClassStaffAssignments.endsAt,now))))
       .limit(1);
     if(!staff)throw new AuthorizationError("current assigned Class teacher");
+    await db.transaction(tx=>currentClassAuthority(tx,cls.id,now));
     return;
   }
   throw new AuthorizationError("Class discussion learner or teacher");
