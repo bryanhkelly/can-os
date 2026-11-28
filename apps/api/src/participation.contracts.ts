@@ -16,3 +16,26 @@ export const readyReceipt=z.object({cookie:z.string().regex(/^__Host-can_os_v3_s
 export const emptyCommand=z.object({}).strict();
 export const readyDoc=obj({ready:yes});
 export const emptyDoc=obj({});
+
+const date=z.string().datetime({offset:true});
+const dateDoc={...str,format:'date-time'};
+const nullableDate={...dateDoc,nullable:true};
+export const waitlistJoinInput=z.object({releaseId:uuid,consentVersion:z.string().min(3).max(80),consentSha256:z.string().regex(/^[a-f0-9]{64}$/),acceptedConsent:z.literal(true),adultConfirmed:z.literal(true)}).strict();
+export const waitlistCancelInput=z.object({releaseId:uuid}).strict();
+export const withdrawRegistrationInput=z.object({registrationId:uuid,confirm:z.literal(true)}).strict();
+export const waitlistQuery=z.object({joinedAt:date.optional(),waitlistId:uuid.optional(),releaseId:uuid.optional()}).strict().refine(q=>(q.joinedAt===undefined)===(q.waitlistId===undefined));
+export const waitlistJoinResult=z.object({status:z.enum(['waiting','invited']),alreadyQueued:z.boolean()}).strict();
+export const waitlistCancelResult=z.object({cancelled:z.literal(true),duplicate:z.boolean()}).strict();
+export const withdrawRegistrationResult=z.object({withdrawn:z.literal(true),alreadyWithdrawn:z.boolean()}).strict();
+const cursor=z.object({joinedAt:date,waitlistId:uuid}).strict();
+const waitlistItem=z.object({releaseId:uuid,title:z.string(),emailDeliveryStatus:z.string().nullable(),status:z.enum(['waiting','invited','expired']),invitationActive:z.boolean(),inviteExpiresAt:date.nullable(),joinedAt:date}).strict();
+export const waitlistPageResult=z.object({items:z.array(waitlistItem).max(50),nextCursor:cursor.nullable()}).strict();
+export const participationDocs={
+ join:obj({releaseId:id,consentVersion:{...str,minLength:3,maxLength:80},consentSha256:{...str,pattern:'^[a-f0-9]{64}$'},acceptedConsent:yes,adultConfirmed:yes}),
+ cancel:obj({releaseId:id}),
+ withdraw:obj({registrationId:id,confirm:yes}),
+ joinResult:obj({status:{...str,enum:['waiting','invited']},alreadyQueued:bool}),
+ cancelResult:obj({cancelled:yes,duplicate:bool}),
+ withdrawResult:obj({withdrawn:yes,alreadyWithdrawn:bool}),
+ page:obj({items:{type:'array' as const,maxItems:50,items:obj({releaseId:id,title:str,emailDeliveryStatus:{...str,nullable:true},status:{...str,enum:['waiting','invited','expired']},invitationActive:bool,inviteExpiresAt:nullableDate,joinedAt:dateDoc})},nextCursor:{...obj({joinedAt:dateDoc,waitlistId:id}),nullable:true}}),
+};
