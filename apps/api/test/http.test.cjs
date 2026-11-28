@@ -728,3 +728,36 @@ test('Class participation exposes distinct protected approvals, invitations and 
  assert.equal(c.assignAdultInput.safeParse({classId:id,learnerPersonId:id,creditMode:'audit'}).success,true);
  assert.equal(c.classApprovalQueueResult.safeParse([{approvalRequestId:id,learnerPersonId:id,applicantPersonId:id,state:'approved',requestedAt:'2026-11-28T00:00:00Z',expiresAt:'2026-11-29T00:00:00Z'}]).success,false);
 });
+
+test('admissions intake and guardian onboarding routes fail closed and expose strict contracts',async()=>{
+ const id='00000000-0000-4000-8000-000000000001';
+ await withServer('0',async(url,document)=>{
+  for(const [method,path] of [['GET','/api/v1/admission-intake-programs'],['GET','/api/v1/admission-existing-students'],['GET','/api/v1/admission-stage-counts'],['GET','/api/v1/admission-household-search'],['GET','/api/v1/admission-applications'],['POST','/api/v1/admission-inquiries'],['POST','/api/v1/admission-stage-transitions'],['POST','/api/v1/admission-guardian-verifications'],['POST','/api/v1/admission-guardian-accounts'],['POST','/api/v1/admission-guardian-invitations']]){
+   const op=document.paths[path][method.toLowerCase()];
+   assert.ok(op.security);assert.ok(op.responses['403']);
+   if(method==='POST')assert.ok(op.requestBody);
+   const res=await fetch(url+path,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(res.status,method==='POST'?503:401);
+  }
+ });
+ const c=require('../dist/participation.contracts');
+ const common={requestId:id,programId:id};
+ const existingStudent={studentProfileId:id,guardianPersonId:id};
+ const newFamily={studentFirstName:'Student',studentLastName:'Example',guardianFirstName:'Guardian',guardianLastName:'Example',guardianEmail:'guardian@example.org'};
+ assert.equal(c.admissionsInquiryInput.safeParse({...common,...newFamily}).success,true);
+ assert.equal(c.admissionsInquiryInput.safeParse({...common,existingStudent:{...existingStudent,householdId:id}}).success,true);
+ assert.equal(c.admissionsInquiryInput.safeParse({...common,existingStudent:{...existingStudent,createHousehold:true}}).success,true);
+ assert.equal(c.admissionsInquiryInput.safeParse({...common,existingStudent:{...existingStudent,householdId:id,createHousehold:true}}).success,false);
+ assert.equal(c.admissionsInquiryInput.safeParse({...common,existingStudent,...newFamily}).success,false);
+ assert.equal(c.admissionsInquiryInput.safeParse({...common,...newFamily,guardianVerified:true}).success,false);
+ assert.equal(c.admissionsTransitionInput.safeParse({applicationId:id,decision:'accept'}).success,true);
+ assert.equal(c.admissionsTransitionInput.safeParse({applicationId:id,decision:'activate_enrollment'}).success,false);
+ assert.equal(c.guardianVerificationInput.safeParse({applicationId:id,method:'in_person_id',evidenceNote:'Independently reviewed identity'}).success,true);
+ assert.equal(c.guardianVerificationInput.safeParse({applicationId:id,method:'in_person_id',evidenceNote:'short'}).success,false);
+ assert.equal(c.admissionsApplicationInput.safeParse({applicationId:id,guardianPersonId:id}).success,false);
+ assert.equal(c.admissionsIntakeQuery.safeParse({page:'2',pageSize:'100'}).success,true);
+ assert.equal(c.admissionsIntakeQuery.safeParse({pageSize:'101'}).success,false);
+ assert.equal(c.inquiryReceipt.safeParse({applicationId:id,enrollmentId:id}).success,false);
+ assert.equal(c.guardianProvisionReceipt.safeParse({created:true,email:'guardian@example.org',accountId:id,privateCredential:false}).success,true);
+ assert.equal(c.guardianProvisionReceipt.safeParse({created:true,email:'guardian@example.org',accountId:id,privateCredential:false,sessionToken:'secret'}).success,false);
+});
