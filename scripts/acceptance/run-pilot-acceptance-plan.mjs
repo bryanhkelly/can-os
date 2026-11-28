@@ -6,6 +6,7 @@ import {neon} from "@neondatabase/serverless";
 import {z} from "zod";
 import {join} from "node:path";
 import {acceptanceFingerprint,openPilotLedger} from "./pilot-run-ledger.mjs";
+import {preflightPilot2} from "./pilot-acceptance-preflight.mjs";
 
 const uuid=z.string().uuid();
 const day=z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -34,7 +35,7 @@ export function parsePlan(raw){
   const meetings=sites.flatMap(s=>s.meetings);
   for(const key of ["requestId","agendaRequestId"])if(new Set(meetings.map(m=>m[key])).size!==8)throw Error("Eight distinct meeting commands required");
   for(const s of sites){
-   if(s.manager.organizationId!==s.host.organizationId||!s.learners.some(l=>l.paired)||!s.learners.some(l=>!l.paired))throw Error("Exact provider manager, paired and no-device participants required");
+   if(s.manager.organizationId!==s.host.organizationId||!s.learners.some(l=>l.paired)||!s.learners.some(l=>!l.paired)||!s.learners.some(l=>l.present??l.paired))throw Error("Exact provider manager, paired and no-device participants required");
    const sorted=[...s.meetings].sort((a,b)=>Date.parse(a.startsAt)-Date.parse(b.startsAt));
    for(const [i,m] of sorted.entries()){
     const start=Date.parse(m.startsAt),end=Date.parse(m.endsAt);
@@ -111,8 +112,9 @@ export async function runPilotAcceptance({mode,env,root,modes}){
    for(const {c,i,m,j} of tasks){
     const name="Pilot 2 Site "+(i+1)+" meeting "+(j+1);
     if(ledger.passed(name)){summary.stages.push({name,status:"passed",resumed:true});continue;}
-    const wait=Math.max(0,Date.parse(m.startsAt)-Date.now());
-    if(wait>0){console.log("Waiting for ordinary scheduled meeting window: "+m.startsAt);await delay(wait);}
+    const start=Date.parse(m.startsAt);
+    if(start>Date.now())console.log("Waiting for ordinary scheduled meeting window: "+m.startsAt);
+    while(start>Date.now())await delay(Math.min(start-Date.now(),60_000));
     if(Date.now()>=Date.parse(m.endsAt))throw Error("Missed authorized meeting window; no clock override");
     governed(name,{stage:"deliver",host:c.s.host,classId:c.s.classId,siteId:c.s.siteId,classSessionId:c.sessionIds[j],learners:c.learners,foreign:cohorts[1-i].learners[0],instruction:{lessonId:m.lessonId,assetVersionId:m.assetVersionId,prompt:m.prompt,choices:m.choices}});
    }
