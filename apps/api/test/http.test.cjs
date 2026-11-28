@@ -628,3 +628,18 @@ test('survey contracts distinguish canonical publisher, independent reviewer and
  assert.equal(c.results.response.safeParse({responseId:id,alreadySubmitted:false,answers:[]}).success,false);
  assert.equal(c.results.publication.safeParse({surveyVersionId:id,lifecycle:'draft'}).success,false);
 });
+
+test('class and classroom surveys expose only governed campaign metadata',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const [route,method] of [["/api/v1/class-survey-campaign-options","GET"],["/api/v1/class-survey-campaign-links","POST"],["/api/v1/classroom-survey-options","GET"],["/api/v1/classroom-survey-links","POST"],["/api/v1/classroom-learner-surveys","GET"]]){
+   assert.ok(document.paths[route][method.toLowerCase()].security);
+   const response=await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);
+   assert.equal(response.headers.get('referrer-policy'),'no-referrer');
+  }
+ });
+ const c=require('../dist/surveys.contracts');
+ const id='00000000-0000-4000-8000-000000000001';
+ assert.equal(c.roomLearnerQuery.safeParse({facilitatedSessionId:id,courseAttemptId:id,personId:id}).success,false);
+ assert.equal(c.classRoomResults.roomLearner.safeParse({surveys:[],notice:'',answers:[]}).success,false);
+});

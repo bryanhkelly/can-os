@@ -95,4 +95,55 @@ export class SurveysController{
   const workflow=verifiedWorkflow(req),input=body;
   return c.results.response.parse(await this.identity.runWorkflow(()=>workflow.submitCourseSurvey(input)));
  }
+
+ @Get('class-survey-campaign-options')
+ @SurveyOperation('canonical','GET')
+ @ApiOperation({operationId:'getNativeClassSurveyCampaignOptions',summary:'get Native Class Survey Campaign Options; verified canonical authority'})
+ @ApiQuery({name:'classId',schema:{type:'string',format:'uuid'},required:true})
+ @ApiOkResponse({schema:c.classRoomDocs.classOptions})
+ async getNativeClassSurveyCampaignOptions(@Req() req:FastifyRequest,@Query() query:unknown){
+  const workflow=verifiedWorkflow(req),input=validated(c.classQuery,query);
+  return c.classRoomResults.classOptions.parse(await this.identity.runWorkflow(()=>workflow.getNativeClassSurveyCampaignOptions(input)));
+ }
+
+ @Post('class-survey-campaign-links')
+ @SurveyOperation('canonical','POST')
+ @ApiOperation({operationId:'linkNativeClassSurveyCampaign',summary:'link Native Class Survey Campaign; verified canonical authority'})
+ @ApiBody({schema:c.classRoomInputs.classLink})
+ @ApiOkResponse({schema:c.classRoomDocs.classLink})
+ async linkNativeClassSurveyCampaign(@Req() req:FastifyRequest,@Body() body:unknown){
+  const workflow=verifiedWorkflow(req),input=body;
+  return c.classRoomResults.classLink.parse(await this.identity.runWorkflow(()=>workflow.linkNativeClassSurveyCampaign(input)));
+ }
+
+ @Get('classroom-survey-options')
+ @SurveyOperation('canonical','GET')
+ @ApiOperation({operationId:'getClassroomSurveyOptions',summary:'get Classroom Survey Options; verified canonical authority'})
+ @ApiQuery({name:'facilitatedSessionId',schema:{type:'string',format:'uuid'},required:true})
+ @ApiOkResponse({schema:c.classRoomDocs.roomOptions})
+ async getClassroomSurveyOptions(@Req() req:FastifyRequest,@Query() query:unknown){
+  const workflow=verifiedWorkflow(req),input=validated(c.roomQuery,query);
+  return c.classRoomResults.roomOptions.parse(await this.identity.runWorkflow(()=>workflow.getClassroomSurveyOptions(input)));
+ }
+
+ @Post('classroom-survey-links')
+ @SurveyOperation('canonical','POST')
+ @ApiOperation({operationId:'attachClassroomSurvey',summary:'attach Classroom Survey; verified canonical authority'})
+ @ApiBody({schema:c.classRoomInputs.roomLink})
+ @ApiOkResponse({schema:c.classRoomDocs.roomLink})
+ async attachClassroomSurvey(@Req() req:FastifyRequest,@Body() body:unknown){
+  const workflow=verifiedWorkflow(req),input=body;
+  return c.classRoomResults.roomLink.parse(await this.identity.runWorkflow(()=>workflow.attachClassroomSurvey(input)));
+ }
+
+ @Get('classroom-learner-surveys')
+ @SurveyOperation('learner','GET')
+ @ApiOperation({operationId:'getClassroomLearnerSurveys',summary:'get Classroom Learner Surveys; verified learner authority'})
+ @ApiQuery({name:'facilitatedSessionId',schema:{type:'string',format:'uuid'},required:true})
+ @ApiQuery({name:'courseAttemptId',schema:{type:'string',format:'uuid'},required:true})
+ @ApiOkResponse({schema:c.classRoomDocs.roomLearner})
+ async getClassroomLearnerSurveys(@Req() req:FastifyRequest,@Query() query:unknown){
+  const workflow=verifiedWorkflow(req),input=validated(c.roomLearnerQuery,query);
+  return c.classRoomResults.roomLearner.parse(await this.identity.runWorkflow(()=>workflow.getClassroomLearnerSurveys(input)));
+ }
 }

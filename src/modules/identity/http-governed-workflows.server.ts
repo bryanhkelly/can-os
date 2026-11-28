@@ -1,3 +1,5 @@
+import * as classSurvey from "@/modules/classes/native-class-survey-link.server";
+import * as roomSurvey from "@/modules/learning/classroom-surveys.server";
 import * as surveyDraft from "@/modules/operations/canonical-survey-draft.server";
 import * as surveyApproval from "@/modules/operations/canonical-survey-approvals.server";
 import * as courseSurvey from "@/modules/learning/course-surveys.server";
@@ -66,6 +68,11 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
  const context=await (mode==="planning"?getBlueprintPlanningContext(request):mode==="canonical"?getCanonicalCommandContext(request):mode==="learner"?getInstructionalLearnerContext(request):getIdentityContext(request));
  if(!context.actorPersonId)throw new AuthorizationError("verified Person");
  return {
+  getNativeClassSurveyCampaignOptions:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Classroom survey context");return classSurvey.getNativeClassSurveyCampaignOptions(request,raw);},
+  linkNativeClassSurveyCampaign:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Classroom survey context");return classSurvey.linkNativeClassSurveyCampaign(request,raw);},
+  getClassroomSurveyOptions:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Classroom survey context");return roomSurvey.getClassroomSurveyOptions(request,raw);},
+  attachClassroomSurvey:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Classroom survey context");return roomSurvey.attachClassroomSurvey(request,raw);},
+  getClassroomLearnerSurveys:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="learner")throw new AuthorizationError("Classroom survey context");return roomSurvey.getClassroomLearnerSurveys(request,raw);},
   readCanonicalSurveyDraftAccess:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Survey context");return surveyDraft.readCanonicalSurveyDraftAccess(request);},
   createCanonicalSurveyDraft:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Survey context");return surveyDraft.createCanonicalSurveyDraft(request,raw);},
   readCanonicalSurveyReviewQueue:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Survey context");return surveyApproval.readCanonicalSurveyReviewQueue(request);},

@@ -49,6 +49,7 @@ export async function createApi(config: ReturnType<typeof readConfig>) {
   adapter.getInstance().addHook('onRequest', async (request, reply) => {
     reply.header('X-Request-Id', request.id);
     reply.header('X-Content-Type-Options', 'nosniff');
+    reply.header('Referrer-Policy', 'no-referrer');
     reply.header('Cache-Control', 'no-store');
   });
   app.setGlobalPrefix('api/v1');

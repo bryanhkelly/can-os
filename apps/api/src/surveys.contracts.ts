@@ -37,3 +37,16 @@ const qPreview=obj({id:uuid,ordinal:integer,prompt:str,type:en(types),required:b
 const versionDoc=obj({id:uuid,surveyId:uuid,title:str,code:str,purposeCode:str,audience:en(audiences),versionNo:integer,ownDraft:bool,questionCount:integer,publicationReady:bool,approvals:arr(approvalDoc,3),reviewPreviewComplete:bool,questions:arr(qPreview,1000)});
 const learnerDoc=obj({id:uuid,prompt:str,type:en(types),required:bool,min:{type:'number',nullable:true},max:{type:'number',nullable:true},options:arr(obj({id:uuid,label:str}))});
 export const docs={drafts:obj({organizationId:uuid,surveyPublicationEnabled:{...bool,enum:[true]},limit:{...integer,enum:[50]},drafts:arr(draftDoc,50)}),draftReceipt:obj({surveyId:uuid,surveyVersionId:uuid,lifecycle:en(['draft']),questionCount:integer}),queue:obj({organizationId:uuid,currentRole:en(['reviewer','publisher']),limit:{...integer,enum:[50]},evidence:arr(obj({id:uuid,kind:str}),1000),evidenceInventoryComplete:bool,versions:arr(versionDoc,50)}),reviewReceipt:obj({reviewId:uuid,kind:en(reviews),decision:en(decisions)}),publication:obj({surveyVersionId:uuid,lifecycle:en(['published'])}),courseList:arr(obj({campaignId:uuid,title:str}),30),courseSurvey:obj({campaignId:uuid,surveyVersionId:uuid,title:str,submitted:bool,questions:arr(learnerDoc,100)}),response:obj({responseId:uuid,alreadySubmitted:bool})};
+
+const stage=z.enum(['entry','pulse','exit']);
+export const classQuery=z.object({classId:id}).strict();
+export const roomQuery=z.object({facilitatedSessionId:id}).strict();
+export const roomLearnerQuery=roomQuery.extend({courseAttemptId:id}).strict();
+const classOptions=z.object({campaigns:z.array(z.object({campaignId:id,title:s,status:z.enum(['scheduled','active']),linked:b}).strict()).max(100),linked:n}).strict();
+const classLink=z.object({campaignId:id,alreadyLinked:b}).strict();
+const roomOptions=z.object({campaigns:z.array(z.object({id,title:s}).strict()).max(100),links:z.array(z.object({surveyCampaignId:id,stage}).strict()).max(100),partial:b,notice:s}).strict();
+const roomLink=z.object({linked:z.literal(true),duplicate:b,note:s}).strict();
+const roomLearner=z.object({surveys:z.array(z.object({campaignId:id,title:s,stage,submitted:b}).strict()).max(30),notice:s}).strict();
+export const classRoomResults={classOptions,classLink,roomOptions,roomLink,roomLearner};
+export const classRoomInputs={classLink:obj({classId:uuid,campaignId:uuid}),roomLink:obj({facilitatedSessionId:uuid,surveyCampaignId:uuid,stage:en(stage.options)})};
+export const classRoomDocs={classOptions:obj({campaigns:arr(obj({campaignId:uuid,title:str,status:en(['scheduled','active']),linked:bool}),100),linked:integer}),classLink:obj({campaignId:uuid,alreadyLinked:bool}),roomOptions:obj({campaigns:arr(obj({id:uuid,title:str}),100),links:arr(obj({surveyCampaignId:uuid,stage:en(stage.options)}),100),partial:bool,notice:str}),roomLink:obj({linked:{...bool,enum:[true]},duplicate:bool,note:str}),roomLearner:obj({surveys:arr(obj({campaignId:uuid,title:str,stage:en(stage.options),submitted:bool}),30),notice:str})};
