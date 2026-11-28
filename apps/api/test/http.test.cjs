@@ -71,7 +71,7 @@ test('canonical reads cannot be enabled outside local development', () => {
 
 test('learner resource routes require the standard session and publish explicit UUID parameters', async ()=>{
   await withServer('0',async (url,document)=>{
-    for(const resource of ['resume','assignments']){
+    for(const resource of ['resume','assignments','learning']){
       const path='/api/v1/me/class-enrollments/00000000-0000-4000-8000-000000000001/'+resource;
       const response=await fetch(url+path,{headers:{'x-role':'student','x-person-id':'forged'}});
       assert.equal(response.status,401);
@@ -659,3 +659,15 @@ test('knowledge checks and completion require verified learner or provider autho
 test('noncredit enrollment publication protects provider scope and explicit Site selection',async()=>{await withServer('0',async(url,document)=>{for(const [route,method] of [["/api/v1/noncredit-enrollment-publisher","GET"],["/api/v1/noncredit-training-readiness","GET"],["/api/v1/noncredit-enrollment-releases","POST"],["/api/v1/noncredit-enrollment-closures","POST"],["/api/v1/noncredit-multisite-releases","POST"]]){assert.ok(document.paths[route][method.toLowerCase()].security);assert.equal((await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined)).status,method==='POST'?503:401);}assert.ok(document.paths['/api/v1/noncredit-enrollment-releases'].post.requestBody.content['application/json'].schema.required.includes('siteId'));});});
 
 test('completion administration requires canonical provider credentials and distinguishes decisions from corrections',async()=>{await withServer('0',async(url,document)=>{for(const [route,method] of [["/api/v1/noncredit-completion-decisions","POST"],["/api/v1/noncredit-completion-policy-catalog","GET"],["/api/v1/noncredit-completion-policies","POST"],["/api/v1/noncredit-completion-review","GET"],["/api/v1/noncredit-completion-queue","GET"],["/api/v1/noncredit-completion-corrections","POST"]]){assert.ok(document.paths[route][method.toLowerCase()].security);assert.equal((await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined)).status,method==='POST'?503:401);}});const c=require('../dist/completion-admin.contracts');assert.equal(c.queueQuery.safeParse({page:'101'}).success,false);assert.equal(c.queueQuery.parse({page:'2'}).page,2);});
+
+test('full learning workspace contract rejects unprojected learner data',()=>{
+ const {workspaceSchema}=require('../dist/learning.contracts');
+ const id='00000000-0000-4000-8000-000000000001';
+ const lesson={unitId:id,unitTitle:'Unit',unitOrder:1,lessonId:id,lessonTitle:'Lesson',lessonOrder:1,progressStatus:null,observedAt:null,lessonBody:'Approved content',videoResources:[]};
+ const workspace={classId:id,classEnrollmentId:id,courseAttemptId:id,classTitle:'Class',courseVersionId:id,enrollmentStatus:'active',creditMode:'noncredit',lessons:[lesson],outcomes:[],awards:[]};
+ assert.equal(workspaceSchema.safeParse(workspace).success,true);
+ assert.equal(workspaceSchema.safeParse({...workspace,personId:id}).success,false);
+ assert.equal(workspaceSchema.safeParse({...workspace,lessons:[{...lesson,rawContent:{}}]}).success,false);
+ assert.equal(workspaceSchema.safeParse({...workspace,lessons:[{...lesson,observedAt:'not a timestamp'}]}).success,false);
+ assert.equal(workspaceSchema.safeParse({...workspace,lessons:Array(501).fill(lesson)}).success,false);
+});
