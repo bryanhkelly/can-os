@@ -14,7 +14,17 @@ const metric=z.object({metricKey:z.enum(["class.registrations","class.uniquePeop
 const siteScope=z.object({host:actor,classId:uuid,siteId:uuid,meetings:z.array(meeting).length(4)}).strict();
 const learner=z.object({actor,courseAttemptId:uuid,paired:z.boolean()}).strict();
 const manifest=z.object({offeringVersionId:uuid,manifestId:uuid,expectedHash:z.string().regex(/^[a-f0-9]{64}$/)}).strict();
+const hash=z.string().regex(/^[a-f0-9]{64}$/);
+const releaseAsset=z.object({assetVersionId:uuid,usageKind:z.enum(["required_instruction","supporting","accessibility","assessment"])}).strict();
+const releasePolicy=z.object({courseVersionId:uuid,minimumApprovedPrimaryTracks:z.number().int().min(1).max(10),
+  completeLessonCoverageRequired:z.literal(true),independentAcademicReviewRequired:z.literal(true),
+  rightsClearanceRequired:z.literal(true),accessibilityReviewRequired:z.literal(true)}).strict();
 const scenario=z.discriminatedUnion("stage",[
+  z.object({stage:z.literal("configure-release"),reviewer:actor,offeringVersionId:uuid,
+    expectedManuscriptHash:hash,expectedPolicyRevision:hash,requirements:z.array(releasePolicy).min(1).max(50),
+    reviewEvidenceVersionId:uuid,rationale:z.string().min(10).max(2000)}).strict(),
+  z.object({stage:z.literal("submit-release"),author:actor,offeringVersionId:uuid,
+    expectedManuscriptHash:hash,assets:z.array(releaseAsset).max(50)}).strict(),
   z.object({stage:z.literal("publish"),publisher:actor,offering:manifest}).strict(),
   z.object({stage:z.literal("enroll"),learner:actor,classId:uuid,siteId:uuid,ownerOrganizationId:uuid,classOfferingVersionId:uuid,creditMode:z.enum(["for_credit","audit","not_applicable"])}).strict(),
   z.object({stage:z.literal("schedule"),sites:z.array(siteScope).length(2)}).strict(),
@@ -70,7 +80,56 @@ test("governed pilot API stage",async({browser},info)=>{
   expect(identity).toEqual({project:"sweet-hall-62441909",branch});
   let evidence:Record<string,unknown>={stage:scenario.stage,revision:process.env.CAN_RELEASE_SOURCE_SHA};
   try{
-    if(scenario.stage==="publish"){
+    if(scenario.stage==="configure-release"||scenario.stage==="submit-release"){
+      const {offeringVersionId,expectedManuscriptHash}=scenario;
+      const acting=scenario.stage==="configure-release"?scenario.reviewer:scenario.author;
+      const [owned]=await sql`SELECT count(*)::int AS count FROM public.offering_versions v
+        JOIN public.offerings o ON o.id=v.offering_id
+        JOIN public.organizations p ON p.id=o.publisher_organization_id
+        WHERE v.id=${offeringVersionId}::uuid AND p.id=${acting.organizationId}::uuid
+          AND p.metadata->>'qa_only'='true' AND p.metadata->>'intended_branch'=${branch}
+          AND v.lifecycle='draft'`;
+      expect(owned?.count).toBe(1);
+      const page=await openActor(browser,acting,contexts);
+      if(scenario.stage==="configure-release"){
+        // A previously reviewed, exact manuscript and policy revision are supplied
+        // by the authorized reviewer. Never derive a new approval from a changed draft.
+        const view=await rpc<{manuscriptHash:string;revision:string;courses:{courseVersionId:string}[]}>(
+          page,"release","getNativeOfferingReleasePolicyReview",{offeringVersionId});
+        expect(view.manuscriptHash).toBe(expectedManuscriptHash);
+        expect(view.revision).toBe(scenario.expectedPolicyRevision);
+        expect(scenario.requirements.map(p=>p.courseVersionId).sort()).toEqual(view.courses.map(c=>c.courseVersionId).sort());
+        const result=await rpc<{offeringVersionId:string;policyRevision:string}>(
+          page,"release","saveNativeOfferingReleasePolicy",{
+            offeringVersionId,expectedManuscriptHash,expectedPolicyRevision:scenario.expectedPolicyRevision,
+            requirements:scenario.requirements,reviewEvidenceVersionId:scenario.reviewEvidenceVersionId,
+            rationale:scenario.rationale});
+        expect(result.offeringVersionId).toBe(offeringVersionId);
+        const updated=await rpc<{revision:string;policies:unknown[]}>(
+          page,"release","getNativeOfferingReleasePolicyReview",{offeringVersionId});
+        expect(updated.revision).toBe(result.policyRevision);
+        expect(updated.policies).toEqual(expect.arrayContaining(scenario.requirements));
+        evidence={...evidence,configuredCourses:scenario.requirements.length,policyReviewed:true,offeringPublished:false};
+      }else{
+        const view=await rpc<{lifecycle:string;manuscriptHash:string}>(
+          page,"release","getNativeOfferingReleaseOverview",{offeringVersionId});
+        expect(view.lifecycle).toBe("draft");
+        expect(view.manuscriptHash).toBe(expectedManuscriptHash);
+        const input={offeringVersionId,expectedHash:expectedManuscriptHash,assets:scenario.assets};
+        const submitted=await rpc<{manifestId:string;manifestHash:string;created:boolean}>(
+          page,"release","submitNativeOfferingRelease",input);
+        uuid.parse(submitted.manifestId);hash.parse(submitted.manifestHash);
+        expect(await rpc(page,"release","submitNativeOfferingRelease",input)).toMatchObject({
+          manifestId:submitted.manifestId,manifestHash:submitted.manifestHash,created:false});
+        const [persisted]=await sql`SELECT m.manifest_hash AS hash,v.lifecycle,
+          (SELECT count(*)::int FROM public.content_publication_manifest_items i WHERE i.manifest_id=m.id) AS assets
+          FROM public.content_publication_manifests m JOIN public.offering_versions v ON v.id=m.offering_version_id
+          WHERE m.id=${submitted.manifestId}::uuid AND v.id=${offeringVersionId}::uuid`;
+        expect(persisted).toEqual({hash:submitted.manifestHash,lifecycle:"draft",assets:scenario.assets.length});
+        evidence={...evidence,manifestId:submitted.manifestId,manifestHash:submitted.manifestHash,
+          submittedAssetUses:scenario.assets.length,offeringPublished:false};
+      }
+    }else if(scenario.stage==="publish"){
       const {publisher,offering}=scenario;
       const [row]=await sql`SELECT count(*)::int AS count FROM public.offering_versions v
         JOIN public.offerings o ON o.id=v.offering_id

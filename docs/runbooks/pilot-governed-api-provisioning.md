@@ -24,3 +24,13 @@ The separate `enroll` stage exercises ordinary direct native Class enrollment ag
 The .test email-link path cannot establish reporting relationship manager authority. The relationship stage therefore requires existing individually issued synthetic .demo credentials from the standard access workflow, not a shared fixed code, plus approved direct reporting relationship manager grants. It refuses .test actors for that stage. The same production credential and reporting policies apply; no exception or automatic privilege assignment has been introduced. Keep the private manifest in the ignored QA environment, never commit codes. No relationship grant is minted by this runner.
 
 `npm run qa:pilot -- report` emits a private aggregate QA inventory across all branch-tagged organizations/people, distinguishing registration, enrollment, distinct people, ended rooms, current attendance assertions, unsuperseded completions and accepted/revoked relationships. It intentionally reports national impact as blocked rather than publishing unreviewed cross-tenant data. The network-impact catalog remains unavailable. Full national executive integration still requires trusted reconciled source manifests, independent disclosure records, approved report scopes and guarded report/UI execution.
+
+
+### Native release preparation via standard application APIs
+
+Two additional governed stages use the same native Offering release commands as the application:
+
+- `configure-release`: independently authorized reviewer reads the exact manuscript and policy revisions, submits the already reviewed Course requirements and existing verified evidence through the native policy command, then rereads the revision. Both pilot policies require approved primary tracks and complete lesson coverage. The runner does not issue evidence or assign reviewer authority.
+- `submit-release`: authorized author reads the exact unchanged draft and submits a manuscript-only or asset-bearing publication manifest. Exact retry must return the same manifest and the canonical Offering must remain draft. The resulting manifest ID/hash can be used for independent review and later publication. The runner never converts submission into approval.
+
+The `publish` stage still consumes independently approved evidence. A manuscript-only submission is not an asset release. Use the normal reviewer workflow and real approved assets; any missing evidence blocks publication. These stages are orchestration of production RPCs, not new test-only business APIs. No SQL mutations, session injection, review fabrication, or runtime authorization changes are introduced. They are source changes pending exact-revision execution.
