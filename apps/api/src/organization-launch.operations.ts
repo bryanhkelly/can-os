@@ -47,5 +47,8 @@ export type OrganizationLaunchOperation =
   | 'createLaunchSiteSpaceV61'
   | 'saveLaunchSiteSpaceV61'
   | 'readLaunchClassFacilitiesV61'
-  | 'saveLaunchClassPhysicalPlanV61';
+  | 'saveLaunchClassPhysicalPlanV61'
+  | 'getSiteContentChannels'
+  | 'saveSiteContentChannels'
+  | 'publishSiteContentChannels';
 export type OrganizationLaunchWorkflow=Record<OrganizationLaunchOperation,(input:unknown)=>Promise<unknown>>;

@@ -21,9 +21,17 @@ import {listMySitesService} from "@/modules/operations/site-directory.server";
 import {getNetworkSitesService,createNetworkSiteService,createSiteInput} from "@/modules/networks/network-sites.server";
 import {readLaunchSiteFacilitiesV61Service,createLaunchSiteSpaceV61Service,saveLaunchSiteSpaceV61Service} from "@/modules/operations/launch-site-facilities.server";
 import {readLaunchClassFacilitiesV61Service,saveLaunchClassPhysicalPlanV61Service} from "@/modules/classes/launch-class-facilities.server";
+import {readAuthorizedSiteContentChannels,saveAuthorizedSiteContentChannels,publishAuthorizedSiteContentChannels} from "@/modules/sites/site-content-channels.server";
+import {siteContentBlockSchema} from "@/domain/site-content-channels";
+const channelsScope=z.object({siteId:z.string().uuid()}).strict();
+const channelPublication=channelsScope.extend({expectedRevision:z.number().int().min(0).max(2147483647)});
+const channelSave=channelPublication.extend({blocks:z.array(siteContentBlockSchema).max(12).refine(xs=>new Set(xs.map(x=>x.id)).size===xs.length)});
 const geographyInput=z.object({siteId:z.string().uuid()}).strict();
 export function organizationLaunchWorkflows(request:Request,mode:string){
  return {
+  getSiteContentChannels:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Content channels context");return readAuthorizedSiteContentChannels(request,parseCommandInput(channelsScope,raw).siteId);},
+  saveSiteContentChannels:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Content channels context");return saveAuthorizedSiteContentChannels(request,parseCommandInput(channelSave,raw));},
+  publishSiteContentChannels:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Content channels context");return publishAuthorizedSiteContentChannels(request,parseCommandInput(channelPublication,raw));},
   readLaunchSiteFacilitiesV61:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Launch facilities context");return readLaunchSiteFacilitiesV61Service(request,raw);},
   createLaunchSiteSpaceV61:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Launch facilities context");return createLaunchSiteSpaceV61Service(request,raw);},
   saveLaunchSiteSpaceV61:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Launch facilities context");return saveLaunchSiteSpaceV61Service(request,raw);},

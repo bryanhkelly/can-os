@@ -17,3 +17,7 @@ Extracts existing registrar Site directory and denomination HQ directly operated
 ## Facilities increment
 
 Five REST operations for Site room inventory, room creation, room revisions, Class facilities and Class physical-plan revisions. Legacy wrappers delegate to the same request-aware services; existing row locks, exact replay, capacity safeguards, approved facilitator assignment and in-transaction staff authority checks remain. CAN Site setup and canonical Class authorization remain separate. Existing source-based regression tests follow the extracted implementation. New contract/HTTP and generated SDK checks are added, not executed here.
+
+## Website content channels increment
+
+Three protected REST operations distinguish private layout reads, revision writes, and publication of the saved layout. The existing content-channel service accepts an explicit authenticated Request; both transports reuse it. Existing source-bound layout, independent publish authorization, transaction locks, source snapshots, and audit records are unchanged. Stale or unsaved publication is explicitly classified as conflict. Canonical editorial policy remains enforced by the domain parser (including protected institutional claims). No website or enrollment activation is implied.

@@ -720,3 +720,23 @@ test('WS03 facilities preserve exact Site scope and distinct canonical Class aut
  assert.equal(bodies.classPlan.safeParse({spaceId:null,facilitatorAssignmentId:id,expectedRevision:1}).success,false);
  assert.equal(bodies.save.safeParse({name:'Room',maxOccupancy:30,resources:{},reason:'Changed room',expectedRevision:0}).success,false);
 });
+
+
+test('WS03 private content channels require explicit publication and exact revision',async()=>{
+ const siteId='00000000-0000-4000-8000-000000000001';
+ await withServer('0',async(url,document)=>{
+  for(const [method,path] of [["GET","/api/v1/sites/{siteId}/content-channels"],["POST","/api/v1/sites/{siteId}/content-channel-revisions"],["POST","/api/v1/sites/{siteId}/content-channel-publications"]]){
+   assert.ok(document.paths[path][method.toLowerCase()].security);
+   const result=await fetch(url+path.replace('{siteId}',siteId),method==='POST'?{method,headers:{origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(result.status,method==='POST'?503:401);
+  }
+ });
+ const {bodies,results}=require('../dist/site-content-channels.contracts');
+ const block={id:'site-setup',channel:'site.setup',placement:'community',layout:'list',enabled:true,eyebrow:'Site',title:'About',description:'Welcome'};
+ assert.equal(bodies.save.safeParse({expectedRevision:1,blocks:[block]}).success,true);
+ assert.equal(bodies.save.safeParse({expectedRevision:1,blocks:[block,block]}).success,false);
+ assert.equal(bodies.save.safeParse({expectedRevision:1,blocks:[{...block,title:'<b>HTML</b>'}]}).success,false);
+ assert.equal(bodies.save.safeParse({expectedRevision:1,blocks:[{...block,url:'https://example.com'}]}).success,false);
+ assert.equal(bodies.publish.safeParse({expectedRevision:1,openEnrollment:true}).success,false);
+ assert.equal(results.published.safeParse({siteId,publishedRevision:1,changed:true,approved:true}).success,false);
+});
