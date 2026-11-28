@@ -48,6 +48,14 @@ describe("pending staff invitation lookup", () => {
   });
 });
 
+function acceptanceReader(personId=base.personId,siteId=base.siteId){
+ const rows:unknown[][]=[[{personId}],[],siteId?[{id:siteId}]:[]];
+ return vi.fn(()=>{
+  const result=rows.shift()??[];
+  const chain={innerJoin:()=>chain,where:()=>chain,for:()=>chain,limit:async()=>result};
+  return {from:()=>chain};
+ });
+}
 describe("transactional staff invitation acceptance", () => {
   it("activates the exact grant and emits acceptance audit/outbox evidence", async () => {
     const updates: unknown[] = [];
@@ -61,7 +69,7 @@ describe("transactional staff invitation acceptance", () => {
           },
         };
       }),
-      select: vi.fn(() => ({ from: () => ({ where: () => ({ limit: async () => [{ id: accountId }] }) }) })),
+      select: acceptanceReader(),
       insert: vi.fn(),
     };
 
@@ -77,10 +85,15 @@ describe("transactional staff invitation acceptance", () => {
     }));
   });
 
+  it.each([["foreign-person",base.siteId], [base.personId,""]])("rejects mismatched Account Person or missing current Site", async (personId,siteId)=>{
+    const tx={select:acceptanceReader(personId,siteId),update:vi.fn(),insert:vi.fn()};
+    await expect(acceptStaffInvitations(tx as never,accountId,[base])).rejects.toThrow(/current invited/);
+    expect(tx.update).not.toHaveBeenCalled();expect(mutation.emit).not.toHaveBeenCalled();
+  });
   it("is idempotent when the grant was already activated", async () => {
     const tx = {
       update: vi.fn(() => ({ set: () => ({ where: () => ({ returning: async () => [] }) }) })),
-      select: vi.fn(), insert: vi.fn(),
+      select: acceptanceReader(), insert: vi.fn(),
     };
     await expect(acceptStaffInvitations(tx as never, accountId, [base])).resolves.toEqual([]);
     expect(mutation.emit).not.toHaveBeenCalled();
