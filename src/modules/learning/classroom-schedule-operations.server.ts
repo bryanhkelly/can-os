@@ -1,8 +1,9 @@
-import { and, eq, gt, isNull, lte, or } from "drizzle-orm";
+import { and, eq, gt, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import { canonicalDeliverySessions, classroomDeploymentSites, classroomOfferingCourses, courseVersions, deploymentOfferingAdoptions, facilitatedClassroomPlans, offeringVersions } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
+import { DomainError } from "@/domain/errors";
 import { validClassroomScheduleWindow } from "@/domain/classroom-scheduling";
 import { requireCanonicalFacilitator } from "./canonical-facilitator-access.server";
 import { authorizedHostDeployment } from "./facilitated-learning-operations.server";
@@ -70,6 +71,13 @@ export async function scheduleOneClassroom(tx:Tx,host:Host,data:ScheduleCommand,
   const deploymentSiteId=await approvedSiteCourse(
     tx,host,data.deploymentId,data.courseVersionId,data.siteId,
   );
+  // The request uniqueness constraint is per organization and facilitator.
+  // Serialize the entire scope rather than acquiring individual request locks
+  // in client-supplied batch order. Native Class scheduling and the legacy
+  // calendar caller share this service, so simultaneous retries cannot both
+  // create a delivery row before discovering the same request.
+  const requestScope=`classroom-schedule:${host.organizationId}:${host.actor.actorPersonId!}`;
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${requestScope},0))`);
   const [prior]=await tx.select().from(facilitatedClassroomPlans).where(and(
     eq(facilitatedClassroomPlans.hostOrganizationId,host.organizationId),
     eq(facilitatedClassroomPlans.facilitatorPersonId,host.actor.actorPersonId!),
@@ -82,7 +90,7 @@ export async function scheduleOneClassroom(tx:Tx,host:Host,data:ScheduleCommand,
       prior.courseVersionId!==data.courseVersionId || prior.siteId!==data.siteId ||
       delivery.startsAt.getTime()!==startsAt.getTime() ||
       delivery.endsAt.getTime()!==endsAt.getTime())
-      throw new Error("Conflicting classroom schedule retry");
+      throw new DomainError("CONFLICT","Conflicting classroom schedule retry");
     return {planId:prior.id,duplicate:true};
   }
   const [delivery]=await tx.insert(canonicalDeliverySessions).values({
