@@ -11,10 +11,10 @@ import { emitEvent,notify,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getRequest } from "@tanstack/react-start/server";
-import { and,asc,desc,eq,inArray,isNotNull,isNull,or,sql } from "drizzle-orm";
+import { and,asc,desc,eq,inArray,isNotNull,isNull,ne,or,sql } from "drizzle-orm";
 import { operationsSelectionSchema,resolveOperationsSelection } from "./operations-scope.server";
 import { resolveActionInTransaction } from "@/modules/actions/resolve-action";
-import { assertAcademicActionAuthority,assertAcademicActionStaff } from "@/modules/actions/academic-action-policy.server";
+import { assertAcademicActionAuthority,assertAcademicActionStaff,isNativeAcademicAction } from "@/modules/actions/academic-action-policy.server";
 import { openingHandoffType } from "@/modules/programs/opening-handoff.server";
 import { gradeResponseActionType } from "@/domain/grade-response-policy";
 import { prioritizeSchoolActions,schoolActionBacklog } from "@/domain/operations-action-triage";
@@ -42,7 +42,7 @@ export const getOperationsActions=createServerFn({method:"GET"})
   ownerFirstName:people.legalFirstName,ownerLastName:people.legalLastName,
   status:actions.status,priority:actions.priority,dueAt:actions.dueAt,createdAt:actions.createdAt,
   metadata:actions.metadata
- }).from(actions).leftJoin(people,eq(people.id,actions.ownerPersonId)).where(and(inArray(actions.siteId,scoped.siteIds),inArray(actions.status,["open","in_progress","waiting"]),allowedPrograms,...(data.programId?[eq(actions.programId,data.programId)]:[]))).orderBy(sql`CASE ${actions.priority} WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 ELSE 2 END`,
+ }).from(actions).leftJoin(people,eq(people.id,actions.ownerPersonId)).where(and(inArray(actions.siteId,scoped.siteIds),inArray(actions.status,["open","in_progress","waiting"]),ne(actions.subjectType,"class_enrollment"),allowedPrograms,...(data.programId?[eq(actions.programId,data.programId)]:[]))).orderBy(sql`CASE ${actions.priority} WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 ELSE 2 END`,
    asc(actions.dueAt),desc(actions.createdAt)).limit(250));
  // Resolve distinct coverage owners concurrently instead of performing one
  // sequential database read per matching Program.
@@ -105,6 +105,7 @@ export const updateOperationsAction=createServerFn({method:"POST"})
   return db.transaction(async tx=>{
    const [record]=await tx.select().from(actions).where(and(eq(actions.id,data.id),inArray(actions.siteId,actor.scope.siteIds!))).for("update").limit(1);
    if(!record)throw new AuthorizationError("action scope");
+   if(isNativeAcademicAction(record))throw new AuthorizationError("Use the assigned native Class academic Action workflow");
    if(record.programId&&!(actor.scope.programIds??[]).includes(record.programId))throw new AuthorizationError("action program scope");
    if(record.type==="support_referral")throw new Error("Use the referral lifecycle");
    if(record.type==="section_creation_request")
@@ -164,6 +165,7 @@ export const assignOperationsAction=createServerFn({method:"POST"})
   return db.transaction(async tx=>{
    const [record]=await tx.select().from(actions).where(and(eq(actions.id,data.id),inArray(actions.siteId,actor.scope.siteIds!))).for("update").limit(1);
    if(!record||["resolved","cancelled"].includes(record.status))throw new AuthorizationError("active action scope");
+   if(isNativeAcademicAction(record))throw new AuthorizationError("Use the assigned native Class academic Action workflow");
    if(record.programId&&!(actor.scope.programIds??[]).includes(record.programId))throw new AuthorizationError("action program scope");
    if(record.type==="support_referral")throw new Error("Use the referral lifecycle");
    if(record.type==="section_creation_request")
@@ -215,6 +217,7 @@ export const setOperationsActionDeadline=createServerFn({method:"POST"})
        .for("update").limit(1);
      if(!record||record.status==="resolved"||record.status==="cancelled")
        throw new AuthorizationError("open action in authorized school");
+     if(isNativeAcademicAction(record))throw new AuthorizationError("Use the assigned native Class academic Action workflow");
      if(record.organizationId&&!actor.scope.organizationIds?.includes(record.organizationId))
        throw new AuthorizationError("action school ownership");
      if(record.programId&&!actor.scope.programIds?.includes(record.programId))
@@ -276,9 +279,11 @@ export const resolveOwnedSiteOperationalAction=createServerFn({method:"POST"})
        .for("update").limit(1);
      if(!record||!record.siteId)
        throw new AuthorizationError("site action scope");
+     if(isNativeAcademicAction(record))throw new AuthorizationError("Use the assigned native Class academic Action workflow");
      if(record.organizationId&&!actor.scope.organizationIds?.includes(record.organizationId))
        throw new AuthorizationError("action school ownership");
-     if(record.programId&&!(actor.scope.programIds??[]).includes(record.programId))
+     if(isNativeAcademicAction(record))throw new AuthorizationError("Use the assigned native Class academic Action workflow");
+   if(record.programId&&!(actor.scope.programIds??[]).includes(record.programId))
        throw new AuthorizationError("action program scope");
      if(!onsiteOwnerResolvableTypes.has(record.type))
        throw new AuthorizationError("this Action is resolved in its owning workflow");
