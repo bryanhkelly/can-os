@@ -4,6 +4,7 @@ import { and, asc, eq, gt, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { canonicalClasses, canonicalClassStaffAssignments } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
+import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { getIdentityContext } from "@/modules/identity/command-context.server";
 import { nativeClassWorkRows,nativeOverdueWorkPredicate } from "./native-class-work-query.server";
 import { currentClassAuthority } from "./native-class-authority.server";
@@ -25,6 +26,10 @@ async function currentTeacher(){
        actor.scope.organizationIds?.length!==1 ||
        !actor.capabilities.has("teacher:read"))
       return null;
+    // Reuse the canonical session boundary, including its mixed-cookie denial.
+    // A recognized teacher with a conflicting session must not silently fall
+    // back to a legacy dashboard or gain a second role.
+    await getCanonicalCommandContext(getRequest());
     return actor;
 }
 
