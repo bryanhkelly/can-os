@@ -54,7 +54,7 @@ export async function createApi(config: ReturnType<typeof readConfig>) {
   app.setGlobalPrefix('api/v1');
   const document = SwaggerModule.createDocument(app, new DocumentBuilder()
     .setTitle('Becomuna API').setDescription('Migration proof of concept; canonical reads disabled by default.')
-    .setVersion('1.0.0').addCookieAuth('__Host-can_os_session', {type:'apiKey',in:'cookie'}, 'session').build());
+    .setVersion('1.0.0').addCookieAuth('__Host-can_os_session', {type:'apiKey',in:'cookie'}, 'session').addCookieAuth('__Host-can_os_v3_session',{type:'apiKey',in:'cookie'},'nativeSession').build());
   if (config.docs === '1') {
     SwaggerModule.setup('api/docs', app, document, {
       jsonDocumentUrl: '/api/openapi.json', ui: true,

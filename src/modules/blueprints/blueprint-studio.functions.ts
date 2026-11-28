@@ -1,9 +1,10 @@
+import {createCanonicalBlueprintConfigurationService,saveCanonicalBlueprintConfigurationService,submitCanonicalBlueprintConfigurationService,decideCanonicalBlueprintReviewService,executeCanonicalBlueprintConfigurationService} from "./blueprint-commands.server";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { getBlueprintPlanningContext } from "./verified-site-planning.server";
-import { AuthorizationError, assertCapability } from "@/domain/command-context";
+import { assertCapability } from "@/domain/command-context";
 import { requireBlueprintSiteScope } from "@/domain/blueprint-studio-scope";
 import {
   createBlueprintConfigurationInputSchema,
@@ -24,13 +25,9 @@ import { blueprintWorkspaceInputSchema, getCanonicalBlueprintWorkspace } from ".
 import { getCanonicalBlueprintReviewQueue } from "./blueprint-review-queue.server";
 import { blueprintReviewEvidenceInputSchema, listBlueprintReviewEvidence } from "./blueprint-review-evidence.server";
 import {
-  createBlueprintConfiguration,
   getBlueprintConfiguration,
-  saveBlueprintConfiguration,
-  submitBlueprintConfiguration,
 } from "./blueprint-configuration.server";
-import { decideBlueprintReview, getBlueprintReview, getBlueprintReviewHistory } from "./blueprint-review.server";
-import { executeBlueprintConfiguration } from "./blueprint-execution.server";
+import { getBlueprintReview, getBlueprintReviewHistory } from "./blueprint-review.server";
 
 function noStore() {
   setResponseHeader("Cache-Control", "private, no-store");
@@ -80,37 +77,17 @@ export const readCanonicalBlueprintConfiguration = createServerFn({ method: "GET
     return detail;
   });
 
-export const createCanonicalBlueprintConfiguration = createServerFn({ method: "POST" })
-  .validator((value: unknown) => createBlueprintConfigurationInputSchema.parse(value))
-  .handler(async ({ data }) => {
-    noStore();
-    const context = await getBlueprintPlanningContext(getRequest());
-    requireBlueprintSiteScope(context, data.version.config);
-    return createBlueprintConfiguration(context, data);
-  });
+export const createCanonicalBlueprintConfiguration=createServerFn({method:"POST"})
+  .validator((value:unknown)=>createBlueprintConfigurationInputSchema.parse(value))
+  .handler(async({data})=>{noStore();return createCanonicalBlueprintConfigurationService(getRequest(),data);});
 
-export const saveCanonicalBlueprintConfiguration = createServerFn({ method: "POST" })
-  .validator((value: unknown) => saveBlueprintConfigurationInputSchema.parse(value))
-  .handler(async ({ data }) => {
-    noStore();
-    const context = await getBlueprintPlanningContext(getRequest());
-    const siteId = requireBlueprintSiteScope(context, data.version.config);
-    const existing = await getBlueprintConfiguration(context, data.configurationId);
-    if (requireBlueprintSiteScope(context, existing.config) !== siteId) {
-      throw new AuthorizationError("Blueprint configuration Site cannot be reassigned");
-    }
-    return saveBlueprintConfiguration(context, data);
-  });
+export const saveCanonicalBlueprintConfiguration=createServerFn({method:"POST"})
+  .validator((value:unknown)=>saveBlueprintConfigurationInputSchema.parse(value))
+  .handler(async({data})=>{noStore();return saveCanonicalBlueprintConfigurationService(getRequest(),data);});
 
-export const submitCanonicalBlueprintConfiguration = createServerFn({ method: "POST" })
-  .validator((value: unknown) => submitBlueprintConfigurationInputSchema.parse(value))
-  .handler(async ({ data }) => {
-    noStore();
-    const context = await getBlueprintPlanningContext(getRequest());
-    const existing = await getBlueprintConfiguration(context, data.configurationId);
-    requireBlueprintSiteScope(context, existing.config);
-    return submitBlueprintConfiguration(context, data);
-  });
+export const submitCanonicalBlueprintConfiguration=createServerFn({method:"POST"})
+  .validator((value:unknown)=>submitBlueprintConfigurationInputSchema.parse(value))
+  .handler(async({data})=>{noStore();return submitCanonicalBlueprintConfigurationService(getRequest(),data);});
 
 export const listCanonicalBlueprintReviewEvidence = createServerFn({ method: "GET" })
   .validator((value: unknown) => blueprintReviewEvidenceInputSchema.parse(value))
@@ -139,16 +116,10 @@ export const readCanonicalBlueprintReviewHistory = createServerFn({ method: "GET
     return getBlueprintReviewHistory(await getBlueprintPlanningContext(getRequest()), data);
   });
 
-export const decideCanonicalBlueprintReview = createServerFn({ method: "POST" })
-  .validator((value: unknown) => decideBlueprintReviewInputSchema.parse(value))
-  .handler(async ({ data }) => {
-    noStore();
-    return decideBlueprintReview(await getCanonicalCommandContext(getRequest()), data);
-  });
+export const decideCanonicalBlueprintReview=createServerFn({method:"POST"})
+  .validator((value:unknown)=>decideBlueprintReviewInputSchema.parse(value))
+  .handler(async({data})=>{noStore();return decideCanonicalBlueprintReviewService(getRequest(),data);});
 
-export const executeCanonicalBlueprintConfiguration = createServerFn({ method: "POST" })
-  .validator((value: unknown) => executeBlueprintConfigurationInputSchema.parse(value))
-  .handler(async ({ data }) => {
-    noStore();
-    return executeBlueprintConfiguration(await getCanonicalCommandContext(getRequest()), data);
-  });
+export const executeCanonicalBlueprintConfiguration=createServerFn({method:"POST"})
+  .validator((value:unknown)=>executeBlueprintConfigurationInputSchema.parse(value))
+  .handler(async({data})=>{noStore();return executeCanonicalBlueprintConfigurationService(getRequest(),data);});

@@ -66,3 +66,5 @@ export function classifyHttpDomainError(error: unknown) {
 
 export {handleAccessRequest,handleAccessVerification,handlePersonalRegistration,handleAccessLogout} from "./access-http.server";
 export {handleSiteSignupRequest} from "./site-signup-http.server";
+
+export {resolveGovernedWorkflow} from "./http-governed-workflows.server";

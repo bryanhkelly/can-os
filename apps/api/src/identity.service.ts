@@ -4,7 +4,9 @@ import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
 export type Identity = {readSession:()=>Promise<unknown>;readReleaseOverview:(input:unknown)=>Promise<unknown>;readReleasePolicy:(input:unknown)=>Promise<unknown>;readReleaseQueue:(input:unknown)=>Promise<unknown>;createSite:(input:unknown)=>Promise<unknown>;submitRelease:(input:unknown)=>Promise<unknown>;saveReleasePolicy:(input:unknown)=>Promise<unknown>;decideRelease:(input:unknown)=>Promise<unknown>;publishCourses:(input:unknown)=>Promise<unknown>;approveAssetManifest:(input:unknown)=>Promise<unknown>;publishOffering:(input:unknown)=>Promise<unknown>;me:unknown;readStudentClasses:()=>Promise<unknown>;readLearningResume:(id:string)=>Promise<unknown>;readHomeworkSummary:(id:string)=>Promise<unknown>;selectMembership:(id:string)=>Promise<void>;recordActivity:()=>Promise<void>;completeLesson:(id:string,lessonId:string)=>Promise<unknown>;submitHomework:(id:string,assignmentId:string,responseText:string)=>Promise<unknown>};
 type AuthHandler='handleAccessRequest'|'handleAccessVerification'|'handlePersonalRegistration'|'handleSiteSignupRequest'|'handleAccessLogout';
-type Bridge = Record<AuthHandler,(request:Request)=>Promise<Response>> & {resolveHttpIdentity:(request:Request)=>Promise<Identity>;classifyHttpDomainError:(error:unknown)=>string};
+export type WorkflowMode='planning'|'canonical'|'can';
+export type Workflow=Record<'createCanonicalBlueprintConfiguration'|'saveCanonicalBlueprintConfiguration'|'submitCanonicalBlueprintConfiguration'|'decideCanonicalBlueprintReview'|'executeCanonicalBlueprintConfiguration'|'recordNativeDeploymentReadiness'|'placeNativeDeploymentSite'|'approveNativeOfferingAdoption',(input:unknown)=>Promise<unknown>>;
+type Bridge = Record<AuthHandler,(request:Request)=>Promise<Response>> & {resolveGovernedWorkflow:(request:Request,mode:WorkflowMode)=>Promise<Workflow>;resolveHttpIdentity:(request:Request)=>Promise<Identity>;classifyHttpDomainError:(error:unknown)=>string};
 
 /** Only explicit verified local runtime configuration can enable this adapter. */
 @Injectable()
@@ -40,6 +42,19 @@ export class CanonicalIdentityService {
     if(typeof request.headers.cookie==='string')headers.set('cookie',request.headers.cookie);
     if(typeof request.headers['user-agent']==='string')headers.set('user-agent',request.headers['user-agent']);
     return bridge[handler](new Request(this.writeOrigin!+'/api/v1/access',{method:'POST',headers,body:JSON.stringify(body)}));
+  }
+  async authenticateWorkflow(request:FastifyRequest,mode:WorkflowMode):Promise<Workflow>{
+    this.assertWriteRequest(request);
+    const cookie=request.headers.cookie;
+    if(typeof cookie!=='string'||!cookie)throw new UnauthorizedException();
+    const bridge=this.load();
+    try{return await bridge.resolveGovernedWorkflow(new Request(this.writeOrigin!+'/api/v1/workflow',{method:'POST',headers:{cookie,origin:this.writeOrigin!}}),mode);}
+    catch(error){throw this.translate(bridge,error);}
+  }
+  async runWorkflow<T>(work:()=>Promise<T>):Promise<T>{
+    const bridge=this.load();
+    try{return await work();}
+    catch(error){if(error instanceof z.ZodError)throw error;throw this.translate(bridge,error);}
   }
   async authenticate(request: FastifyRequest, mode:'read'|'write'='read'): Promise<Identity> {
     // No caller-supplied role, account, grant or forwarding headers.

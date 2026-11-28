@@ -173,3 +173,12 @@ test('access wire contracts forbid ambiguous credentials and caller-selected ide
  assert.equal(c.requestBody.safeParse({email,role:'platform_owner'}).success,false);
  assert.equal(c.registerBody.safeParse({email,firstName:'QA',lastName:'User',adultConfirmed:false}).success,false);
 });
+
+test('Blueprint and deployment commands remain protected and disabled by default',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const p of ["/api/v1/blueprint-configurations","/api/v1/blueprint-configurations/revisions","/api/v1/blueprint-configurations/submissions","/api/v1/blueprint-reviews","/api/v1/blueprint-executions","/api/v1/deployment-readiness-reviews","/api/v1/deployment-site-placements","/api/v1/offering-adoption-approvals"]){
+   const op=document.paths[p].post;assert.ok(op.security);assert.ok(op.requestBody);assert.ok(op.responses['403']);
+   assert.equal((await fetch(url+p,{method:'POST',headers:{Origin:url,'content-type':'application/json'},body:'{}'})).status,503);
+  }
+ });
+});
