@@ -1,3 +1,4 @@
+import {ContextualReportingRelationships} from "@/components/reporting/ContextualReportingRelationships";
 import { SiteGuideV61 } from "./SiteGuideV61";
 /**
  * CAN OS V6.1 · Shape / Site Profile.
@@ -223,6 +224,7 @@ export function EstablishSiteProfileUnified({
         </div>
       </ActionFooter>
     </form>
+    <ContextualReportingRelationships scopeKind="site" scopeId={site.id}/>
   </section>;
 }
 
