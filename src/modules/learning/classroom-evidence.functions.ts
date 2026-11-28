@@ -37,18 +37,19 @@ function assertLive(room: typeof facilitatedLearningSessions.$inferSelect, now: 
     throw new AuthorizationError("current classroom session");
 }
 
-async function learnerRoom(tx: Tx, courseAttemptId: string, roomId: string) {
+async function learnerRoom(tx: Tx, courseAttemptId: string, roomId: string, lockParticipant = false) {
   const actor = await getInstructionalLearnerContext(getRequest());
   if (!actor.actorPersonId || !["student", "learner"].includes(actor.role ?? ""))
     throw new AuthorizationError("authenticated course learner");
   const access = await authorizeCanonicalCourseAttempt(tx, actor, courseAttemptId);
-  const [pair] = await tx.select({ id: facilitatedLearningParticipants.id })
+  const pairQuery = tx.select({ id: facilitatedLearningParticipants.id })
     .from(facilitatedLearningParticipants).where(and(
       eq(facilitatedLearningParticipants.facilitatedSessionId, roomId),
       eq(facilitatedLearningParticipants.courseAttemptId, courseAttemptId),
       eq(facilitatedLearningParticipants.participantPersonId, actor.actorPersonId),
       isNull(facilitatedLearningParticipants.leftAt),
     )).limit(1);
+  const [pair] = lockParticipant ? await pairQuery.for("update") : await pairQuery;
   const [room] = await tx.select().from(facilitatedLearningSessions)
     .where(eq(facilitatedLearningSessions.id, roomId)).limit(1);
   const now = new Date();
@@ -244,8 +245,9 @@ export const recordClassroomPresence = createServerFn({ method: "POST" })
     guard();
     return db.transaction(async tx => {
       const { room, personId } = await learnerRoom(
-        tx, data.courseAttemptId, data.facilitatedSessionId,
+        tx, data.courseAttemptId, data.facilitatedSessionId, true,
       );
+      // Serialize one participant's presence stream across devices and retries.
       const [prior] = await tx.select().from(facilitatedRoomPresenceEvents)
         .where(and(
           eq(facilitatedRoomPresenceEvents.facilitatedSessionId, room.id),
@@ -270,11 +272,24 @@ export const recordClassroomPresence = createServerFn({ method: "POST" })
           )).limit(1);
         if (recent) return { recorded: false, duplicate: false, throttled: true };
       }
-      await tx.insert(facilitatedRoomPresenceEvents).values({
+      const [saved] = await tx.insert(facilitatedRoomPresenceEvents).values({
         facilitatedSessionId: room.id, courseAttemptId: data.courseAttemptId,
         participantPersonId: personId, clientInstanceId: data.clientInstanceId,
         clientEventId: data.clientEventId, eventKind: data.eventKind,
-      }).onConflictDoNothing();
+      }).onConflictDoNothing().returning({ id: facilitatedRoomPresenceEvents.id });
+      if (!saved) {
+        const [existing] = await tx.select().from(facilitatedRoomPresenceEvents)
+          .where(and(
+            eq(facilitatedRoomPresenceEvents.facilitatedSessionId, room.id),
+            eq(facilitatedRoomPresenceEvents.courseAttemptId, data.courseAttemptId),
+            eq(facilitatedRoomPresenceEvents.clientEventId, data.clientEventId),
+          )).limit(1);
+        if (!existing || existing.participantPersonId !== personId ||
+            existing.clientInstanceId !== data.clientInstanceId ||
+            existing.eventKind !== data.eventKind)
+          throw new Error("Conflicting device presence retry");
+        return { recorded: true, duplicate: true, throttled: false };
+      }
       return { recorded: true, duplicate: false, throttled: false };
     });
   });
