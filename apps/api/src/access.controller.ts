@@ -23,15 +23,20 @@ async function translateResponse(response:Response,reply:FastifyReply,status:num
  }
  if(response.status!==status)throw new InternalServerErrorException();
  const payload=schema?schema.parse(await response.json()):undefined;
- const cookie=response.headers.get('set-cookie');
- if(cookie){
-   // JSON verification and logout issue exactly one existing secure cookie.
-   // Never manufacture a session cookie or copy arbitrary response headers.
-   // Exact canonical cookie grammar; reject additional cookies, Domain, and
-   // malformed attributes instead of accepting substring matches.
-   if(!/^__Host-can_os_session=(?:[A-Za-z0-9_-]{40,128})?; Path=\/; HttpOnly; Secure; SameSite=Lax; Max-Age=\d+$/.test(cookie))throw new InternalServerErrorException();
-   reply.header('Set-Cookie',cookie);
- }
+ const cookies=response.headers.getSetCookie();
+ // Verification must issue exactly one CAN bearer. Logout must clear both
+ // cookie names independently; never forward arbitrary response headers.
+ if(status===204){
+   const expected=new Set(['__Host-can_os_session','__Host-can_os_v3_session']);
+   for(const cookie of cookies){
+     const match=/^(__Host-can_os(?:_v3)?_session)=; Path=\\/; HttpOnly; Secure; SameSite=Lax; Max-Age=0$/.exec(cookie);
+     if(!match||!expected.delete(match[1]!))throw new InternalServerErrorException();
+   }
+   if(expected.size!==0)throw new InternalServerErrorException();
+ }else if(status===200&&schema===c.verified){
+   if(cookies.length!==1||!/^__Host-can_os_session=[A-Za-z0-9_-]{40,128}; Path=\\/; HttpOnly; Secure; SameSite=Lax; Max-Age=43200$/.test(cookies[0]!))throw new InternalServerErrorException();
+ }else if(cookies.length)throw new InternalServerErrorException();
+ if(cookies.length)reply.header('Set-Cookie',cookies);
  reply.header('Referrer-Policy','no-referrer');
  reply.code(status);
  return payload;
