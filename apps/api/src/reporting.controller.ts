@@ -65,6 +65,7 @@ export class ReportingController{
 
  @Get('reports/geography-options')
  @Governed('operator-reporting','GET')
+ @ApiCookieAuth('nativeSession')
  @ApiQuery({name:'basis',enum:['current','historical'],required:true})
  @ApiOperation({operationId:'getReportingGeographyOptions',summary:'Authorized geographic filter options, not grants'})
  @ApiOkResponse({schema:c.intelligenceDocs.geography})
@@ -75,6 +76,7 @@ export class ReportingController{
 
  @Get('reports/site-options')
  @Governed('operator-reporting','GET')
+ @ApiCookieAuth('nativeSession')
  
  @ApiOperation({operationId:'getProviderReportSites',summary:'Authorized operator Site filter options'})
  @ApiOkResponse({schema:c.intelligenceDocs.sites})

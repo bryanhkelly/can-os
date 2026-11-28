@@ -674,6 +674,8 @@ test('WS09 intelligence reads have documented security and deny anonymous forged
  assert.equal(requestQuery.safeParse({direction:'incoming',scopeKind:'site'}).success,false);
  assert.equal(recipientQuery.safeParse({query:'x'}).success,false);
  assert.equal(r.sites.safeParse([{id:'00000000-0000-4000-8000-000000000001',label:'Site',personId:'forged'}]).success,false);
+ assert.equal(r.scopes.safeParse({items:[],next:null,metrics:[{metricKey:'class.registrations',definitionVersion:'0.1.0',label:'Class: Registrations'}]}).success,true);
+ assert.equal(r.requests.safeParse({items:[],next:null,canAuthorize:true,metrics:[{metricKey:'class.registrations',definitionVersion:'0.1.0',label:'Class: Registrations'}]}).success,true);
  assert.equal(r.recipients.safeParse({items:Array.from({length:26},()=>({id:'00000000-0000-4000-8000-000000000001',name:'Site'})),next:null}).success,false);
  assert.equal(r.readiness.safeParse({networkOrganizationId:'00000000-0000-4000-8000-000000000001',asOf:'2026-11-28T00:00:00Z',counts:{configuredUnits:0,activeUnits:0,configuredMemberships:0,currentMemberships:0,configuredGrants:0,currentGrants:0,currentGrantHosts:0},blockers:[],classification:'private_setup_inventory',disclosureApproved:true}).success,false);
 });

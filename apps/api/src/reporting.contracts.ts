@@ -34,6 +34,7 @@ const geographyKind=z.enum(['region','state','county','metro','micro','csa']);
 const coverageMode=z.enum(['prospective','from_date','all_history']);
 const action=z.enum(['accept','decline','withdraw','revoke']);
 const metricTerm=z.object({metricKey:text.min(1).max(128),definitionVersion:text.min(1).max(64)}).strict();
+const metricChoice=metricTerm.extend({label:text});
 const named=z.object({id:uuid,name:text}).strict();
 export const geographyQuery=z.object({basis:z.enum(['current','historical'])}).strict();
 export const scopeQuery=z.object({kind:scopeKind,after:uuid.optional()}).strict();
@@ -45,10 +46,11 @@ export const intelligenceResults={
  geography:z.array(z.object({code:text,name:text,kind:geographyKind}).strict()).max(1000),
  sites:z.array(z.object({id:uuid,label:text}).strict()).max(1000),
  recipients:z.object({items:z.array(named).max(25),next:uuid.nullable()}).strict(),
- scopes:z.object({items:z.array(named).max(25),next:uuid.nullable(),metrics:z.array(metricTerm).max(50)}).strict(),
- requests:z.object({items:z.array(z.object({agreement,allowedActions:z.array(action),organizationName:text,scopeName:text,metricLabels:z.array(text),inherited:z.boolean()}).strict()).max(25),next:uuid.nullable(),canAuthorize:z.boolean(),metrics:z.array(metricTerm).max(50)}).strict(),
+ scopes:z.object({items:z.array(named).max(25),next:uuid.nullable(),metrics:z.array(metricChoice).max(50)}).strict(),
+ requests:z.object({items:z.array(z.object({agreement,allowedActions:z.array(action),organizationName:text,scopeName:text,metricLabels:z.array(text),inherited:z.boolean()}).strict()).max(25),next:uuid.nullable(),canAuthorize:z.boolean(),metrics:z.array(metricChoice).max(50)}).strict(),
 };
 const namedDoc=obj({id,name:s});
+const metricChoiceDoc=obj({metricKey:{...s,minLength:1,maxLength:128},definitionVersion:{...s,minLength:1,maxLength:64},label:s});
 const countDoc=obj(Object.fromEntries(Object.keys(setupCounts.shape).map(k=>[k,n])));
 const agreementDoc=obj({id,dataPopulation:en(population.options),ownerOrganizationId:id,recipientOrganizationId:id,scopeKind:en(scopeKind.options),scopeId:id,relationshipKind:en(relationshipKinds),metrics:arr(metric,50),coverageMode:en(coverageMode.options),coverageFrom:{...dt,nullable:true},supersedesId:{...id,nullable:true},validThrough:{...dt,nullable:true},proposedAt:dt,status:en(status.options),acceptedAt:{...dt,nullable:true}},['id','dataPopulation','ownerOrganizationId','recipientOrganizationId','scopeKind','scopeId','relationshipKind','metrics','validThrough','proposedAt','status','acceptedAt']);
 export const intelligenceDocs={
@@ -56,6 +58,6 @@ export const intelligenceDocs={
  geography:arr(obj({code:s,name:s,kind:en(geographyKind.options)}),1000),
  sites:arr(obj({id,label:s}),1000),
  recipients:obj({items:arr(namedDoc,25),next:{...id,nullable:true}}),
- scopes:obj({items:arr(namedDoc,25),next:{...id,nullable:true},metrics:arr(metric,50)}),
- requests:obj({items:arr(obj({agreement:agreementDoc,allowedActions:arr(en(action.options)),organizationName:s,scopeName:s,metricLabels:arr(s),inherited:b}),25),next:{...id,nullable:true},canAuthorize:b,metrics:arr(metric,50)}),
+ scopes:obj({items:arr(namedDoc,25),next:{...id,nullable:true},metrics:arr(metricChoiceDoc,50)}),
+ requests:obj({items:arr(obj({agreement:agreementDoc,allowedActions:arr(en(action.options)),organizationName:s,scopeName:s,metricLabels:arr(s),inherited:b}),25),next:{...id,nullable:true},canAuthorize:b,metrics:arr(metricChoiceDoc,50)}),
 };
