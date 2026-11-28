@@ -18,7 +18,7 @@ describe("one Site UUID; retired identity bridge",()=>{
     "src/modules/sites/site-published-classes.server.ts",
     "src/modules/sites/site-noncredit-releases.server.ts",
     "src/modules/identity/platform-admin.functions.ts",
-    "src/modules/identity/canonical-sensitive-approvals.functions.ts",
+    "src/modules/identity/canonical-sensitive-approvals.server.ts",
     "src/modules/sites/staff-principal-verification.functions.ts",
   ];
   for(const file of files)
