@@ -1,7 +1,7 @@
 import {Controller,Get,Post,Req,Res,Body,applyDecorators,HttpException,InternalServerErrorException,HttpCode} from '@nestjs/common';
 import {ApiTags,ApiOperation,ApiBody,ApiResponse,ApiHeader,ApiCookieAuth} from '@nestjs/swagger';
 import type {FastifyReply,FastifyRequest} from 'fastify';
-import {AnonymousAccessOperation,CanonicalReadOperation,CanonicalWriteOperation,verifiedIdentity} from './security';
+import {AnonymousAccessOperation,CanonicalReadOperation,verifiedIdentity} from './security';
 import {CanonicalIdentityService} from './identity.service';
 import {problemOpenApiSchema} from './contracts';
 import {validated} from './learning.contracts';
@@ -84,12 +84,12 @@ export class AccessController{
    return this.identity.run(verifiedIdentity(req),async actor=>c.session.parse(await actor.readSession()));
  }
  @Post('logout')
- @CanonicalWriteOperation()
+ @AnonymousAccessOperation()
  @ApiCookieAuth('session')
  @HttpCode(204)
  @AccessErrors()
  @ApiHeader({name:'Origin',required:true})
- @ApiOperation({operationId:'logout',summary:'Revoke current session and clear its cookie'})
+ @ApiOperation({operationId:'logout',summary:'Revoke the presented session and clear its cookie, including delegated sessions'})
  @ApiBody({schema:c.doc.empty})
  @ApiResponse({status:204})
  async logout(@Req() req:FastifyRequest,@Res({passthrough:true}) reply:FastifyReply,@Body() body:unknown){
