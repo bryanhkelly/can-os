@@ -1,4 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
+import { selectApiMembership } from "@/lib/api/browser-session";
+import { clearWorkspaceQueries } from "@/lib/api/workspace-query-scope";
 import { getWorkspaceHome } from "@/components/shell/workspace-navigation.registry";
 
 type MembershipGrant = { id: string; role: string };
@@ -24,16 +26,10 @@ export async function switchVerifiedMembership({
   if (redirect.origin !== window.location.origin) throw new Error("The requested destination is unavailable.");
 
   if (target.id !== activeGrantId) {
-    const response = await fetch("/access/session", {
-      method: "POST",
-      credentials: "same-origin",
-      cache: "no-store",
-      redirect: "error",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ grantId: target.id }),
-    });
-    if (!response.ok) throw new Error("Unable to change membership.");
-    queryClient.clear();
+    // Stop reads from the previous membership before changing the session.
+    await queryClient.cancelQueries();
+    await selectApiMembership(target.id);
+    await clearWorkspaceQueries(queryClient);
   }
 
   window.location.assign(`${redirect.pathname}${redirect.search}${redirect.hash}`);
