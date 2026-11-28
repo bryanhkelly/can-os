@@ -32,7 +32,7 @@ test("both pilot modes: exact provider counts, two-tenant denial and no implied 
    const s=await authenticateQaActor({request:c},site.actor.email,undefined,"nest");
    const grant=s.grants.find(g=>g.id===site.actor.grantId);
    expect(grant).toMatchObject({personId:site.actor.personId,organizationId:site.actor.organizationId,siteId:site.actor.siteId});
-   expect((await c.post(api+"/me/session/membership",{headers:{Origin:origin},data:{grantId:site.actor.grantId}})).status()).toBe(200);
+   expect((await c.post(api+"/me/session/membership",{headers:{Origin:origin},data:{grantId:site.actor.grantId}})).status()).toBe(204);
    expect((await qaSession({request:c},"nest")).activeGrantId).toBe(site.actor.grantId);
   }
   for(const [i,site] of f.sites.entries()){
