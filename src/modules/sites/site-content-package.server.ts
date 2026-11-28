@@ -172,11 +172,11 @@ export async function processSitePackage(actor:AccessContext,data:Request&{diges
    const safe=safeGlooFailure(error);
    const classified=safe.code==="processing_failed"?{code:"processing_"+failureStage,message:"Site Intelligence failed during "+failureStage+". Contact support."}:safe;
    const failure={...classified,code:finalContentRecoveryFailure(classified.code,claim.finalContentRecovery)};
-   console.error("Site Intelligence failure", {siteId:data.siteId,inputId:claim.inputId,correlationId:token,stage:failureStage,code:failure.code,totalElapsedMs:Date.now()-started});
+   console.error("Site Intelligence failure", {siteId:data.siteId,inputId:claim.inputId,correlationId:token,stage:failureStage,code:failure.code,causeCode:classified.code,totalElapsedMs:Date.now()-started});
    await db.transaction(async tx=>{
      const [failed]=await tx.update(inputs).set({status:"failed",leaseToken:null,leaseUntil:null,errorCode:failure.code,updatedAt:new Date()}).where(fence).returning({id:inputs.id});
      if(failed)await emitReportableChange(tx,{eventType:EventTypes.SiteIntelligenceProcessingFailed,sourceId:failed.id,sourceVersion:token,occurredAt:new Date(),actorPersonId:actor.actorPersonId,dimensions:{organizationId,siteId:data.siteId},payload:{attempt:claim.attempt}});
-     if(failed)await writeAudit(tx,actor,{action:"site.content_generation.failed",entityType:"site",entityId:data.siteId,scope:{siteId:data.siteId,organizationId},after:{inputId:failed.id,inputDigest:data.digest,errorCode:failure.code}});
+     if(failed)await writeAudit(tx,actor,{action:"site.content_generation.failed",entityType:"site",entityId:data.siteId,scope:{siteId:data.siteId,organizationId},after:{inputId:failed.id,inputDigest:data.digest,errorCode:failure.code,causeCode:classified.code}});
    });
    return {status:"failed" as const,...failure};
  }

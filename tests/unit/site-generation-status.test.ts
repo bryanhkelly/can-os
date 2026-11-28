@@ -46,4 +46,5 @@ it("permits a cooled-down final recovery for contract errors without an endless 
  expect(terminal).toBe("gloo_content_retry_exhausted");
  expect(generationEligibility({...base,attempt:{...attempt,errorCode:terminal},now:later})).toMatchObject({allowed:false,code:"retry_limit"});
  expect(finalContentRecoveryFailure(attempt.errorCode,false)).toBe(attempt.errorCode);
+ expect(finalContentRecoveryFailure("gloo_http_401",true)).toBe("gloo_content_retry_exhausted");
 });

@@ -56,6 +56,12 @@ describe("Gloo persistent package transport",()=>{
     expect((await generateSitePackageWithGloo(packageInput,send)).content.website.heroHeadline).toBe(packageContent.website.heroHeadline);
     expect(send).toHaveBeenCalledTimes(1);
   });
+  it("rejects prose surrounding an otherwise valid JSON object",async()=>{
+    configure();
+    const sender=vi.fn(async()=>new Response(JSON.stringify({status:"completed",output:[{type:"message",content:[{type:"output_text",text:"Here is your draft: "+JSON.stringify(packageContent)}]}]})));
+    await expect(generateSitePackageWithGloo(packageInput,sender)).rejects.toMatchObject({code:"gloo_content_contract",issues:[{field:"$",reason:"invalid_json"}]});
+    expect(sender).toHaveBeenCalledTimes(2);
+  });
   it("retries the full package once using only allowlisted validation diagnostics",async()=>{
     configure();
     const invalid={...packageContent,website:{...packageContent.website,heroHeadline:"https://private.example/secret"}};

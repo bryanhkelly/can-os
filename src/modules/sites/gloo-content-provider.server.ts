@@ -21,7 +21,7 @@ function validationIssues(error:unknown):ValidationIssue[]{
 /** Accept only a single outer Markdown JSON fence or harmless whitespace. No substring extraction, field coercion or content repair. */
 export function normalizeGlooJson(raw:string):string{
  const trimmed=raw.trim();
- const fenced=/^```(?:json)?[ \\t]*\\r?\\n([\\s\\S]*?)\\r?\\n```[ \\t]*$/i.exec(trimmed);
+ const fenced=/^```(?:json)?[ \t]*\r?\n([\s\S]*?)\r?\n```[ \t]*$/i.exec(trimmed);
  return fenced?fenced[1]!.trim():trimmed;
 }
 function contractFailure(error:unknown,label:string){
@@ -69,7 +69,7 @@ async function requestGloo(input:unknown,instructions:string,maxTokens:number,se
 
 export async function generateWithGloo(input:SiteGenerationInput,send:typeof fetch=fetch){
  const {raw,...metadata}=await requestGloo(input,SITE_CONTENT_INSTRUCTIONS,3000,send,GLOO_PACKAGE_TIMEOUT_MS);
- try{return {...metadata,content:parseGeneratedSiteContent(normalizeGlooJson(raw),input.target)};}catch(error){throw contractFailure(error,"Gloo draft");}
+ try{if(raw.length>24000)throw new SitePackageContractError("$","too_large","Generated content exceeds the contract");return {...metadata,content:parseGeneratedSiteContent(normalizeGlooJson(raw),input.target)};}catch(error){throw contractFailure(error,"Gloo draft");}
 }
 export async function generateSitePackageWithGloo(input:SitePackageInput,send:typeof fetch=fetch,hooks:GenerationHooks={}){
  const deadline=Date.now()+GLOO_PACKAGE_TIMEOUT_MS;
