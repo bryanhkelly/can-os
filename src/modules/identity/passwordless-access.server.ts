@@ -6,7 +6,7 @@ import { roleCapabilities } from "@/domain/access-context";
 import { assertMembershipSwitchIdentity } from "@/domain/membership-switch-policy";
 import { AuthorizationError } from "@/domain/command-context";
 import { AccessInfrastructureError, InvalidAccessCredentialError, type AccessFailureReason } from "@/domain/access-errors";
-import { clearSessionCookieHeader,hashAccessSecret,hashPrivateAccessCode,isPrivateAccessCode,equalSecretHashes,issueOpaqueSecret,normalizeAccessEmail,sessionCookieHeader,sessionIdleCutoff } from "@/domain/access-tokens";
+import { accessSessionCookie,clearSessionCookieHeader,hashAccessSecret,hashPrivateAccessCode,isPrivateAccessCode,equalSecretHashes,issueOpaqueSecret,normalizeAccessEmail,sessionCookieHeader,sessionIdleCutoff } from "@/domain/access-tokens";
 import {
  isDemoAccountEmail,LOCAL_DEMO_ACCESS_CODE,
 } from "@/domain/local-demo-access";
@@ -17,6 +17,7 @@ import { and,desc,eq,gt,inArray,isNull,isNotNull,lt,sql } from "drizzle-orm";
 import { sendAccessLinkViaResend,type AccessEmailSender } from "./resend-access-mail.server";
 import { acceptStaffInvitations,listPendingStaffInvitations } from "./staff-invitations.server";
 import { readDemoStaffBindings, matchesDemoStaffBinding } from "./demo-staff-access.server";
+import { readCookie } from "@/domain/session-cookies";
 import { safeAccessReturnTo } from "@/domain/access-navigation";
 import { realSchoolSetupSignupSchema, siteSignupSchema } from "@/domain/school-setup";
 
@@ -420,6 +421,16 @@ export async function revokeAccessSession(sessionId:string,accountId:string):Pro
   }
  });
  return clearSessionCookieHeader();
+}
+/** Revocation grants no business authority. Resolve the original session by its
+ * opaque credential even when its effective grant is disabled or delegated.
+ * A missing/expired/revoked credential can safely clear only its own cookie. */
+export async function revokePresentedAccessSession(request:Request):Promise<string> {
+ const token=readCookie(request,accessSessionCookie);
+ if(!token || !/^[A-Za-z0-9_-]{40,128}$/.test(token))return clearSessionCookieHeader();
+ const [session]=await db.select({id:accessSessions.id,accountId:accessSessions.accountId})
+  .from(accessSessions).where(and(eq(accessSessions.secretHash,hashAccessSecret(token,secretPepper())),isNull(accessSessions.revokedAt))).limit(1);
+ return session?revokeAccessSession(session.id,session.accountId):clearSessionCookieHeader();
 }
 /** Selection is restricted to a grant assigned to the authenticated account. */
 export async function selectAccessGrant(sessionId:string,accountId:string,grantId:string):Promise<void> {
