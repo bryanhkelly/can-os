@@ -795,3 +795,31 @@ test('Class workspace and roster use protected explicit contracts',async()=>{
  assert.equal(queries.workspace.safeParse({view:'manage',role:'site_admin'}).success,false);
  assert.equal(results.roster.safeParse({members:[],total:0,nextOffset:null,rawPeople:[]}).success,false);
 });
+
+test('learning evidence routes enforce authentication and distinguish ratings and assisted practice from grades',async()=>{
+ await withServer('0',async(url,document)=>{
+  const id='00000000-0000-4000-8000-000000000001';
+  for(const route of ['/api/v1/me/course-attempts/{courseAttemptId}/classroom-feedback','/api/v1/me/course-attempts/{courseAttemptId}/participation-kind','/api/v1/me/class-enrollments/{classEnrollmentId}/calendar']){
+   assert.ok(document.paths[route].get.security);
+   assert.equal((await fetch(url+route.replace(/\{\w+\}/g,id))).status,401);
+  }
+  for(const route of ['/api/v1/me/course-attempts/{courseAttemptId}/classroom-feedback','/api/v1/classroom-assisted-activities']){
+   assert.ok(document.paths[route].post.security);
+   assert.equal((await fetch(url+route.replace(/\{\w+\}/g,id),{method:'POST',headers:{Origin:url,'content-type':'application/json'},body:'{}'})).status,503);
+  }
+ });
+ const {inputs,results}=require('../dist/learning-evidence.contracts');
+ const id='00000000-0000-4000-8000-000000000001';
+ const feedback={facilitatedSessionId:id,questionKey:'clarity',rating:5};
+ assert.equal(inputs.feedback.safeParse(feedback).success,true);
+ assert.equal(inputs.feedback.safeParse({...feedback,rating:6}).success,false);
+ assert.equal(inputs.feedback.safeParse({...feedback,participantPersonId:id}).success,false);
+ const assisted={facilitatedSessionId:id,activityReleaseId:id,courseAttemptId:id,requestId:id,method:'paper',answerChoice:0,answerText:null,evidenceNote:'Observed paper answer during classroom practice'};
+ assert.equal(inputs.assisted.safeParse(assisted).success,true);
+ assert.equal(inputs.assisted.safeParse({...assisted,answerText:'second answer'}).success,false);
+ assert.equal(inputs.assisted.safeParse({...assisted,answerChoice:null}).success,false);
+ assert.equal(inputs.assisted.safeParse({...assisted,learnerPersonId:id}).success,false);
+ assert.equal(results.assisted.safeParse({recorded:true,duplicate:false,facilitatorAttributed:true}).success,true);
+ assert.equal(results.assisted.safeParse({recorded:true,duplicate:false,facilitatorAttributed:true,grade:100}).success,false);
+ assert.equal(results.feedbackHistory.safeParse({rooms:[{facilitatedSessionId:id,startedAt:'2026-11-28T00:00:00Z',feedbackClosesAt:'2026-12-05T00:00:00Z',ratings:{clarity:3}}],notice:'Optional ratings'}).success,true);
+});
