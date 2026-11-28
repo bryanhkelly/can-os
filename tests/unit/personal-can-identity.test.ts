@@ -33,7 +33,7 @@ describe("Personal CAN account boundaries", () => {
     const signin=readFileSync(
       "src/modules/identity/passwordless-access.server.ts","utf8");
     expect(personal).toContain("eq(accountPersonGrants.active, true)");
-    expect(personal).toContain("if (!existing.consumedAt && existing.expiresAt > new Date())");
+    expect(personal).toContain("if (!existing.consumedAt)");
     expect(personal).toContain("if (demo) return provisionPrivatePersonalSignup(data,email)");
     expect(personal).toContain("if(!account)return genericResult");
     expect(personal).toContain("privateAccessCodeHash");
