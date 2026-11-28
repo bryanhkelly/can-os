@@ -32,7 +32,8 @@ export const transferNativeClassroomControl=createServerFn({method:"POST"})
     setResponseHeader("Referrer-Policy","no-referrer");
     const actor=await getCanonicalCommandContext(getRequest());
     if(!actor.actorPersonId||!["site_admin","registrar"].includes(actor.role??"")||
-       actor.actorPersonId===data.toPersonId||data.expectedFacilitatorPersonId===data.toPersonId)
+       actor.actorPersonId===data.toPersonId||actor.actorPersonId===data.expectedFacilitatorPersonId||
+       data.expectedFacilitatorPersonId===data.toPersonId)
       throw new AuthorizationError("independent Class Site manager and distinct replacement facilitator");
     assertCapability(actor,"class.manage");
     return db.transaction(async tx=>{
@@ -54,12 +55,12 @@ export const transferNativeClassroomControl=createServerFn({method:"POST"})
       if(!room || (await nativeClassForRoom(tx,room))?.classSessionId!==link.id)
         throw new AuthorizationError("exact current Class room");
       await assertCurrentCanonicalStaffForMutation(tx,getRequest(),actor);
-      const [prior]=await tx.select({payload:domainEvents.payload}).from(domainEvents)
+      const [prior]=await tx.select({payload:domainEvents.payload,actorPersonId:domainEvents.actorPersonId}).from(domainEvents)
         .where(and(eq(domainEvents.aggregateType,"facilitated_learning_session"),
           eq(domainEvents.aggregateId,room.id),eq(domainEvents.eventType,EventTypes.ClassroomControlTransferred),
           sql`${domainEvents.payload}->>'requestId' = ${data.requestId}`)).limit(1);
       if(prior){
-        if(prior.payload.fromPersonId!==data.expectedFacilitatorPersonId||
+        if(prior.actorPersonId!==actor.actorPersonId||prior.payload.fromPersonId!==data.expectedFacilitatorPersonId||
            prior.payload.toPersonId!==data.toPersonId||prior.payload.reason!==data.reason)
           throw new AuthorizationError("conflicting classroom transfer retry");
         return {transferred:true,duplicate:true,facilitatedSessionId:room.id,

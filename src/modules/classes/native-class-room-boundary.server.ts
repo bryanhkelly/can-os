@@ -87,14 +87,15 @@ export async function nativeClassForRoom(tx:Tx,room:Room){
   await currentClassAuthority(tx,cls.id,new Date());
   // Preserve the immutable scheduled facilitator. A different current room
   // controller must have the matching durable manager-directed transfer.
-  if(row.originalFacilitatorId!==room.facilitatorPersonId){
+  {
     const [transfer]=await tx.select({payload:domainEvents.payload}).from(domainEvents)
       .where(and(eq(domainEvents.aggregateType,"facilitated_learning_session"),
         eq(domainEvents.aggregateId,room.id),eq(domainEvents.eventType,"ClassroomControlTransferred")))
       .orderBy(desc(domainEvents.occurredAt),desc(domainEvents.id)).limit(1);
-    if(!transfer||transfer.payload.classSessionId!==row.classSessionId||
+    if(transfer ? (transfer.payload.classSessionId!==row.classSessionId||
        transfer.payload.toPersonId!==room.facilitatorPersonId||
        transfer.payload.originalFacilitatorPersonId!==row.originalFacilitatorId)
+       : row.originalFacilitatorId!==room.facilitatorPersonId)
       throw new AuthorizationError("governed current classroom control assignment");
   }
   return {classId:cls.id,classSessionId:row.classSessionId,originalFacilitatorPersonId:row.originalFacilitatorId,adoptionId:cls.adoptionId,

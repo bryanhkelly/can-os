@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
@@ -42,6 +42,7 @@ export function NativeClassroomHostPanel({
   const [joinCode,setJoinCode]=useState(initialCode);
   const [expiresAt,setExpiresAt]=useState(initialExpiry);
   const [busy,setBusy]=useState(false);
+  const renewalRequest=useRef<{roomId:string;requestId:string}|null>(null);
   const [ending,setEnding]=useState(false);
   const [message,setMessage]=useState("");
   const [error,setError]=useState("");
@@ -53,11 +54,17 @@ export function NativeClassroomHostPanel({
     if(busy)return;
     setBusy(true);setError("");setMessage("");
     try{
-      const data=await renewFacilitatedLearningPairing({data:{facilitatedSessionId:roomId}});
+      if(renewalRequest.current?.roomId!==roomId)
+        renewalRequest.current={roomId,requestId:crypto.randomUUID()};
+      const data=await renewFacilitatedLearningPairing({data:{facilitatedSessionId:roomId,requestId:renewalRequest.current.requestId}});
+      renewalRequest.current=null;
       setJoinCode(data.pairingCode);setExpiresAt(data.pairingExpiresAt);
       setMessage("Short-lived join code renewed. Opening the audience display will show its QR.");
-    }catch{
-      setError("Pairing renewal refused. Check your active Class assignment and session.");
+    }catch(error){
+      // A definitive authorization denial needs a fresh request; network
+      // failures keep the same key so a committed renewal can be recovered.
+      if(error&&typeof error==="object"&&"code" in error&&error.code==="FORBIDDEN")renewalRequest.current=null;
+      setError("Pairing renewal failed. Retry, or check your active Class assignment and session.");
     }finally{setBusy(false)}
   }
   async function end(){

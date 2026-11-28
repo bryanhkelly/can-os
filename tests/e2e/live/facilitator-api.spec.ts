@@ -96,7 +96,13 @@ test("exact Site manager cancellation and independently authenticated backup sch
       await deny(p.page,"room","renewFacilitatedLearningPairing",scope);
       await deny(p.page,"session","openNativeClassSession",{classId,classSessionId:sessionId});
       expect(await rpc(b.page,"session","openNativeClassSession",{classId,classSessionId:sessionId})).toMatchObject({alreadyStarted:true,facilitatedSessionId:roomId});
-      expect(await rpc(b.page,"room","renewFacilitatedLearningPairing",scope)).toMatchObject(scope);
+      const renew={...scope,requestId:randomUUID()};
+      const first=await rpc<{pairingCode:string;pairingExpiresAt:string;duplicate:boolean}>(b.page,"room","renewFacilitatedLearningPairing",renew);
+      expect(first.duplicate).toBe(false);
+      expect(await rpc(b.page,"room","renewFacilitatedLearningPairing",renew)).toMatchObject({...first,duplicate:true});
+      const rotated=await rpc<typeof first>(b.page,"room","renewFacilitatedLearningPairing",{...scope,requestId:randomUUID()});
+      expect(rotated.pairingCode).not.toBe(first.pairingCode);
+      await deny(b.page,"room","renewFacilitatedLearningPairing",renew);
       const [after]=await sql`SELECT s.facilitator_person_id AS original,r.facilitator_person_id AS controller,p.facilitated_session_id
         FROM public.class_sessions s JOIN public.facilitated_classroom_plans p ON p.id=s.classroom_plan_id
         JOIN public.facilitated_learning_sessions r ON r.id=p.facilitated_session_id WHERE s.id=${sessionId}::uuid`;
