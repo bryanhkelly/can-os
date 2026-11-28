@@ -135,6 +135,11 @@ function ReleaseReview({item}:{item:Item}){
               {JSON.stringify(course.syllabus,null,2)}
             </pre>
           </details>
+          <details className="mt-3 border-t border-border pt-3">
+            <summary className="cursor-pointer font-semibold">Official assignments ({course.assignments?.length??0}) and grading policy</summary>
+            <p className="mt-2 text-xs text-muted-foreground">These definitions are bound to the reviewed snapshot. Inspect instructions, rubric, delivery and policy before approval.</p>
+            <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap text-xs">{JSON.stringify({assignments:course.assignments??[],deliveryAssignments:course.deliveryAssignments??[],gradingPolicies:course.gradingPolicies??[]},null,2)}</pre>
+          </details>
           {course.units.map(unit=><div key={unit.id} className="mt-3 border-t border-border pt-3">
             <h5 className="font-semibold">{unit.sequenceNo}. {unit.title}</h5>
             <details className="mt-1 text-xs">
