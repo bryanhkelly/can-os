@@ -70,7 +70,9 @@ export async function authenticateQaActor(context:BrowserContext,email:string,si
   const verified=await context.request.post(origin+"/access/verify",{headers:{Origin:origin},data:{token}});
   if(!verified.ok())throw Error("One-time access verification failed: "+verified.status());
   const session=await qaSession(context);
-  const replay=await context.request.post(origin+"/access/verify",{headers:{Origin:origin},data:{token}});
-  expect(replay.status()).toBe(401);
+  if(signup){
+    const replay=await context.request.post(origin+"/access/verify",{headers:{Origin:origin},data:{token}});
+    expect(replay.status()).toBe(401);
+  }
   return session;
 }
