@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, asc, desc, eq, inArray, isNotNull, lt, ne, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, lt, ne, or, sql } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
@@ -7,7 +7,7 @@ import { db } from "@/db/client";
 import {
   auditEvents, canonicalOfferingCourses, contentManifestReviewDecisions, contentAssets,
   contentAssetVersions, contentPublicationManifests, contentPublicationManifestItems,
-  courseLessons, courses, courseUnits, courseVersions,
+  courseLessons, courses, courseUnits, courseVersions, officialCourseAssignmentVersions,
   evidenceDocuments, evidenceDocumentVersions, offeringReleaseRequirements, offeringVersions, offerings,
   type JsonObject,
 } from "@/db/canonical-v301";
@@ -104,7 +104,7 @@ async function loadBundle(tx:Tx,offeringVersionId:string,lock:boolean) {
       .where(eq(courseVersions.id,row.courseVersionId)).for("update");
   }
   const ids=rows.map(row=>row.courseVersionId);
-  const [units,lessons]=await Promise.all([
+  const [units,lessons,assignments,deliveryRows,gradingPolicies]=await Promise.all([
     tx.select({
       id:courseUnits.id,courseVersionId:courseUnits.courseVersionId,
       unitKey:courseUnits.unitKey,title:courseUnits.title,
@@ -120,8 +120,17 @@ async function loadBundle(tx:Tx,offeringVersionId:string,lock:boolean) {
     }).from(courseLessons).where(inArray(courseLessons.courseVersionId,ids))
       .orderBy(asc(courseLessons.courseVersionId),asc(courseLessons.courseUnitId),
         asc(courseLessons.lessonOrder)).limit(2001),
+    tx.select().from(officialCourseAssignmentVersions)
+      .where(inArray(officialCourseAssignmentVersions.courseVersionId,ids))
+      .orderBy(asc(officialCourseAssignmentVersions.courseVersionId),asc(officialCourseAssignmentVersions.assignmentKey)).limit(2001),
+    tx.execute(sql`SELECT id,course_version_id,official_assignment_version_id,assignment_key,version_no,assessment_version_id,due_at,assignment_spec
+      FROM public.graded_assignments WHERE section_id IS NULL AND course_version_id IN (${sql.join(ids.map(id=>sql`${id}::uuid`),sql`, `)})
+      ORDER BY course_version_id,assignment_key,version_no,id LIMIT 2001`),
+    tx.execute(sql`SELECT id,course_version_id,policy_key,policy_spec,effective_from,approved_by_person_id
+      FROM public.course_grading_policy_versions WHERE course_version_id IN (${sql.join(ids.map(id=>sql`${id}::uuid`),sql`, `)})
+      ORDER BY course_version_id,policy_key,id LIMIT 501`),
   ]);
-  if(units.length>1000||lessons.length>2000)
+  if(units.length>1000||lessons.length>2000||assignments.length>2000||deliveryRows.rows.length>2000||gradingPolicies.rows.length>500)
     invalid("The Course composition exceeds the review snapshot limit.");
   const unitIds=new Set(units.map(unit=>unit.id));
   for(const row of rows){
@@ -137,13 +146,25 @@ async function loadBundle(tx:Tx,offeringVersionId:string,lock:boolean) {
     productDefinition:version.productDefinition,
     courses:rows.map(({lifecycle,...row})=>({
       ...row,
+      // Omit empty arrays so unchanged no-assignment manuscripts retain their
+      // existing hashes. Any nonempty requirement, delivery or policy changes
+      // invalidate the exact submitted snapshot and require fresh review.
+      ...(assignments.some(a=>a.courseVersionId===row.courseVersionId)?{
+        assignments:assignments.filter(a=>a.courseVersionId===row.courseVersionId),
+      }:{}),
+      ...(deliveryRows.rows.some(a=>a.course_version_id===row.courseVersionId)?{
+        deliveryAssignments:deliveryRows.rows.filter(a=>a.course_version_id===row.courseVersionId),
+      }:{}),
+      ...(gradingPolicies.rows.some(a=>a.course_version_id===row.courseVersionId)?{
+        gradingPolicies:gradingPolicies.rows.filter(a=>a.course_version_id===row.courseVersionId),
+      }:{}),
       units:units.filter(unit=>unit.courseVersionId===row.courseVersionId)
         .map(unit=>({
           ...unit,lessons:lessons.filter(lesson=>lesson.courseUnitId===unit.id),
         })),
     })), // Lifecycle changes do not alter content.
   });
-  return {offering,version,courses:rows,units,lessons,hash,unitCount:units.length,lessonCount:lessons.length};
+  return {offering,version,courses:rows,units,lessons,assignments,deliveryAssignments:deliveryRows.rows,gradingPolicies:gradingPolicies.rows,hash,unitCount:units.length,lessonCount:lessons.length};
 }
 
 async function requireAppointments(tx:Tx,actor:Actor,
@@ -212,15 +233,17 @@ async function requireIndependentNativeCourseReview(
     actorPersonId:platformAuditEvents.actorPersonId,
   }).from(platformAuditEvents)
     .where(and(
-      eq(platformAuditEvents.action,"curriculum.native_draft_lesson.save"),
-      eq(platformAuditEvents.resourceType,"course_lesson"),
-      inArray(platformAuditEvents.resourceId,lessonIds),
+      or(and(eq(platformAuditEvents.action,"curriculum.native_draft_lesson.save"),
+        eq(platformAuditEvents.resourceType,"course_lesson"),inArray(platformAuditEvents.resourceId,lessonIds)),
+        ...(bundle.assignments.length?[and(eq(platformAuditEvents.action,"curriculum.native_draft_assignment.create"),
+          eq(platformAuditEvents.resourceType,"official_course_assignment_version"),
+          inArray(platformAuditEvents.resourceId,bundle.assignments.map(a=>a.id)))]:[])),
     )).limit(1001);
   if(history.length>1000)
     invalid("Course edit provenance exceeds the independent review limit.");
   if(history.some(change=>!change.actorPersonId||
     reviewerPersonIds.has(change.actorPersonId)))
-    throw new AuthorizationError("Course reviewer cannot approve lessons they previously edited");
+    throw new AuthorizationError("Course reviewer cannot approve lessons or assignments they previously authored");
 }
 
 async function requireApprovedSnapshot(tx:Tx,manifest:
@@ -559,6 +582,9 @@ export const getNativeOfferingReviewContent=createServerFn({method:"GET"})
           courseVersionId:row.courseVersionId,courseTitle:row.courseTitle,
           courseCode:row.courseCode,isRequired:row.isRequired,
           syllabus:row.syllabus,
+          assignments:bundle.assignments.filter(a=>a.courseVersionId===row.courseVersionId),
+          deliveryAssignments:bundle.deliveryAssignments.filter(a=>a.course_version_id===row.courseVersionId),
+          gradingPolicies:bundle.gradingPolicies.filter(a=>a.course_version_id===row.courseVersionId),
           units:bundle.units.filter(unit=>unit.courseVersionId===row.courseVersionId)
             .map(unit=>({
               id:unit.id,title:unit.title,sequenceNo:unit.sequenceNo,
