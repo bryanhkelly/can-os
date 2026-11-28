@@ -4,7 +4,7 @@ const fs=require('node:fs');
 const os=require('node:os');
 const path=require('node:path');
 const ts=require('typescript');
-const modules=["operation","campaign-api","go-link-api","engagement-registry-api","marketing-package-api","marketing-artifact-api","sender-admin-api","engagement-api"];
+const modules=["operation","campaign-api","go-link-api","engagement-registry-api","marketing-package-api","marketing-artifact-api","sender-admin-api","engagement-api","engagement-workspaces"];
 /** Isolated adapter mapping tests. No real provider, database or alternate application endpoint. */
 function withAdapter(run){
  const temp=fs.mkdtempSync(path.join(os.tmpdir(),'engagement-sdk-'));
@@ -17,7 +17,8 @@ function withAdapter(run){
   }
   const {createEngagementApi}=require(path.join(temp,'engagement-api.js'));
   const {requireApiReceipt}=require(path.join(temp,'operation.js'));
-  await run(createEngagementApi,requireApiReceipt);
+  const {createNestEngagementWorkspaces}=require(path.join(temp,"engagement-workspaces.js"));
+  await run(createEngagementApi,requireApiReceipt,createNestEngagementWorkspaces);
  }).finally(()=>fs.rmSync(temp,{recursive:true,force:true}));
 }
 test('every authenticated controller operation has exactly one SDK adapter',()=>withAdapter(async(createApi)=>{
@@ -52,4 +53,15 @@ test('a failed or uncertain mutation is never automatically replayed',()=>withAd
  assert.equal(calls,1);
  assert.throws(()=>receipt({response:new Response(null,{status:200})}),/could not be confirmed/);
  assert.equal(receipt({response:new Response(null,{status:200}),data:null}),null);
+}));
+
+test('all nested workspaces share one explicitly selected client and API instance',()=>withAdapter(async(_api,_receipt,compose)=>{
+ const workspaces=compose({});
+ assert.equal(workspaces.go.api,workspaces.campaign.api);
+ assert.equal(workspaces.engagement.api,workspaces.sender.api);
+ assert.equal(workspaces.marketing.api,workspaces.engagement.api);
+ assert.equal(workspaces.marketing.engagement,workspaces.engagement);
+ assert.equal(workspaces.engagement.go,workspaces.go);
+ assert.equal(workspaces.engagement.campaign,workspaces.campaign);
+ for(const port of Object.values(workspaces))assert.equal(port.kind,'nest');
 }));
