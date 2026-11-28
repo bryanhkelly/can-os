@@ -9,16 +9,18 @@ const uuid=z.string().uuid();
 const actor=z.object({email:z.string().email().refine(x=>x===x.toLowerCase()&&x.endsWith(".test")),grantId:uuid,organizationId:uuid}).strict();
 const fixture=z.object({manager:actor,primary:actor,backup:actor,foreign:actor,
   classId:uuid,siteId:uuid,classSessionId:uuid,liveClassSessionId:uuid,
+  learner:actor,courseAttemptId:uuid,assetVersionId:uuid,
   replacement:z.object({requestId:uuid,startsAt:z.string().datetime({offset:true}),endsAt:z.string().datetime({offset:true}),lessonId:uuid,agendaRequestId:uuid}).strict()}).strict()
   .parse(JSON.parse(process.env.CAN_FACILITATOR_QA_JSON??"{}"));
 const branch="br-solitary-art-arun91gj";
 const sql=neon(process.env.TEST_DATABASE_URL!);
 
-test("exact Site manager cancellation and independently authenticated backup scheduling",async({browser})=>{
+test("governed cancellation and live facilitator takeover preserve actual learner evidence",async({browser})=>{
   const [identity]=await sql`SELECT current_setting('neon.project_id',true) AS project,current_setting('neon.branch_id',true) AS branch`;
   expect(identity).toEqual({project:"sweet-hall-62441909",branch});
-  const {manager,primary,backup,foreign,classId,siteId,classSessionId,replacement}=fixture;
-  expect(new Set([manager,primary,backup,foreign].map(a=>a.email)).size).toBe(4);
+  const {manager,primary,backup,foreign,classId,siteId,classSessionId,replacement,learner,courseAttemptId,assetVersionId}=fixture;
+  expect(new Set([manager,primary,backup,foreign,learner].map(a=>a.email)).size).toBe(5);
+  expect(learner.organizationId).toBe(manager.organizationId);
   expect(primary.organizationId).toBe(manager.organizationId);
   expect(backup.organizationId).toBe(manager.organizationId);
   expect(foreign.organizationId).not.toBe(manager.organizationId);
@@ -47,10 +49,16 @@ test("exact Site manager cancellation and independently authenticated backup sch
     return {page:await pilotRpcPage(context),session,grant:session.grants.find(g=>g.id===a.grantId)!};
   }
   try{
-    const m=await login(manager),p=await login(primary),b=await login(backup),f=await login(foreign);
+    const m=await login(manager),p=await login(primary),b=await login(backup),f=await login(foreign),l=await login(learner);
+    expect(l.session.role).toBe("student");
+    expect(l.grant.siteId).toBe(siteId);
+    const [enrolled]=await sql`SELECT count(*)::int AS count FROM public.class_enrollments
+      WHERE class_id=${classId}::uuid AND learner_person_id=${l.grant.personId}::uuid
+        AND course_attempt_id=${courseAttemptId}::uuid AND status='active'`;
+    expect(enrolled?.count).toBe(1);
     expect(["site_admin","registrar"]).toContain(m.session.role);
     expect(p.session.role).toBe("room_facilitator");expect(b.session.role).toBe("room_facilitator");
-    expect(new Set([m,p,b,f].map(x=>x.grant.personId)).size).toBe(4);
+    expect(new Set([m,p,b,f,l].map(x=>x.grant.personId)).size).toBe(5);
     for(const x of [m,p,b])expect(x.grant.siteId).toBe(siteId);
     const [before]=await sql`SELECT s.facilitator_person_id,p.state,p.facilitated_session_id,d.starts_at
       FROM public.class_sessions s JOIN public.facilitated_classroom_plans p ON p.id=s.classroom_plan_id
@@ -79,13 +87,36 @@ test("exact Site manager cancellation and independently authenticated backup sch
     {
       const sessionId=fixture.liveClassSessionId;
       expect(sessionId).not.toBe(classSessionId);
-      const [live]=await sql`SELECT s.facilitator_person_id,p.facilitated_session_id,r.state
+      const [due]=await sql`SELECT s.facilitator_person_id,p.facilitated_session_id,p.state
         FROM public.class_sessions s JOIN public.facilitated_classroom_plans p ON p.id=s.classroom_plan_id
-        JOIN public.facilitated_learning_sessions r ON r.id=p.facilitated_session_id
         WHERE s.id=${sessionId}::uuid AND s.class_id=${classId}::uuid`;
-      expect(live).toMatchObject({facilitator_person_id:p.grant.personId,state:"live"});
-      const roomId=uuid.parse(live?.facilitated_session_id);
+      expect(due).toMatchObject({facilitator_person_id:p.grant.personId,state:"scheduled",facilitated_session_id:null});
+      const opened=await rpc<{facilitatedSessionId:string;pairingCode:string|null;alreadyStarted:boolean}>(p.page,"session","openNativeClassSession",{classId,classSessionId:sessionId});
+      expect(opened.alreadyStarted).toBe(false);
+      const roomId=uuid.parse(opened.facilitatedSessionId);
+      if(!opened.pairingCode)throw Error("A newly opened scheduled Class Session is required");
       const scope={facilitatedSessionId:roomId};
+      const learnerScope={...scope,courseAttemptId};
+      expect(await rpc(l.page,"room","pairWithFacilitatedRoom",{courseAttemptId,pairingCode:opened.pairingCode})).toMatchObject({...scope,paired:true});
+      const activity={...scope,lessonId,requestId:randomUUID(),prompt:"Synthetic continuity exercise",answerType:"single_choice",choices:["First","Second"]};
+      const released=await rpc<{id:string}>(p.page,"activity","releaseClassroomActivity",activity);
+      const response={...learnerScope,activityReleaseId:released.id,clientSubmissionId:randomUUID(),clientInstanceId:randomUUID(),answerChoice:0,answerText:null};
+      expect(await rpc(l.page,"activity","submitClassroomResponse",response)).toMatchObject({saved:true,duplicate:false,graded:false});
+      const attendance={...learnerScope,requestId:randomUUID(),status:"present",method:"in_person_roll_call",evidenceNote:"Synthetic QA role-play only, not real attendance"};
+      expect(await rpc(p.page,"attendance","attestClassroomParticipation",attendance)).toMatchObject({saved:true,noDeviceEvidence:false});
+      const projector={...scope,lessonId,assetVersionId,requestId:randomUUID(),commandKind:"pause",positionSeconds:15};
+      expect(await rpc(p.page,"projector","issueClassroomProjectorCommand",projector)).toMatchObject({accepted:true,duplicate:false});
+      const evidence=async()=> {
+        const [row]=await sql`SELECT
+          (SELECT count(*)::int FROM public.facilitated_learning_participants WHERE facilitated_session_id=${roomId}::uuid AND course_attempt_id=${courseAttemptId}::uuid AND left_at IS NULL) AS paired,
+          (SELECT count(*)::int FROM public.facilitated_room_activity_releases WHERE id=${released.id}::uuid AND released_by_person_id=${p.grant.personId}::uuid) AS original_prompt,
+          (SELECT count(*)::int FROM public.facilitated_room_activity_responses WHERE activity_release_id=${released.id}::uuid AND course_attempt_id=${courseAttemptId}::uuid) AS responses,
+          (SELECT count(*)::int FROM public.facilitated_room_attendance_assertions WHERE facilitated_session_id=${roomId}::uuid AND request_id=${attendance.requestId}::uuid AND facilitator_person_id=${p.grant.personId}::uuid) AS original_attestation,
+          (SELECT count(*)::int FROM public.facilitated_room_control_commands WHERE facilitated_session_id=${roomId}::uuid AND request_id=${projector.requestId}::uuid AND facilitator_person_id=${p.grant.personId}::uuid) AS original_projector`;
+        return row;
+      };
+      const originalEvidence=await evidence();
+      expect(originalEvidence).toEqual({paired:1,original_prompt:1,responses:1,original_attestation:1,original_projector:1});
       const transfer={classId,classSessionId:sessionId,requestId:randomUUID(),expectedFacilitatorPersonId:p.grant.personId,toPersonId:b.grant.personId,reason:"Synthetic QA live facilitator continuity"};
       await deny(b.page,"roomControl","transferNativeClassroomControl",transfer);
       await deny(f.page,"roomControl","transferNativeClassroomControl",transfer);
@@ -96,6 +127,20 @@ test("exact Site manager cancellation and independently authenticated backup sch
       await deny(p.page,"room","renewFacilitatedLearningPairing",scope);
       await deny(p.page,"session","openNativeClassSession",{classId,classSessionId:sessionId});
       expect(await rpc(b.page,"session","openNativeClassSession",{classId,classSessionId:sessionId})).toMatchObject({alreadyStarted:true,facilitatedSessionId:roomId});
+      // No learner re-pairing, replacement enrollment or fabricated evidence.
+      expect(await evidence()).toEqual(originalEvidence);
+      const visible=await rpc<{activities:{id:string;responded:boolean}[]}>(l.page,"activity","getClassroomLearnerActivities",learnerScope);
+      expect(visible.activities.find(x=>x.id===released.id)).toMatchObject({responded:true});
+      const hostActivity=await rpc<{pairedCount:number;releases:{id:string;respondingLearners:number}[]}>(b.page,"activity","getClassroomHostActivity",scope);
+      expect(hostActivity.pairedCount).toBe(1);
+      expect(hostActivity.releases.find(x=>x.id===released.id)).toMatchObject({respondingLearners:1});
+      expect(await rpc(b.page,"projector","getClassroomProjectorCommand",scope)).toMatchObject({roomState:"live",latest:{commandKind:"pause",positionSeconds:15,lessonId,assetVersionId}});
+      await deny(p.page,"projector","issueClassroomProjectorCommand",{...projector,requestId:randomUUID()});
+      await deny(p.page,"attendance","getClassroomAttendanceRoster",scope);
+      const roster=await rpc<{members:{courseAttemptId:string;latestStatus:string;pairedDevice:boolean}[]}>(b.page,"attendance","getClassroomAttendanceRoster",scope);
+      expect(roster.members.find(x=>x.courseAttemptId===courseAttemptId)).toMatchObject({latestStatus:"present",pairedDevice:true});
+      expect(await rpc(b.page,"activity","closeClassroomActivity",{...scope,activityReleaseId:released.id})).toMatchObject({closed:true});
+      expect(await rpc(b.page,"projector","issueClassroomProjectorCommand",{...projector,requestId:randomUUID(),commandKind:"play"})).toMatchObject({accepted:true,duplicate:false});
       const renew={...scope,requestId:randomUUID()};
       const first=await rpc<{pairingCode:string;pairingExpiresAt:string;duplicate:boolean}>(b.page,"room","renewFacilitatedLearningPairing",renew);
       expect(first.duplicate).toBe(false);
@@ -107,6 +152,7 @@ test("exact Site manager cancellation and independently authenticated backup sch
         FROM public.class_sessions s JOIN public.facilitated_classroom_plans p ON p.id=s.classroom_plan_id
         JOIN public.facilitated_learning_sessions r ON r.id=p.facilitated_session_id WHERE s.id=${sessionId}::uuid`;
       expect(after).toMatchObject({original:p.grant.personId,controller:b.grant.personId,facilitated_session_id:roomId});
+      expect(await evidence()).toEqual(originalEvidence);
       expect(await rpc(b.page,"room","endFacilitatedLearningRoom",scope)).toMatchObject({ended:true});
     }
     const workspace=await rpc<{rooms:Record<string,unknown>[]}>(b.page,"room","getFacilitatedHostWorkspace");
