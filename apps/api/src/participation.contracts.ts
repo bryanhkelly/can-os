@@ -200,3 +200,12 @@ export const interestDocs={
  page:obj({items:{type:'array' as const,maxItems:50,items:interestItemDoc},nextCursor:{...nullableText,maxLength:80}}),
  guardianOffers:anyList(obj({applicationId:id,studentPersonId:id,studentName:str,program:str,applicationStage:str,waitlisted:bool,transferOriginExited:{...bool,nullable:true},blockers:anyList(obj({id,title:str,status:str})),offers:{type:'array' as const,maxItems:150,items:guardianOfferDoc}})),
 };
+
+export const transferDestinationInput=z.object({originTransferActionId:uuid,destinationProgramId:uuid,requestId:uuid,confirmedDestination:z.literal(true)}).strict();
+export const transferDestinationsResult=z.array(z.object({id:uuid,name:z.string(),siteName:z.string(),slug:z.string()}).strict()).max(80);
+export const transferDestinationReceipt=z.object({requested:z.boolean(),alreadyHasAccess:z.boolean(),destinationName:z.string()}).strict();
+export const transferDocs={
+ request:obj({originTransferActionId:id,destinationProgramId:id,requestId:id,confirmedDestination:yes}),
+ destinations:{type:'array' as const,maxItems:80,items:obj({id,name:str,siteName:str,slug:str})},
+ receipt:obj({requested:bool,alreadyHasAccess:bool,destinationName:str}),
+};
