@@ -1,7 +1,7 @@
 import {createFileRoute} from "@tanstack/react-router";
 import {readWorkspaceSession} from "@/modules/identity/workspace-session.server";
 import {getCommandContext} from "@/modules/identity/command-context.server";
-import {selectAccessGrant,recordMeaningfulSessionActivity} from "@/modules/identity/passwordless-access.server";
+import {selectCurrentSessionMembership,recordCurrentSessionActivity} from "@/modules/identity/session-lifecycle.server";
 import {AuthorizationError} from "@/domain/command-context";
 import {registerSessionDevice} from "@/modules/identity/session-device.server";
 import {logServerFailure} from "@/lib/server-failure-log";
@@ -29,9 +29,7 @@ export const Route=createFileRoute("/access/session")({
     if(body && typeof body==="object" && "kind" in body &&
       (body as {kind:unknown}).kind==="activity" &&
       Object.keys(body).length===1){
-      await recordMeaningfulSessionActivity(
-       context.sessionId,context.impersonatedByAccountId??context.sessionAccountId??context.accountId,
-      );
+      await recordCurrentSessionActivity(context);
       return new Response(null,{status:204,headers:{"Cache-Control":"no-store"}});
     }
     if(body&&typeof body==="object"&&"kind" in body&&(body as {kind:unknown}).kind==="device"){
@@ -48,7 +46,7 @@ export const Route=createFileRoute("/access/session")({
     if(context.delegatedByPlatformOwner) return Response.json({error:"Return to Platform Owner before changing memberships."},{status:403});
     const grantId=body&&typeof body==="object"&&"grantId" in body?(body as {grantId:unknown}).grantId:null;
     if(typeof grantId!=="string")return Response.json({error:"Invalid membership"},{status:400});
-    await selectAccessGrant(context.sessionId,context.impersonatedByAccountId??context.sessionAccountId??context.accountId,grantId);
+    await selectCurrentSessionMembership(context,grantId);
     return Response.json({ok:true},{headers:{"Cache-Control":"no-store"}});
    }catch(error){
     return Response.json({error:error instanceof AuthorizationError?"Unauthorized":"Unable to switch membership"},

@@ -47,14 +47,14 @@ async function tokenFor(email:string):Promise<string>{
   throw Error("QA one-time access message was not delivered");
 }
 
-export async function qaSession(context:BrowserContext):Promise<QaSession>{
+export async function qaSession(context:Pick<BrowserContext,"request">):Promise<QaSession>{
   const response=await context.request.get(origin+"/access/session");
   if(!response.ok())throw Error("Standard session lookup failed: "+response.status());
   // Never attach or print response bodies, cookies or access links.
   return sessionSchema.parse(await response.json());
 }
 
-export async function authenticateQaActor(context:BrowserContext,email:string,signup?:
+export async function authenticateQaActor(context:Pick<BrowserContext,"request">,email:string,signup?:
   {kind:"person";firstName:string;lastName:string}|
   {kind:"site";firstName:string;lastName:string;name:string;organizationName:string;organizationType:"church"|"other_partner"}){
   guard(email);
