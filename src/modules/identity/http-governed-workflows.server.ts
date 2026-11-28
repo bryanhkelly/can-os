@@ -38,6 +38,7 @@ import {readSiteInformationV61Service,saveSiteInformationV61Service} from "@/mod
 import {readExistingSiteProgramsV61Service,readSiteProgramsAudiencesV61Service,saveSiteProgramsAudiencesV61Service} from "@/modules/programs/site-programs-audiences-v61.server";
 import {readSiteBrandHttp,saveSiteBrandHttp,revokeSiteBrandAssetHttp} from "@/modules/sites/site-brand-http.server";
 import {readLaunchSitePublicationService,reviewLaunchSiteWebsiteCopyService} from "@/modules/sites/launch-site-publication.server";
+import {updateLaunchSiteAddressService,updateLaunchSiteContactService,updateLaunchSiteInformationService,updateLaunchSiteIdentityService,getLaunchSiteConfigurationService} from "@/modules/programs/site-configuration.server";
 export type WorkflowMode="planning"|"canonical"|"can"|"learner";
 /** Existing independent native reviewer credentials remain distinct from CAN.
  * No fallback, new role, token or grant is manufactured by this adapter. */
@@ -46,6 +47,11 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
  const context=await (mode==="planning"?getBlueprintPlanningContext(request):mode==="canonical"?getCanonicalCommandContext(request):mode==="learner"?getInstructionalLearnerContext(request):getIdentityContext(request));
  if(!context.actorPersonId)throw new AuthorizationError("verified Person");
  return {
+  getLaunchSiteConfiguration:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Site profile context");return getLaunchSiteConfigurationService(request,raw);},
+  updateLaunchSiteAddress:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Site profile context");return updateLaunchSiteAddressService(request,raw);},
+  updateLaunchSiteContact:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Site profile context");return updateLaunchSiteContactService(request,raw);},
+  updateLaunchSiteIdentity:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Site profile context");return updateLaunchSiteIdentityService(request,raw);},
+  updateLaunchSiteInformation:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Site profile context");return updateLaunchSiteInformationService(request,raw);},
   readSiteBrandHttp:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Site Brand and publication context");return readSiteBrandHttp(request,raw);},
   saveSiteBrandHttp:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Site Brand and publication context");return saveSiteBrandHttp(request,raw);},
   revokeSiteBrandAssetHttp:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Site Brand and publication context");return revokeSiteBrandAssetHttp(request,raw);},

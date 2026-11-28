@@ -369,3 +369,16 @@ test('Brand versions and website copy review remain independently protected',asy
  assert.equal(bodies.review.safeParse({expectedRevision:0,contentReviewed:true,publishSite:true}).success,false);
  assert.equal(bodies.revoke.safeParse({reason:'Rights withdrawn',assetId:'forged'}).success,false);
 });
+
+test('Site profile endpoints are protected and use exact revisions',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const [method,route] of [["GET","/api/v1/sites/{siteId}/profile"],["POST","/api/v1/sites/{siteId}/physical-address"],["POST","/api/v1/sites/{siteId}/contact"],["POST","/api/v1/sites/{siteId}/identity"],["POST","/api/v1/sites/{siteId}/legacy-information"]]){
+   const op=document.paths[route][method.toLowerCase()];assert.ok(op.security);assert.ok(op.responses['409']);
+   const response=await fetch(url+route.replace('{siteId}','00000000-0000-4000-8000-000000000001'),method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);
+  }
+ });
+ const {bodies}=require('../dist/site-profile.contracts');
+ assert.equal(bodies.address.safeParse({address:null}).success,false);
+ assert.equal(bodies.contact.safeParse({expectedRevision:'2026-11-28T00:00:00Z',contact:null,publicClaimApproved:true}).success,false);
+});
