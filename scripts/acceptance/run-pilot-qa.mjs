@@ -1,16 +1,18 @@
 // QA-only runner. Never load production .env.local or inherit app credentials.
-import { existsSync, readFileSync, writeFileSync, lstatSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, lstatSync, mkdtempSync, rmSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { parseEnv } from "node:util";
 import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { resolve } from "node:path";
+import { resolve, join } from "node:path";
+import { tmpdir } from "node:os";
 
 const root = fileURLToPath(new URL("../..", import.meta.url));
 const file = resolve(root, ".env.pilot-qa");
 const allowedBranch = "br-solitary-art-arun91gj";
 const secret = () => randomBytes(32).toString("hex");
 const modes = {
+  prepare: ["scripts/dev.mjs","--host","localhost","--port","5183","--strictPort"],
   readiness: ["scripts/acceptance/diagnose-noncredit-pilot-qa.mjs"],
   executive: ["scripts/acceptance/diagnose-pilot-executive-readiness.mjs"],
   schema: ["scripts/acceptance/check-pilot-migration-parity.mjs"],
@@ -69,7 +71,7 @@ function localConfiguration() {
 }
 try {
   const mode=process.argv[2];
-  if(process.argv.length!==3) fail("Use exactly one QA action: init, readiness, executive, schema, regression, keys, fixture, api, browser.");
+  if(process.argv.length!==3) fail("Use exactly one QA action: init, prepare, readiness, executive, schema, regression, keys, fixture, api, browser.");
   if(mode==="init") init();
   else {
     if(!Object.hasOwn(modes,mode)) fail("Unknown QA action.");
@@ -82,7 +84,7 @@ try {
       const {neon}=await import("@neondatabase/serverless");
       for(const key of ["CAN_CANONICAL_AUTH_DATABASE_URL","CAN_CANONICAL_OPERATIONS_DATABASE_URL"]){
         if(!env[key]) {
-          if(key==="CAN_CANONICAL_AUTH_DATABASE_URL" && (mode==="api"||mode==="browser")) fail(key+" is required for QA runtime.");
+          if(key==="CAN_CANONICAL_AUTH_DATABASE_URL" && (mode==="prepare"||mode==="api"||mode==="browser")) fail(key+" is required for QA runtime.");
           continue;
         }
         const expectedLogin=key==="CAN_CANONICAL_AUTH_DATABASE_URL"?"can_os_canonical_auth_app":"can_os_canonical_ops_app";
@@ -92,8 +94,26 @@ try {
         if(identity?.project!=="sweet-hall-62441909"||identity?.branch!==allowedBranch||identity?.login!==expectedLogin) fail("Secondary QA database attestation failed: "+key);
       }
     }
-    const result=spawnSync(process.execPath,modes[mode],{cwd:root,env,stdio:"inherit"});
-    process.exitCode=result.status??1;
+    // Prepare the real application privately, before any fixture or sessions exist.
+    // Use the existing isolated .test access-mail transport, never Resend.
+    // Outbox holds single-use credentials: no artifact or Git persistence.
+    const outbox=mode==="prepare"?mkdtempSync(join(tmpdir(),"can-pilot-qa-mail-")):null;
+    try {
+      if(outbox){
+        const {checkPilotMigrationParity}=await import("./check-pilot-migration-parity.mjs");
+        if(!(await checkPilotMigrationParity(env)).ready) fail("Repair QA database parity before preparation.");
+        if((env.CAN_ACCESS_TOKEN_PEPPER?.length??0)<32||(env.CAN_CANONICAL_ACCESS_TOKEN_PEPPER?.length??0)<32)
+          fail("Independent QA session keys required.");
+        Object.assign(env,{DATABASE_URL:env.TEST_DATABASE_URL,CAN_ACCESS_PUBLIC_ORIGIN:"https://app.can-os.test",
+          CAN_ACCESS_MAIL_OUTBOX_DIR:outbox});
+        console.log("Private preparation: http://localhost:5183");
+        console.log("Temporary local test-mail outbox (contains short-lived secrets; do not share): "+outbox);
+      }
+      const result=spawnSync(process.execPath,modes[mode],{cwd:root,env,stdio:"inherit"});
+      process.exitCode=result.status??1;
+    }finally{
+      if(outbox)rmSync(outbox,{recursive:true,force:true});
+    }
   }
 } catch(error) {
   // Only emit our own known errors; driver errors can contain connection URLs.
