@@ -698,3 +698,36 @@ test('learning module resolves the shared identity provider without a duplicate 
    assert.equal(module.get(controller,{strict:true}).identity,shared);
  }finally{await app.close();}
 });
+
+test('WS07 recorded instruction and history operations require ordinary authentication and document paths',async()=>{
+ await withServer('0',async(url,document)=>{
+  const id='00000000-0000-4000-8000-000000000001';
+  const paths=['instructors','instruction','practice-history'].map(p=>'/api/v1/me/course-attempts/{courseAttemptId}/'+p);
+  paths.push('/api/v1/me/class-enrollments/{classEnrollmentId}/historical-work','/api/v1/me/class-enrollments/{classEnrollmentId}/assignments/{assignmentId}/revisions');
+  for(const route of paths){
+   const op=document.paths[route].get;assert.ok(op.security);assert.ok(op.responses['403']);
+   const res=await fetch(url+route.replace(/\{\w+\}/g,id));assert.equal(res.status,401);
+  }
+  for(const p of ['instructor-selections','instruction-asset-access','recorded-lesson-completions','practice-attempts']){
+   const op=document.paths['/api/v1/me/course-attempts/{courseAttemptId}/'+p].post;
+   assert.ok(op.security);assert.ok(op.requestBody);assert.ok(op.responses['409']);
+   const res=await fetch(url+'/api/v1/me/course-attempts/'+id+'/'+p,{method:'POST',headers:{Origin:url,'content-type':'application/json'},body:'{}'});
+   assert.equal(res.status,503);
+  }
+ });
+});
+test('recorded instruction wire contracts reject caller-selected identity, invalid revisions, and leaked practice keys',()=>{
+ const {input,output}=require('../dist/instructional.contracts');
+ const id='00000000-0000-4000-8000-000000000001';
+ const selection={requestId:id,trackVersionId:id,expectedRevision:0};
+ assert.equal(input.select.safeParse(selection).success,true);
+ assert.equal(input.select.safeParse({...selection,courseAttemptId:id}).success,false);
+ assert.equal(input.select.safeParse({...selection,expectedRevision:-1}).success,false);
+ assert.equal(input.complete.safeParse({requestId:id,lessonId:id,expectedRevision:0}).success,false);
+ assert.equal(output.choices.safeParse({choices:[],blocked:[],selection:null}).success,true);
+ assert.equal(output.choices.safeParse({choices:[],blocked:[],selection:null,personId:id}).success,false);
+ assert.equal(output.download.safeParse({downloadUrl:'https://example.test/signed',expiresInSeconds:60}).success,false);
+ const row={id,courseUnitId:id,trackVersionId:id,policyVersionId:id,scoreNumeric:null,recordedAt:'2026-11-28T00:00:00.000Z',trackTitle:null,courseUnitTitle:null,answers:[{promptKey:'a',promptText:'Question',response:'Answer'}]};
+ assert.equal(output.history.safeParse([row]).success,true);
+ assert.equal(output.history.safeParse([{...row,answers:[{...row.answers[0],answerKey:'private'}]}]).success,false);
+});

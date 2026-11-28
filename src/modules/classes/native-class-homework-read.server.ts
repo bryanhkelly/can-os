@@ -1,3 +1,6 @@
+import { projectSubmissionRevisionPage } from "@/domain/submission-revisions";
+import { AuthorizationError } from "@/domain/command-context";
+import {readHistoricalClassWork} from "./historical-class-work.server";
 import { sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import type { CommandContext } from "@/domain/command-context";
@@ -101,4 +104,30 @@ export async function readNativeClassHomework(actor:CommandContext,classEnrollme
         };
       })};
     });
+}
+
+/** Current learner's own revision history; raw response JSON remains server-side. */
+export async function readNativeHomeworkHistory(actor:CommandContext,data:{classEnrollmentId:string;assignmentId:string;beforeRevision?:number}){
+    return db.transaction(async tx=>{
+      const {cls,courseAttemptId}=await authorizeNativeLearnerClass(tx,actor,data.classEnrollmentId,"active_read");
+      const result=await tx.execute(sql`
+        SELECT r.revision_no,r.status,r.response,r.submitted_at,r.recorded_at,r.source
+        FROM public.graded_submission_revisions r
+        JOIN public.graded_submissions gs ON gs.id=r.submission_id AND gs.course_version_id=r.course_version_id
+        JOIN public.graded_assignments ga ON ga.id=gs.assignment_id AND ga.course_version_id=gs.course_version_id
+        WHERE gs.course_attempt_id=${courseAttemptId}::uuid
+          AND gs.course_version_id=${cls.courseVersionId}::uuid
+          AND ga.id=${data.assignmentId}::uuid AND ga.section_id IS NULL
+          AND (${data.beforeRevision??null}::int IS NULL OR r.revision_no<${data.beforeRevision??null}::int)
+        ORDER BY r.revision_no DESC LIMIT 21
+      `);
+      return projectSubmissionRevisionPage(result.rows);
+    });
+}
+/** Preserved school evidence is restricted to the current student grant. */
+export async function readNativeHistoricalWork(actor:CommandContext,data:{classEnrollmentId:string;beforeId?:string}){
+  if(actor.role!=="student")throw new AuthorizationError("own school records");
+  return db.transaction(async tx=>{
+   const {cls,enrollment}=await authorizeNativeLearnerClass(tx,actor,data.classEnrollmentId,"active_read");
+   return readHistoricalClassWork(tx,{classId:cls.id,classEnrollmentId:enrollment.id,beforeId:data.beforeId});
 }

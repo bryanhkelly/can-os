@@ -10,6 +10,13 @@ export async function checkStudentContract(client:BecomunaBrowserApi, enrollment
  if(learning.data){const lessonBody:string|undefined=learning.data.lessons[0]?.lessonBody;void lessonBody;}
  const assignments=await client.GET('/api/v1/me/class-enrollments/{classEnrollmentId}/assignment-workspace',{params:{path:{classEnrollmentId:enrollmentId}}});
  if(assignments.data){const response:string|undefined=assignments.data.assignments[0]?.responseText;void response;}
+ const history=await client.GET('/api/v1/me/class-enrollments/{classEnrollmentId}/assignments/{assignmentId}/revisions',{params:{path:{classEnrollmentId:enrollmentId,assignmentId:enrollmentId},query:{beforeRevision:2}}});
+ if(history.data){const next:number|null=history.data.nextBefore;void next;}
+ const choices=await client.GET('/api/v1/me/course-attempts/{courseAttemptId}/instructors',{params:{path:{courseAttemptId:enrollmentId}}});
+ if(choices.data){const revision:number|undefined=choices.data.selection?.revision;void revision;}
+ await client.POST('/api/v1/me/course-attempts/{courseAttemptId}/instructor-selections',{params:{path:{courseAttemptId:enrollmentId}},body:{requestId:enrollmentId,trackVersionId:enrollmentId,expectedRevision:0}});
+ // @ts-expect-error optimistic concurrency revision must be supplied
+ await client.POST('/api/v1/me/course-attempts/{courseAttemptId}/instructor-selections',{params:{path:{courseAttemptId:enrollmentId}},body:{requestId:enrollmentId,trackVersionId:enrollmentId}});
  // Browser-owned Origin is still mandatory on the wire; the browser, not UI code, supplies it.
  await client.POST('/api/v1/me/session/membership',{body:{grantId:enrollmentId}});
  await client.POST('/api/v1/me/session/activity',{body:{}});

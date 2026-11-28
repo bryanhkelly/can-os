@@ -1,10 +1,12 @@
-import { Controller, Get, Post, Body, HttpCode, Param, Req, applyDecorators } from '@nestjs/common';
-import { ApiCookieAuth, ApiOperation, ApiTags, ApiOkResponse, ApiParam, ApiResponse, ApiBody, ApiHeader } from '@nestjs/swagger';
+import { Controller, Get, Post, Body, HttpCode, Param, Query, Req, applyDecorators } from '@nestjs/common';
+import { ApiCookieAuth, ApiOperation, ApiTags, ApiOkResponse, ApiParam, ApiResponse, ApiBody, ApiHeader, ApiQuery } from '@nestjs/swagger';
 import type { FastifyRequest } from 'fastify';
 import { CanonicalReadOperation, CanonicalWriteOperation, verifiedIdentity } from './security';
 import { CanonicalIdentityService } from './identity.service';
 import { problemOpenApiSchema } from './contracts';
 import { enrollmentId, workspaceSchema, workspaceDoc, homeworkWorkspaceSchema, homeworkWorkspaceDoc, resumeSchema, resumeDoc, homeworkSchema, homeworkDoc, validated, lessonParams, assignmentParams, emptyCommand, submissionBody, completionResult, submissionResult, emptyDoc, submissionBodyDoc, completionDoc, submissionResultDoc } from './learning.contracts';
+
+import {queries as historyQueries,results as historyResults,docs as historyDocs} from './role-workspaces.contracts';
 
 function LearnerRead(){
   return applyDecorators(CanonicalReadOperation(),
@@ -54,6 +56,25 @@ export class LearningController{
   assignments(@Req() request:FastifyRequest,@Param() params:unknown){
     const id=enrollmentId(params);
     return this.identity.run(verifiedIdentity(request),async actor=>homeworkSchema.parse(await actor.readHomeworkSummary(id)));
+  }
+  @Get(':classEnrollmentId/assignments/:assignmentId/revisions')
+  @LearnerRead()
+  @ApiParam({name:'assignmentId',type:String,format:'uuid',required:true})
+  @ApiQuery({name:'beforeRevision',type:Number,required:false})
+  @ApiOperation({operationId:'listMyAssignmentRevisions',summary:'Read own current assignment revision history, newest first'})
+  @ApiOkResponse({schema:historyDocs.revisions})
+  revisions(@Req() request:FastifyRequest,@Param() params:unknown,@Query() query:unknown){
+    const input={...validated(assignmentParams,params),...validated(historyQueries.revision,query)};
+    return this.identity.run(verifiedIdentity(request),async actor=>historyResults.revisions.parse(await actor.readHomeworkHistory(input)));
+  }
+  @Get(':classEnrollmentId/historical-work')
+  @LearnerRead()
+  @ApiQuery({name:'beforeId',type:String,required:false})
+  @ApiOperation({operationId:'listMyHistoricalClassWork',summary:'Read own preserved published school evidence under current student authority'})
+  @ApiOkResponse({schema:historyDocs.historical})
+  historical(@Req() request:FastifyRequest,@Param() params:unknown,@Query() query:unknown){
+    const input={classEnrollmentId:enrollmentId(params),...validated(historyQueries.historical,query)};
+    return this.identity.run(verifiedIdentity(request),async actor=>historyResults.historical.parse(await actor.readHistoricalWork(input)));
   }
   @Post(':classEnrollmentId/lessons/:lessonId/completion')
   @LearnerWrite('lessonId')

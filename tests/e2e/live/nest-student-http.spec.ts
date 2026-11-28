@@ -57,7 +57,7 @@ test("independent standard HTTP client validates both students and rejects forei
        expect((await qaSession(context,"nest")).activeGrantId).toBe(student.grantId);
        for(const e of foreign.enrollments){
          expect(own.classes.some(c=>c.classId===e.classId||c.enrollmentId===e.classEnrollmentId)).toBe(false);
-         for(const resource of ["resume","assignments","learning","assignment-workspace"]){
+         for(const resource of ["resume","assignments","learning","assignment-workspace","historical-work"]){
            const denied=await http.get(api+"/me/class-enrollments/"+e.classEnrollmentId+"/"+resource);
            expect(denied.status()).toBe(403);
            expect((await denied.json()).code).toBe("FORBIDDEN");
@@ -99,6 +99,11 @@ test("independent standard HTTP client validates both students and rejects forei
      expect((await own.post(assignment,{...options,data:{responseText:"Different response must not overwrite"}})).status()).toBe(403);
      const latest=await own.get(target+"/assignments");expect(latest.status()).toBe(200);
      expect(homework.parse(await latest.json()).assignments.find(a=>a.id===w.assignmentId)?.status).toBe("submitted");
+     const revisions=await own.get(target+"/assignments/"+w.assignmentId+"/revisions");expect(revisions.status()).toBe(200);
+     const page=z.object({items:z.array(z.object({revisionNo:z.number().int().positive(),responseText:z.string()})),nextBefore:z.number().int().positive().nullable()}).parse(await revisions.json());
+     expect(page.items.length).toBeLessThanOrEqual(20);
+     const foreignRevisions=await foreign.get(target+"/assignments/"+w.assignmentId+"/revisions");expect(foreignRevisions.status()).toBe(403);
+     const malformed=await own.get(target+"/assignments/"+w.assignmentId+"/revisions?beforeRevision=0");expect(malformed.status()).toBe(400);
      const detail=await own.get(target+"/assignment-workspace");expect(detail.status()).toBe(200);
      expect((await detail.json()).assignments.find((a:{id:string})=>a.id===w.assignmentId)).toMatchObject({status:"submitted",responseText:input.responseText,submitted:true});
    }

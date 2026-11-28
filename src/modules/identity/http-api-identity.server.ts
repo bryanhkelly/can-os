@@ -3,13 +3,17 @@ import {selectCurrentSessionMembership,recordCurrentSessionActivity} from "./ses
 import { getInstructionalLearnerContext } from "./learning-command-context.server";
 import { AuthorizationError } from "@/domain/command-context";
 import { readNativeClassLearning, readNativeClassResume } from "@/modules/classes/native-class-learning-read.server";
-import { readNativeClassHomework, readNativeClassHomeworkSummary } from "@/modules/classes/native-class-homework-read.server";
+import { readNativeClassHomework, readNativeClassHomeworkSummary, readNativeHomeworkHistory, readNativeHistoricalWork } from "@/modules/classes/native-class-homework-read.server";
 import {createLaunchSiteService} from "@/modules/programs/launch-site-create.server";
 import {submitNativeOfferingReleaseService,saveNativeOfferingReleasePolicyService,decideNativeOfferingReleaseService,publishNativeOfferingCoursesService,approveNativeOfferingAssetManifestService,publishNativeOfferingVersionService,getNativeOfferingReviewContentService,getNativeOfferingReleaseOverviewService,getNativeOfferingReleasePolicyReviewService,getNativeOfferingReleaseReviewQueueService} from "@/modules/learning/native-offering-release.server";
 import {readWorkspaceSession} from "./workspace-session.server";
 import { getIdentityContext } from "./command-context.server";
 import { normalizeClientError } from "@/lib/client-error";
 import { readStudentClasses } from "@/modules/classes/native-class-student-home.server";
+
+import { listAvailableInstructionalTracks, selectInstructionalTrack, readSelectedInstructionalTrack, getSelectedInstructionalTrackAssetDownload, completeRecordedLesson, recordFormativePractice, readFormativePracticeHistory } from "@/modules/learning/student-instructional-tracks.server";
+import type { z } from "zod";
+import type { selectInstructionalTrackSchema, completeRecordedLessonSchema, recordFormativePracticeSchema } from "@/modules/learning/student-instructional-tracks.server";
 
 /** Transport-neutral adapter. No new tokens, grant selectors, or demo privileges. */
 export async function resolveHttpIdentity(request: Request) {
@@ -69,6 +73,21 @@ export async function resolveHttpIdentity(request: Request) {
     },
     readLearningResume: async (id:string) => readNativeClassResume(await learner(),id),
     readHomeworkWorkspace: async (id:string) => readNativeClassHomework(await learner(),id),
+    readHomeworkHistory: async (data:{classEnrollmentId:string;assignmentId:string;beforeRevision?:number})=>readNativeHomeworkHistory(await learner(),data),
+    readHistoricalWork: async (data:{classEnrollmentId:string;beforeId?:string})=>readNativeHistoricalWork(await learner(),data),
+    instruction: {
+      choices: async (courseAttemptId:string)=>listAvailableInstructionalTracks(await learner(),{courseAttemptId}),
+      selected: async (courseAttemptId:string)=>{
+        const value=await readSelectedInstructionalTrack(await learner(),{courseAttemptId});
+        return {...value,selection:{...value.selection,selectedAt:value.selection.selectedAt.toISOString()},
+          lessons:value.lessons.map(lesson=>({...lesson,progress:lesson.progress?{...lesson.progress,observedAt:lesson.progress.observedAt.toISOString()}:null}))};
+      },
+      select: async (input:z.input<typeof selectInstructionalTrackSchema>)=>{requireWrite();return selectInstructionalTrack(await learner(),input);},
+      download: async (input:{courseAttemptId:string;assetVersionId:string})=>{requireWrite();return getSelectedInstructionalTrackAssetDownload(await learner(),input);},
+      complete: async (input:z.input<typeof completeRecordedLessonSchema>)=>{requireWrite();return completeRecordedLesson(await learner(),input);},
+      practice: async (input:z.input<typeof recordFormativePracticeSchema>)=>{requireWrite();return recordFormativePractice(await learner(),input);},
+      history: async (courseAttemptId:string)=>(await readFormativePracticeHistory(await learner(),{courseAttemptId})).map(row=>({...row,recordedAt:row.recordedAt.toISOString()})),
+    },
     readHomeworkSummary: async (id:string) => readNativeClassHomeworkSummary(await learner(),id),
   };
 }
