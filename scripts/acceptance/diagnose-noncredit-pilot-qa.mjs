@@ -21,7 +21,6 @@ const checks = {
   CAN_ACCESS_TOKEN_PEPPER: (env.CAN_ACCESS_TOKEN_PEPPER?.length ?? 0) >= 32,
   CAN_CANONICAL_ACCESS_TOKEN_PEPPER: (env.CAN_CANONICAL_ACCESS_TOKEN_PEPPER?.length ?? 0) >= 32,
   CAN_NONCREDIT_ASSESSMENT_KEY_HEX: /^[a-f0-9]{64}$/i.test(env.CAN_NONCREDIT_ASSESSMENT_KEY_HEX ?? ""),
-  CAN_NONCREDIT_AUTO_FINALIZATION_ENABLED: env.CAN_NONCREDIT_AUTO_FINALIZATION_ENABLED === "true",
 };
 const sessionKeys = ["LEARNER","OTHER","PROVIDER"].map(role => "CAN_PILOT_QA_"+role+"_SESSION");
 for (const key of sessionKeys) checks[key] = /^[A-Za-z0-9_-]{40,}$/.test(env[key] ?? "");
