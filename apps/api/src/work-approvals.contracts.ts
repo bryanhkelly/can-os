@@ -67,7 +67,7 @@ export const manualBodies={
 };
 const manualRow=obj({id,title:s,status:s,priority,siteId:id.nullable(),programId:id.nullable(),ownerPersonId:id.nullable(),dueAt:dt.nullable(),updatedAt:dt});
 const inboxItem=obj({id,title:s,status:s,priority:z.enum(['critical','high','normal']),siteId:id.nullable(),programId:id.nullable(),dueAt:dt.nullable(),createdAt:dt,href:s});
-const inboxSource=obj({source:z.enum(['operations','credential_request','credential_review']),items:z.array(inboxItem).max(250),possiblyTruncated:b,limit:n,href:s});
+const inboxSource=obj({source:z.enum(['operations','credential_request','credential_review','jurisdiction_review','reporting_relationship_review']),items:z.array(inboxItem).max(250),possiblyTruncated:b,limit:n,href:s});
 export const manualResults={created:obj({actionId:id,replayed:b}),escalated:obj({changed:b,replayed:b}),page:obj({items:z.array(manualRow).max(50),nextAfterId:id.nullable()}),inbox:obj({sources:z.array(inboxSource).max(3)})};
 export const manualBodyDocs={
  create:o({requestId:i,siteId:i,programId:i,title:{...t,minLength:3,maxLength:200},description:{...t,maxLength:2000},ownerPersonId:ni,priority:{...choice('normal','high','urgent'),default:'normal'},dueAt:nd},['requestId','siteId','title','ownerPersonId']),
@@ -76,7 +76,7 @@ export const manualBodyDocs={
 export const manualDocs={
  created:o({actionId:i,replayed:bool}),escalated:o({changed:bool,replayed:bool}),
  page:o({items:a(o({id:i,title:t,status:t,priority:choice('normal','high','urgent'),siteId:ni,programId:ni,ownerPersonId:ni,dueAt:nd,updatedAt:date}),50),nextAfterId:ni}),
- inbox:o({sources:a(o({source:choice('operations','credential_request','credential_review'),items:a(o({id:i,title:t,status:t,priority:choice('critical','high','normal'),siteId:ni,programId:ni,dueAt:nd,createdAt:date,href:t}),250),possiblyTruncated:bool,limit:integer,href:t}),3)})
+ inbox:o({sources:a(o({source:choice('operations','credential_request','credential_review','jurisdiction_review','reporting_relationship_review'),items:a(o({id:i,title:t,status:t,priority:choice('critical','high','normal'),siteId:ni,programId:ni,dueAt:nd,createdAt:date,href:t}),250),possiblyTruncated:bool,limit:integer,href:t}),3)})
 };
 
 export const dependencyBody=obj({blockedByActionId:id,operation:z.enum(['add','remove']),expectedUpdatedAt:dt,reason:s.trim().min(5).max(500)});
