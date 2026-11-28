@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { engagementOwnerScopeKey } from "@/domain/engagement-owner-scope";
 import { engagementChannels, engagementChannelSchema, engagementChannelLabels } from "@/domain/engagement-definition";
 import { GoLinkWorkspace } from "@/components/launch-studio/GoLinkWorkspace";
+import {legacyGoLinkTransport,type GoLinkWorkspaceTransport} from "@/modules/engagement/go-link-workspace-transport";
 import { UniversalEngagementPublisher } from "@/components/launch-studio/UniversalEngagementPublisher";
 import { LaunchPreviewSharing } from "@/components/launch-studio/LaunchPreviewSharing";
 import { SiteEngagementLibrary } from "@/components/launch-studio/SiteEngagementLibrary";
@@ -17,6 +18,11 @@ describe("Engagement component session isolation", () => {
     expect(GoLinkWorkspace({siteId:"site-a",packageId:"package-a"}).key).toBe(initial.key);
     expect(GoLinkWorkspace({siteId:"site-b",packageId:"package-a"}).key).not.toBe(initial.key);
     expect(GoLinkWorkspace({siteId:"site-a",packageId:"package-b"}).key).not.toBe(initial.key);
+  });
+  it("isolates Go Link draft and pending issuance when the selected transport changes",()=>{
+    const transport:GoLinkWorkspaceTransport={kind:"nest",api:legacyGoLinkTransport.api};
+    const props={siteId:"site-a",packageId:"package-a"};
+    expect(GoLinkWorkspace({...props,transport}).key).not.toBe(GoLinkWorkspace(props).key);
   });
   it("separates Site, platform and Organization engagement libraries", () => {
     const local = SiteEngagementLibrary({siteId:"site-a",packageId:"package-a"});
