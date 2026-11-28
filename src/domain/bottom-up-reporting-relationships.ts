@@ -16,7 +16,10 @@ export const relationshipProposalSchema = z.object({
   scopeKind:z.enum(relationshipScopeKinds),
   scopeId:uuid,
   relationshipKind:z.enum(relationshipKinds),
-  metrics:z.array(relationshipMetricSchema).min(1).max(50),
+  metrics:z.array(relationshipMetricSchema).max(50),
+  coverageMode:z.enum(["prospective","from_date","all_history"]).optional(),
+  coverageFrom:timestamp.nullable().optional(),
+  supersedesId:uuid.nullable().optional(),
   validThrough:timestamp.nullable(),
 }).strict();
 export type RelationshipProposal = z.infer<typeof relationshipProposalSchema>;
@@ -50,6 +53,9 @@ export function validateRelationshipProposal(input:unknown,owner:VerifiedRelatio
     !Number.isFinite(now.getTime())||
     (proposal.validThrough!==null&&Date.parse(proposal.validThrough)<=now.getTime()))
     throw new Error("Invalid relationship scope or effective period");
+  const coverage=proposal.coverageMode??"prospective";
+  if(coverage==="from_date"?(!proposal.coverageFrom||Date.parse(proposal.coverageFrom)>now.getTime()):proposal.coverageFrom!=null)
+    throw new Error("Explicit valid reporting coverage required");
   const keys=new Set<string>();
   for(const metric of proposal.metrics){
     requireMetricContract(registry,metric.metricKey,metric.definitionVersion);
@@ -115,17 +121,20 @@ export type RelationshipFact = {
 /** Fact-grain matching, never a host-wide grant expansion. No transitive
  * traversal or recipient re-sharing. A publisher Offering does not authorize
  * records whose source Organization is an independent host. Missing dimensions
- * deny narrower scopes. Facts are prospective from acceptance in this version. */
+ * deny narrower scopes. Historical coverage is explicit and independently accepted. */
 export function relationshipMatchesFact(relationship:ReportingRelationship,
   recipientOrganizationId:string,metric:RelationshipMetric,fact:RelationshipFact,now:Date):boolean {
   const current=now.getTime(),occurred=Date.parse(fact.occurredAt);
   const accepted=Date.parse(relationship.acceptedAt??"");
   const proposed=Date.parse(relationship.proposedAt);
   const expiry=relationship.validThrough===null?Infinity:Date.parse(relationship.validThrough);
+  const coverage=relationship.coverageMode??"prospective";
+  const start=coverage==="all_history"?-Infinity:coverage==="from_date"?Date.parse(relationship.coverageFrom??""):accepted;
+  if(coverage==="from_date"?(!Number.isFinite(start)||start>proposed):relationship.coverageFrom!=null)return false;
   if(relationship.status!=="accepted"||!relationship.acceptedByPersonId||
     relationship.acceptedByPersonId===relationship.proposedByPersonId||
     !Number.isFinite(current)||!Number.isFinite(occurred)||!Number.isFinite(accepted)||
-    !Number.isFinite(proposed)||accepted<proposed||accepted>current||occurred<accepted||
+    !Number.isFinite(proposed)||accepted<proposed||accepted>current||!(occurred>=start)||
     occurred>current||!(expiry>current)||!(expiry>occurred)||
     relationship.recipientOrganizationId!==recipientOrganizationId||
     relationship.ownerOrganizationId!==fact.dimensions.organizationId||
