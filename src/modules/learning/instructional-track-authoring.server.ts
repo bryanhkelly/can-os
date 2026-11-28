@@ -679,6 +679,10 @@ export async function reviewInstructionalTrack(
       owningOrganizationId: bundle.course.publisherOrganizationId,
       payload: input,
     }, async () => {
+      // A new review is only a decision on a submitted draft. Retrying an
+      // existing receipt is still allowed; published content uses withdrawal.
+      if (bundle.version.lifecycle !== "draft" || manifest.manifestStatus !== "draft")
+        conflict("Published instructional tracks require the withdrawal workflow.");
       await tx.insert(instructionalTrackReviews).values({
         trackVersionId: bundle.version.id,
         manifestHash: input.expectedRevision,
@@ -761,6 +765,41 @@ export async function publishInstructionalTrack(
           invalid(`Current independent ${kind} approval is required before publication.`);
         }
       }
+      // Submission is not a permanent rights grant. Revalidate the exact sealed
+      // asset usages and current approvals immediately before publication.
+      if (bundle.courseVersion.lifecycle !== "published")
+        invalid("The exact Course version must remain published.");
+      const [presentations, materials, manifestItems] = await Promise.all([
+        tx.select().from(trackLessonPresentations)
+          .where(eq(trackLessonPresentations.trackVersionId, bundle.version.id)),
+        tx.select().from(instructionalTrackMaterials)
+          .where(eq(instructionalTrackMaterials.trackVersionId, bundle.version.id)),
+        tx.select().from(contentPublicationManifestItems)
+          .where(eq(contentPublicationManifestItems.manifestId, manifest.id)),
+      ]);
+      const usages = buildTrackManifestUsages({ presentations, materials });
+      const assets = await assertInstructionalTrackAssetsEligible(tx, usages.map(item => item.assetVersionId));
+      if (manifestItems.length !== usages.length || usages.some(usage => {
+        const item = manifestItems.find(row => row.contentAssetVersionId === usage.assetVersionId &&
+          row.usageKind === usage.usageKind);
+        const asset = assets.get(usage.assetVersionId);
+        return !item || !asset || item.contentHash !== asset.sha256 ||
+          item.rightsEvidenceVersionId !== asset.rightsEvidenceVersionId;
+      })) conflict("The sealed asset manifest no longer matches current approved content and rights.");
+      const rightsReview = reviews.find(review => review.reviewKind === "rights");
+      if (!rightsReview?.evidenceVersionId) invalid("Current track rights evidence is required.");
+      const [rights] = await tx.select({
+        kindCode: evidenceDocuments.kindCode,
+        verifiedAt: evidenceDocumentVersions.verifiedAt,
+        verifiedByPersonId: evidenceDocumentVersions.verifiedByPersonId,
+        validFrom: evidenceDocumentVersions.validFrom,
+        validThrough: evidenceDocumentVersions.validThrough,
+      }).from(evidenceDocumentVersions)
+        .innerJoin(evidenceDocuments, eq(evidenceDocuments.id, evidenceDocumentVersions.documentId))
+        .where(eq(evidenceDocumentVersions.id, rightsReview.evidenceVersionId)).limit(1);
+      if (!rights || rights.kindCode !== "rights" ||
+        !isVerifiedEvidenceCurrent({ ...rights, at: new Date() }))
+        invalid("Track rights evidence expired or is no longer verified.");
       await tx.update(contentPublicationManifests)
         .set({ manifestStatus: "approved" })
         .where(eq(contentPublicationManifests.id, manifest.id));
