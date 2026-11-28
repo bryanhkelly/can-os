@@ -5,7 +5,8 @@ const status=['pending','approved','rejected','revoked'] as const;
 export const requestBody=z.object({evidenceReference:evidence}).strict();
 export const reviewBody=z.object({approvalId:uuid,decision:z.enum(['approve','reject']),evidenceReference:evidence,expiresAt:date.optional()}).strict().refine(v=>v.decision==='reject'||v.expiresAt!==undefined,{message:'Approval expiry required'});
 export const revokeBody=z.object({approvalId:uuid,reason:evidence}).strict();
-export const myApproval=z.object({id:uuid,status:z.enum(status),requestedAt:date,reviewedAt:nullableDate,approvedUntil:nullableDate}).strict().nullable();
+const approval=z.object({id:uuid,status:z.enum(status),requestedAt:date,reviewedAt:nullableDate,approvedUntil:nullableDate}).strict();
+export const myApproval=z.object({approval:approval.nullable()}).strict();
 const base=z.object({id:uuid,requestedByAccountId:uuid,requestedAt:date,organizationId:uuid.nullable(),siteId:uuid.nullable()}).strict();
 export const active=z.array(base.extend({reviewedAt:nullableDate,approvedUntil:nullableDate})).max(101);
 export const pending=z.array(base.extend({grantId:uuid,role:z.string(),evidenceReference:evidence})).max(101);
@@ -20,7 +21,7 @@ export const doc={
  request:obj({evidenceReference:proof}),
  review:obj({approvalId:id,decision:{...str,enum:['approve','reject']},evidenceReference:proof,expiresAt:{...dt,description:'Required for approval; at most 366 days in the future'}},['approvalId','decision','evidenceReference']),
  revoke:obj({approvalId:id,reason:proof}),
- my:{...obj({id,status:{...str,enum:[...status]},requestedAt:dt,reviewedAt:nd,approvedUntil:nd}),nullable:true},
+ my:obj({approval:{...obj({id,status:{...str,enum:[...status]},requestedAt:dt,reviewedAt:nd,approvedUntil:nd}),nullable:true}}),
  active:arr(obj({...baseDoc,reviewedAt:nd,approvedUntil:nd})),
  pending:arr(obj({...baseDoc,grantId:id,role:str,evidenceReference:proof})),
  requested:obj({requested:yes,approvalId:id}),
