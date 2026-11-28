@@ -73,3 +73,6 @@ export {handleAccessRequest,handleAccessVerification,handlePersonalRegistration,
 export {handleSiteSignupRequest} from "./site-signup-http.server";
 
 export {resolveGovernedWorkflow} from "./http-governed-workflows.server";
+
+export {handlePublicGo} from "@/modules/engagement/go-public-http.server";
+export {handlePublicCampaignUnsubscribe,handleResendDeliveryWebhook} from "@/modules/communication/public-communication-http.server";
