@@ -323,7 +323,7 @@ export const approveNativeOfferingAdoption=createServerFn({method:"POST"})
         invalid("Deployment review history requires explicit reconciliation.");
       for(const kind of nativeAdoptionReviewKinds){
         const review=readiness.find(item=>item.reviewKind===kind);
-        if(!review||review.outcome!=="ready"||
+        if(!review||review.outcome!=="ready"||review.evaluatedAt>now||
           review.evaluatedByPersonId===reviewerPersonId||
           (review.expiresAt&&review.expiresAt<=now))
           invalid("Independent, unexpired operating, registration and delivery readiness is required.");
