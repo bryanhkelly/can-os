@@ -76,7 +76,10 @@ describe("P0 independent credential issuer authorization",()=>{
     expect(sql).not.toContain("GRANT SELECT ON education_v30.canonical_sensitive_capability_approvals");
   });
   it("separates staff requests from reviewer decisions and revocation",()=>{
-    const service=file("src/modules/identity/canonical-sensitive-approvals.functions.ts");
+    const service=file("src/modules/identity/canonical-sensitive-approvals.server.ts");
+    const transport=file("src/modules/identity/canonical-sensitive-approvals.functions.ts");
+    expect(transport).toContain("requestCanonicalCredentialIssuerApprovalService(actor,request,data)");
+    expect(service).not.toContain("@tanstack/react-start");
     expect(service).toContain("requestCanonicalCredentialIssuerApproval");
     expect(service).toContain("reviewCanonicalCredentialIssuerApproval");
     expect(service).toContain("revokeCanonicalCredentialIssuerApproval");
@@ -90,7 +93,7 @@ describe("P0 independent credential issuer authorization",()=>{
     expect(service).not.toContain("canonicalAccountGrants");
     expect(service).not.toContain("accessAccountCanonicalPrincipals");
     expect(service).not.toContain("site_canonical_identity_links");
-    expect(service).toContain("assertCurrentReviewerInTransaction(tx,reviewer)");
+    expect(service).toContain("assertCurrentReviewerInTransaction(tx,reviewer,request)");
     expect(service).toContain("roles:[\"site_admin\",\"registrar\"]");
     expect(service).toContain("FOR SHARE OF a,p");
     expect(service).toContain("current authorized issuer Site");
@@ -105,11 +108,14 @@ describe("P0 independent credential issuer authorization",()=>{
     const shared=file("src/modules/identity/current-can-grant-transaction.server.ts");
     expect(shared).toContain("current_grant.role=");
     expect(shared).toContain("current_grant.active=true");
-    expect(shared).toContain("account.person_id=");
+    expect(shared).toContain("target_account.person_id=");
     expect(shared).toContain("verified_org.type::text=");
     expect(shared).toContain("FOR SHARE OF session,session_owner,target_account,current_grant,person,verified_org");
     expect(shared).toContain("session.delegated_grant_id IS NULL");
     expect(service).toContain("reviewEvidenceReference:data.evidenceReference");
+    expect(service).toContain("a.private_access_code_hash IS NULL");
+    expect(service).toContain("credential-issuer:"+'"'+"+grantId");
+    expect(service).toContain('new DomainError("CONFLICT"');
     expect(service).toContain("expiresAt.getTime()>now.getTime()+366");
   });
   it("migrates issuer approvals to the shared CAN grant without authorizing unverified users",()=>{
