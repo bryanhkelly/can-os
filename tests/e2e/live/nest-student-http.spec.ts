@@ -42,6 +42,15 @@ test("independent standard HTTP client validates both students and rejects forei
      expect(own.classes.filter(c=>c.status==="active").map(c=>c.enrollmentId).sort()).toEqual(student.enrollments.map(e=>e.classEnrollmentId).sort());
      for(const e of student.enrollments){
        expect(own.classes.find(c=>c.enrollmentId===e.classEnrollmentId)).toMatchObject({classId:e.classId,courseAttemptId:e.courseAttemptId});
+       const classPath=api+"/classes/"+e.classId;
+       const workspace=await http.get(classPath+"/workspace?view=learn");expect(workspace.status()).toBe(200);
+       const projection=await workspace.json();
+       expect(projection).toMatchObject({classId:e.classId,view:"learn",learner:{classEnrollmentId:e.classEnrollmentId,courseAttemptId:e.courseAttemptId},roster:[],staffCandidates:[],staffAssignments:[],learnerCandidates:[],offering:null,canControlRoom:false});
+       expect(projection.sessions.every((session:{planId:string|null;roomId:string|null;roomState:string|null})=>session.planId===null&&session.roomId===null&&session.roomState===null)).toBe(true);
+       expect((await http.get(classPath+"/workspace?view=teach")).status()).toBe(403);
+       expect((await http.get(classPath+"/workspace?view=manage")).status()).toBe(403);
+       expect((await http.get(classPath+"/roster")).status()).toBe(403);
+       expect((await http.get(classPath+"/workspace?view=learn&personId="+student.personId)).status()).toBe(400);
        const target=api+"/me/class-enrollments/"+e.classEnrollmentId;
        const resume=await http.get(target+"/resume");expect(resume.status()).toBe(200);
        expect(await resume.json()).toMatchObject({classId:e.classId});
@@ -69,6 +78,8 @@ test("independent standard HTTP client validates both students and rejects forei
        expect((await qaSession(context,"nest")).activeGrantId).toBe(student.grantId);
        for(const e of foreign.enrollments){
          expect(own.classes.some(c=>c.classId===e.classId||c.enrollmentId===e.classEnrollmentId)).toBe(false);
+         expect((await http.get(api+"/classes/"+e.classId+"/workspace?view=learn")).status()).toBe(403);
+         expect((await http.get(api+"/classes/"+e.classId+"/roster")).status()).toBe(403);
          const foreignInstruction=api+"/me/course-attempts/"+e.courseAttemptId;
          for(const resource of ["instructors","instruction","practice-history"]){
            expect((await http.get(foreignInstruction+"/"+resource)).status()).toBe(403);
@@ -81,6 +92,7 @@ test("independent standard HTTP client validates both students and rejects forei
          }
        }
      }
+     expect((await http.get(api+"/classroom-rehearsal/choices")).status()).toBe(403);
      for(const resource of ["resume","learning","assignment-workspace"])expect((await http.get(api+"/me/class-enrollments/not-a-uuid/"+resource)).status()).toBe(400);
    }
    if(fixture.write){
