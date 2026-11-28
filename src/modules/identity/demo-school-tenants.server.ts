@@ -40,17 +40,8 @@ export async function matchesDemoCredentialScope(
   reader: Reader = db,
 ): Promise<boolean> {
   if (!isDemoAccountEmail(email) || !organizationId || !siteId) return false;
-  const domain = email.trim().toLowerCase().split("@")[1]!;
-  if (domain === DEMO_ACCOUNT_DOMAIN) return organizationId === LOCAL_DEMO_ADMIN.organizationId &&
-    siteId === LOCAL_DEMO_ADMIN.siteId;
-  const [binding] = await reader.select({domain:demoSchoolTenants.domain})
-    .from(demoSchoolTenants)
-    .innerJoin(sites, and(eq(sites.id,demoSchoolTenants.siteId),
-      eq(sites.organizationId,demoSchoolTenants.organizationId)))
-    .where(and(eq(demoSchoolTenants.domain,domain),
-      eq(demoSchoolTenants.organizationId,organizationId),
-      eq(demoSchoolTenants.siteId,siteId),eq(demoSchoolTenants.enabled,true))).limit(1);
-  return Boolean(binding);
+  const binding=await readDemoCredentialDomain(email,reader);
+  return binding?.organizationId===organizationId && binding?.siteId===siteId;
 }
 
 /** Transaction-side equivalent of credential scope. Inputs are trusted
@@ -62,11 +53,15 @@ export function demoCredentialScopePredicate(
     ${email} ~ '^[^@[:space:]]+@[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?([.][a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*[.]demo$'
     AND ${organizationId} IS NOT NULL AND ${siteId} IS NOT NULL
     AND EXISTS (SELECT 1 FROM public.sites credential_site
-      WHERE credential_site.id=${siteId} AND credential_site.organization_id=${organizationId})
+      JOIN public.organizations credential_org ON credential_org.id=credential_site.organization_id
+      WHERE credential_site.id=${siteId} AND credential_site.organization_id=${organizationId}
+        AND credential_org.domain=split_part(${email},'@',2))
     AND (
       (split_part(${email},'@',2)=${DEMO_ACCOUNT_DOMAIN}
         AND ${organizationId}=${LOCAL_DEMO_ADMIN.organizationId}::uuid
-        AND ${siteId}=${LOCAL_DEMO_ADMIN.siteId}::uuid)
+        AND ${siteId}=${LOCAL_DEMO_ADMIN.siteId}::uuid
+        AND NOT EXISTS (SELECT 1 FROM public.demo_school_tenants registered
+          WHERE registered.domain=${DEMO_ACCOUNT_DOMAIN} OR registered.organization_id=${organizationId}))
       OR EXISTS (SELECT 1 FROM public.demo_school_tenants credential_tenant
         WHERE credential_tenant.enabled
           AND credential_tenant.domain=split_part(${email},'@',2)
@@ -81,17 +76,28 @@ export function demoCredentialScopePredicate(
 export async function readDemoCredentialDomain(email:string, reader:Reader=db) {
   if (!isDemoAccountEmail(email)) return null;
   const domain=email.trim().toLowerCase().split("@")[1]!;
-  if (domain===DEMO_ACCOUNT_DOMAIN) {
+  // Registered bindings take precedence, including disabled registrations.
+  const [binding]=await reader.select({organizationId:demoSchoolTenants.organizationId,
+    siteId:demoSchoolTenants.siteId,enabled:demoSchoolTenants.enabled,
+    ownerDomain:organizations.domain,siteOrganizationId:sites.organizationId})
+    .from(demoSchoolTenants)
+    .leftJoin(sites,eq(sites.id,demoSchoolTenants.siteId))
+    .leftJoin(organizations,eq(organizations.id,demoSchoolTenants.organizationId))
+    .where(eq(demoSchoolTenants.domain,domain)).limit(1);
+  if(binding)return binding.enabled && binding.ownerDomain===domain &&
+    binding.siteOrganizationId===binding.organizationId
+    ? {organizationId:binding.organizationId,siteId:binding.siteId}:null;
+  // Compatibility for the original seeded fixture until its registry is migrated.
+  if(domain===DEMO_ACCOUNT_DOMAIN){
     const [site]=await reader.select({organizationId:sites.organizationId,siteId:sites.id})
-      .from(sites).where(and(eq(sites.id,LOCAL_DEMO_ADMIN.siteId),
-        eq(sites.organizationId,LOCAL_DEMO_ADMIN.organizationId))).limit(1);
+      .from(sites).innerJoin(organizations,eq(organizations.id,sites.organizationId))
+      .where(and(eq(sites.id,LOCAL_DEMO_ADMIN.siteId),
+        eq(sites.organizationId,LOCAL_DEMO_ADMIN.organizationId),eq(organizations.domain,domain),
+        sql`NOT EXISTS (SELECT 1 FROM public.demo_school_tenants registered
+          WHERE registered.organization_id=${sites.organizationId})`)).limit(1);
     return site??null;
   }
-  const [binding]=await reader.select({organizationId:demoSchoolTenants.organizationId,siteId:demoSchoolTenants.siteId})
-    .from(demoSchoolTenants).innerJoin(sites,and(eq(sites.id,demoSchoolTenants.siteId),
-      eq(sites.organizationId,demoSchoolTenants.organizationId)))
-    .where(and(eq(demoSchoolTenants.domain,domain),eq(demoSchoolTenants.enabled,true))).limit(1);
-  return binding??null;
+  return null;
 }
 
 export async function hasApprovedDemoPersonalCredential(accountId:string,email:string,reader:Reader=db) {
