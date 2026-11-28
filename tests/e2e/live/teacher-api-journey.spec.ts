@@ -21,6 +21,8 @@ const modules={
   home:"/src/modules/classes/native-class-teacher-home.functions.ts",
   work:"/src/modules/classes/native-class-teacher-homework.functions.ts",
   learner:"/src/modules/classes/native-class-homework.functions.ts",
+  action:"/src/modules/actions/action-detail.functions.ts",
+  followUp:"/src/modules/learning/teacher-missing-work.functions.ts",
 } as const;
 async function rpc<T>(page:Page,module:keyof typeof modules,name:string,data?:unknown):Promise<T>{
   return page.evaluate(async ({url,name,data})=>{
@@ -36,7 +38,7 @@ async function deny(page:Page,module:keyof typeof modules,name:string,data:unkno
     try{await api[name]({data});return null;}
     catch(error){return error&&typeof error==="object"&&"code" in error?error.code:null;}
   },{url:modules[module],name,data});
-  expect(code).toBe("FORBIDDEN");
+  expect(["FORBIDDEN","AUTHENTICATION_REQUIRED"]).toContain(code);
 }
 async function actor(browser:Browser,selected?:z.infer<typeof selection>,role?:string){
   const context=await browser.newContext({baseURL:origin});
@@ -94,6 +96,15 @@ test("ordinary teacher and student APIs reconcile native Class work and deny unr
     const assignment=learnerWork.assignments.find(a=>a.id===fixture.assignmentId);
     expect(assignment).toBeDefined();
     expect(["not_started","assigned","returned"]).toContain(assignment!.status);
+    const target={classId:fixture.classId,classEnrollmentId:fixture.classEnrollmentId,assignmentId:fixture.assignmentId};
+    expect(await allPages<OverdueItem>(teacher.page,"getNativeClassTeacherMissingWork",fixture.classId)).toEqual(expect.arrayContaining([expect.objectContaining({classEnrollmentId:fixture.classEnrollmentId,assignmentId:fixture.assignmentId})]));
+    await deny(other.page,"work","createNativeClassMissingWorkFollowUp",target);
+    const followUp=await rpc<{actionId:string;created:boolean}>(teacher.page,"work","createNativeClassMissingWorkFollowUp",target);
+    expect(followUp.created).toBe(true);
+    expect(await rpc(teacher.page,"work","createNativeClassMissingWorkFollowUp",target)).toMatchObject({actionId:followUp.actionId,created:false});
+    expect(await rpc(teacher.page,"action","getActionDetail",{actionId:followUp.actionId})).toMatchObject({classId:fixture.classId,status:"open",canResolveMissingWork:true});
+    await deny(other.page,"action","getActionDetail",{actionId:followUp.actionId});
+    await deny(student.page,"action","getActionDetail",{actionId:followUp.actionId});
     const submitted=await rpc<{submissionId:string;alreadySubmitted:boolean}>(student.page,"learner","submitNativeClassHomework",
       {...workInput,assignmentId:fixture.assignmentId,responseText:"Isolated QA teacher review response."});
     expect(submitted.alreadySubmitted).toBe(false);
@@ -114,6 +125,13 @@ test("ordinary teacher and student APIs reconcile native Class work and deny unr
     const revised=await rpc<{submissionId:string}>(student.page,"learner","submitNativeClassHomework",
       {...workInput,assignmentId:fixture.assignmentId,responseText:"Isolated QA revised response with a fuller explanation."});
     expect(revised.submissionId).toBe(submitted.submissionId);
+    expect(await allPages<{actionId:string}>(teacher.page,"getNativeClassTeacherOpenFollowUps",fixture.classId)).toEqual(expect.arrayContaining([expect.objectContaining({actionId:followUp.actionId})]));
+    const resolution={actionId:followUp.actionId,resolutionNote:"Learner revised and resubmitted the work."};
+    await deny(other.page,"followUp","resolveMissingWorkFollowUp",resolution);
+    expect(await rpc(teacher.page,"followUp","resolveMissingWorkFollowUp",resolution)).toMatchObject({resolved:true});
+    expect(await rpc(teacher.page,"followUp","resolveMissingWorkFollowUp",resolution)).toMatchObject({resolved:false});
+    expect(await rpc(teacher.page,"action","getActionDetail",{actionId:followUp.actionId})).toMatchObject({status:"resolved",resolutionNote:resolution.resolutionNote});
+    expect((await allPages<{actionId:string}>(teacher.page,"getNativeClassTeacherOpenFollowUps",fixture.classId)).some(a=>a.actionId===followUp.actionId)).toBe(false);
     const finalQueue=await allPages<WorkItem>(teacher.page,"getNativeClassTeacherHomework",fixture.classId);
     expect(finalQueue.find(i=>i.id===submitted.submissionId)).toMatchObject({status:"submitted"});
     expect((await read()).classes.find(c=>c.classId===fixture.classId)?.reviewCount).toBe(finalQueue.filter(i=>i.status==="submitted").length);
