@@ -1,14 +1,15 @@
 import { and, eq, gt, ilike, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { accessAccounts, accessSessions, accountPersonGrants, people } from "@/db/schema";
+import { accessAccounts, accessSessions, accountPersonGrants, people, organizations, sites } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { accessSessionCookie, hashAccessSecret, sessionIdleCutoff } from "@/domain/access-tokens";
 import { readCookie } from "@/domain/session-cookies";
 import { roleCapabilities } from "@/domain/access-context";
-import { platformOwnerMayActAs, ownerDelegationLifetimeMs } from "@/domain/platform-owner-delegation";
+import { platformOwnerMayActAs, platformOwnerMayActAsTarget, ownerDelegationLifetimeMs } from "@/domain/platform-owner-delegation";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
-import { isEligiblePrivilegedMailbox } from "@/domain/domain-classification";
+import { identityEmailDomain, isEligiblePrivilegedMailbox } from "@/domain/domain-classification";
+import { matchesDemoCredentialScope } from "./demo-school-tenants.server";
 import { issuePrivateAccountCredential } from "./private-account-credential.server";
 import { readOwnerDelegationGrants } from "./session-grants.server";
 import { assertRawAccountPerson } from "./unambiguous-adult-account.server";
@@ -83,6 +84,33 @@ export function assertPlatformOwnerUndelegated(owner:{delegatedGrantId:string|nu
   if(owner.delegatedGrantId) throw new AuthorizationError("return to Platform Owner first");
 }
 
+/** Require both a synthetic Person and the current approved synthetic Site.
+ * A .demo address on an ordinary live membership is not sufficient evidence. */
+export async function isApprovedSyntheticDelegationTarget(
+  target:{personId:string;email:string;organizationId:string|null;siteId:string|null},
+  reader:Pick<typeof db,"select">=db,
+):Promise<boolean>{
+  const domain=identityEmailDomain(target.email);
+  if(!domain||!isDemoAccountEmail(target.email)||!target.organizationId||!target.siteId)return false;
+  const [person]=await reader.select({domain:people.domain}).from(people)
+    .where(and(eq(people.id,target.personId),eq(people.active,true))).limit(1);
+  if(person?.domain!==domain)return false;
+  const [scope]=await reader.select({domain:organizations.domain}).from(organizations)
+    .innerJoin(sites,and(eq(sites.organizationId,organizations.id),eq(sites.id,target.siteId)))
+    .where(eq(organizations.id,target.organizationId)).limit(1);
+  return scope?.domain===domain &&
+    await matchesDemoCredentialScope(target.email,target.organizationId,target.siteId,reader);
+}
+
+export async function mayActAsDelegationTarget(
+  target:{role:string;personId:string;email:string;organizationId:string|null;siteId:string|null},
+  reader:Pick<typeof db,"select">=db,
+):Promise<boolean>{
+  if(platformOwnerMayActAs(target.role))return true;
+  if(target.role!=="student"&&target.role!=="guardian")return false;
+  return platformOwnerMayActAsTarget(target.role,await isApprovedSyntheticDelegationTarget(target,reader));
+}
+
 /** Opaque existing grant IDs are resolved from current eligible canonical accounts.
  * No impersonated persona, organization relationship or preview record is created.
  */
@@ -123,7 +151,9 @@ export async function listPlatformOwnerTargets(request: Request, search: string)
   const eligible = await Promise.all(rows.map(async row => {
     if (!Object.hasOwn(roleCapabilities, row.role)) return null;
     const grants = await readOwnerDelegationGrants(row.accountId, row.personId, row.email);
-    return grants.some(grant => grant.id === row.grantId) ? row : null;
+    if(!grants.some(grant => grant.id === row.grantId))return null;
+    const syntheticSitePerson=await isApprovedSyntheticDelegationTarget(row);
+    return {...row,syntheticSitePerson,canAct:platformOwnerMayActAsTarget(row.role,syntheticSitePerson)};
   }));
   return { targets: eligible.filter(row => row !== null).slice(0,25), limited: rows.length > 25 };
 }
@@ -135,18 +165,20 @@ export async function startPlatformOwnerDelegation(request: Request, raw: unknow
   if (request.headers.get("origin") !== new URL(request.url).origin)
     throw new AuthorizationError("same-origin owner delegation");
   const data = delegationRequest.parse(raw);
-  const owner = await getVerifiedPlatformOwnerSession(request);
+  return db.transaction(async tx => {
+  const owner = await getVerifiedPlatformOwnerSession(request,tx,true);
   assertPlatformOwnerUndelegated(owner);
   const now = new Date();
   const expiresAt = new Date(Math.min(now.getTime() + ownerDelegationLifetimeMs,
     owner.expiresAt.getTime()));
   if (expiresAt <= now) throw new AuthorizationError("current owner session");
-  return db.transaction(async tx => {
     const [target] = await tx.select({
       grantId: accountPersonGrants.id,
       accountId: accountPersonGrants.accountId,
       personId: accountPersonGrants.personId,
       role: accountPersonGrants.role,
+      organizationId: accountPersonGrants.organizationId,
+      siteId: accountPersonGrants.siteId,
       email: accessAccounts.emailNormalized,
       verifiedAt: accessAccounts.emailVerifiedAt,
       accountPersonId: accessAccounts.personId,
@@ -167,7 +199,7 @@ export async function startPlatformOwnerDelegation(request: Request, raw: unknow
     await assertRawAccountPerson(target.accountId, target.personId, tx);
     // Do not let delegation authorize a simulated independent reviewer decision.
     // Reviewer roles may be inspected with "View as" only.
-    if (data.mode === "act" && !platformOwnerMayActAs(target.role))
+    if (data.mode === "act" && !await mayActAsDelegationTarget(target,tx))
       throw new AuthorizationError("independent role: use View as");
     const [changed] = await tx.update(accessSessions).set({
       delegatedGrantId: target.grantId, delegatedMode: data.mode,
