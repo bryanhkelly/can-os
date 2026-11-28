@@ -45,7 +45,7 @@ describe("secure canonical learning runtime boundaries", () => {
         "requireCanonicalLearningActivityEnabled()"],
       ["src/modules/learning/facilitated-learning.functions.ts",
         "requireFacilitatedLearningEnabled()"],
-      ["src/modules/learning/facilitated-impact.functions.ts",
+      ["src/modules/learning/facilitated-impact.server.ts",
         "requireFacilitatedLearningEnabled()"],
     ] as const;
     for (const [path, gate] of modules) {

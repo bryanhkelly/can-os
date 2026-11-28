@@ -116,7 +116,7 @@ describe("network attribution is not a parallel enrollment system",()=>{
       attributed({reportingUnitId:"district-new",reportingUnitName:"New District",
         path:[root,state,district]}),
     ])).toThrow(/immutable historical path/);
-    const service=read("src/modules/enrollment/noncredit-network-report.functions.ts");
+    const service=read("src/modules/enrollment/noncredit-network-report.server.ts");
     expect(service).toContain("const historicalLeaf=historicalPath?.length");
     expect(service).not.toContain("networkMemberships.reportingUnitId");
     expect(service).toContain("attribution.relationshipSnapshot.creditedOrganizationName");

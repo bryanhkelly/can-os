@@ -1,3 +1,8 @@
+import {accessSessionCookie} from "@/domain/access-tokens";
+import {readCookie} from "@/domain/session-cookies";
+import * as pilotOutcomes from "@/modules/learning/noncredit-pilot-outcomes.server";
+import * as operatorNetwork from "@/modules/enrollment/noncredit-network-report.server";
+import * as facilitatedImpact from "@/modules/learning/facilitated-impact.server";
 import * as classSurvey from "@/modules/classes/native-class-survey-link.server";
 import * as roomSurvey from "@/modules/learning/classroom-surveys.server";
 import * as surveyDraft from "@/modules/operations/canonical-survey-draft.server";
@@ -60,14 +65,18 @@ import {listSitePreviewSharesService,createSitePreviewShareService,setSitePrevie
 import {exploreCanonicalBlueprintReferencesService,discoverCanonicalBlueprintOfferingsService,readCanonicalBlueprintWorkspaceService,listCanonicalBlueprintReviewsService,listCanonicalBlueprintReviewEvidenceService} from "@/modules/blueprints/blueprint-catalog-read.server";
 import {getStaffLaunchWorkspaceService,getLaunchStudioDraftService,saveLaunchStudioDraftService} from "@/modules/programs/launch-drafts.server";
 import {listLaunchOptionsService,getLaunchEntryService} from "@/modules/programs/launch-discovery.server";
-export type WorkflowMode="planning"|"canonical"|"can"|"learner";
+export type WorkflowMode="planning"|"canonical"|"can"|"learner"|"operator-reporting";
 /** Existing independent native reviewer credentials remain distinct from CAN.
  * No fallback, new role, token or grant is manufactured by this adapter. */
 export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode){
  if(request.method!=="POST"&&request.method!=="GET")throw new AuthorizationError("explicit HTTP method");
- const context=await (mode==="planning"?getBlueprintPlanningContext(request):mode==="canonical"?getCanonicalCommandContext(request):mode==="learner"?getInstructionalLearnerContext(request):getIdentityContext(request));
+ if(mode==="operator-reporting"&&request.method!=="GET")throw new AuthorizationError("read-only reporting context");
+ const context=await (mode==="operator-reporting"?(readCookie(request,accessSessionCookie)!==undefined?getIdentityContext(request):getCanonicalCommandContext(request)):mode==="planning"?getBlueprintPlanningContext(request):mode==="canonical"?getCanonicalCommandContext(request):mode==="learner"?getInstructionalLearnerContext(request):getIdentityContext(request));
  if(!context.actorPersonId)throw new AuthorizationError("verified Person");
  return {
+  getNoncreditPilotOutcomes:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="operator-reporting")throw new AuthorizationError("Operational reporting context");return {...await pilotOutcomes.getNoncreditPilotOutcomes(request,raw),disclosureApproved:false as const};},
+  getNoncreditOperatorNetworkSummary:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="operator-reporting")throw new AuthorizationError("Operational reporting context");return operatorNetwork.getNoncreditOperatorNetworkSummary(request,raw);},
+  getFacilitatedImpactReport:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Operational reporting context");return facilitatedImpact.getFacilitatedImpactReport(request);},
   getNativeClassSurveyCampaignOptions:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Classroom survey context");return classSurvey.getNativeClassSurveyCampaignOptions(request,raw);},
   linkNativeClassSurveyCampaign:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Classroom survey context");return classSurvey.linkNativeClassSurveyCampaign(request,raw);},
   getClassroomSurveyOptions:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Classroom survey context");return roomSurvey.getClassroomSurveyOptions(request,raw);},

@@ -643,3 +643,13 @@ test('class and classroom surveys expose only governed campaign metadata',async(
  assert.equal(c.roomLearnerQuery.safeParse({facilitatedSessionId:id,courseAttemptId:id,personId:id}).success,false);
  assert.equal(c.classRoomResults.roomLearner.safeParse({surveys:[],notice:'',answers:[]}).success,false);
 });
+
+test('operational reporting exposes private evidence without treating it as publication approval',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const route of ["/api/v1/reports/noncredit-pilot-outcomes","/api/v1/reports/noncredit-operator-summary","/api/v1/reports/facilitated-impact"]){assert.ok(document.paths[route].get.security);assert.equal((await fetch(url+route)).status,401);}
+ });
+ const c=require('../dist/outcomes.contracts');
+ assert.equal(c.pilotQuery.safeParse({geography:'US-CA',organizationId:'forged'}).success,false);
+ assert.equal(c.pilotQuery.safeParse({geography:'US-CA'}).success,true);
+ assert.equal(c.pilotQuery.safeParse({geography:'invalid'}).success,false);
+});

@@ -159,7 +159,7 @@ describe("Phase 2 linked-room attendance reconciliation",()=>{
   });
   it("keeps cohort and provider Site reporting on the same correction projector",()=>{
     const cohort=read("src/modules/enrollment/noncredit-cohort-operations.functions.ts");
-    const network=read("src/modules/enrollment/noncredit-network-report.functions.ts");
+    const network=read("src/modules/enrollment/noncredit-network-report.server.ts");
     const operator=read("src/components/enrollment/NoncreditReleaseOperations.tsx");
     for(const source of [cohort,network]){
       expect(source).toContain("summarizeVerifiedRoomAttendance(");

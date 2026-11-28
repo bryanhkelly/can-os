@@ -52,7 +52,7 @@ describe("Classroom Connect P1 authorization and feedback boundaries", () => {
     const feedback = read("src/modules/learning/classroom-feedback.functions.ts");
     const mapping = read("src/db/canonical-v301/facilitated-room-feedback.ts");
     const companion = read("src/components/learning/ClassroomFeedbackPanel.tsx");
-    const report = read("src/modules/learning/facilitated-impact.functions.ts");
+    const report = read("src/modules/learning/facilitated-impact.server.ts");
     expect(feedback).toContain("authorizeCanonicalCourseAttempt(tx, actor, courseAttemptId, true)");
     expect(feedback).toContain("eq(facilitatedLearningParticipants.participantPersonId, actor.actorPersonId!)");
     expect(feedback).toContain("classroomFeedbackOpen(row.room, new Date())");

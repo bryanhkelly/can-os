@@ -12,7 +12,7 @@ const access=readFileSync("src/modules/learning/noncredit-assessment.server.ts",
 const surveys=readFileSync("src/modules/learning/course-surveys.server.ts","utf8");
 const activities=readFileSync("src/components/learning/NoncreditCourseActivities.tsx","utf8");
 const assessment=readFileSync("src/components/learning/CourseAssessmentPanel.tsx","utf8");
-const pilotReport=readFileSync("src/modules/learning/noncredit-pilot-outcomes.functions.ts","utf8");
+const pilotReport=readFileSync("src/modules/learning/noncredit-pilot-outcomes.server.ts","utf8");
 const surveyDisplay=readFileSync("src/components/learning/NoncreditCourseSurveys.tsx","utf8");
 const providerEnrollment=readFileSync("src/routes/programs.noncredit.enrollment.tsx","utf8");
 const publisher=readFileSync("src/modules/enrollment/noncredit-enrollment-publication.functions.ts","utf8");
@@ -111,7 +111,8 @@ describe("noncredit pilot correctness boundaries",()=>{
   });
 
   it("does not report another Site's private noncredit training evidence",()=>{
-    expect(pilotReport).toContain('requireCanonicalLabProvider("noncredit.enrollment.read")');
+    expect(pilotReport).toContain('resolveOperatorReportingScopeRequest(request)');
+    expect(readFileSync("src/modules/reporting/operator-reporting-scope-request.server.ts","utf8")).toContain('resolveCanonicalProvider(request,"noncredit.enrollment.read")');
     expect(pilotReport).toContain("noncreditSelfEnrollmentClaims.registrationId");
     expect(pilotReport).toContain("noncreditSelfEnrollmentReleases.siteId,siteIds");
     expect(pilotReport).toContain("noncreditSelfEnrollmentReleases.registeringOrganizationId");
