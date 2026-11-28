@@ -613,3 +613,18 @@ test('marketing artifact APIs distinguish preview, immutable release, output and
  assert.equal(c.results.preview.safeParse({state:'missing-brand',body:'not distributable'}).success,false);
  assert.equal(c.results.output.safeParse({format:'email',content:'x',mimeType:'text/html',fileName:'x.html',plainText:null}).success,true);
 });
+
+test('survey contracts distinguish canonical publisher, independent reviewer and learner operations',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const [route,method] of [["/api/v1/survey-drafts","GET"],["/api/v1/survey-drafts","POST"],["/api/v1/survey-review-queue","GET"],["/api/v1/survey-publication-queue","GET"],["/api/v1/survey-reviews","POST"],["/api/v1/survey-publications","POST"],["/api/v1/course-surveys","GET"],["/api/v1/course-survey","GET"],["/api/v1/course-survey-responses","POST"]]){
+   const op=document.paths[route][method.toLowerCase()];assert.ok(op.security);assert.ok(op.responses['403']);
+   const response=await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);
+  }
+ });
+ const c=require('../dist/surveys.contracts');
+ const id='00000000-0000-4000-8000-000000000001';
+ assert.equal(c.scope.safeParse({courseAttemptId:id,campaignId:id,personId:id}).success,false);
+ assert.equal(c.results.response.safeParse({responseId:id,alreadySubmitted:false,answers:[]}).success,false);
+ assert.equal(c.results.publication.safeParse({surveyVersionId:id,lifecycle:'draft'}).success,false);
+});

@@ -42,7 +42,7 @@ describe("native Class reuses canonical assessment and survey engines",()=>{
     expect(server).not.toContain("scope.registration.learnerId");
   });
   it("reuses published, permissioned identified survey invitations for native Class",()=>{
-    const source=read("src/modules/learning/course-surveys.functions.ts");
+    const source=read("src/modules/learning/course-surveys.server.ts");
     expect(source).toContain('access.source!=="noncredit"&&access.source!=="class"');
     expect(source).toContain("eq(surveyInvitations.invitedPersonId,context.actorPersonId)");
     expect(source).toContain('eq(surveyCampaigns.responseMode,"identified")');

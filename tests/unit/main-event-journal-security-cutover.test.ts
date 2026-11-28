@@ -62,8 +62,8 @@ describe("CAN OS public journal security and native writer cutover",()=>{
     expect(provision).not.toContain("education_v30.audit_events");
     expect(provision).not.toContain("education_v30.evidence_documents");
     for(const path of [
-      "src/modules/operations/canonical-survey-draft.functions.ts",
-      "src/modules/operations/canonical-survey-approvals.functions.ts",
+      "src/modules/operations/canonical-survey-draft.server.ts",
+      "src/modules/operations/canonical-survey-approvals.server.ts",
     ]){
       const source=read(path);
       expect(source).toContain("SET LOCAL ROLE");

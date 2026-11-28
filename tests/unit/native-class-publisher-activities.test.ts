@@ -18,7 +18,7 @@ describe("publisher Course Activities recover the original UX without a parallel
     expect(grant).not.toContain("canonicalCourseActivitySets");
   });
   it("binds survey responses to exact Class campaigns, not just a Course or Deployment",()=>{
-    const survey=source("src/modules/learning/course-surveys.functions.ts");
+    const survey=source("src/modules/learning/course-surveys.server.ts");
     const schema=source("src/db/canonical-v301/classes.ts");
     const ddl=source("database/canonical/v3.0.1/patch-unified-class-offerings.sql");
     expect(survey).toContain("classSurveyCampaignIds(tx,context,access)");
@@ -70,7 +70,7 @@ describe("publisher Course Activities recover the original UX without a parallel
     expect(packageJson).not.toContain("native-course-activities.test.ts");
   });
   it("permits national survey authors without a synthetic Site while retaining capability and SQL role",()=>{
-    const drafts=source("src/modules/operations/canonical-survey-draft.functions.ts");
+    const drafts=source("src/modules/operations/canonical-survey-draft.server.ts");
     const role=source("src/domain/canonical-survey-draft.ts");
     expect(drafts).not.toContain("!actor.scope.siteIds?.length");
     expect(drafts).toContain("canonicalSurveyDraftDatabaseRole(actor)");

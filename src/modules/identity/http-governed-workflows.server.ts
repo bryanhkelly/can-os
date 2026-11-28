@@ -1,3 +1,6 @@
+import * as surveyDraft from "@/modules/operations/canonical-survey-draft.server";
+import * as surveyApproval from "@/modules/operations/canonical-survey-approvals.server";
+import * as courseSurvey from "@/modules/learning/course-surveys.server";
 import * as artifacts from "@/modules/programs/site-marketing-artifacts.server";
 import * as marketing from "@/modules/programs/site-marketing-packages-v61.server";
 import * as engagement from "@/modules/engagement/engagement-registry-service.server";
@@ -63,6 +66,15 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
  const context=await (mode==="planning"?getBlueprintPlanningContext(request):mode==="canonical"?getCanonicalCommandContext(request):mode==="learner"?getInstructionalLearnerContext(request):getIdentityContext(request));
  if(!context.actorPersonId)throw new AuthorizationError("verified Person");
  return {
+  readCanonicalSurveyDraftAccess:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Survey context");return surveyDraft.readCanonicalSurveyDraftAccess(request);},
+  createCanonicalSurveyDraft:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Survey context");return surveyDraft.createCanonicalSurveyDraft(request,raw);},
+  readCanonicalSurveyReviewQueue:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Survey context");return surveyApproval.readCanonicalSurveyReviewQueue(request);},
+  readCanonicalSurveyPublicationQueue:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Survey context");return surveyApproval.readCanonicalSurveyPublicationQueue(request);},
+  recordCanonicalSurveyReview:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Survey context");return surveyApproval.recordCanonicalSurveyReview(request,raw);},
+  publishCanonicalSurveyVersion:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Survey context");return surveyApproval.publishCanonicalSurveyVersion(request,raw);},
+  listNoncreditCourseSurveys:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="learner")throw new AuthorizationError("Survey context");return courseSurvey.listNoncreditCourseSurveys(request,raw);},
+  getCourseSurvey:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="learner")throw new AuthorizationError("Survey context");return courseSurvey.getCourseSurvey(request,raw);},
+  submitCourseSurvey:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="learner")throw new AuthorizationError("Survey context");return courseSurvey.submitCourseSurvey(request,raw);},
   previewSiteMarketingArtifact:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Marketing artifact context");return artifacts.previewSiteMarketingArtifact(request,raw);},
   createSiteMarketingPackageRelease:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Marketing artifact context");return artifacts.createSiteMarketingPackageRelease(request,raw);},
   listSiteMarketingPackageReleases:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Marketing artifact context");return artifacts.listSiteMarketingPackageReleases(request,raw);},

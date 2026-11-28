@@ -9,7 +9,7 @@ const autoPatch=readFileSync(
 const feedbackPatch=readFileSync(
   "database/canonical/v3.0.1/patch-noncredit-feedback-invitations.sql","utf8");
 const access=readFileSync("src/modules/learning/noncredit-assessment.server.ts","utf8");
-const surveys=readFileSync("src/modules/learning/course-surveys.functions.ts","utf8");
+const surveys=readFileSync("src/modules/learning/course-surveys.server.ts","utf8");
 const activities=readFileSync("src/components/learning/NoncreditCourseActivities.tsx","utf8");
 const assessment=readFileSync("src/components/learning/CourseAssessmentPanel.tsx","utf8");
 const pilotReport=readFileSync("src/modules/learning/noncredit-pilot-outcomes.functions.ts","utf8");
