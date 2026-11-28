@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { individualStaffIssuerEligible, individualStaffTargetEligible } from "@/domain/individual-staff-handoff";
+import { individualStaffIssuerEligible, individualStaffTargetEligible, requiresIndividualStaffCredential } from "@/domain/individual-staff-handoff";
 import { localStaffInviteInput } from "@/domain/staff-onboarding-policy";
 
 const verifiedIssuer={personId:"operator",disabled:false,email:"registrar@school.org",
@@ -33,6 +33,15 @@ describe("individual staff handoff",()=>{
     expect(individualStaffTargetEligible({...existing,privateCredential:false},"person")).toBe(false);
     expect(individualStaffTargetEligible({...existing,disabled:true},"person")).toBe(false);
     expect(individualStaffTargetEligible({...existing,personId:null},undefined)).toBe(false);
+  });
+  it("defaults registered synthetic staff to shared code even with optional confirmation",()=>{
+    const approved={demoIdentity:true,approvedSharedScope:true,existingPrivateCredential:false,confirmationProvided:true};
+    expect(requiresIndividualStaffCredential(approved)).toBe(false);
+    expect(requiresIndividualStaffCredential({...approved,confirmationProvided:false})).toBe(false);
+    expect(requiresIndividualStaffCredential({...approved,existingPrivateCredential:true})).toBe(true);
+    expect(requiresIndividualStaffCredential({...approved,approvedSharedScope:false})).toBe(true);
+    expect(requiresIndividualStaffCredential({...approved,approvedSharedScope:false,confirmationProvided:false})).toBe(false);
+    expect(requiresIndividualStaffCredential({...approved,demoIdentity:false,approvedSharedScope:false})).toBe(false);
   });
   it("requires explicit bounded evidence when requesting individual handoff",()=>{
     const data={email:"teacher@school.demo",firstName:"Teacher",lastName:"Example",
