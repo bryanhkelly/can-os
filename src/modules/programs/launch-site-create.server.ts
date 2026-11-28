@@ -1,3 +1,4 @@
+import {parseCommandInput} from "@/domain/command-input";
 import {z} from "zod";
 import {schoolPlanningLocationSchema} from "@/domain/school-stub";
 import {siteLaunchPreferencesSchema} from "@/domain/site-launch-preferences";
@@ -23,7 +24,7 @@ export const createLaunchSiteInput=z.object({
   launchPreferences:siteLaunchPreferencesSchema.optional(),
  }).strict().refine(value=>!value.stubOnly||Boolean(value.planningLocation), "A school stub requires city and state");
 export async function createLaunchSiteService(actor:AccessContext,raw:unknown){
-  const data=createLaunchSiteInput.parse(raw);
+  const data=parseCommandInput(createLaunchSiteInput,raw);
   assertCapability(actor,"program.launch.start");
   if(!hasRegistrarAuthority(actor.role))throw new AuthorizationError("registrar program launch workspace");
   if(!actor.actorPersonId||!actor.scope.organizationIds?.includes(data.organizationId)||actor.grantSiteId!==null)

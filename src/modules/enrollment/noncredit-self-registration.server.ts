@@ -1,3 +1,4 @@
+import {parseCommandInput} from "@/domain/command-input";
 import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { z } from "zod";
@@ -146,7 +147,7 @@ async function requireLearnerGrant(tx:Tx, accountId:string, personId:string, org
  * a participant, Person, Site, provider or registering Organization ID.
  */
 export async function enrollMyselfInNoncreditService(request:Request,raw:unknown){
- const data=noncreditEnrollCommand.parse(raw);
+ const data=parseCommandInput(noncreditEnrollCommand,raw);
     const { resolveVerifiedAdultAccount, issueNativeLearnerSession } = await import("./noncredit-participant-identity.server");
     const owner=await resolveVerifiedAdultAccount(request);
     if(!await probeCanonicalAuthReader())

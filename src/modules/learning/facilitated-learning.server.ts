@@ -1,3 +1,4 @@
+import {parseCommandInput} from "@/domain/command-input";
 import { requireFacilitatedLearningEnabled } from "@/modules/learning/canonical-learning-release.server";
 import { assertNativeClassRoomStaff } from "@/modules/classes/native-class-room-boundary.server";
 import { digestCode, generatePairingCode, derivePairingRenewalCode, displayCode, recordRoomAuditAndEvent, currentRoomParticipantPermitted, ownedRoom, assertRoomLive, currentRoomMediaAudience, assertRoomMediaRightsForAudience, assertAuthorizedFacilitatedRoomMedia, createFacilitatedRoomForHost } from "./facilitated-learning-operations.server";
@@ -48,7 +49,7 @@ const protectedMediaKey=/^learning\/instructional-track\/[0-9a-f]{8}-[0-9a-f]{4}
  */
 export const getFacilitatedRoomMediaInputSchema=roomIdInput;
 export async function getFacilitatedRoomMediaService(request:Request,raw:unknown=undefined){
- const data=getFacilitatedRoomMediaInputSchema.parse(raw);
+ const data=parseCommandInput(getFacilitatedRoomMediaInputSchema,raw);
 
     requireFacilitatedLearningEnabled();
     
@@ -93,7 +94,7 @@ export async function getFacilitatedRoomMediaService(request:Request,raw:unknown
  */
 export const getFacilitatedRoomMediaAccessInputSchema=roomMediaInput;
 export async function getFacilitatedRoomMediaAccessService(request:Request,raw:unknown=undefined){
- const data=getFacilitatedRoomMediaAccessInputSchema.parse(raw);
+ const data=parseCommandInput(getFacilitatedRoomMediaAccessInputSchema,raw);
 
     requireFacilitatedLearningEnabled();
     
@@ -244,7 +245,7 @@ export async function getFacilitatedHostWorkspaceService(request:Request,raw:unk
 
 export const startFacilitatedLearningRoomInputSchema=facilitatedStartSchema;
 export async function startFacilitatedLearningRoomService(request:Request,raw:unknown=undefined){
- const data=startFacilitatedLearningRoomInputSchema.parse(raw);
+ const data=parseCommandInput(startFacilitatedLearningRoomInputSchema,raw);
 
     requireFacilitatedLearningEnabled();
     
@@ -254,7 +255,7 @@ export async function startFacilitatedLearningRoomService(request:Request,raw:un
 
 export const renewFacilitatedLearningPairingInputSchema=roomIdInput.extend({requestId:z.string().uuid().optional()}).strict();
 export async function renewFacilitatedLearningPairingService(request:Request,raw:unknown=undefined){
- const data=renewFacilitatedLearningPairingInputSchema.parse(raw);
+ const data=parseCommandInput(renewFacilitatedLearningPairingInputSchema,raw);
 
     requireFacilitatedLearningEnabled();
     
@@ -298,7 +299,7 @@ export async function renewFacilitatedLearningPairingService(request:Request,raw
 
 export const endFacilitatedLearningRoomInputSchema=roomIdInput;
 export async function endFacilitatedLearningRoomService(request:Request,raw:unknown=undefined){
- const data=endFacilitatedLearningRoomInputSchema.parse(raw);
+ const data=parseCommandInput(endFacilitatedLearningRoomInputSchema,raw);
 
     requireFacilitatedLearningEnabled();
     
@@ -320,7 +321,7 @@ export async function endFacilitatedLearningRoomService(request:Request,raw:unkn
 
 export const recordFacilitatedPlaybackInputSchema=facilitatedPlaybackSchema;
 export async function recordFacilitatedPlaybackService(request:Request,raw:unknown=undefined){
- const data=recordFacilitatedPlaybackInputSchema.parse(raw);
+ const data=parseCommandInput(recordFacilitatedPlaybackInputSchema,raw);
 
     requireFacilitatedLearningEnabled();
     
@@ -356,7 +357,7 @@ export async function recordFacilitatedPlaybackService(request:Request,raw:unkno
 
 export const pairWithFacilitatedRoomInputSchema=joinInput;
 export async function pairWithFacilitatedRoomService(request:Request,raw:unknown=undefined){
- const data=pairWithFacilitatedRoomInputSchema.parse(raw);
+ const data=parseCommandInput(pairWithFacilitatedRoomInputSchema,raw);
 
     requireFacilitatedLearningEnabled();
     
@@ -421,7 +422,7 @@ export async function pairWithFacilitatedRoomService(request:Request,raw:unknown
 
 export const leaveFacilitatedRoomInputSchema=leaveInput;
 export async function leaveFacilitatedRoomService(request:Request,raw:unknown=undefined){
- const data=leaveFacilitatedRoomInputSchema.parse(raw);
+ const data=parseCommandInput(leaveFacilitatedRoomInputSchema,raw);
 
     requireFacilitatedLearningEnabled();
     
@@ -454,7 +455,7 @@ export async function leaveFacilitatedRoomService(request:Request,raw:unknown=un
 
 export const getLearnerFacilitatedRoomInputSchema=z.object({courseAttemptId:z.string().uuid()}).strict();
 export async function getLearnerFacilitatedRoomService(request:Request,raw:unknown=undefined){
- const data=getLearnerFacilitatedRoomInputSchema.parse(raw);
+ const data=parseCommandInput(getLearnerFacilitatedRoomInputSchema,raw);
 
     requireFacilitatedLearningEnabled();
     

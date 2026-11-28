@@ -1,3 +1,4 @@
+import {parseCommandInput} from "@/domain/command-input";
 import { nativeClassConsentDigest } from "./native-class-consent.server";
 import { and, asc, desc, eq, gt, ilike, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -49,7 +50,7 @@ export const nativeClassEnrollmentInput=z.object({
   networkMembershipId:z.string().uuid().optional(),
 }).strict();
 export async function enrollInNativeClassService(request:Request,raw:unknown){
- const data=nativeClassEnrollmentInput.parse(raw);
+ const data=parseCommandInput(nativeClassEnrollmentInput,raw);
  const {actor,personId:learnerPersonId}=await resolveAuthorizedLearningPerson(request,"learning.participate");
     return db.transaction(async tx=>{
       // Resolve the parent Class ID without locking the Offering. Publisher

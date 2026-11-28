@@ -1,3 +1,4 @@
+import {parseCommandInput} from "@/domain/command-input";
 import { and, desc, eq, gt, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
@@ -73,7 +74,7 @@ const activityInput = roomInput.extend({
 
 export const getClassroomLearnerActivitiesInputSchema=learnerInput;
 export async function getClassroomLearnerActivitiesService(request:Request,raw:unknown=undefined){
- const data=getClassroomLearnerActivitiesInputSchema.parse(raw);
+ const data=parseCommandInput(getClassroomLearnerActivitiesInputSchema,raw);
 
     guard();
     return db.transaction(async tx => {
@@ -102,7 +103,7 @@ export async function getClassroomLearnerActivitiesService(request:Request,raw:u
 
 export const releaseClassroomActivityInputSchema=activityInput;
 export async function releaseClassroomActivityService(request:Request,raw:unknown=undefined){
- const data=releaseClassroomActivityInputSchema.parse(raw);
+ const data=parseCommandInput(releaseClassroomActivityInputSchema,raw);
 
     guard();
     const host = await resolveCanonicalFacilitator(request);
@@ -155,7 +156,7 @@ export async function releaseClassroomActivityService(request:Request,raw:unknow
 
 export const closeClassroomActivityInputSchema=roomInput.extend({ activityReleaseId: uuid }).strict();
 export async function closeClassroomActivityService(request:Request,raw:unknown=undefined){
- const data=closeClassroomActivityInputSchema.parse(raw);
+ const data=parseCommandInput(closeClassroomActivityInputSchema,raw);
 
     guard();
     const host = await resolveCanonicalFacilitator(request);
@@ -188,7 +189,7 @@ const responseInput = learnerInput.extend({
 
 export const submitClassroomResponseInputSchema=responseInput;
 export async function submitClassroomResponseService(request:Request,raw:unknown=undefined){
- const data=submitClassroomResponseInputSchema.parse(raw);
+ const data=parseCommandInput(submitClassroomResponseInputSchema,raw);
 
     guard();
     return db.transaction(async tx => {
@@ -240,7 +241,7 @@ const presenceInput = learnerInput.extend({
 
 export const recordClassroomPresenceInputSchema=presenceInput;
 export async function recordClassroomPresenceService(request:Request,raw:unknown=undefined){
- const data=recordClassroomPresenceInputSchema.parse(raw);
+ const data=parseCommandInput(recordClassroomPresenceInputSchema,raw);
 
     guard();
     return db.transaction(async tx => {
@@ -297,7 +298,7 @@ export async function recordClassroomPresenceService(request:Request,raw:unknown
  * projector routes; they use getClassroomPresentationState instead. */
 export const getClassroomHostActivityInputSchema=roomInput;
 export async function getClassroomHostActivityService(request:Request,raw:unknown=undefined){
- const data=getClassroomHostActivityInputSchema.parse(raw);
+ const data=parseCommandInput(getClassroomHostActivityInputSchema,raw);
 
     guard();
     const host = await resolveCanonicalFacilitator(request);
@@ -421,7 +422,7 @@ export async function getClassroomHostActivityService(request:Request,raw:unknow
  */
 export const getClassroomPresentationStateInputSchema=roomInput;
 export async function getClassroomPresentationStateService(request:Request,raw:unknown=undefined){
- const data=getClassroomPresentationStateInputSchema.parse(raw);
+ const data=parseCommandInput(getClassroomPresentationStateInputSchema,raw);
 
     guard();
     const host = await resolveCanonicalFacilitator(request);

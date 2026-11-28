@@ -1,3 +1,4 @@
+import {parseCommandInput} from "@/domain/command-input";
 import { and, desc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
@@ -69,7 +70,7 @@ async function verifiedEvidence(tx:Tx,id:string){
  * Organization and its currently approved operation-operator relationships.
  */
 export async function approveNativeOfferingAdoptionService(request:Request,raw:unknown){
- const data=approvalInput.parse(raw);
+ const data=parseCommandInput(approvalInput,raw);
     const actor=await getCanonicalCommandContext(request);
     const organizationId=reviewerScope(actor);
     const reviewerPersonId=actor.actorPersonId!;

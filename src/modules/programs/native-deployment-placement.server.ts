@@ -1,3 +1,4 @@
+import {parseCommandInput} from "@/domain/command-input";
 import {and,eq,sql} from "drizzle-orm";
 import {randomUUID} from "node:crypto";
 import {z} from "zod";
@@ -17,7 +18,7 @@ export const inputSchema=z.object({deploymentId:z.string().uuid(),siteId:z.strin
  * applies to every caller, including Launch Studio and acceptance clients.
  * Never infer placement from a Site ID supplied by the browser alone. */
 export async function placeNativeDeploymentSiteService(request:Request,raw:unknown){
- const data=inputSchema.parse(raw);
+ const data=parseCommandInput(inputSchema,raw);
   const provider=await resolveCanonicalProvider(request,"blueprint.execute");
   if(provider.siteIds.length!==1||provider.siteIds[0]!==data.siteId)
     throw new AuthorizationError("exact current Blueprint Site scope");

@@ -1,3 +1,4 @@
+import {parseCommandInput} from "@/domain/command-input";
 import {and,desc,eq,sql} from "drizzle-orm";
 import {db} from "@/db/client";
 import {deploymentReadinessReviews,programDeployments,evidenceDocuments,evidenceDocumentVersions} from "@/db/canonical-v301";
@@ -11,7 +12,7 @@ import {writeCanonicalAudit,emitCanonicalDomainEvent} from "@/platform/canonical
 
 /** Direct independent CAN reviewer; this records evidence, not operating authority. */
 export async function recordNativeDeploymentReadinessService(request:Request,raw:unknown){
- const data=deploymentReadinessCommand.parse(raw);
+ const data=parseCommandInput(deploymentReadinessCommand,raw);
   if(request.headers.get("origin")!==new URL(request.url).origin)
     throw new AuthorizationError("same-origin independent readiness decision");
   const actor=await getIdentityContext(request);

@@ -1,3 +1,4 @@
+import {parseCommandInput} from "@/domain/command-input";
 import { registeredRoomParticipant } from "./classroom-attendance-operations.server";
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
@@ -34,7 +35,7 @@ function guard(){
 }
 export const getClassroomAttendanceRosterInputSchema=roomInput;
 export async function getClassroomAttendanceRosterService(request:Request,raw:unknown=undefined){
- const data=getClassroomAttendanceRosterInputSchema.parse(raw);
+ const data=parseCommandInput(getClassroomAttendanceRosterInputSchema,raw);
 
     guard();const host=await resolveCanonicalFacilitator(request);
     return db.transaction(async tx=>{
@@ -145,7 +146,7 @@ export async function getClassroomAttendanceRosterService(request:Request,raw:un
  */
 export const attestClassroomParticipationInputSchema=attendanceInput;
 export async function attestClassroomParticipationService(request:Request,raw:unknown=undefined){
- const data=attestClassroomParticipationInputSchema.parse(raw);
+ const data=parseCommandInput(attestClassroomParticipationInputSchema,raw);
 
     guard();const host=await resolveCanonicalFacilitator(request);
     return db.transaction(async tx=>{

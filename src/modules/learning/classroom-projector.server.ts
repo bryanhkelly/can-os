@@ -1,3 +1,4 @@
+import {parseCommandInput} from "@/domain/command-input";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
@@ -29,7 +30,7 @@ function guard() {
  */
 export const getClassroomProjectorCommandInputSchema=roomInput;
 export async function getClassroomProjectorCommandService(request:Request,raw:unknown=undefined){
- const data=getClassroomProjectorCommandInputSchema.parse(raw);
+ const data=parseCommandInput(getClassroomProjectorCommandInputSchema,raw);
 
     guard();
     const host = await resolveCanonicalFacilitator(request);
@@ -72,7 +73,7 @@ export async function getClassroomProjectorCommandService(request:Request,raw:un
 
 export const issueClassroomProjectorCommandInputSchema=commandInput;
 export async function issueClassroomProjectorCommandService(request:Request,raw:unknown=undefined){
- const data=issueClassroomProjectorCommandInputSchema.parse(raw);
+ const data=parseCommandInput(issueClassroomProjectorCommandInputSchema,raw);
 
     guard();
     const host = await resolveCanonicalFacilitator(request);

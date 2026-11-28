@@ -1,3 +1,4 @@
+import {parseCommandInput} from "@/domain/command-input";
 import { createHash } from "node:crypto";
 import { and, asc, desc, eq, inArray, isNotNull, lt, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -307,7 +308,7 @@ async function log(tx:Tx,actor:Actor,organizationId:string,
 /** Creator preflight. It reveals neither another operator's adoption nor
  * evidence or reviewer identities outside the publisher Course appointment. */
 export async function getNativeOfferingReleaseOverviewService(actor:Actor,raw:unknown){
-    const data=releaseInput.parse(raw);
+    const data=parseCommandInput(releaseInput,raw);
     return db.transaction(async tx=>{
       const bundle=await loadBundle(tx,data.offeringVersionId,false);
       await requireAppointments(tx,actor,bundle,"instructional_track.author");
@@ -351,7 +352,7 @@ export async function getNativeOfferingReleaseOverviewService(actor:Actor,raw:un
 /** Submission creates an existing native content manifest. No new Course,
  * approval role, publisher, or local authorization is created. */
 export async function submitNativeOfferingReleaseService(actor:Actor,raw:unknown){
-    const data=assetSubmissionInput.parse(raw);
+    const data=parseCommandInput(assetSubmissionInput,raw);
     return db.transaction(async tx=>{
       const bundle=await loadBundle(tx,data.offeringVersionId,true);
       await requireAppointments(tx,actor,bundle,"instructional_track.author");
@@ -401,7 +402,7 @@ export async function submitNativeOfferingReleaseService(actor:Actor,raw:unknown
  * asset-backed release manuscript has become stale. Release policy editing
  * must never depend on untrusted or copied manifest state. */
 export async function getNativeOfferingReleasePolicyReviewService(actor:Actor,raw:unknown){
-    const data=releaseInput.parse(raw);
+    const data=parseCommandInput(releaseInput,raw);
     return db.transaction(async tx=>{
       const bundle=await loadBundle(tx,data.offeringVersionId,false);
       await requireAppointments(tx,actor,bundle,"instructional_track.review");
@@ -426,7 +427,7 @@ export async function getNativeOfferingReleasePolicyReviewService(actor:Actor,ra
  * Explicit evidence, CAS revision and a distinct author/reviewer role prevent
  * silently treating missing primary-track requirements as zero. */
 export async function saveNativeOfferingReleasePolicyService(actor:Actor,raw:unknown){
-    const data=policyInput.parse(raw);
+    const data=parseCommandInput(policyInput,raw);
     return db.transaction(async tx=>{
       const bundle=await loadBundle(tx,data.offeringVersionId,true);
       await requireAppointments(tx,actor,bundle,"instructional_track.review");
@@ -546,7 +547,7 @@ export async function getNativeOfferingReleaseReviewQueueService(actor:Actor,raw
  * The server returns the actual immutable-snapshot syllabus, unit and lesson
  * content only after exact-version Course appointments are revalidated. */
 export async function getNativeOfferingReviewContentService(actor:Actor,raw:unknown){
-    const data=publishInput.parse(raw);
+    const data=parseCommandInput(publishInput,raw);
     return db.transaction(async tx=>{
       const bundle=await loadBundle(tx,data.offeringVersionId,true);
       await requireAppointments(tx,actor,bundle,"instructional_track.review");
@@ -585,7 +586,7 @@ export async function getNativeOfferingReviewContentService(actor:Actor,raw:unkn
 }
 
 export async function decideNativeOfferingReleaseService(actor:Actor,raw:unknown){
-    const data=decisionInput.parse(raw);
+    const data=parseCommandInput(decisionInput,raw);
     return db.transaction(async tx=>{
       const bundle=await loadBundle(tx,data.offeringVersionId,true);
       await requireAppointments(tx,actor,bundle,"instructional_track.review");
@@ -617,7 +618,7 @@ export async function decideNativeOfferingReleaseService(actor:Actor,raw:unknown
  * local adoption. Course publication deliberately precedes Offering release:
  * recorded-instructor tracks may only be created against published Courses. */
 export async function publishNativeOfferingCoursesService(actor:Actor,raw:unknown){
-    const data=publishInput.parse(raw);
+    const data=parseCommandInput(publishInput,raw);
     return db.transaction(async tx=>{
       const bundle=await loadBundle(tx,data.offeringVersionId,true);
       await requireAppointments(tx,actor,bundle,"instructional_track.publish");
@@ -653,7 +654,7 @@ export async function publishNativeOfferingCoursesService(actor:Actor,raw:unknow
  * Course manuscript review. The existing database trigger refuses empty
  * manifests and independently checks academic/rights/accessibility decisions. */
 export async function approveNativeOfferingAssetManifestService(actor:Actor,raw:unknown){
-    const data=publishInput.parse(raw);
+    const data=parseCommandInput(publishInput,raw);
     return db.transaction(async tx=>{
       const bundle=await loadBundle(tx,data.offeringVersionId,true);
       await requireAppointments(tx,actor,bundle,"instructional_track.publish");
@@ -688,7 +689,7 @@ export async function approveNativeOfferingAssetManifestService(actor:Actor,raw:
  * published constituent Courses. Local adoption remains an independent
  * governed operation, never an implicit side effect of publication. */
 export async function publishNativeOfferingVersionService(actor:Actor,raw:unknown){
-    const data=publishInput.parse(raw);
+    const data=parseCommandInput(publishInput,raw);
     return db.transaction(async tx=>{
       const bundle=await loadBundle(tx,data.offeringVersionId,true);
       await requireAppointments(tx,actor,bundle,"instructional_track.publish");
