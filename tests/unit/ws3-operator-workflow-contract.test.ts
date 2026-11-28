@@ -6,8 +6,8 @@ const classUi=source("src/components/learning/NativeClassCompletionOperatorPanel
 const approvals=source("src/components/learning/CompletionEvidenceReviewQueuePanel.tsx");
 const route=source("src/routes/canonical.completion-evidence-reviews.tsx");
 const nativeRoute=source("src/routes/class_.$classId.tsx");
-const review=source("src/modules/learning/completion-evidence-review.functions.ts");
-const revocation=source("src/modules/learning/credential-revocation.functions.ts");
+const review=source("src/modules/learning/completion-evidence-review.server.ts");
+const revocation=source("src/modules/learning/credential-revocation.server.ts");
 const gate=source("scripts/acceptance/check-ws3-merge-gate.mjs");
 const qa=source("scripts/acceptance/dry-run-ws3-migrations.mjs");
 

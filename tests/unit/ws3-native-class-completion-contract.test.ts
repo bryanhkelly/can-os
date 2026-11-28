@@ -4,7 +4,7 @@ import {describe,it,expect} from "vitest";
 const read=(path:string)=>readFileSync(path,"utf8");
 const sql=read("database/canonical/v3.0.1/patch-ws3-class-governed-outcomes.sql");
 const bindingSql=read("database/canonical/v3.0.1/patch-ws3-source-bound-evidence.sql");
-const command=read("src/modules/classes/native-class-completion.functions.ts");
+const command=read("src/modules/classes/native-class-completion.server.ts");
 const canonical=read("database/canonical/v3.0.1/patch-unified-class-course-attempts.sql");
 
 describe("WS3 governed native Class completion contract",()=>{
@@ -80,7 +80,7 @@ describe("WS3 governed native Class completion contract",()=>{
     expect(sql).toContain("binding.delivery_site_id=attr.delivery_site_id");
   });
   it("takes WS00 Class-first lock order to avoid WS2 withdrawal deadlocks",()=>{
-    const start=command.indexOf("export const decideNativeClassCompletion");
+    const start=command.indexOf("export async function decideNativeClassCompletionService");
     const code=command.slice(start);
     const cls=code.indexOf("const [lockedClass]");
     const en=code.indexOf("const [locked]");

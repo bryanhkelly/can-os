@@ -1,3 +1,4 @@
+import {useAssessmentWorkspaceScope} from "@/lib/api/use-assessment-workspace-scope";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/choice";
 import { Select } from "@/components/ui/select";
@@ -9,12 +10,12 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   getNativeClassCompletionQueue,getNativeClassCompletionReview,
   decideNativeClassCompletion,
-} from "@/modules/classes/native-class-completion.functions";
+} from "@/lib/api/browser-assessments-outcomes";
 import {
   requestCompletionEvidenceReview,getPendingCompletionEvidenceReviews,
   decideCompletionEvidenceReview,
-} from "@/modules/learning/completion-evidence-review.functions";
-import { publishNativeClassCompletionPolicy } from "@/modules/classes/native-class-completion-policy.functions";
+} from "@/lib/api/browser-assessments-outcomes";
+import { publishNativeClassCompletionPolicy } from "@/lib/api/browser-assessments-outcomes";
 
 /** WS3 V6.1 right-angle operator workspace. Actual Class, learner,
  * reviewer and Site rights are always resolved from the original source.
@@ -22,6 +23,11 @@ import { publishNativeClassCompletionPolicy } from "@/modules/classes/native-cla
  * evidence, then the provider records the canonical outcome.
  */
 export function NativeClassCompletionOperatorPanel({classId}:{classId:string}){
+  const scope=useAssessmentWorkspaceScope();
+  if(!scope)return <p role="status">Verified workspace membership is required.</p>;
+  return <NativeClassCompletionOperatorPanelSession key={JSON.stringify([scope,classId])} classId={classId} scope={scope}/>;
+}
+function NativeClassCompletionOperatorPanelSession({classId,scope}:{classId:string;scope:NonNullable<ReturnType<typeof useAssessmentWorkspaceScope>>}){
   const [page,setPage]=useState(0);
   const [approvalPage,setApprovalPage]=useState(0);
   const [selectedId,setSelectedId]=useState<string|null>(null);
@@ -35,54 +41,52 @@ export function NativeClassCompletionOperatorPanel({classId}:{classId:string}){
   const [notice,setNotice]=useState("");
   const [view,setView]=useState<"participants"|"approvals">("participants");
   const list=useQuery({
-    queryKey:["ws3-class-completion-queue",classId,page],
-    queryFn:()=>getNativeClassCompletionQueue({data:{classId,page}}),
-    enabled:!!classId,retry:false,
+    queryKey:["ws3-class-completion-queue",scope,classId,page],
+    queryFn:({signal})=>getNativeClassCompletionQueue(classId,page,signal),
+    enabled:!!classId,retry:false,gcTime:0,
   });
   const detail=useQuery({
-    queryKey:["ws3-class-completion",selectedId],
-    queryFn:()=>getNativeClassCompletionReview({
-      data:{classEnrollmentId:selectedId!},
-    }),
-    enabled:!!selectedId,retry:false,
+    queryKey:["ws3-class-completion",scope,selectedId],
+    queryFn:({signal})=>getNativeClassCompletionReview(selectedId!,signal),
+    enabled:!!selectedId,retry:false,gcTime:0,
   });
   const approvals=useQuery({
-    queryKey:["ws3-source-evidence-review-queue",approvalPage],
-    queryFn:()=>getPendingCompletionEvidenceReviews({data:{page:approvalPage}}),
-    enabled:view==="approvals",retry:false,
+    queryKey:["ws3-source-evidence-review-queue",scope,approvalPage],
+    queryFn:({signal})=>getPendingCompletionEvidenceReviews(approvalPage,signal),
+    enabled:view==="approvals",retry:false,gcTime:0,
   });
   const request=useMutation({
-    mutationFn:()=>requestCompletionEvidenceReview({data:{
+    mutationFn:()=>requestCompletionEvidenceReview({
       purpose:"class_completion_decision",
       classEnrollmentId:selectedId!,
       expectedClassOutcomeId:detail.data?.currentDecision?.id??null,
       approvedOutcome:outcome,evidenceVersionId:evidenceVersionId.trim(),
       reason:reason.trim(),
-    }}),
+    }),
     onSuccess:()=>setNotice("Evidence review requested. A second authorized reviewer must approve it before completion may be recorded."),
   });
   const decide=useMutation({
-    mutationFn:()=>decideNativeClassCompletion({data:{
+    mutationFn:()=>decideNativeClassCompletion({
       classEnrollmentId:selectedId!,
       expectedPolicyVersionId:detail.data!.policyVersionId!,
       expectedPriorOutcomeId:detail.data?.currentDecision?.id??null,
       outcome,evidenceVersionId:evidenceVersionId.trim(),
       reason:reason.trim(),
-    }}),
+    }),
     onSuccess:async()=>{
       setNotice("Official Class decision recorded with its original completion policy and audit history.");
       await Promise.all([list.refetch(),detail.refetch()]);
     },
   });
   const publishPolicy=useMutation({
-    mutationFn:()=>publishNativeClassCompletionPolicy({data:{
+    mutationFn:()=>publishNativeClassCompletionPolicy({
       classId,
       expectedLatestVersion:list.data?.latestCompletionPolicyVersion??null,
       requireAllLessons:policyRequireLessons,
       requiredVerifiedSessions:policySessions,
       requirePassingAssessment:policyRequireAssessment,
       policyEvidenceVersionId:policyEvidence.trim(),
-    }}),
+    }),
     onSuccess:async()=>{
       setPolicyEvidence("");
       setNotice("Completion policy published. It applies only to future Class Enrollments; existing pins remain unchanged.");
@@ -91,11 +95,11 @@ export function NativeClassCompletionOperatorPanel({classId}:{classId:string}){
   });
   const review=useMutation({
     mutationFn:async(input:{requestId:string;decision:"approve"|"reject"})=>
-      decideCompletionEvidenceReview({data:input}),
+      decideCompletionEvidenceReview(input),
     onSuccess:async()=>{setNotice("Independent evidence review saved.");
       await approvals.refetch();},
   });
-  const ready=!!selectedId && !!detail.data?.policyVersionId &&
+  const ready=!detail.isError&&!list.isError&&!!selectedId && !!detail.data?.policyVersionId &&
     (outcome!=="completed" || detail.data.readiness.readyForIndependentReview) &&
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
       .test(evidenceVersionId.trim()) && reason.trim().length>=10 &&
@@ -129,8 +133,8 @@ export function NativeClassCompletionOperatorPanel({classId}:{classId:string}){
         </p>
         {approvals.isPending&&<p role="status">Verifying current reviewer scope…</p>}
         {approvals.isError&&<p role="alert">Pending reviews are unavailable.</p>}
-        {approvals.data?.pending.length===0&&<p className="text-sm">No pending reviews at your authorized Site.</p>}
-        {approvals.data?.pending.map(item=>
+        {!approvals.isError&&approvals.data?.pending.length===0&&<p className="text-sm">No pending reviews at your authorized Site.</p>}
+        {!approvals.isError&&approvals.data?.pending.map(item=>
           <article key={item.requestId} className="space-y-2 border border-border p-4">
             <h4 className="font-semibold">{item.purpose.replaceAll("_"," ")}</h4>
             <p className="text-xs text-muted-foreground">Source: {item.sourceId}</p>
@@ -155,7 +159,7 @@ export function NativeClassCompletionOperatorPanel({classId}:{classId:string}){
           <span className="text-xs text-muted-foreground">
             Approval page {approvalPage+1}
           </span>
-          <Button variant="outline" disabled={!approvals.data?.hasMore}
+          <Button variant="outline" disabled={approvals.isError||!approvals.data?.hasMore}
             onClick={()=>setApprovalPage(p=>p+1)}>Next</Button>
         </div>
         {review.isError&&<p role="alert">This evidence approval was denied or could not be saved.</p>}
@@ -165,7 +169,7 @@ export function NativeClassCompletionOperatorPanel({classId}:{classId:string}){
         {list.isError&&<p role="alert">
           This Class queue is unavailable. Verify the Class, original Site and current grant.
         </p>}
-        {list.data&&<div className="space-y-3">
+        {list.data&&!list.isError&&<div className="space-y-3">
           <h3 className="font-serif text-xl">{list.data.classTitle}</h3>
           <details className="border border-border bg-card p-4">
             <summary className="cursor-pointer font-semibold">
@@ -200,7 +204,7 @@ export function NativeClassCompletionOperatorPanel({classId}:{classId:string}){
                   onChange={e=>setPolicyEvidence(e.target.value)}
                   placeholder="Verified evidence UUID"/>
               </Label>
-              <Button disabled={publishPolicy.isPending ||
+              <Button disabled={list.isError || publishPolicy.isPending ||
                   !(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
                     .test(policyEvidence.trim())) ||
                   !(policyRequireLessons||policySessions>0||policyRequireAssessment)}
@@ -256,7 +260,7 @@ export function NativeClassCompletionOperatorPanel({classId}:{classId:string}){
           <h3 className="font-serif text-xl">Adjudicate selected Class enrollment</h3>
           {detail.isPending&&<p role="status">Rechecking completion evidence…</p>}
           {detail.isError&&<p role="alert">Independent source review is unavailable.</p>}
-          {detail.data&&<div className="space-y-3">
+          {detail.data&&!detail.isError&&<div className="space-y-3">
             <p className="text-sm">
               Policy: {detail.data.policyVersionId?"Pinned at original enrollment":"Unavailable"}
               {" · "}Recorded decision: {detail.data.currentDecision?.resultCode??"None"}

@@ -4,7 +4,7 @@ import { describe,expect,it } from "vitest";
 const read=(path:string)=>readFileSync(path,"utf8");
 describe("native Class evidence consolidates on existing canonical engines",()=>{
   it("ties the read model to the authenticated Person and actual Class Course Attempt",()=>{
-    const source=read("src/modules/classes/native-class-canonical-evidence.functions.ts");
+    const source=read("src/modules/classes/native-class-canonical-evidence.server.ts");
     const access=read("src/modules/classes/native-learner-class-access.server.ts");
     expect(source).toContain('if(!actor.actorPersonId||actor.role!=="learner")');
     expect(source).toContain('authorizeNativeLearnerClass(tx,actor,data.classEnrollmentId,"history_read")');
@@ -12,11 +12,11 @@ describe("native Class evidence consolidates on existing canonical engines",()=>
     expect(access).toContain('authorizeCanonicalCourseAttempt(tx,actor,enrollment.courseAttemptId,mode==="history_read",enrollment.id)');
     expect(access).toContain('access.source!=="class"');
     expect(access).toContain("access.courseVersionId!==cls.courseVersionId");
-    expect(source).toContain('setResponseHeader("Cache-Control","private, no-store")');
+    expect(read("src/modules/classes/native-class-canonical-evidence.functions.ts")).toContain('setResponseHeader("Cache-Control","private, no-store")');
     expect(source).not.toContain('process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED');
   });
   it("reuses canonical assessment grants, finalized results and lesson evidence without creating a second ledger",()=>{
-    const source=read("src/modules/classes/native-class-canonical-evidence.functions.ts");
+    const source=read("src/modules/classes/native-class-canonical-evidence.server.ts");
     for(const name of ["assessmentAccess","assessmentFormAdministrations",
       "assessmentExecutionAttempts","assessmentExecutionResults",
       "learnerLessonProgress","courseLessons","canonicalClassOutcomes"]){

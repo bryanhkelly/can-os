@@ -7,8 +7,8 @@ describe("publisher Course Activities recover the original UX without a parallel
   it("keeps Course publisher ownership distinct from local Class operator",()=>{
     const publisher=source("src/modules/classes/native-class-publisher.server.ts");
     const scope=source("src/modules/learning/native-class-assessment-scope.server.ts");
-    const grant=source("src/modules/classes/native-class-assessment-provision.functions.ts");
-    const final=source("src/modules/classes/native-class-assessment-finalize.functions.ts");
+    const grant=source("src/modules/classes/native-class-assessment-provision.server.ts");
+    const final=source("src/modules/classes/native-class-assessment-finalize.server.ts");
     expect(publisher).toContain("courses.publisherOrganizationId");
     expect(publisher).toContain("canonicalOfferingCourses.courseVersionId");
     expect(scope).toContain("eq(assessmentDefinitions.ownerOrganizationId,publisherOrganizationId)");

@@ -6,7 +6,7 @@ const operatorRead=source("src/modules/learning/noncredit-completion-review.serv
 const operatorPanel=source("src/components/learning/NoncreditCompletionReviewPanel.tsx");
 const queuePanel=source("src/components/learning/NoncreditCompletionQueuePanel.tsx");
 const noncreditRoute=source("src/routes/canonical_.noncredit-review-queue.tsx");
-const canonicalClassRead=source("src/modules/classes/native-class-canonical-evidence.functions.ts");
+const canonicalClassRead=source("src/modules/classes/native-class-canonical-evidence.server.ts");
 const canonicalClassPanel=source("src/components/learning/NativeClassCanonicalEvidencePanel.tsx");
 const preflight=source("scripts/acceptance/check-ws3-completion-readiness.mjs");
 

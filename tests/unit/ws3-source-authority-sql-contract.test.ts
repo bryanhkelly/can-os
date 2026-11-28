@@ -8,9 +8,9 @@ const credentialSql=file("database/canonical/v3.0.1/patch-achievement-credential
 const readerSql=file("database/canonical/v3.0.1/patch-credential-learner-reader.sql");
 const sourceGuard=file("src/modules/learning/verified-completion-evidence.server.ts");
 const corrections=file("src/modules/learning/noncredit-completion-corrections.server.ts");
-const revocations=file("src/modules/learning/credential-revocation.functions.ts");
+const revocations=file("src/modules/learning/credential-revocation.server.ts");
 const operatorRead=file("src/modules/learning/noncredit-completion-review.server.ts");
-const learnerRead=file("src/modules/learning/learner-credentials.functions.ts");
+const learnerRead=file("src/modules/learning/learner-credentials.server.ts");
 
 describe("WS3 completion evidence source and credential-current contracts",()=>{
   it("preserves immutably approved source/Person/decision binding with forced RLS",()=>{

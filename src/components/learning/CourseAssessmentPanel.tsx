@@ -1,3 +1,4 @@
+import {useAssessmentWorkspaceScope} from "@/lib/api/use-assessment-workspace-scope";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { QueryState, WorkspaceNotice } from "@/components/workspace";
@@ -6,7 +7,7 @@ import {
   beginNoncreditKnowledgeCheckAttempt, getNoncreditKnowledgeCheck,
   submitNoncreditKnowledgeCheckAnswers,
   saveNoncreditKnowledgeCheckAnswer,
-} from "@/modules/learning/noncredit-assessment.functions";
+} from "@/lib/api/browser-assessments-outcomes";
 
 type KnowledgeCheck = Awaited<ReturnType<typeof getNoncreditKnowledgeCheck>>;
 
@@ -15,7 +16,9 @@ export function CourseAssessmentPanel({courseAttemptId,phase="final",onAssessmen
   courseAttemptId:string;phase?:"baseline"|"final";onAssessmentCompleted?:()=>void;
   context?:"noncredit"|"class";
 }) {
-  return <KnowledgeCheckSession key={courseAttemptId+":"+phase}
+  const scope=useAssessmentWorkspaceScope();
+  if(!scope)return <WorkspaceNotice>Verified workspace membership is required.</WorkspaceNotice>;
+  return <KnowledgeCheckSession key={JSON.stringify([scope,courseAttemptId,phase])}
     courseAttemptId={courseAttemptId} phase={phase} context={context}
     onAssessmentCompleted={onAssessmentCompleted}/>;
 }
@@ -28,42 +31,43 @@ function KnowledgeCheckSession({courseAttemptId,phase,onAssessmentCompleted,cont
   const [error,setError]=useState("");
   const [draftStatus,setDraftStatus]=useState<"idle"|"saving"|"saved"|"failed">("idle");
   const draftQueue=useRef<Promise<void>>(Promise.resolve());
+  const mounted=useRef(false);
+  const starting=useRef(false);
   const load=useCallback(async()=>{
-    const next=await getNoncreditKnowledgeCheck({data:{courseAttemptId,phase}});
-    setCheck(next);
-    setError("");
+    const next=await getNoncreditKnowledgeCheck(courseAttemptId,phase);
+    if(mounted.current){setCheck(next);setError("");}
   },[courseAttemptId,phase]);
   useEffect(()=>{
     let active=true;
+    mounted.current=true;
+    const controller=new AbortController();
     setCheck(null);setError("");setDraftStatus("idle");
-    void getNoncreditKnowledgeCheck({data:{courseAttemptId,phase}})
+    void getNoncreditKnowledgeCheck(courseAttemptId,phase,controller.signal)
       .then(next=>{if(active)setCheck(next);})
       .catch(()=>{if(active)setError("Knowledge-check availability could not be verified.");});
-    return ()=>{active=false;};
+    return ()=>{active=false;mounted.current=false;controller.abort();};
   },[courseAttemptId,phase]);
 
   async function begin() {
-    if(busy)return;
+    if(starting.current||!mounted.current)return;
+    starting.current=true;
     setBusy(true);setError("");
     try {
-      await beginNoncreditKnowledgeCheckAttempt({
-        data:{courseAttemptId,phase,requestId:crypto.randomUUID()},
-      });
-      await load();
+      await beginNoncreditKnowledgeCheckAttempt({courseAttemptId,phase,requestId:crypto.randomUUID()});
+      if(mounted.current)await load();
     }catch {
       setError("Unable to start this knowledge check. Check your participation or attempt limit.");
-    }finally {setBusy(false);}
+    }finally {starting.current=false;if(mounted.current)setBusy(false);}
   }
 
   function saveDraft(attemptId:string,questionId:string,optionIds:string[]) {
     setDraftStatus("saving");
     // Serialize edits for an attempt; canonical answer revisions persist across sessions.
     draftQueue.current=draftQueue.current.catch(()=>undefined).then(async()=>{
-      await saveNoncreditKnowledgeCheckAnswer({
-        data:{courseAttemptId,phase,attemptId,questionId,optionIds,requestId:crypto.randomUUID()},
-      });
-      setDraftStatus("saved");
-    }).catch(()=>setDraftStatus("failed"));
+      if(!mounted.current)return;
+      await saveNoncreditKnowledgeCheckAnswer({courseAttemptId,phase,attemptId,questionId,optionIds,requestId:crypto.randomUUID()});
+      if(mounted.current)setDraftStatus("saved");
+    }).catch(()=>{if(mounted.current)setDraftStatus("failed");});
   }
 
   if(error&&!check)return <WorkspaceNotice tone="danger">
@@ -112,16 +116,14 @@ function KnowledgeCheckSession({courseAttemptId,phase,onAssessmentCompleted,cont
         onSubmit={async answers=>{
           setError("");
           await draftQueue.current;
-          await submitNoncreditKnowledgeCheckAnswers({
-            data:{courseAttemptId,phase,attemptId:check.attemptId!,
+          if(!mounted.current)throw new Error("Assessment workspace closed");
+          await submitNoncreditKnowledgeCheckAnswers({courseAttemptId,phase,attemptId:check.attemptId!,
               requestId:crypto.randomUUID(),
               answers:answers.map(answer=>({
                 questionId:answer.questionId,optionIds:answer.optionIds??[],
               })),
-            },
           });
-          await load();
-          onAssessmentCompleted?.();
+          if(mounted.current){await load();if(mounted.current)onAssessmentCompleted?.();}
         }}/>}
     {check.state==="in_progress"&&<p className="text-xs text-muted-foreground" role="status">
       {draftStatus==="saving"?"Saving answers...":

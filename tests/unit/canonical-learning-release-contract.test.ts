@@ -41,7 +41,7 @@ describe("secure canonical learning runtime boundaries", () => {
     const modules = [
       ["src/modules/learning/canonical-learning-activity.functions.ts",
         "requireCanonicalLearningActivityEnabled()"],
-      ["src/modules/learning/canonical-course-evidence.functions.ts",
+      ["src/modules/learning/canonical-course-evidence.server.ts",
         "requireCanonicalLearningActivityEnabled()"],
       ["src/modules/learning/facilitated-learning.functions.ts",
         "requireFacilitatedLearningEnabled()"],
@@ -50,7 +50,7 @@ describe("secure canonical learning runtime boundaries", () => {
     ] as const;
     for (const [path, gate] of modules) {
       const body = source(path);
-      const handlers = body.match(/\.handler\(async/g)?.length ?? 0;
+      const handlers = path.endsWith("canonical-course-evidence.server.ts") ? (body.match(/export async function getCanonicalCourseEvidenceService\(/g)?.length ?? 0) : (body.match(/\.handler\(async/g)?.length ?? 0);
       const guarded = body.split(gate).length - 1;
       expect(handlers, path).toBeGreaterThan(0);
       expect(guarded, path).toBe(handlers);

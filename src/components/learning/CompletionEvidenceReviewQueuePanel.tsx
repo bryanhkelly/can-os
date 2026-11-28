@@ -1,3 +1,4 @@
+import {useAssessmentWorkspaceScope} from "@/lib/api/use-assessment-workspace-scope";
 import { useState } from "react";
 import { useQuery,useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -9,8 +10,8 @@ import {
   getPendingCompletionEvidenceReviews,
   decideCompletionEvidenceReview,
   requestCompletionEvidenceReview,
-} from "@/modules/learning/completion-evidence-review.functions";
-import { revokeLearningAwardIssuance } from "@/modules/learning/credential-revocation.functions";
+} from "@/lib/api/browser-assessments-outcomes";
+import { revokeLearningAwardIssuance } from "@/lib/api/browser-assessments-outcomes";
 
 const uuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -20,41 +21,46 @@ const uuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}
  * server, not these browser fields; role alone never authorizes issuance.
  */
 export function CompletionEvidenceReviewQueuePanel(){
+  const scope=useAssessmentWorkspaceScope();
+  if(!scope)return <p role="status">Verified workspace membership is required.</p>;
+  return <CompletionEvidenceReviewSession key={JSON.stringify(scope)} scope={scope}/>;
+}
+function CompletionEvidenceReviewSession({scope}:{scope:NonNullable<ReturnType<typeof useAssessmentWorkspaceScope>>}){
   const [page,setPage]=useState(0);
   const [issuanceId,setIssuanceId]=useState("");
   const [evidenceVersionId,setEvidenceVersionId]=useState("");
   const [reason,setReason]=useState("");
   const [notice,setNotice]=useState("");
   const queue=useQuery({
-    queryKey:["ws3-independent-evidence-review-queue",page],
-    queryFn:()=>getPendingCompletionEvidenceReviews({data:{page}}),
-    retry:false,
+    queryKey:["ws3-independent-evidence-review-queue",scope,page],
+    queryFn:({signal})=>getPendingCompletionEvidenceReviews(page,signal),
+    retry:false,gcTime:0,
   });
   const decide=useMutation({
     mutationFn:(data:{requestId:string;decision:"approve"|"reject"})=>
-      decideCompletionEvidenceReview({data}),
+      decideCompletionEvidenceReview(data),
     onSuccess:async()=>{
       setNotice("Independent evidence decision recorded with its authorization history.");
       await queue.refetch();
     },
   });
   const requestRevocation=useMutation({
-    mutationFn:()=>requestCompletionEvidenceReview({data:{
+    mutationFn:()=>requestCompletionEvidenceReview({
       purpose:"award_revocation",
       issuanceId:issuanceId.trim(),
       evidenceVersionId:evidenceVersionId.trim(),
       reason:reason.trim(),
-    }}),
+    }),
     onSuccess:()=>{
       setNotice("Revocation evidence sent for independent approval. This has not revoked the credential.");
     },
   });
   const revoke=useMutation({
-    mutationFn:()=>revokeLearningAwardIssuance({data:{
+    mutationFn:()=>revokeLearningAwardIssuance({
       issuanceId:issuanceId.trim(),
       evidenceVersionId:evidenceVersionId.trim(),
       reason:reason.trim(),
-    }}),
+    }),
     onSuccess:()=>{
       setNotice("Revocation recorded in the original credential ledger. Historical issuance remains preserved.");
       setIssuanceId("");setEvidenceVersionId("");setReason("");
@@ -81,7 +87,7 @@ export function CompletionEvidenceReviewQueuePanel(){
       Pending evidence cannot be displayed under this session.
       <Button variant="outline" onClick={()=>void queue.refetch()}>Retry authorization</Button>
     </div>}
-    {queue.data&&<section className="space-y-3" aria-label="Independent approvals awaiting decision">
+    {queue.data&&!queue.isError&&<section className="space-y-3" aria-label="Independent approvals awaiting decision">
       <h3 className="font-serif text-xl">Pending independent review</h3>
       <DirectoryTable label="Pending independent approvals"
         caption="Requests within your authorized Site and capability scope; decisions are server-authorized."

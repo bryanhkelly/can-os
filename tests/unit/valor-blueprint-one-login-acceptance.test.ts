@@ -56,9 +56,9 @@ describe("Valor single CAN login and independent Blueprint acceptance contracts"
   });
 
   it("separately denies credential issuance until issuer approval and full release flags",()=>{
-    const issuer=read("src/modules/learning/credential-issuance.functions.ts");
+    const issuer=read("src/modules/learning/credential-issuance.server.ts");
     expect(issuer).toContain('process.env.CAN_CREDENTIAL_ISSUANCE_ENABLED !== "true"');
-    expect(issuer).toContain("assertCurrentCredentialIssuer(tx, getRequest(), actor)");
+    expect(issuer).toContain("assertCurrentCredentialIssuer(tx, request, actor)");
     expect(issuer).toContain("assertNoncreditCompletionSiteScope(tx, actor, registration)");
     expect(issuer).toContain("registration.participantPersonId === actor.actorPersonId");
     expect(issuerFixture).toContain("independent active issuer authority not recognized");

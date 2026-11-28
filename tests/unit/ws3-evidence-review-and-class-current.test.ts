@@ -5,11 +5,11 @@ const read=(path:string)=>readFileSync(path,"utf8");
 const reviewSql=read("database/canonical/v3.0.1/patch-ws3-independent-evidence-review.sql");
 const reviewedSql=read("database/canonical/v3.0.1/patch-ws3-source-bound-evidence.sql");
 const classSql=read("database/canonical/v3.0.1/patch-ws3-class-governed-outcomes.sql");
-const reviewService=read("src/modules/learning/completion-evidence-review.functions.ts");
-const classService=read("src/modules/classes/native-class-completion.functions.ts");
+const reviewService=read("src/modules/learning/completion-evidence-review.server.ts");
+const classService=read("src/modules/classes/native-class-completion.server.ts");
 const classOperator=read("src/components/learning/NativeClassCompletionOperatorPanel.tsx");
 const classRoute=read("src/routes/class_.$classId.tsx");
-const learnerSource=read("src/modules/classes/native-class-canonical-evidence.functions.ts");
+const learnerSource=read("src/modules/classes/native-class-canonical-evidence.server.ts");
 const preflight=read("scripts/acceptance/check-ws3-completion-readiness.mjs");
 
 describe("WS3 independent evidence reviewer workflow",()=>{

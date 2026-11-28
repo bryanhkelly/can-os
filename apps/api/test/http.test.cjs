@@ -659,3 +659,106 @@ test('knowledge checks and completion require verified learner or provider autho
 test('noncredit enrollment publication protects provider scope and explicit Site selection',async()=>{await withServer('0',async(url,document)=>{for(const [route,method] of [["/api/v1/noncredit-enrollment-publisher","GET"],["/api/v1/noncredit-training-readiness","GET"],["/api/v1/noncredit-enrollment-releases","POST"],["/api/v1/noncredit-enrollment-closures","POST"],["/api/v1/noncredit-multisite-releases","POST"]]){assert.ok(document.paths[route][method.toLowerCase()].security);assert.equal((await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined)).status,method==='POST'?503:401);}assert.ok(document.paths['/api/v1/noncredit-enrollment-releases'].post.requestBody.content['application/json'].schema.required.includes('siteId'));});});
 
 test('completion administration requires canonical provider credentials and distinguishes decisions from corrections',async()=>{await withServer('0',async(url,document)=>{for(const [route,method] of [["/api/v1/noncredit-completion-decisions","POST"],["/api/v1/noncredit-completion-policy-catalog","GET"],["/api/v1/noncredit-completion-policies","POST"],["/api/v1/noncredit-completion-review","GET"],["/api/v1/noncredit-completion-queue","GET"],["/api/v1/noncredit-completion-corrections","POST"]]){assert.ok(document.paths[route][method.toLowerCase()].security);assert.equal((await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined)).status,method==='POST'?503:401);}});const c=require('../dist/completion-admin.contracts');assert.equal(c.queueQuery.safeParse({page:'101'}).success,false);assert.equal(c.queueQuery.parse({page:'2'}).page,2);});
+
+
+test('credential reader and sample preview are private, fail closed and never issue awards',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const [route,method] of [['/api/v1/me/credentials','GET'],['/api/v1/me/credential-downloads','POST'],['/api/v1/credential-previews','POST']]){
+   const operation=document.paths[route][method.toLowerCase()];assert.ok(operation.security);
+   const response=await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json','x-role':'platform_owner'},body:'{}'}:{headers:{'x-role':'platform_owner'}});
+   assert.equal(response.status,method==='POST'?503:401);assert.equal(response.headers.get('cache-control'),'no-store');
+  }
+  assert.equal(document.paths['/api/v1/credential-issuances'],undefined);
+ });
+ const c=require('../dist/credentials.contracts');const id='00000000-0000-4000-8000-000000000001';
+ assert.equal(c.download.safeParse({issuanceId:id,format:'pdf'}).success,true);
+ assert.equal(c.download.safeParse({issuanceId:id,format:'pdf',personId:id}).success,false);
+ assert.equal(c.preview.safeParse({trainingVersionId:id,format:'html'}).success,false);
+ assert.equal(c.preview.safeParse({trainingVersionId:id,format:'pdf',recipientName:'forged'}).success,false);
+ assert.equal(c.artifactResult.safeParse({filename:'sample.pdf',mediaType:'application/pdf',base64:'YWJj',issued:true}).success,false);
+});
+
+test('source-bound evidence and revocation endpoints use canonical authority and strict intent contracts',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const [route,method] of [['/api/v1/completion-evidence-review-requests','POST'],['/api/v1/completion-evidence-review-queue','GET'],['/api/v1/completion-evidence-review-decisions','POST'],['/api/v1/credential-revocations','POST']]){
+   assert.ok(document.paths[route][method.toLowerCase()].security);
+   const response=await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);
+  }
+ });
+ const c=require('../dist/credentials.contracts'),id='00000000-0000-4000-8000-000000000001';
+ const request={purpose:'award_revocation',issuanceId:id,evidenceVersionId:id,reason:'Independently verified evidence'};
+ assert.equal(c.evidenceRequest.safeParse(request).success,true);
+ assert.equal(c.evidenceRequest.safeParse({...request,registrationId:id}).success,false);
+ assert.equal(c.evidenceRequest.safeParse({...request,approvedByPersonId:id}).success,false);
+ assert.equal(c.evidenceDecision.safeParse({requestId:id,decision:'approve',siteId:id}).success,false);
+ assert.equal(c.evidenceQueue.safeParse({page:'101'}).success,false);
+ assert.equal(c.revocation.safeParse({issuanceId:id,evidenceVersionId:id,reason:'short'}).success,false);
+});
+
+test('Class completion policies, decisions and reviews preserve distinct governed operations',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const [route,method] of [['/api/v1/class-completion-review','GET'],['/api/v1/class-completion-queue','GET'],['/api/v1/class-completion-decisions','POST'],['/api/v1/class-completion-policies','POST']]){
+   assert.ok(document.paths[route][method.toLowerCase()].security);
+   assert.equal((await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined)).status,method==='POST'?503:401);
+  }
+ });
+ const c=require('../dist/credentials.contracts'),id='00000000-0000-4000-8000-000000000001';
+ const policy={classId:id,expectedLatestVersion:null,requireAllLessons:false,requiredVerifiedSessions:0,requirePassingAssessment:false,policyEvidenceVersionId:id};
+ assert.equal(c.classPolicy.safeParse(policy).success,false);
+ assert.equal(c.classPolicy.safeParse({...policy,requiredVerifiedSessions:4}).success,true);
+ assert.equal(c.classPolicy.safeParse({...policy,requiredVerifiedSessions:4,approvedByPersonId:id}).success,false);
+ assert.equal(c.classDecision.safeParse({classEnrollmentId:id,expectedPolicyVersionId:id,expectedPriorOutcomeId:null,outcome:'completed',evidenceVersionId:id,reason:'Reviewed evidence'}).success,true);
+ assert.equal(c.classQueue.safeParse({classId:id,page:'101'}).success,false);
+});
+
+test('native Class assessment and evidence APIs are governed and reject caller-owned identity',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const [route,method] of [['/api/v1/class-knowledge-check-access','POST'],['/api/v1/class-knowledge-review-queue','GET'],['/api/v1/class-knowledge-check-finalizations','POST'],['/api/v1/me/class-completion-evidence','GET']]){
+   assert.ok(document.paths[route][method.toLowerCase()].security);
+   const response=await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);assert.equal(response.headers.get('cache-control'),'no-store');
+  }
+ });
+ const c=require('../dist/credentials.contracts'),id='00000000-0000-4000-8000-000000000001';
+ assert.equal(c.nativeEnrollment.safeParse({classEnrollmentId:id,learnerId:id}).success,false);
+ assert.equal(c.nativeFinalize.safeParse({classEnrollmentId:id,assessmentAttemptId:id}).success,true);
+ assert.equal(c.nativeFinalize.safeParse({classEnrollmentId:id,assessmentAttemptId:id,pointsEarned:100}).success,false);
+ assert.equal(c.nativePending.safeParse({pending:[{classEnrollmentId:id,assessmentAttemptId:id,learnerName:'Learner',submittedAt:null,answers:[]}],partial:false}).success,false);
+});
+
+test('course evidence is a private read and excludes raw survey responses or grading keys',async()=>{
+ await withServer('0',async(url,document)=>{
+  const route='/api/v1/me/course-evidence';
+  assert.ok(document.paths[route].get.security);
+  assert.equal((await fetch(url+route,{headers:{'x-role':'learner'}})).status,401);
+ });
+ const c=require('../dist/credentials.contracts'),id='00000000-0000-4000-8000-000000000001';
+ assert.equal(c.courseEvidenceQuery.safeParse({courseAttemptId:id,personId:id}).success,false);
+ const data={courseAttemptId:id,observations:[],assessments:[],surveys:[],completion:null,caution:'Estimated interaction only'};
+ assert.equal(c.courseEvidenceResult.safeParse(data).success,true);
+ assert.equal(c.courseEvidenceResult.safeParse({...data,surveys:[{responseId:id,campaignId:id,submittedAt:'2026-11-28T00:00:00Z',answers:[]}]}).success,false);
+});
+
+test('native Class phase is explicit, backwards compatible and cannot be arbitrary',()=>{
+ const c=require('../dist/credentials.contracts'),id='00000000-0000-4000-8000-000000000001';
+ assert.equal(c.nativeProvision.safeParse({classEnrollmentId:id}).success,true);
+ assert.equal(c.nativeProvision.safeParse({classEnrollmentId:id,phase:'baseline'}).success,true);
+ assert.equal(c.nativeProvision.safeParse({classEnrollmentId:id,phase:'official'}).success,false);
+});
+
+test('credential issuance is not published before restricted-role acceptance',async()=>{
+ await withServer('0',async(url,document)=>{
+  assert.equal(Object.values(document.paths).some(path=>Object.values(path).some(op=>op?.operationId==='issueNoncreditAchievement')),false);
+  const response=await fetch(url+'/api/v1/credential-issuances',{method:'POST',headers:{Origin:url,'content-type':'application/json'},body:'{}'});
+  assert.equal(response.status,404);
+ });
+});
+
+test('assessment and outcome domain controllers publish each fixed governed operation exactly once',async()=>{
+ const {assessmentsOutcomesOperations}=require('../dist/assessments-outcomes.operations');
+ await withServer('0',async(_url,document)=>{
+  const operations=Object.values(document.paths).flatMap(path=>Object.values(path));
+  for(const id of assessmentsOutcomesOperations){const matches=operations.filter(operation=>operation?.operationId===id);assert.equal(matches.length,1,id);assert.ok(matches[0].security?.length,id);}
+ });
+});

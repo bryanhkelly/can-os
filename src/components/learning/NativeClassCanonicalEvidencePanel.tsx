@@ -1,17 +1,21 @@
+import {useAssessmentWorkspaceScope} from "@/lib/api/use-assessment-workspace-scope";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { CourseAssessmentPanel } from "@/components/learning/CourseAssessmentPanel";
 import { NoncreditCourseSurveys } from "@/components/learning/NoncreditCourseSurveys";
-import { getNativeClassCanonicalEvidence } from "@/modules/classes/native-class-canonical-evidence.functions";
+import { getNativeClassCanonicalEvidence } from "@/lib/api/browser-assessments-outcomes";
 
 /** Existing canonical evidence only. No parallel Class quiz or completion authority. */
-export function NativeClassCanonicalEvidencePanel({classEnrollmentId}:{
-  classEnrollmentId:string;
-}){
+export function NativeClassCanonicalEvidencePanel({classEnrollmentId}:{classEnrollmentId:string}){
+  const scope=useAssessmentWorkspaceScope();
+  if(!scope)return <p role="status">Verified workspace membership is required.</p>;
+  return <NativeClassEvidenceSession key={JSON.stringify([scope,classEnrollmentId])} classEnrollmentId={classEnrollmentId} scope={scope}/>;
+}
+function NativeClassEvidenceSession({classEnrollmentId,scope}:{classEnrollmentId:string;scope:NonNullable<ReturnType<typeof useAssessmentWorkspaceScope>>}){
   const query=useQuery({
-    queryKey:["native-class-canonical-evidence",classEnrollmentId],
-    queryFn:()=>getNativeClassCanonicalEvidence({data:{classEnrollmentId}}),
-    retry:false,refetchOnReconnect:true,
+    queryKey:["native-class-canonical-evidence",scope,classEnrollmentId],
+    queryFn:({signal})=>getNativeClassCanonicalEvidence(classEnrollmentId,signal),
+    retry:false,refetchOnReconnect:true,gcTime:0,
   });
   return <section className="space-y-4 border border-border bg-card p-5"
     aria-label="Your Course learning evidence">
@@ -30,7 +34,7 @@ export function NativeClassCanonicalEvidencePanel({classEnrollmentId}:{
         Retry evidence check
       </Button>
     </div>}
-    {query.data&&<>
+    {query.data&&!query.isError&&<>
       <section aria-label="Learning and completion checklist" className="space-y-3">
         <h3 className="font-serif text-xl">Your learning checklist</h3>
         <p className="text-sm text-muted-foreground">
@@ -53,7 +57,7 @@ export function NativeClassCanonicalEvidencePanel({classEnrollmentId}:{
           </li>
           <li className="flex flex-wrap items-start justify-between gap-3 p-4">
             <div>
-              <p className="font-semibold">Knowledge check</p>
+              <p className="font-semibold">Final knowledge check</p>
               <p className="text-sm text-muted-foreground">
                 {query.data.finalizedPassed>0
                   ?`${query.data.finalizedPassed} independently confirmed passing result(s)`
@@ -100,10 +104,14 @@ export function NativeClassCanonicalEvidencePanel({classEnrollmentId}:{
           completion, academic credit, grades or certificates.
         </p>
       </section>
+      {query.data.currentBaselineGrants>0&&<section className="border-t border-border pt-4" aria-label="Authorized baseline diagnostic">
+        <CourseAssessmentPanel courseAttemptId={query.data.courseAttemptId} phase="baseline" context="class" onAssessmentCompleted={()=>void query.refetch()}/>
+      </section>}
+      {query.data.finalizedBaselineAssessments>0&&<p className="text-sm text-muted-foreground">Baseline diagnostic recorded. It does not count as a final passing assessment.</p>}
       <p className="text-sm text-muted-foreground">
         {query.data.currentAssessmentGrants>0
-          ?"An approved canonical Course assessment grant is available. Open your knowledge check below. Final results require the responsible provider's independent confirmation."
-          :"No currently authorized knowledge check is assigned to this Course Attempt. Your provider can grant access to a published Class knowledge check. Your existing lesson progress remains available."}
+          ?"An approved canonical Course assessment grant is available. Open your final knowledge check below. Final results require the responsible provider's independent confirmation."
+          :"No currently authorized final knowledge check is assigned to this Course Attempt. Your provider can grant access to a published Class knowledge check. Your existing lesson progress remains available."}
       </p>
       {query.data.currentAssessmentGrants>0&&<section
         className="border-t border-border pt-4" aria-label="Authorized Course knowledge check">
