@@ -19,6 +19,8 @@ if(fixture.classId===fixture.otherClassId||!fixture.expectedClassIds.includes(fi
   throw Error("Distinct reviewed actors and Classes required");
 const modules={
   home:"/src/modules/classes/native-class-teacher-home.functions.ts",
+  gradebook:"/src/modules/classes/native-class-gradebook.functions.ts",
+  draft:"/src/modules/learning/native-course-draft.functions.ts",
   work:"/src/modules/classes/native-class-teacher-homework.functions.ts",
   learner:"/src/modules/classes/native-class-homework.functions.ts",
   action:"/src/modules/actions/action-detail.functions.ts",
@@ -61,11 +63,11 @@ async function actor(browser:Browser,selected?:z.infer<typeof selection>,role?:s
 type Dashboard={kind:string;classes:{classId:string;enrollmentCount:number;reviewCount:number;overdueCount:number}[]};
 type WorkItem={id:string;status:string;responseText:string;teacherFeedback:string|null;isPracticeSubmission:boolean};
 type OverdueItem={classEnrollmentId:string;assignmentId:string;status:string};
-async function allPages<T>(page:Page,name:string,classId:string){
+async function allPages<T>(page:Page,name:string,classId:string,module:keyof typeof modules="work"){
   const items:T[]=[];
   let offset=0;
   for(let i=0;i<100;i++){
-    const result=await rpc<{items:T[];nextOffset:number|null}>(page,"work",name,{classId,offset});
+    const result=await rpc<{items:T[];nextOffset:number|null}>(page,module,name,{classId,offset});
     items.push(...result.items);
     if(result.nextOffset===null)return items;
     expect(result.nextOffset).toBe(offset+100);
@@ -91,6 +93,9 @@ test("ordinary teacher and student APIs reconcile native Class work and deny unr
     for(const page of [student.page,other.page,visitor.page])
       await deny(page,"work","getNativeClassTeacherMissingWork",{classId:fixture.classId});
     await deny(teacher.page,"work","getNativeClassTeacherHomework",{classId:fixture.otherClassId});
+    await deny(teacher.page,"gradebook","getNativeClassTeacherGradebook",{classId:fixture.otherClassId});
+    for(const page of [student.page,other.page,visitor.page])
+      await deny(page,"gradebook","getNativeClassTeacherGradebook",{classId:fixture.classId});
     const workInput={classEnrollmentId:fixture.classEnrollmentId};
     const learnerWork=await rpc<{assignments:{id:string;status:string;practiceFeedback:string|null}[]}>(student.page,"learner","getNativeClassHomework",workInput);
     const assignment=learnerWork.assignments.find(a=>a.id===fixture.assignmentId);
@@ -132,6 +137,8 @@ test("ordinary teacher and student APIs reconcile native Class work and deny unr
     expect(await rpc(teacher.page,"followUp","resolveMissingWorkFollowUp",resolution)).toMatchObject({resolved:false});
     expect(await rpc(teacher.page,"action","getActionDetail",{actionId:followUp.actionId})).toMatchObject({status:"resolved",resolutionNote:resolution.resolutionNote});
     expect((await allPages<{actionId:string}>(teacher.page,"getNativeClassTeacherOpenFollowUps",fixture.classId)).some(a=>a.actionId===followUp.actionId)).toBe(false);
+    const officialRows=await allPages<{classEnrollmentId:string;assignmentId:string;practiceOnly:boolean;officialDecision:string|null;officialScore:string|null}>(teacher.page,"getNativeClassTeacherGradebook",fixture.classId,"gradebook");
+    expect(officialRows.find(row=>row.classEnrollmentId===fixture.classEnrollmentId&&row.assignmentId===fixture.assignmentId)).toMatchObject({practiceOnly:true,officialDecision:null,officialScore:null});
     const finalQueue=await allPages<WorkItem>(teacher.page,"getNativeClassTeacherHomework",fixture.classId);
     expect(finalQueue.find(i=>i.id===submitted.submissionId)).toMatchObject({status:"submitted"});
     expect((await read()).classes.find(c=>c.classId===fixture.classId)?.reviewCount).toBe(finalQueue.filter(i=>i.status==="submitted").length);
