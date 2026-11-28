@@ -1,8 +1,9 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { HistoricalClassWork } from "./HistoricalClassWork";
 import { SubmissionRevisionHistory } from "./SubmissionRevisionHistory";
-import { getNativeClassTeacherHomework, getNativeClassTeacherMissingWork, getNativeClassTeacherHomeworkHistory, getNativeClassTeacherHistoricalWork, getNativeClassTeacherAssessments,
+import { getNativeClassTeacherHomework, getNativeClassTeacherMissingWork, getNativeClassTeacherOpenFollowUps, createNativeClassMissingWorkFollowUp, getNativeClassTeacherHomeworkHistory, getNativeClassTeacherHistoricalWork, getNativeClassTeacherAssessments,
   returnNativeClassPracticeFeedback } from
   "@/modules/classes/native-class-teacher-homework.functions";
 import { Button } from "@/components/ui/button";
@@ -124,7 +125,25 @@ function NativeClassTeacherWork({classId}:{classId:string}){
 }
 
 function NativeClassMissingWork({classId}:{classId:string}){
+  const client=useQueryClient();
   const [offset,setOffset]=useState(0);
+  const [followUpOffset,setFollowUpOffset]=useState(0);
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState("");
+  const [notice,setNotice]=useState("");
+  const followUps=useQuery({queryKey:["native-class-open-follow-ups",classId,followUpOffset],
+    queryFn:()=>getNativeClassTeacherOpenFollowUps({data:{classId,offset:followUpOffset}}),retry:false});
+  async function createFollowUp(classEnrollmentId:string,assignmentId:string){
+    if(busy)return;
+    setBusy(true);setNotice("");setError("");
+    try{
+      const result=await createNativeClassMissingWorkFollowUp({data:{classId,classEnrollmentId,assignmentId}});
+      setNotice(result.assignedToAnotherTeacher?"Another teacher already owns this follow-up.":result.created?"Follow-up created.":"Your follow-up is already open.");
+      await Promise.all([client.invalidateQueries({queryKey:["native-class-teacher-missing-work",classId]}),
+        client.invalidateQueries({queryKey:["native-class-open-follow-ups",classId]})]);
+    }catch(failure){setError(normalizeClientError(failure,"Unable to create or refresh follow-up.").message);}
+    finally{setBusy(false);}
+  }
   const queue=useQuery({
     queryKey:["native-class-teacher-missing-work",classId,offset],
     queryFn:()=>getNativeClassTeacherMissingWork({data:{classId,offset}}),retry:false,
@@ -135,12 +154,17 @@ function NativeClassMissingWork({classId}:{classId:string}){
     <QueryState loading={queue.isPending&&"Checking current Class assignments…"}
       error={queue.isError&&"Missing work is unavailable under your current teaching appointment."}
       onRetry={()=>void queue.refetch()} retrying={queue.isFetching}/>
+    {notice&&<WorkspaceNotice tone="success">{notice}</WorkspaceNotice>}
+    {error&&<WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
     {queue.data&&<>
       {queue.data.items.length===0&&<EmptyState title="No overdue work on this page."/>}
       <ul className="divide-y divide-border">
         {queue.data.items.map(item=><li key={`${item.classEnrollmentId}:${item.assignmentId}`} className="py-3 text-sm">
           <p className="font-semibold">{item.studentName} · {item.assignmentTitle}</p>
           <p className="text-xs text-muted-foreground">Due {new Date(item.dueAt).toLocaleDateString()} · {item.status.replaceAll("_"," ")}</p>
+          {item.followUpActionId?<Link to="/actions/$actionId" params={{actionId:item.followUpActionId}} className="mt-2 inline-block font-semibold underline">Open follow-up</Link>:
+            item.assignedToAnotherTeacher?<p className="mt-2 text-xs text-muted-foreground">Already assigned to another teacher</p>:
+            <Button type="button" size="sm" variant="outline" className="mt-2" disabled={busy} onClick={()=>void createFollowUp(item.classEnrollmentId,item.assignmentId)}>Create follow-up</Button>}
         </li>)}
       </ul>
       <div className="flex flex-wrap items-center gap-2">
@@ -149,6 +173,26 @@ function NativeClassMissingWork({classId}:{classId:string}){
         <Button type="button" variant="outline" size="sm" disabled={queue.data.nextOffset===null||queue.isFetching} onClick={()=>setOffset(value=>value+100)}>Next</Button>
       </div>
     </>}
+    <div className="space-y-3 border-t border-border pt-4">
+      <h3 className="font-semibold">My open follow-ups</h3>
+      <QueryState loading={followUps.isPending&&"Loading assigned follow-ups…"}
+        error={followUps.isError&&"Unable to load assigned follow-ups."}
+        onRetry={()=>void followUps.refetch()} retrying={followUps.isFetching}/>
+      {followUps.data&&<>
+        {followUps.data.items.length===0&&<EmptyState title="No assigned open follow-ups on this page."/>}
+        <ul className="divide-y divide-border">
+          {followUps.data.items.map(item=><li key={item.actionId} className="py-3 text-sm">
+            <Link to="/actions/$actionId" params={{actionId:item.actionId}} className="font-semibold underline">{item.studentName} · {item.assignmentTitle}</Link>
+            <p className="text-xs text-muted-foreground">{item.status.replaceAll("_"," ")}</p>
+          </li>)}
+        </ul>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" variant="outline" size="sm" disabled={followUpOffset===0||followUps.isFetching} onClick={()=>setFollowUpOffset(value=>Math.max(0,value-100))}>Previous</Button>
+          <span className="text-xs text-muted-foreground">Page {followUpOffset/100+1}</span>
+          <Button type="button" variant="outline" size="sm" disabled={followUps.data.nextOffset===null||followUps.isFetching} onClick={()=>setFollowUpOffset(value=>value+100)}>Next</Button>
+        </div>
+      </>}
+    </div>
   </section>;
 }
 
