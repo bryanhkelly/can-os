@@ -135,3 +135,93 @@ Storybook, migration execution or browser pass is claimed.
   the aggregate-only reporting reader. Add resource-local entry points,
   expiry controls, notifications and operational acceptance. Do not merge or
   deploy unvalidated code solely because the database schema exists.
+
+
+## Reporting workstream continuation — release-11252026, 2026-11-27
+
+The bottom-up tag is a voluntary, mutually accepted Organization relationship
+at an exact owned resource. It is not a legal affiliation, an operator
+appointment, a funding allocation, a credential, a hierarchy edge or permission
+to publish. Preserve existing domain-specific authorities and legal evidence.
+Do not generate legacy host-wide network_reporting_grants from scoped tags.
+The Relationship Engine is the sole proposed path for new voluntary reporting
+consent; legacy network configuration remains setup inventory, not execution
+authority. No top-down invitations or distribution work is included.
+
+Implemented in source:
+- One scope-aware relationship reader and shared current-CAN-grant transaction
+  guard; eliminated duplicate incoming and outgoing readers. Site-bound
+  registrars/Site Admins may initiate a tag without granting any metric.
+  Organization-wide relationship managers retain proposal, decision, revocation
+  and report capability. Impersonation cannot manufacture consent.
+- Relationship terms can contain zero metrics. A Site operator can initiate a
+  tag; the authorized owner representative can subsequently propose reporting
+  terms. No automatic report grant, branding or financial attribution.
+- Additive terms migration 2026-11-27-reporting-relationship-terms.sql:
+  prospective, explicit historical start or all eligible history; optional
+  expiry; immutable same-party/scope/kind revision lineage; accepted original
+  remains active until replacement accepted atomically. Old rows preserved.
+  Logical separation of tag and reporting terms uses the existing agreement
+  record; no parallel consent ledger.
+- Population pinned at proposal, verified against current owner and recipient
+  at acceptance. Synthetic-to-synthetic uses ordinary independently verified
+  membership and the same business commands. Real/synthetic/unknown mixing
+  denied; unknown legacy agreement population is never assumed real.
+- Reusable ContextualReportingRelationships mounted in Site Profile, Launch
+  Studio Site Profile, Program academic preparation and Class reports.
+  Manager workspace reuses this component for all five supported scope kinds,
+  including Organization and Offering. Organization and exact Site inherited
+  terms are read-only in descendant contexts. No inferred Program-to-Class
+  membership. Private query hooks isolate identity and scope.
+- Relationship portfolio report uses existing V6.1 ReportDocumentView and
+  server-derived setup inventory independent of inbox pagination. Counts
+  distinguish connected organizations, accepted tags, accepted metric terms,
+  pending incoming/outgoing and directly tagged Programs. No implied outcome
+  or execution authority. Synthetic inventory explicitly labeled.
+- Internal registration source reader uses exact native Class and noncredit
+  self-enrollment release/claim joins. Internal projection resolves live
+  accepted scoped agreements, active current owner, same population and
+  current metric version before the existing deduplicated rollup.
+  No inferred local Program membership or site-less facts. Source coverage
+  remains incomplete; the reader is internal only, not a partner endpoint.
+- Internal last-mile disclosure helper requires a reconciled source manifest,
+  exact approval digest/audience, current agreements, reviewed overlapping
+  cuts and differencing, and suppression below ten distinct contributors.
+  No persisted disclosure approval workflow or external release is enabled.
+- Tests added/updated for zero-metric tags, historical coverage, scoped
+  initiation and synthetic population boundaries. Storybook adds tag-only
+  interaction. Existing metric registry, metric definitions and proposal
+  allowlist are unchanged.
+
+Release blockers:
+1. Neon main still has the original agreement schema; apply the new terms
+   migration only after isolated validation. Attempted to create a dedicated
+   QA database branch; Neon rejected it with "branches limit exceeded".
+   No production data or schema changed in this continuation. Verify atomic
+   amendment rollback, concurrent requests, grants, forced RLS, and role
+   isolation before deployment.
+2. No local repository checkout (GitHub DNS unavailable); execute exact-SHA
+   typecheck, build, unit, integration, Storybook, and authenticated browser
+   acceptance in the normal release workflow. No test execution claimed.
+3. Complete governed organization-wide role appointment/provisioning and
+   separate analyst access. No real or synthetic membership grants issued.
+4. Complete approval/notification integration with existing work management
+   and communication infrastructure, including independent disclosure
+   artifact persistence, manifest reconciliation, source-completeness proof
+   and revocation-safe snapshot/export behavior. Keep outcome endpoint closed
+   until those controls exist. The incoming inbox is available as a workflow
+   source, not a notification delivery service.
+5. Mount Organization and Offering tags in their ordinary resource pages
+   once those contexts support an authorized local grant. The manager
+   workspace provides both selectors today.
+6. Initiative, Campaign, Event, Funding Agreement, Solution and Content
+   adapters remain explicit future resource types: establish canonical
+   ownership, source dimensions, exact attribution and allowed action
+   policy before expanding the five-kind schema. Do not add guessed links
+   or widen an existing Program/Site grant.
+7. Validate full relationship workflow with two independently assigned
+   synthetic organizations and real/synthetic denial; no synthetic records
+   inserted into production.
+
+This is the reporting workstream; no metric-catalog expansion and no top-down
+network control work in this increment.
