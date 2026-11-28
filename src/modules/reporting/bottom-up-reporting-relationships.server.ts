@@ -4,6 +4,7 @@ import {db} from "@/db/client";
 import type {AccessContext} from "@/domain/access-context";
 import {isDemoAccountEmail,isEligiblePrivilegedMailbox} from "@/domain/domain-classification";
 import {canConnectRelationshipPopulations,relationshipIdentityEligible,relationshipPopulation} from "@/domain/reporting-relationship-population";
+import {assertCurrentCANGrantForMutation} from "@/modules/identity/current-can-grant-transaction.server";
 import {getIdentityContext} from "@/modules/identity/command-context.server";
 import {AuthorizationError} from "@/domain/command-context";
 import {relationshipProposalMetrics} from "@/domain/relationship-metric-policy";
@@ -34,7 +35,7 @@ const columns=sql`id,owner_organization_id AS "ownerOrganizationId",
 /** Only a direct, independently provisioned organization-wide membership can
  * authorize initial relationship management. No automatic administrator grants.
  * Recheck and lock the live identity rows inside every command transaction. */
-async function requireRelationshipAuthority(tx:Tx,actor:AccessContext,allowInitiation=false):Promise<string>{
+async function requireRelationshipAuthority(tx:Tx,request:Request,actor:AccessContext,allowInitiation=false):Promise<string>{
   const manager=actor.role==="reporting_relationship_manager"&&actor.grantSiteId===null;
   const initiator=allowInitiation&&actor.capabilities.has("relationships.initiate")&&actor.grantSiteId!==null;
   const organizationId=actor.scope.organizationIds?.[0];
@@ -42,20 +43,20 @@ async function requireRelationshipAuthority(tx:Tx,actor:AccessContext,allowIniti
     (!manager&&!initiator)||
     actor.sessionAccountId||actor.impersonatedByAccountId||actor.delegatedByPlatformOwner||!actor.actorPersonId)
     throw new AuthorizationError("direct organization reporting relationship manager");
+  await assertCurrentCANGrantForMutation(tx,request,actor,{
+    roles:manager?["reporting_relationship_manager"]:["site_admin","registrar"],
+    organizationId,siteId:actor.grantSiteId,
+  });
+  // The shared identity guard locks the current session and grant. The
+  // relationship policy adds only the owning institution's population check.
   const result=await tx.execute(sql`
-    SELECT g.id,o.domain,a.email_normalized AS email,(a.email_verified_at IS NOT NULL) AS "mailboxVerified",
-      s.authentication_method AS "authenticationMethod" FROM public.account_person_grants g
-    JOIN public.access_accounts a ON a.id=g.account_id AND a.person_id=g.person_id
-    JOIN public.people p ON p.id=g.person_id
-    JOIN public.organizations o ON o.id=g.organization_id
-    JOIN public.access_sessions s ON s.active_grant_id=g.id AND s.account_id=a.id
-    WHERE g.id=${actor.grantId}::uuid AND g.account_id=${actor.accountId}::uuid
-      AND g.person_id=${actor.actorPersonId}::uuid AND g.organization_id=${organizationId}::uuid
-      AND g.site_id IS NOT DISTINCT FROM ${actor.grantSiteId}::uuid AND g.active AND g.role=${actor.role}
-      AND NOT a.disabled AND p.active AND o.lifecycle_status='active'
-      AND s.id=${actor.sessionId}::uuid AND s.revoked_at IS NULL
-      AND s.expires_at>CURRENT_TIMESTAMP AND s.delegated_grant_id IS NULL
-    FOR SHARE OF g,a,p,o,s`);
+    SELECT o.domain,a.email_normalized AS email,(a.email_verified_at IS NOT NULL) AS "mailboxVerified",
+      s.authentication_method AS "authenticationMethod"
+    FROM public.organizations o
+    JOIN public.access_accounts a ON a.id=${actor.accountId}::uuid
+    JOIN public.access_sessions s ON s.id=${actor.sessionId}::uuid AND s.account_id=a.id
+    WHERE o.id=${organizationId}::uuid AND o.lifecycle_status='active'
+    FOR SHARE OF o`);
   const membership=z.object({domain:z.string().nullable(),email:z.string(),mailboxVerified:z.boolean(),
     authenticationMethod:z.enum(["email_link","local_demo_code","private_access_code"]).nullable()}).safeParse(result.rows[0]);
   if(result.rows.length!==1||!membership.success||
@@ -129,7 +130,7 @@ export async function proposeReportingRelationship(request:Request,input:unknown
     throw new AuthorizationError("relationship initiation");
   const candidate=relationshipProposalSchema.parse(input);
   return db.transaction(async tx=>{
-    const ownerId=await requireRelationshipAuthority(tx,actor,true);
+    const ownerId=await requireRelationshipAuthority(tx,request,actor,true);
     const scope=await resolveScope(tx,candidate.scopeKind,candidate.scopeId,ownerId);
     if(!canAuthorize&&(candidate.metrics.length>0||candidate.supersedesId||candidate.coverageFrom||
       (candidate.coverageMode&&candidate.coverageMode!=="prospective")||!scope.siteId))
@@ -165,7 +166,7 @@ export async function decideReportingRelationship(request:Request,input:unknown)
     throw new AuthorizationError(capability);
   const organizationId=actor.scope.organizationIds[0]!;
   return db.transaction(async tx=>{
-    await requireRelationshipAuthority(tx,actor);
+    await requireRelationshipAuthority(tx,request,actor);
     const result=await tx.execute(sql`
       SELECT ${columns} FROM public.reporting_relationship_agreements
       WHERE id=${agreementId}::uuid
@@ -213,7 +214,7 @@ export async function searchRelationshipRecipients(request:Request,input:unknown
   const actor=await getIdentityContext(request);
   const {query,after}=lookupInput.parse(input);
   return db.transaction(async tx=>{
-    const ownerId=await requireRelationshipAuthority(tx,actor,true);
+    const ownerId=await requireRelationshipAuthority(tx,request,actor,true);
     const domain=await ownerDomain(tx,ownerId);
     // Page the candidate organizations, not their memberships. The cursor is
     // based on the scanned page even if every candidate fails eligibility.
@@ -246,7 +247,7 @@ export async function listReportingRelationships(request:Request,input:unknown){
   return db.transaction(async tx=>{
     const manager=actor.capabilities.has("relationships.propose");
     if(!manager&&(!selection||direction!=="outgoing"))throw new AuthorizationError("exact Site relationship scope");
-    const organizationId=await requireRelationshipAuthority(tx,actor,!!selection&&direction==="outgoing");
+    const organizationId=await requireRelationshipAuthority(tx,request,actor,!!selection&&direction==="outgoing");
     const scope=selection?await resolveScope(tx,selection.scopeKind,selection.scopeId,organizationId):null;
     if(scope){
       if(direction!=="outgoing")throw new AuthorizationError("outgoing relationship resource");
@@ -297,7 +298,7 @@ export async function listRelationshipScopes(request:Request,input:unknown){
   const actor=await getIdentityContext(request);
   const {kind,after}=scopeInput.parse(input);
   return db.transaction(async tx=>{
-    const owner=await requireRelationshipAuthority(tx,actor);
+    const owner=await requireRelationshipAuthority(tx,request,actor);
     const source=kind==="organization"?sql`SELECT id,name FROM public.organizations WHERE id=${owner}::uuid`:
       kind==="site"?sql`SELECT id,name FROM public.sites WHERE organization_id=${owner}::uuid`:
       kind==="program"?sql`SELECT id,name FROM public.programs WHERE organization_id=${owner}::uuid`:
