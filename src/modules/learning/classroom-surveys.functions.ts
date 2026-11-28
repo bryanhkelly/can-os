@@ -11,13 +11,12 @@ import {
   surveyInvitations, surveyResponses, surveyVersions,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
-import { attemptInAssignedClassroomRelease } from "./classroom-release-boundary.server";
 import { classroomFeedbackOpen } from "@/domain/classroom-feedback";
 import { facilitatedRoomOperationalState } from "@/domain/facilitated-learning";
 import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
 import { authorizeCanonicalCourseAttempt } from "./canonical-course-participation.server";
 import { requireCanonicalFacilitator } from "./canonical-facilitator-access.server";
-import { ownedRoom, roomHostIsCurrent } from "./facilitated-learning-operations.server";
+import { ownedRoom, currentRoomParticipantPermitted } from "./facilitated-learning-operations.server";
 import { requireFacilitatedLearningEnabled } from "./canonical-learning-release.server";
 
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -164,13 +163,8 @@ export const getClassroomLearnerSurveys=createServerFn({method:"GET"})
         )).limit(1);
       const [room]=await tx.select().from(facilitatedLearningSessions)
         .where(eq(facilitatedLearningSessions.id,data.facilitatedSessionId)).limit(1);
-      if(!pair||!room||room.deploymentId!==access.deploymentId ||
-        room.courseVersionId!==access.courseVersionId ||
-        !await roomHostIsCurrent(tx,room,new Date()))
+      if(!pair||!room||!await currentRoomParticipantPermitted(tx,room,access,personId,new Date()))
         throw new AuthorizationError("own registered classroom survey");
-      if(!await attemptInAssignedClassroomRelease(
-        tx,room,access.courseAttemptId,personId,
-      ))throw new AuthorizationError("own classroom enrollment release");
       const links=await tx.select({
         id:facilitatedRoomSurveyCampaigns.surveyCampaignId,
         stage:facilitatedRoomSurveyCampaigns.stage,
