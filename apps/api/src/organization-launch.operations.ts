@@ -64,5 +64,17 @@ export type OrganizationLaunchOperation =
   | 'requestSiteAffiliation'
   | 'listNetworkAffiliations'
   | 'reviewNetworkAffiliation'
-  | 'withdrawSiteAffiliation';
+  | 'withdrawSiteAffiliation'
+  | 'listNetworkAgreementDesk'
+  | 'verifyNetworkAgreement'
+  | 'provisionDenominationHQOfficer'
+  | 'prepareChurchOnboarding'
+  | 'listChurchOnboardingRequests'
+  | 'verifyChurchOnboardingRequest'
+  | 'approveChurchOnboardingRequest'
+  | 'declineChurchOnboardingRequest'
+  | 'requestChurchOnboardingEvidence'
+  | 'cancelChurchOnboardingRequest'
+  | 'resendChurchEvidenceNotice'
+  | 'resendApprovedChurchInvitation';
 export type OrganizationLaunchWorkflow=Record<OrganizationLaunchOperation,(input:unknown)=>Promise<unknown>>;

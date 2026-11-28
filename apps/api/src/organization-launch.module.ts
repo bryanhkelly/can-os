@@ -16,5 +16,6 @@ import {SiteContentChannelsController} from './site-content-channels.controller'
 import {SiteMediaController} from './site-media.controller';
 import {SiteIntelligenceController} from './site-intelligence.controller';
 import {NetworkAffiliationsController} from './network-affiliations.controller';
-@Module({imports:[CanonicalIdentityModule],controllers:[SitesController,LaunchWorkspaceController,PreviewSharesController,WebsiteController,SitePublishingController,SiteProfileController,BrandController,SitePlanningController,LaunchController,SiteGeographyController,OrganizationSiteDirectoryController,LaunchFacilitiesController,SiteContentChannelsController,SiteMediaController,SiteIntelligenceController,NetworkAffiliationsController]})
+import {NetworkStewardController} from './network-steward.controller';
+@Module({imports:[CanonicalIdentityModule],controllers:[SitesController,LaunchWorkspaceController,PreviewSharesController,WebsiteController,SitePublishingController,SiteProfileController,BrandController,SitePlanningController,LaunchController,SiteGeographyController,OrganizationSiteDirectoryController,LaunchFacilitiesController,SiteContentChannelsController,SiteMediaController,SiteIntelligenceController,NetworkAffiliationsController,NetworkStewardController]})
 export class OrganizationLaunchModule {}

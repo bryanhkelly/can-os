@@ -33,3 +33,7 @@ Three governed REST operations for stored consumer-specific content, exact provi
 ## Network affiliation lifecycle
 
 Six authenticated routes reuse existing local Site and denomination HQ authority, current network agreement checks, scoped rows, transaction locking, audit and events. No affiliation creates a reporting grant, changes Site ownership or replaces the accepted-tag relationship model. Invalid state transitions are explicit conflicts. Existing TanStack handlers delegate to the same service. Existing directory bounds and transaction-time authority revalidation still need runtime review.
+
+## Organization stewardship increment
+
+Twelve protected REST operations reuse existing network agreement, independent officer evidence, verified church provisioning, application verification/approval, evidence follow-up, cancellation and invitation resend services. Scope is the existing real CAN steward; no caller-selected role or bypass. Church invitation remains distinct from accepted identity and opening authority. Reviewer-only application records stay behind existing steward checks. No outbound email or provisioning executed in this session. Legacy steward RPCs still delegate directly to the same domain services. Runtime checks and cross-workstream access provisioning review remain required.

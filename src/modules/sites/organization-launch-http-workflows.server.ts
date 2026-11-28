@@ -32,9 +32,22 @@ import {beginSiteMediaFolderUpload,finishSiteMediaFolderUpload,listSiteMediaFold
 const mediaFinish=siteMediaUploadSchema.extend({key:z.string().regex(siteMediaKeyPattern)});
 import {readSiteIntelligenceContentService,previewSiteIntelligenceService,processSiteIntelligenceService} from "@/modules/sites/site-content-generation-http.server";
 import {listAffiliationNetworksService,listSiteAffiliationsService,requestSiteAffiliationService,listNetworkAffiliationsService,reviewNetworkAffiliationService,withdrawSiteAffiliationService} from "@/modules/networks/network-affiliations.server";
+import {listNetworkAgreementDeskService,verifyNetworkAgreementService,provisionDenominationHQOfficerService,prepareChurchOnboardingService,listChurchOnboardingRequestsService,verifyChurchOnboardingRequestService,approveChurchOnboardingRequestService,declineChurchOnboardingRequestService,requestChurchOnboardingEvidenceService,cancelChurchOnboardingRequestService,resendChurchEvidenceNoticeService,resendApprovedChurchInvitationService} from "@/modules/networks/network-steward-http.server";
 const geographyInput=z.object({siteId:z.string().uuid()}).strict();
 export function organizationLaunchWorkflows(request:Request,mode:string){
  return {
+  listNetworkAgreementDesk:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Network steward context");return listNetworkAgreementDeskService(request,raw);},
+  verifyNetworkAgreement:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Network steward context");return verifyNetworkAgreementService(request,raw);},
+  provisionDenominationHQOfficer:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Network steward context");return provisionDenominationHQOfficerService(request,raw);},
+  prepareChurchOnboarding:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Network steward context");return prepareChurchOnboardingService(request,raw);},
+  listChurchOnboardingRequests:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Network steward context");return listChurchOnboardingRequestsService(request,raw);},
+  verifyChurchOnboardingRequest:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Network steward context");return verifyChurchOnboardingRequestService(request,raw);},
+  approveChurchOnboardingRequest:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Network steward context");return approveChurchOnboardingRequestService(request,raw);},
+  declineChurchOnboardingRequest:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Network steward context");return declineChurchOnboardingRequestService(request,raw);},
+  requestChurchOnboardingEvidence:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Network steward context");return requestChurchOnboardingEvidenceService(request,raw);},
+  cancelChurchOnboardingRequest:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Network steward context");return cancelChurchOnboardingRequestService(request,raw);},
+  resendChurchEvidenceNotice:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Network steward context");return resendChurchEvidenceNoticeService(request,raw);},
+  resendApprovedChurchInvitation:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Network steward context");return resendApprovedChurchInvitationService(request,raw);},
   listAffiliationNetworks:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Affiliation context");return listAffiliationNetworksService(request,raw);},
   listSiteAffiliations:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Affiliation context");return listSiteAffiliationsService(request,raw);},
   requestSiteAffiliation:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Affiliation context");return requestSiteAffiliationService(request,raw);},

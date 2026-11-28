@@ -797,3 +797,21 @@ test('WS03 affiliation workflows require independently scoped sessions',async()=
  assert.equal(bodies.review.safeParse({decision:'approve',reason:'Verified',organizationId:id}).success,false);
  assert.equal(results.decision.safeParse({affiliationId:id,status:'approved',reportingAccess:true}).success,false);
 });
+
+
+test('WS03 network stewardship preserves independent evidence and invitation state',async()=>{
+ const id='00000000-0000-4000-8000-000000000001';
+ await withServer('0',async(url,document)=>{
+  for(const [method,path] of [["GET","/api/v1/network-steward/agreements"],["POST","/api/v1/network-steward/agreements"],["POST","/api/v1/network-steward/hq-officers"],["POST","/api/v1/network-steward/church-provisioning"],["GET","/api/v1/network-steward/church-applications"],["POST","/api/v1/network-steward/church-applications/{requestId}/verifications"],["POST","/api/v1/network-steward/church-applications/{requestId}/approvals"],["POST","/api/v1/network-steward/church-applications/{requestId}/declines"],["POST","/api/v1/network-steward/church-applications/{requestId}/evidence-requests"],["POST","/api/v1/network-steward/church-applications/{requestId}/cancellations"],["POST","/api/v1/network-steward/church-applications/{requestId}/evidence-notices"],["POST","/api/v1/network-steward/church-applications/{requestId}/invitation-resends"]]){
+   assert.ok(document.paths[path][method.toLowerCase()].security);
+   const response=await fetch(url+path.replace('{requestId}',id),method==='POST'?{method,headers:{origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);
+  }
+ });
+ const {bodies,results}=require('../dist/network-steward.contracts');
+ assert.equal(bodies.officer.safeParse({denominationOrganizationId:id,authorityDocumentId:id,email:'officer@example.com',firstName:'Test',lastName:'Officer'}).success,true);
+ assert.equal(bodies.officer.safeParse({denominationOrganizationId:id,email:'officer@example.com',firstName:'Test',lastName:'Officer'}).success,false);
+ assert.equal(bodies.churchVerify.safeParse({evidenceReference:'signed evidence',verificationMethod:'signed_authority',approved:true}).success,false);
+ assert.equal(results.notice.safeParse({providerAccepted:true,delivered:true}).success,false);
+ assert.equal(results.bootstrap.safeParse({churchId:id,siteId:id,grantId:id,invitationPending:true,created:true,emailSent:false,invitationDeliveryStatus:'failed'}).success,true);
+});
