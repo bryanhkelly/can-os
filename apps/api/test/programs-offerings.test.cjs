@@ -40,3 +40,35 @@ test('WS04 registers its controllers once and shares the configured identity ser
     await app.close();
   }
 });
+
+test('WS04 configuration and review GETs reject caller-supplied authority or unexpected query fields', async () => {
+  const { app } = await createApi(readConfig({ API_DOCS: '0' }));
+  const id = '00000000-0000-4000-8000-000000000001';
+  const identity = app.get(CanonicalIdentityService);
+  let calls = 0;
+  // Stub only the in-process identity port. Production routing and the default-deny
+  // guard are unchanged; real session/RLS acceptance is a separate mandatory gate.
+  identity.authenticateWorkflow = async (_request, mode, method) => {
+    assert.equal(mode, 'planning');
+    assert.equal(method, 'GET');
+    return {
+      readCanonicalBlueprintConfiguration: async () => { calls++; throw new Error('must not dispatch'); },
+      readCanonicalBlueprintReview: async () => { calls++; throw new Error('must not dispatch'); },
+    };
+  };
+  try {
+    await app.listen(0, '127.0.0.1');
+    const url = await app.getUrl();
+    for (const path of [
+      '/api/v1/blueprint-configurations/' + id,
+      '/api/v1/blueprint-configuration-versions/' + id + '/review'
+    ]) {
+      const response = await fetch(url + path + '?actorPersonId=' + id);
+      assert.equal(response.status, 400);
+      assert.equal((await response.json()).code, 'VALIDATION_FAILED');
+    }
+    assert.equal(calls, 0);
+  } finally {
+    await app.close();
+  }
+});

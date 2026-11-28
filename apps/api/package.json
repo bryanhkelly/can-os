@@ -8,7 +8,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "node dist/main.js",
-    "test": "npm run build && node --test test/http.test.cjs",
+    "test": "npm run build && node --test test/http.test.cjs test/programs-offerings.test.cjs",
     "build:canonical": "node scripts/build-canonical.mjs",
     "sdk:export": "node scripts/export-openapi.cjs",
     "sdk:generate": "npm run build && npm run sdk:export && openapi-typescript sdk/generated/browser-openapi.json -o sdk/generated/schema.ts",
