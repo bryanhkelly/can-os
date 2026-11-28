@@ -659,3 +659,62 @@ test('knowledge checks and completion require verified learner or provider autho
 test('noncredit enrollment publication protects provider scope and explicit Site selection',async()=>{await withServer('0',async(url,document)=>{for(const [route,method] of [["/api/v1/noncredit-enrollment-publisher","GET"],["/api/v1/noncredit-training-readiness","GET"],["/api/v1/noncredit-enrollment-releases","POST"],["/api/v1/noncredit-enrollment-closures","POST"],["/api/v1/noncredit-multisite-releases","POST"]]){assert.ok(document.paths[route][method.toLowerCase()].security);assert.equal((await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined)).status,method==='POST'?503:401);}assert.ok(document.paths['/api/v1/noncredit-enrollment-releases'].post.requestBody.content['application/json'].schema.required.includes('siteId'));});});
 
 test('completion administration requires canonical provider credentials and distinguishes decisions from corrections',async()=>{await withServer('0',async(url,document)=>{for(const [route,method] of [["/api/v1/noncredit-completion-decisions","POST"],["/api/v1/noncredit-completion-policy-catalog","GET"],["/api/v1/noncredit-completion-policies","POST"],["/api/v1/noncredit-completion-review","GET"],["/api/v1/noncredit-completion-queue","GET"],["/api/v1/noncredit-completion-corrections","POST"]]){assert.ok(document.paths[route][method.toLowerCase()].security);assert.equal((await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined)).status,method==='POST'?503:401);}});const c=require('../dist/completion-admin.contracts');assert.equal(c.queueQuery.safeParse({page:'101'}).success,false);assert.equal(c.queueQuery.parse({page:'2'}).page,2);});
+
+test('owner control routes have protected contracts and fail closed without runtime credentials',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const path of ['delegation','delegation-targets']){
+   const route='/api/v1/owner/'+path,operation=document.paths[route].get;
+   assert.ok(operation.security);assert.ok(operation.responses['403']);
+   const denied=await fetch(url+route,{headers:{'x-role':'platform_owner','x-person-id':'forged'}});
+   assert.equal(denied.status,401);
+   assert.equal(denied.headers.get('cache-control'),'no-store');
+  }
+  for(const path of ['delegation','delegation/return','private-credential-recovery']){
+   const route='/api/v1/owner/'+path,operation=document.paths[route].post;
+   assert.ok(operation.security);assert.ok(operation.requestBody);assert.ok(operation.responses['403']);
+   assert.equal((await fetch(url+route,{method:'POST',headers:{Origin:url,'content-type':'application/json'},body:'{}'})).status,503);
+  }
+ });
+});
+test('owner control rejects ambiguous route policies and never calls effective identity resolver',async()=>{
+ const {OwnerControlOperation,CanonicalWriteOperation,verifiedOwnerControl,verifiedIdentity}=require('../dist/security');
+ const actor={status:async()=>({active:false,mode:null,expiresAt:null})};
+ const req={method:'POST',headers:{cookie:'opaque'}};
+ let calls=0;
+ const guard=new DefaultDenyGuard(new Reflector(),{
+  authenticateOwnerControl:async(request,method)=>{assert.equal(request,req);assert.equal(method,'POST');calls++;return actor;},
+  authenticate:async()=>{throw Error('effective identity resolver must not run');}
+ });
+ const handler=()=>{};class Controller{}
+ const descriptor={value:handler};
+ OwnerControlOperation('POST')(Controller.prototype,'method',descriptor);
+ const context={getHandler:()=>handler,getClass:()=>Controller,switchToHttp:()=>({getRequest:()=>req})};
+ assert.equal(await guard.canActivate(context),true);
+ assert.equal(calls,1);
+ assert.equal(verifiedOwnerControl(req),actor);
+ assert.throws(()=>verifiedIdentity(req),/Unauthorized/);
+ assert.throws(()=>verifiedOwnerControl({}),/Unauthorized/);
+ CanonicalWriteOperation()(Controller.prototype,'method',descriptor);
+ await assert.rejects(()=>guard.canActivate(context),/Unauthorized/);
+ assert.equal(calls,1);
+});
+test('owner control validates target, reason, confirmation and credential output',()=>{
+ const c=require('../dist/owner-control.contracts');
+ const grantId='00000000-0000-4000-8000-000000000001',reason='Reviewed support request';
+ assert.equal(c.startBody.safeParse({grantId,reason,mode:'view'}).success,true);
+ assert.equal(c.startBody.safeParse({grantId,reason,mode:'act',role:'platform_owner'}).success,false);
+ assert.equal(c.startBody.safeParse({grantId,reason:'short',mode:'act'}).success,false);
+ assert.equal(c.stopBody.safeParse({confirm:false}).success,false);
+ assert.equal(c.stopBody.safeParse({confirm:true,accountId:grantId}).success,false);
+ assert.equal(c.recoverBody.parse({grantId,reason,confirm:true}).operation,'rotate');
+ assert.equal(c.recovered.safeParse({privateAccessCode:'a'.repeat(43),revokedCount:1,hash:'private'}).success,false);
+});
+test('owner control requires original cookie, exact method and trusted write origin',async()=>{
+ const {CanonicalIdentityService}=require('../dist/identity.service');
+ const service=new CanonicalIdentityService();
+ service.configure(true,'http://localhost:3001');
+ await assert.rejects(()=>service.authenticateOwnerControl({method:'GET',headers:{}},'GET'),/Unauthorized/);
+ await assert.rejects(()=>service.authenticateOwnerControl({method:'GET',headers:{}},'POST'),/Forbidden/);
+ await assert.rejects(()=>service.authenticateOwnerControl({method:'POST',headers:{origin:'https://foreign.example','content-type':'application/json',cookie:'opaque'}},'POST'),/Forbidden/);
+ await assert.rejects(()=>service.authenticateOwnerControl({method:'POST',headers:{origin:'http://localhost:3001','content-type':'text/plain',cookie:'opaque'}},'POST'),/Unsupported Media Type/);
+});
