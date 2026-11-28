@@ -11,7 +11,7 @@ import {buildSitePackageInput,parseSiteContentPackage,privatePackageSourcesMatch
 import {writeAudit} from "@/platform/mutation";
 import type {AccessContext} from "@/domain/access-context";
 import {readAuthorizedSiteContentBrief} from "./site-content-brief.server";
-import {generationEligibility} from "@/domain/site-generation-status";
+import {generationEligibility,legacyGlooRetryEligible} from "@/domain/site-generation-status";
 import {generateSitePackageWithGloo,assertGlooConfiguration,safeGlooFailure,glooConfiguration} from "./gloo-content-provider.server";
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Consumer="website"|"outreach";
@@ -37,7 +37,7 @@ async function readEligibility(tx:Tx,siteId:string,organizationId:string,digest:
  const [active]=await tx.select({leaseUntil:inputs.leaseUntil}).from(inputs).where(and(scoped,eq(inputs.status,"processing"),gt(inputs.leaseUntil,now))).limit(1);
  const [usage]=await tx.select({count:sql<number>`count(*)::int`}).from(inputs).where(and(scoped,gt(inputs.createdAt,new Date(now.getTime()-86400000))));
  const config=glooConfiguration();
- return {attempt,eligibility:generationEligibility({attempt:attempt??null,activeUntil:active?.leaseUntil??null,dailyCount:usage?.count??0,configured:config.keyConfigured&&config.modelConfigured,now})};
+ return {attempt,eligibility:generationEligibility({attempt:attempt??null,activeUntil:active?.leaseUntil??null,dailyCount:usage?.count??0,configured:config.keyConfigured&&config.modelConfigured,configurationError:!config.keyConfigured&&!config.modelConfigured?"gloo_missing_both":!config.keyConfigured?"gloo_missing_key":!config.modelConfigured?"gloo_missing_model":undefined,now})};
 }
 export async function previewSitePackage(actor:AccessContext,data:Request){
  return db.transaction(async tx=>{
@@ -154,4 +154,27 @@ export async function processSitePackage(actor:AccessContext,data:Request&{diges
    });
    return {status:"failed" as const,...failure};
  }
+}
+
+/** Administration callers verify an independent non-demo platform grant before entering these operations. No editorial input or generated content is returned. */
+export async function listLegacyGlooFailures(){
+ return db.select({inputId:inputs.id,siteId:sites.id,siteName:sites.name,revision:inputs.revision,attempts:inputs.attempts}).from(inputs).innerJoin(sites,and(eq(inputs.siteId,sites.id),eq(inputs.organizationId,sites.organizationId))).where(and(eq(inputs.status,"failed"),eq(inputs.attempts,3),eq(inputs.errorCode,"processing_failed"))).orderBy(desc(inputs.updatedAt)).limit(100);
+}
+export async function authorizeLegacyGlooRetry(actor:AccessContext,data:{siteId:string;inputId:string}){
+ assertActor(actor);
+ if(!actor.capabilities.has("platform.admin")||actor.delegationMode||actor.sessionAccountId)throw new AuthorizationError("Platform administration");
+ assertGlooConfiguration();
+ return db.transaction(async tx=>{
+   const [site]=await tx.select({id:sites.id,organizationId:sites.organizationId}).from(sites).where(eq(sites.id,data.siteId)).for("update");
+   if(!site)throw new Error("Site not found.");
+   const scoped=scope(site.id,site.organizationId);
+   const [active]=await tx.select({id:inputs.id}).from(inputs).where(and(scoped,eq(inputs.status,"processing"),gt(inputs.leaseUntil,new Date()))).limit(1);
+   if(active)return {ok:false as const,message:"Content generation is already in progress."};
+   const [row]=await tx.select({id:inputs.id,status:inputs.status,attempts:inputs.attempts,errorCode:inputs.errorCode,updatedAt:inputs.updatedAt}).from(inputs).where(and(scoped,eq(inputs.id,data.inputId))).limit(1);
+   if(!row||!legacyGlooRetryEligible(row))return {ok:false as const,message:"This legacy failure is no longer eligible for recovery."};
+   const [saved]=await tx.update(inputs).set({attempts:2,errorCode:"legacy_retry_authorized",updatedAt:new Date()}).where(and(scoped,eq(inputs.id,row.id),eq(inputs.status,"failed"),eq(inputs.attempts,3),eq(inputs.errorCode,"processing_failed"))).returning({id:inputs.id});
+   if(!saved)return {ok:false as const,message:"Retry eligibility changed."};
+   await writeAudit(tx,actor,{action:"site.content_generation.legacy_retry_authorized",entityType:"site",entityId:site.id,scope:{siteId:site.id,organizationId:site.organizationId},before:{inputId:row.id,attempts:3,errorCode:row.errorCode},after:{inputId:row.id,attempts:2,errorCode:"legacy_retry_authorized",additionalAttemptGranted:1}});
+   return {ok:true as const,message:"One diagnostic retry authorized. The Site editor must initiate it; no Site data was sent."};
+ });
 }

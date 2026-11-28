@@ -17,6 +17,7 @@ import { PlatformOwnerPilotAccessPanel } from "@/components/platform/PlatformOwn
 import { UniversalEngagementPublisher } from "@/components/launch-studio/UniversalEngagementPublisher";
 import { SiteEngagementLibrary } from "@/components/launch-studio/SiteEngagementLibrary";
 import type { OwnerEngagementSurface } from "@/components/links/OwnerEngagementDestinationPicker";
+import { PlatformGlooHealth } from "@/components/platform/PlatformGlooHealth";
 import { PlatformReportingHealth } from "@/components/platform/PlatformReportingHealth";
 import { PlatformAccountHealth } from "@/components/platform/PlatformAccountHealth";
 import { PlatformAcademicIntegrity } from "@/components/platform/PlatformAcademicIntegrity";
@@ -77,6 +78,7 @@ function PlatformAdministration() {
     {summary.platformOwner && <PlatformOwnerDelegationPanel/>}
     <PlatformAccountHealth health={summary.accountHealth}/>
     <PlatformReportingHealth/>
+    <PlatformGlooHealth/>
     <PlatformAcademicIntegrity integrity={summary.academicIntegrity}/>
     <PlatformCatalogManager/>
     <PlatformReleaseCenter records={summary.publisherReleaseReadiness}

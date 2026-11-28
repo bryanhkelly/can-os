@@ -1,5 +1,5 @@
 import {describe,it,expect} from "vitest";
-import {generationEligibility,generationOutcomeMessage} from "../../src/domain/site-generation-status";
+import {generationEligibility,generationOutcomeMessage,legacyGlooRetryEligible} from "../../src/domain/site-generation-status";
 const now=new Date("2026-11-26T06:42:00Z");
 const base={attempt:null,activeUntil:null,dailyCount:0,configured:true,now};
 const failed={status:"failed",attempts:3,errorCode:"processing_failed",updatedAt:now};
@@ -24,4 +24,15 @@ describe("Site Intelligence generation policy",()=>{
   expect(generationOutcomeMessage({status:"processing"}).success).toBe(false);
   expect(generationOutcomeMessage({status:"reused"}).success).toBe(true);
  });
+});
+
+it("distinguishes missing runtime bindings before a claim",()=>{
+ expect(generationEligibility({...base,configured:false,configurationError:"gloo_missing_key"})).toMatchObject({allowed:false,code:"gloo_missing_key",attempts:0});
+});
+it("only authorizes recovery for the old undiagnosed exhausted failure",()=>{
+ expect(legacyGlooRetryEligible(failed)).toBe(true);
+ for(const errorCode of ["legacy_retry_authorized","gloo_content_contract","processing_persistence"])expect(legacyGlooRetryEligible({...failed,errorCode})).toBe(false);
+ expect(legacyGlooRetryEligible({...failed,attempts:2})).toBe(false);
+ expect(legacyGlooRetryEligible({...failed,status:"ready"})).toBe(false);
+ expect(generationEligibility({...base,attempt:{...failed,attempts:2,errorCode:"legacy_retry_authorized"}})).toMatchObject({allowed:true,code:"retry"});
 });
