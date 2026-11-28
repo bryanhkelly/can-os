@@ -61,7 +61,7 @@ export async function resolveHttpIdentity(request: Request) {
         ...(session.ownerDelegation?{ownerDelegation:session.ownerDelegation}:{}),
       };
     },
-    getMyCredentialIssuerApproval:async()=>{const row=await getMyCredentialIssuerApprovalService(actor);return row?{...row,requestedAt:row.requestedAt.toISOString(),reviewedAt:row.reviewedAt?.toISOString()??null,approvedUntil:row.approvedUntil?.toISOString()??null}:null;},
+    getMyCredentialIssuerApproval:async()=>{const row=await getMyCredentialIssuerApprovalService(actor);return {approval:row?{...row,requestedAt:row.requestedAt.toISOString(),reviewedAt:row.reviewedAt?.toISOString()??null,approvedUntil:row.approvedUntil?.toISOString()??null}:null};},
     listPendingCredentialIssuerApprovals:async()=> (await listPendingCredentialIssuerApprovalsService(actor)).map(row=>({...row,requestedAt:row.requestedAt.toISOString()})),
     listActiveCredentialIssuerApprovals:async()=> (await listActiveCredentialIssuerApprovalsService(actor)).map(row=>({...row,requestedAt:row.requestedAt.toISOString(),reviewedAt:row.reviewedAt?.toISOString()??null,approvedUntil:row.approvedUntil?.toISOString()??null})),
     requestCanonicalCredentialIssuerApproval:(input:unknown)=>{requireWrite();return requestCanonicalCredentialIssuerApprovalService(actor,request,input);},
