@@ -5,8 +5,8 @@ const school=read("src/modules/learning/account-school-participation.functions.t
 const activity=read("src/modules/learning/my-activity.functions.ts");
 const native=read("src/modules/classes/native-class-enrollment.functions.ts");
 const noncredit=read("src/modules/enrollment/noncredit-self-enrollment.functions.ts");
-const waitlist=read("src/modules/enrollment/noncredit-waitlist.functions.ts");
-const participant=read("src/modules/enrollment/noncredit-self-enrollment-identity.server.ts");
+const waitlist=read("src/modules/enrollment/noncredit-waitlist.server.ts");
+const participant=read("src/modules/enrollment/noncredit-participant-identity.server.ts");
 const ui=read("src/routes/learn.my-activity.tsx");
 
 describe("account-wide participation source authority and pagination",()=>{
@@ -76,12 +76,12 @@ describe("account-wide participation source authority and pagination",()=>{
  });
  it("paginates only original Person-owned waitlist opportunities",()=>{
   for(const phrase of [
-    "getMyNoncreditWaitlistPage",
+    "readMyNoncreditWaitlistPage",
     "waitlistCursor",
     "cursor.waitlistId",
     "eq(noncreditEnrollmentWaitlist.accessAccountId,owner.accountId)",
     "eq(noncreditEnrollmentWaitlist.accessPersonId,owner.personId)",
-    "requireNoncreditParticipantAccount()",
+    "resolveNoncreditParticipantAccount(request)",
   ])expect(waitlist).toContain(phrase);
   expect(participant).toContain("account.personId!==personId");
   expect(waitlist).toContain("assertNoncreditParticipantRelease(current,release)");
