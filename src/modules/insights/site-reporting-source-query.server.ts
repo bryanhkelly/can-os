@@ -9,7 +9,6 @@ import { domainEvents, reportingSourceEventReceipts } from "@/db/schema";
 import { loadAuthorizedSiteReportingScope } from "@/modules/insights/site-reporting-source-scope.server";
 import { REPORTABLE_EVENT_CATALOG } from "@/domain/reportable-event-catalog";
 import { summarizeReportingSourceCoverage } from "@/domain/reporting-source-coverage-policy";
-import { reportingProjectionEnabled } from "@/modules/insights/reporting-projection-rollout.server";
 
 /**
  * Shared authorized source-quality query. A single server-side aggregate
@@ -24,9 +23,6 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 export async function querySiteReportingSourceCoverageInTx(
   tx: Tx, actor: AccessContext, selection: SourceCoverageSelection, asOf: Date,
 ) {
-  if (!reportingProjectionEnabled()) {
-    throw new Error("Reporting source projections are not activated");
-  }
   const { from, to } = parseClosedReportingWindow(
     selection, asOf, "Source coverage requires a closed, positive UTC window up to 90 days",
   );
