@@ -92,7 +92,7 @@ function RelationshipsWorkspace({privateScope}:{privateScope:string}){
           {scopeAfter&&<Button type="button" variant="outline" disabled={busy} onClick={()=>{setScopeAfter(undefined);setScopeId("");}}>First activities</Button>}
           {scopes.data?.next&&<Button type="button" variant="outline" disabled={busy} onClick={()=>{setScopeAfter(scopes.data?.next??undefined);setScopeId("");}}>More activities</Button>}
         </div>
-        {selectedScope&&<ContextualReportingRelationships scopeKind={kind} scopeId={selectedScope.id}/>}
+        {selectedScope&&<ContextualReportingRelationships scopeKind={kind} scopeId={selectedScope.id} onChanged={async()=>{await Promise.all([requests.query.refetch({throwOnError:true}),portfolio.query.refetch({throwOnError:true})]);}}/>}
       </section>}
       {requests.query.isFetching?<p role="status">Loading relationship requests...</p>:
       requests.data&&<ReportingRelationshipPanel
