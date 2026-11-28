@@ -275,7 +275,7 @@ export async function rotatePrivateAccountAccessCode(request: Request, raw: unkn
     const owner=await getVerifiedPlatformOwnerSession(request,tx,true);
     assertPlatformOwnerUndelegated(owner);
     const [target]=await tx.select({accountId:accountPersonGrants.accountId,personId:accountPersonGrants.personId,
-      role:accountPersonGrants.role}).from(accountPersonGrants)
+      role:accountPersonGrants.role,organizationId:accountPersonGrants.organizationId,siteId:accountPersonGrants.siteId}).from(accountPersonGrants)
       .where(and(eq(accountPersonGrants.id,data.grantId),eq(accountPersonGrants.active,true))).limit(1);
     if(!target||target.accountId===owner.ownerAccountId||!platformOwnerMayActAs(target.role))
       throw new AuthorizationError("eligible existing private-code account");
@@ -285,6 +285,10 @@ export async function rotatePrivateAccountAccessCode(request: Request, raw: unkn
     if(!account||account.disabled||account.personId!==target.personId||!isDemoAccountEmail(account.email)||
       (data.operation==="rotate"?!account.privateAccessCodeHash:!!account.privateAccessCodeHash))
       throw new AuthorizationError("existing private-code account");
+    // Recovery of an existing individual credential is distinct from
+    // converting an approved standard synthetic account to a private code.
+    if(data.operation==="enroll" && await matchesDemoCredentialScope(account.email,target.organizationId,target.siteId,tx))
+      throw new AuthorizationError("standard synthetic account uses the shared demo credential");
     const eligible=await readOwnerDelegationGrants(account.id,target.personId,account.email,tx);
     const allGrants=await tx.select({role:accountPersonGrants.role,personId:accountPersonGrants.personId})
       .from(accountPersonGrants).where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true))).limit(101);
