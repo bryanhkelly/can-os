@@ -9,7 +9,7 @@ const reviewService=read("src/modules/learning/completion-evidence-review.server
 const classService=read("src/modules/classes/native-class-completion.server.ts");
 const classOperator=read("src/components/learning/NativeClassCompletionOperatorPanel.tsx");
 const classRoute=read("src/routes/class_.$classId.tsx");
-const learnerSource=read("src/modules/classes/native-class-canonical-evidence.functions.ts");
+const learnerSource=read("src/modules/classes/native-class-canonical-evidence.server.ts");
 const preflight=read("scripts/acceptance/check-ws3-completion-readiness.mjs");
 
 describe("WS3 independent evidence reviewer workflow",()=>{

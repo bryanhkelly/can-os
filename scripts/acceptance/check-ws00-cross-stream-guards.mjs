@@ -69,7 +69,7 @@ check("WS3 completion takes parent Class lock before Enrollment",()=>{
 check("WS3 rejects ambiguous assessment revisions and preserves current authorization",()=>{
   const revisions=read("src/domain/canonical-assessment-revisions.ts");
   const completion=read("src/modules/classes/native-class-completion.server.ts");
-  const reader=read("src/modules/classes/native-class-canonical-evidence.functions.ts");
+  const reader=read("src/modules/classes/native-class-canonical-evidence.server.ts");
   required(revisions.includes("if(ambiguous.has(attemptId))continue;"),
     "WS3 current-grade projection must fail closed when an attempt has invalid revisions");
   required(completion.includes("latestCanonicalAssessmentRevisions") &&

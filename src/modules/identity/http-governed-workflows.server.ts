@@ -1,3 +1,6 @@
+import {provisionNativeClassKnowledgeCheckAccessService} from "@/modules/classes/native-class-assessment-provision.server";
+import {getNativeClassPendingKnowledgeReviewsService,finalizeNativeClassKnowledgeCheckService} from "@/modules/classes/native-class-assessment-finalize.server";
+import {getNativeClassCanonicalEvidenceService} from "@/modules/classes/native-class-canonical-evidence.server";
 import * as classCompletion from "@/modules/classes/native-class-completion.server";
 import {publishNativeClassCompletionPolicyService} from "@/modules/classes/native-class-completion-policy.server";
 import * as completionEvidence from "@/modules/learning/completion-evidence-review.server";
@@ -87,6 +90,10 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
  const context=await (mode==="operator-reporting"?(readCookie(request,accessSessionCookie)!==undefined?getIdentityContext(request):getCanonicalCommandContext(request)):mode==="planning"?getBlueprintPlanningContext(request):mode==="canonical"?getCanonicalCommandContext(request):mode==="learner"?getInstructionalLearnerContext(request):getIdentityContext(request));
  if(!context.actorPersonId)throw new AuthorizationError("verified Person");
  return {
+  provisionNativeClassKnowledgeCheckAccess:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Native Class assessment context");return provisionNativeClassKnowledgeCheckAccessService(request,raw);},
+  getNativeClassPendingKnowledgeReviews:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Native Class assessment context");return getNativeClassPendingKnowledgeReviewsService(request,raw);},
+  finalizeNativeClassKnowledgeCheck:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Native Class assessment context");return finalizeNativeClassKnowledgeCheckService(request,raw);},
+  getNativeClassCanonicalEvidence:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="learner")throw new AuthorizationError("Native Class assessment context");return getNativeClassCanonicalEvidenceService(request,raw);},
   getNativeClassCompletionReview:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Class completion context");return classCompletion.getNativeClassCompletionReviewService(request,raw);},
   decideNativeClassCompletion:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Class completion context");return classCompletion.decideNativeClassCompletionService(request,raw);},
   getNativeClassCompletionQueue:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Class completion context");return classCompletion.getNativeClassCompletionQueueService(request,raw);},

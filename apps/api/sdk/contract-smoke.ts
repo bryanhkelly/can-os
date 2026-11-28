@@ -29,3 +29,13 @@ export async function checkOutcomeContract(client:BecomunaBrowserApi,id:string){
  // @ts-expect-error issuance is intentionally not exposed until acceptance
  await client.POST('/api/v1/credential-issuances',{body:{}});
 }
+
+export async function checkNativeAssessmentContract(client:BecomunaBrowserApi,id:string){
+ await client.POST('/api/v1/class-knowledge-check-access',{body:{classEnrollmentId:id}});
+ await client.GET('/api/v1/class-knowledge-review-queue',{params:{query:{classId:id}}});
+ await client.POST('/api/v1/class-knowledge-check-finalizations',{body:{classEnrollmentId:id,assessmentAttemptId:id}});
+ const evidence=await client.GET('/api/v1/me/class-completion-evidence',{params:{query:{classEnrollmentId:id}}});
+ if(evidence.data){const verified:boolean=evidence.data.classCompletionAuthorityVerified;void verified;}
+ // @ts-expect-error scoring is server-authoritative
+ await client.POST('/api/v1/class-knowledge-check-finalizations',{body:{classEnrollmentId:id,assessmentAttemptId:id,pointsEarned:100}});
+}

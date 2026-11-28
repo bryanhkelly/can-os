@@ -7,7 +7,8 @@ import {problemOpenApiSchema} from './contracts';
 import {validated} from './learning.contracts';
 import * as c from './credentials.contracts';
 function Operation(method:'GET'|'POST'){return applyDecorators(GovernedWorkflowOperation('canonical',method),ApiCookieAuth('session'),...(method==='POST'?[HttpCode(200),ApiHeader({name:'Origin',required:true})]:[]),...[400,401,403,409,413,415,500,503].map(status=>ApiResponse({status,content:{'application/problem+json':{schema:problemOpenApiSchema}}})));}
-@ApiTags('Private noncredit credentials')
+function LearnerRead(){return applyDecorators(GovernedWorkflowOperation('learner','GET'),ApiCookieAuth('session'),...[400,401,403,409,500,503].map(status=>ApiResponse({status,content:{'application/problem+json':{schema:problemOpenApiSchema}}})));}
+@ApiTags('Credentials, evidence and Class outcomes')
 @Controller()
 export class CredentialsController {
  constructor(private readonly identity:CanonicalIdentityService){}
@@ -77,4 +78,28 @@ export class CredentialsController {
  @ApiBody({schema:c.classDocs.policy})
  @ApiOkResponse({schema:c.classDocs.policyResult})
  async publishNativeClassCompletionPolicy(@Req() req:FastifyRequest,@Body() body:unknown){const workflow=verifiedWorkflow(req),input=validated(c.classPolicy,body);return c.classPolicyResult.parse(await this.identity.runWorkflow(()=>workflow.publishNativeClassCompletionPolicy(input)));}
+ @Post('class-knowledge-check-access')
+ @Operation('POST')
+ @ApiOperation({operationId:'provisionNativeClassKnowledgeCheckAccess',summary:'provisionNativeClassKnowledgeCheckAccess'})
+ @ApiBody({schema:c.nativeDocs.enrollment})
+ @ApiOkResponse({schema:c.nativeDocs.grant})
+ async provisionNativeClassKnowledgeCheckAccess(@Req() req:FastifyRequest,@Body() body:unknown){const workflow=verifiedWorkflow(req),input=validated(c.nativeEnrollment,body);return c.nativeGrant.parse(await this.identity.runWorkflow(()=>workflow.provisionNativeClassKnowledgeCheckAccess(input)));}
+ @Get('class-knowledge-review-queue')
+ @Operation('GET')
+ @ApiOperation({operationId:'getNativeClassPendingKnowledgeReviews',summary:'getNativeClassPendingKnowledgeReviews'})
+ @ApiQuery({name:'classId',schema:{type:'string',format:'uuid'},required:true})
+ @ApiOkResponse({schema:c.nativeDocs.pending})
+ async getNativeClassPendingKnowledgeReviews(@Req() req:FastifyRequest,@Query() query:unknown){const workflow=verifiedWorkflow(req),input=validated(c.nativeClassQuery,query);return c.nativePending.parse(await this.identity.runWorkflow(()=>workflow.getNativeClassPendingKnowledgeReviews(input)));}
+ @Post('class-knowledge-check-finalizations')
+ @Operation('POST')
+ @ApiOperation({operationId:'finalizeNativeClassKnowledgeCheck',summary:'finalizeNativeClassKnowledgeCheck'})
+ @ApiBody({schema:c.nativeDocs.finalize})
+ @ApiOkResponse({schema:c.nativeDocs.finalized})
+ async finalizeNativeClassKnowledgeCheck(@Req() req:FastifyRequest,@Body() body:unknown){const workflow=verifiedWorkflow(req),input=validated(c.nativeFinalize,body);return c.nativeFinalized.parse(await this.identity.runWorkflow(()=>workflow.finalizeNativeClassKnowledgeCheck(input)));}
+ @Get('me/class-completion-evidence')
+ @LearnerRead()
+ @ApiOperation({operationId:'getNativeClassCanonicalEvidence',summary:'getNativeClassCanonicalEvidence'})
+ @ApiQuery({name:'classEnrollmentId',schema:{type:'string',format:'uuid'},required:true})
+ @ApiOkResponse({schema:c.nativeDocs.evidence})
+ async getNativeClassCanonicalEvidence(@Req() req:FastifyRequest,@Query() query:unknown){const workflow=verifiedWorkflow(req),input=validated(c.nativeEnrollment,query);return c.nativeEvidence.parse(await this.identity.runWorkflow(()=>workflow.getNativeClassCanonicalEvidence(input)));}
 }

@@ -51,12 +51,12 @@ describe("native Class reuses canonical assessment and survey engines",()=>{
     expect(source).not.toContain("class_activity_submissions");
   });
   it("provisions canonical grants only to independently authorized Class members",()=>{
-    const service=read("src/modules/classes/native-class-assessment-provision.functions.ts");
+    const service=read("src/modules/classes/native-class-assessment-provision.server.ts");
     for(const claim of [
       'assertCapability(actor,"class.manage")',
       'assertCapability(actor,"noncredit.assessment.provision")',
       "await validateClassAuthority(tx",
-      "await assertCurrentCanonicalStaffForMutation(tx,getRequest(),actor)",
+      "await assertCurrentCanonicalStaffForMutation(tx,request,actor)",
       "eq(learnerCourseAttempts.classEnrollmentId,enrollment.id)",
       'isNull(learnerCourseAttempts.noncreditRegistrationId)',
       "await tx.insert(assessmentAccess)",
@@ -64,11 +64,11 @@ describe("native Class reuses canonical assessment and survey engines",()=>{
     expect(service).not.toContain("tx.insert(noncreditRegistrations)");
   });
   it("requires a different reviewer from learner and uses canonical result triggers",()=>{
-    const review=read("src/modules/classes/native-class-assessment-finalize.functions.ts");
+    const review=read("src/modules/classes/native-class-assessment-finalize.server.ts");
     expect(review).toContain("enrollment.learnerPersonId===actor.actorPersonId");
     expect(review).toContain('assertCapability(actor,"noncredit.assessment.finalize")');
     expect(review).toContain('assertCapability(actor,"class.manage")');
-    expect(review).toContain("await assertCurrentCanonicalStaffForMutation(tx,getRequest(),actor)");
+    expect(review).toContain("await assertCurrentCanonicalStaffForMutation(tx,request,actor)");
     expect(review).toContain("evaluateKnowledgeCheckResult(");
     expect(review).toContain("await tx.insert(assessmentExecutionResults)");
     expect(review).not.toContain("noncreditCompletionDecisions");

@@ -711,3 +711,18 @@ test('Class completion policies, decisions and reviews preserve distinct governe
  assert.equal(c.classDecision.safeParse({classEnrollmentId:id,expectedPolicyVersionId:id,expectedPriorOutcomeId:null,outcome:'completed',evidenceVersionId:id,reason:'Reviewed evidence'}).success,true);
  assert.equal(c.classQueue.safeParse({classId:id,page:'101'}).success,false);
 });
+
+test('native Class assessment and evidence APIs are governed and reject caller-owned identity',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const [route,method] of [['/api/v1/class-knowledge-check-access','POST'],['/api/v1/class-knowledge-review-queue','GET'],['/api/v1/class-knowledge-check-finalizations','POST'],['/api/v1/me/class-completion-evidence','GET']]){
+   assert.ok(document.paths[route][method.toLowerCase()].security);
+   const response=await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);assert.equal(response.headers.get('cache-control'),'no-store');
+  }
+ });
+ const c=require('../dist/credentials.contracts'),id='00000000-0000-4000-8000-000000000001';
+ assert.equal(c.nativeEnrollment.safeParse({classEnrollmentId:id,learnerId:id}).success,false);
+ assert.equal(c.nativeFinalize.safeParse({classEnrollmentId:id,assessmentAttemptId:id}).success,true);
+ assert.equal(c.nativeFinalize.safeParse({classEnrollmentId:id,assessmentAttemptId:id,pointsEarned:100}).success,false);
+ assert.equal(c.nativePending.safeParse({pending:[{classEnrollmentId:id,assessmentAttemptId:id,learnerName:'Learner',submittedAt:null,answers:[]}],partial:false}).success,false);
+});
