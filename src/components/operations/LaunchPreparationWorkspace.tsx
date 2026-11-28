@@ -1,3 +1,4 @@
+import {ContextualReportingRelationships} from "@/components/reporting/ContextualReportingRelationships";
 import { WorkspaceLinkNavigation } from "@/components/workspace/workspace-link-navigation";
 import { Link } from "@tanstack/react-router";
 import { OneHourSchoolLaunch } from "@/components/operations/OneHourSchoolLaunch";
@@ -55,6 +56,7 @@ export function LaunchPreparationWorkspace({ hubMode=false, focus, currentLaunch
         {focus === "readiness" && currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<div id="launch-services" className="scroll-mt-6">
           <SchoolJurisdictionReviewPanel key={`jurisdiction-review-${currentLaunch.id}`} programId={currentLaunch.id}/>
           <ProgramSiteAuthorizationPanel key={`site-authorization-${currentLaunch.id}`} programId={currentLaunch.id}/>
+          <ContextualReportingRelationships scopeKind="program" scopeId={currentLaunch.id}/>
           <p className="mt-3 text-sm text-muted-foreground">You can prepare the academic year, website and family outreach while CAN reviews the requested services. Each service, admissions and school opening retain their own authorization checks.</p>
           <Link to="/launch/site" search={{...schoolSelection,module:"program-catalog"}} className="mt-2 inline-block text-sm font-semibold underline">Continue planning your Solutions →</Link>
         </div>}
