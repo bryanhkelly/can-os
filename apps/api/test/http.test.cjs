@@ -659,3 +659,35 @@ test('knowledge checks and completion require verified learner or provider autho
 test('noncredit enrollment publication protects provider scope and explicit Site selection',async()=>{await withServer('0',async(url,document)=>{for(const [route,method] of [["/api/v1/noncredit-enrollment-publisher","GET"],["/api/v1/noncredit-training-readiness","GET"],["/api/v1/noncredit-enrollment-releases","POST"],["/api/v1/noncredit-enrollment-closures","POST"],["/api/v1/noncredit-multisite-releases","POST"]]){assert.ok(document.paths[route][method.toLowerCase()].security);assert.equal((await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined)).status,method==='POST'?503:401);}assert.ok(document.paths['/api/v1/noncredit-enrollment-releases'].post.requestBody.content['application/json'].schema.required.includes('siteId'));});});
 
 test('completion administration requires canonical provider credentials and distinguishes decisions from corrections',async()=>{await withServer('0',async(url,document)=>{for(const [route,method] of [["/api/v1/noncredit-completion-decisions","POST"],["/api/v1/noncredit-completion-policy-catalog","GET"],["/api/v1/noncredit-completion-policies","POST"],["/api/v1/noncredit-completion-review","GET"],["/api/v1/noncredit-completion-queue","GET"],["/api/v1/noncredit-completion-corrections","POST"]]){assert.ok(document.paths[route][method.toLowerCase()].security);assert.equal((await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined)).status,method==='POST'?503:401);}});const c=require('../dist/completion-admin.contracts');assert.equal(c.queueQuery.safeParse({page:'101'}).success,false);assert.equal(c.queueQuery.parse({page:'2'}).page,2);});
+
+test('WS10 protected Work and credential approval operations have explicit HTTP contracts',async()=>{
+ await withServer('0',async(url,document)=>{
+  const id='00000000-0000-4000-8000-000000000001';
+  for(const [method,route,operation] of [["GET","operations/actions","getOperationsActions"],["GET","actions/:actionId","getActionDetail"],["POST","operations/actions/:id/status","updateOperationsAction"],["POST","operations/actions/:id/assignment","assignOperationsAction"],["POST","operations/actions/:id/deadline","setOperationsActionDeadline"],["POST","operations/actions/:id/owner-resolution","resolveOwnedSiteOperationalAction"],["POST","credential-issuer-approvals","requestCanonicalCredentialIssuerApproval"],["GET","me/credential-issuer-approval","getMyCredentialIssuerApproval"],["GET","credential-issuer-approvals/active","listActiveCredentialIssuerApprovals"],["GET","credential-issuer-approvals/pending","listPendingCredentialIssuerApprovals"],["POST","credential-issuer-approvals/:approvalId/decisions","reviewCanonicalCredentialIssuerApproval"],["POST","credential-issuer-approvals/:approvalId/revocations","revokeCanonicalCredentialIssuerApproval"]]){
+   const path='/api/v1/'+route.replace(/:(\w+)/g,'{$1}');
+   const actual='/api/v1/'+route.replace(/:\w+/g,id);
+   const op=document.paths[path][method.toLowerCase()];
+   assert.equal(op.operationId,operation);assert.ok(op.security);assert.ok(op.responses['403']);
+   if(method==='GET'){
+    const response=await fetch(url+actual,{headers:{'x-role':'platform_owner','x-person-id':id}});
+    assert.equal(response.status,401);
+   }else{
+    assert.ok(op.requestBody);assert.ok(op.parameters.some(p=>p.name==='Origin'));
+    const response=await fetch(url+actual,{method,headers:{origin:'https://foreign.example','content-type':'application/json','x-role':'platform_owner'},body:'{}'});
+    assert.ok([403,503].includes(response.status));
+   }
+  }
+ });
+});
+test('WS10 schemas reject forged authority and incomplete decisions',()=>{
+ const {bodies,queries,params,results}=require('../dist/work-approvals.contracts');
+ const id='00000000-0000-4000-8000-000000000001';
+ assert.equal(queries.selection.safeParse({siteId:id,actorPersonId:id}).success,false);
+ assert.equal(params.id.safeParse({id:'bad'}).success,false);
+ assert.equal(bodies.status.safeParse({status:'resolved'}).success,false);
+ assert.equal(bodies.assignment.safeParse({ownerPersonId:id,priority:'urgent',role:'platform_owner'}).success,false);
+ assert.equal(bodies.deadline.safeParse({dueAt:'tomorrow',reason:'Valid reason'}).success,false);
+ assert.equal(bodies.review.safeParse({decision:'approve',evidenceReference:'A sufficiently long evidence reference'}).success,false);
+ assert.equal(bodies.review.safeParse({decision:'reject',evidenceReference:'A sufficiently long evidence reference'}).success,true);
+ assert.equal(results.saved.safeParse({saved:true,privateMetadata:{}}).success,false);
+});
