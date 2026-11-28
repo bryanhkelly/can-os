@@ -6,6 +6,8 @@ import {readCanonicalBlueprintConfigurationService,readCanonicalBlueprintReviewS
 import {recordNativeDeploymentReadinessService} from "@/modules/programs/native-deployment-readiness.server";
 import {placeNativeDeploymentSiteService} from "@/modules/programs/native-deployment-placement.server";
 import {approveNativeOfferingAdoptionService} from "@/modules/programs/native-offering-adoption-command.server";
+import {enrollMyselfInNoncreditService} from "@/modules/enrollment/noncredit-self-registration.server";
+import {enrollInNativeClassService} from "@/modules/classes/native-class-enrollment-command.server";
 export type WorkflowMode="planning"|"canonical"|"can";
 /** Existing independent native reviewer credentials remain distinct from CAN.
  * No fallback, new role, token or grant is manufactured by this adapter. */
@@ -14,6 +16,8 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
  const context=await (mode==="planning"?getBlueprintPlanningContext(request):mode==="canonical"?getCanonicalCommandContext(request):getIdentityContext(request));
  if(!context.actorPersonId)throw new AuthorizationError("verified Person");
  return {
+  registerNoncredit:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("registration context");return enrollMyselfInNoncreditService(request,raw);},
+  enrollNativeClass:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("enrollment context");return enrollInNativeClassService(request,raw);},
   readCanonicalBlueprintConfiguration:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="planning")throw new AuthorizationError("governed read context");return readCanonicalBlueprintConfigurationService(request,raw);},
   readCanonicalBlueprintReview:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="planning")throw new AuthorizationError("governed read context");return readCanonicalBlueprintReviewService(request,raw);},
   readCanonicalBlueprintReviewHistory:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="planning")throw new AuthorizationError("governed read context");return readCanonicalBlueprintReviewHistoryService(request,raw);},

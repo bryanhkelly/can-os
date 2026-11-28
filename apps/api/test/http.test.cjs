@@ -196,3 +196,18 @@ test('Blueprint reads require credentials and have bounded history parameters',a
  assert.equal(historyQuery.safeParse({page:'101'}).success,false);
  assert.equal(historyQuery.safeParse({page:'0',organizationId:'forged'}).success,false);
 });
+
+test('participation APIs retain distinct receipts and never expose learner cookies in JSON',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const path of ['/api/v1/noncredit-registrations','/api/v1/class-enrollments']){
+   assert.ok(document.paths[path].post.security);
+   assert.ok(document.paths[path].post.responses['403']);
+   assert.equal((await fetch(url+path,{method:'POST',headers:{Origin:url,'content-type':'application/json'},body:'{}'})).status,503);
+  }
+ });
+ const {registrationResult,enrollmentResult}=require('../dist/participation.contracts');
+ const id='00000000-0000-4000-8000-000000000001';
+ assert.equal(registrationResult.safeParse({registrationId:id,courseAttemptId:id,alreadyEnrolled:false,classId:null,classEnrollmentId:null}).success,true);
+ assert.equal(registrationResult.safeParse({registrationId:id,courseAttemptId:id,alreadyEnrolled:false,classId:null,classEnrollmentId:null,cookie:'secret'}).success,false);
+ assert.equal(enrollmentResult.safeParse({classEnrollmentId:id,courseAttemptId:id,alreadyEnrolled:false,registrationId:id}).success,false);
+});
