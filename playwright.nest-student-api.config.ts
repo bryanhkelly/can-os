@@ -1,4 +1,6 @@
 import {defineConfig} from "@playwright/test";
+import {existsSync} from "node:fs";
+import {resolve} from "node:path";
 import provision from "./playwright.pilot-provision.config";
 const env=process.env;
 const suites={
@@ -14,6 +16,7 @@ const selected=env.CAN_NEST_QA_SUITE??"student";
 if(!Object.hasOwn(suites,selected))throw Error("Unknown Nest QA suite");
 const suite=suites[selected as keyof typeof suites];
 if(!env[suite.fixture])throw Error("Reviewed isolated QA fixture required");
+for(const file of suite.files)if(!existsSync(resolve(process.cwd(),"tests/e2e/live",file)))throw Error("Required acceptance file missing: "+file);
 if(!provision.webServer||Array.isArray(provision.webServer))throw Error("Existing isolated QA server configuration required");
 export default defineConfig({
   ...provision,reporter:[["list"],["./tests/e2e/helpers/nest-required-acceptance-reporter.ts"],...(selected==="pilot2"?[["./tests/e2e/helpers/nest-pilot2-receipt-reporter.ts"]]:[])] as import("@playwright/test").ReporterDescription[],use:{...provision.use,baseURL:"http://localhost:3001"},testMatch:[...suite.files],timeout:600000,projects:[{name:"http-only"}],
