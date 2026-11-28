@@ -1,6 +1,7 @@
 import {and,eq,gt,inArray,isNull,lte,or} from "drizzle-orm";
 import {db} from "@/db/client";
-import {accessAccounts,guardianRelationships} from "@/db/schema";
+import {accessAccounts,guardianRelationships,people} from "@/db/schema";
+import {minorReviewRecord,requireMinorReviewEvidence} from "./guardian-minor-review-evidence.server";
 import {guardianRelationshipPredicate,schoolGuardianAuthorityCompatible} from "@/domain/guardian-relationship";
 import {canonicalPersons,guardianAuthorities,learnerProfiles} from "@/db/canonical-v301";
 import {AuthorizationError,assertCapability} from "@/domain/command-context";
@@ -50,18 +51,7 @@ export async function requireCurrentNativeGuardianAuthority(
  tx:Tx,guardianPersonId:string,learnerPersonId:string,now:Date,
  purpose:"enrollment"|"instruction",
 ){
- const rows=await tx.select({
-  id:guardianAuthorities.id,kind:guardianAuthorities.authorityKind,
-  verifiedAt:guardianAuthorities.verifiedAt,
-  birthDate:canonicalPersons.birthDate,
- }).from(guardianAuthorities)
- .innerJoin(learnerProfiles,eq(learnerProfiles.id,guardianAuthorities.learnerId))
- .innerJoin(canonicalPersons,eq(canonicalPersons.id,learnerProfiles.personId))
- .where(and(
-  currentNativeGuardianAuthorityPredicate(guardianPersonId,now,purpose),
-  eq(learnerProfiles.personId,learnerPersonId),
- )).for("share").limit(2);
- if(rows.length!==1)throw new AuthorizationError("current verified guardian authority");
+ // Relationship first: the same lock ordering as review and revocation.
  const [schoolRelationship]=await tx.select({
   metadata:guardianRelationships.metadata,
   canManageEnrollment:guardianRelationships.canManageEnrollment,
@@ -71,7 +61,18 @@ export async function requireCurrentNativeGuardianAuthority(
  })).for("share").limit(1);
  if(!schoolGuardianAuthorityCompatible(schoolRelationship,purpose))
   throw new AuthorizationError("reconciled guardian authority");
- return rows[0]!;
+ const rows=await tx.select({
+  id:guardianAuthorities.id,kind:guardianAuthorities.authorityKind,
+  verifiedAt:guardianAuthorities.verifiedAt,endsAt:guardianAuthorities.endsAt,
+ }).from(guardianAuthorities)
+ .innerJoin(learnerProfiles,eq(learnerProfiles.id,guardianAuthorities.learnerId))
+ .innerJoin(people,eq(people.id,learnerProfiles.personId))
+ .where(and(
+  currentNativeGuardianAuthorityPredicate(guardianPersonId,now,purpose),
+  eq(learnerProfiles.personId,learnerPersonId),eq(people.active,true),
+ )).for("share").limit(2);
+ if(rows.length!==1)throw new AuthorizationError("current verified guardian authority");
+ return {...rows[0]!,schoolRelationship};
 }
 
 /** Placement additionally requires verified minor age. */
@@ -79,7 +80,22 @@ export async function requireNativeGuardianChild(
  tx:Tx,guardianPersonId:string,learnerPersonId:string,now:Date,
 ){
  const authority=await requireCurrentNativeGuardianAuthority(tx,guardianPersonId,learnerPersonId,now,"enrollment");
- const birthDate=authority.birthDate;
+ if(authority.schoolRelationship?.metadata.nativeMinorReview!==undefined){
+  const review=minorReviewRecord.safeParse(authority.schoolRelationship.metadata.nativeMinorReview);
+  if(!review.success||review.data.authorityId!==authority.id||
+     [guardianPersonId,learnerPersonId].includes(review.data.reviewerPersonId)||
+     Date.parse(review.data.verifiedAt)>now.getTime()||Date.parse(review.data.expiresAt)<=now.getTime()||
+     authority.endsAt?.getTime()!==Date.parse(review.data.expiresAt))
+   throw new AuthorizationError("current independent minor review");
+  await requireMinorReviewEvidence(tx,{applicationId:review.data.applicationId,
+   documentId:review.data.documentId,guardianPersonId,learnerPersonId},now);
+  return authority;
+ }
+ // Historical independently verified native records retain their existing
+ // age source until the separate Person cutover. Do not create or copy it.
+ const [legacy]=await tx.select({birthDate:canonicalPersons.birthDate}).from(canonicalPersons)
+  .where(eq(canonicalPersons.id,learnerPersonId)).limit(1);
+ const birthDate=legacy?.birthDate;
  if(!birthDate||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(birthDate))
   throw new AuthorizationError("verified minor birth date");
  const [y,m,d]=birthDate.split("-").map(Number);

@@ -4,10 +4,11 @@ import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
 import {and,asc,desc,eq,gt,isNull,lte,or} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
+import {people} from "@/db/schema";
 import {
  canonicalClasses,canonicalClassOfferings,
  canonicalClassOfferingVersions,canonicalClassEnrollments,
- canonicalClassEnrollmentApprovalRequests,canonicalPersons,
+ canonicalClassEnrollmentApprovalRequests,
  guardianAuthorities,learnerProfiles,} from "@/db/canonical-v301";
 import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {AuthorizationError} from "@/domain/command-context";
@@ -47,14 +48,14 @@ export const getMyNativeGuardianLearners=createServerFn({method:"GET"})
   return db.transaction(async tx=>{
    const rows=await tx.select({
     learnerPersonId:learnerProfiles.personId,
-    firstName:canonicalPersons.legalFirstName,
-    lastName:canonicalPersons.legalLastName,
+    firstName:people.legalFirstName,
+    lastName:people.legalLastName,
    }).from(guardianAuthorities)
     .innerJoin(learnerProfiles,eq(learnerProfiles.id,guardianAuthorities.learnerId))
-    .innerJoin(canonicalPersons,eq(canonicalPersons.id,learnerProfiles.personId))
+    .innerJoin(people,eq(people.id,learnerProfiles.personId))
     .where(and(
       currentNativeGuardianAuthorityPredicate(guardian.personId,now),
-    )).orderBy(asc(canonicalPersons.legalFirstName)).limit(100);
+    )).orderBy(asc(people.legalFirstName)).limit(100);
    const learners: Array<{learnerPersonId:string;name:string}>=[];
    for(const row of rows){
     try{

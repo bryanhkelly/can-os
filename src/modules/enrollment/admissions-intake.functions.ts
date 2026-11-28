@@ -769,6 +769,9 @@ export const verifyAdmissionsGuardianRelationship=createServerFn({method:"POST"}
     .where(and(eq(guardianRelationships.guardianPersonId,contactId),
      eq(guardianRelationships.studentPersonId,learner.personId))).for("update").limit(1);
    if(!relationship)throw new DomainError("ADMISSIONS_GUARDIAN_RELATIONSHIP_REQUIRED");
+   if(actor.impersonatedByAccountId||actor.sessionAccountId||[contactId,learner.personId].includes(actor.actorPersonId!))
+    throw new AuthorizationError("independent guardian relationship verification");
+   if(relationship.metadata.verification==="revoked")throw new AuthorizationError("revoked relationship requires independent reconciliation");
    if(relationship.metadata.verification==="verified")return {verified:true};
    const verifiedAt=new Date();
    await tx.update(guardianRelationships).set({

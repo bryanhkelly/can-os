@@ -26,7 +26,7 @@ async function scopedGuardianGrant(
  actor: Awaited<ReturnType<typeof admissionsRegistrar>>,
  grantId: string,
 ) {
- if (actor.sessionAccountId) throw new AuthorizationError("real school registrar");
+ if (actor.sessionAccountId || actor.impersonatedByAccountId) throw new AuthorizationError("real school registrar");
  if (grantId === actor.grantId)
   throw new AuthorizationError("registrar cannot revoke their own active grant");
  const [grant] = await tx.select({
