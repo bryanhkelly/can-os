@@ -67,3 +67,12 @@ export async function checkAdmissionsIntakeContract(client:BecomunaBrowserApi,id
  // @ts-expect-error the guardian is derived from the application, never selected by client
  await client.POST('/api/v1/admission-guardian-accounts',{body:{applicationId:id,guardianPersonId:id}});
 }
+
+export async function checkFamilyApplicationContract(client:BecomunaBrowserApi,id:string){
+ await client.GET('/api/v1/me/family-application-workspace');
+ await client.POST('/api/v1/family-applications',{body:{requestId:id,programId:id,studentFirstName:'Student',studentLastName:'Example',gradeLevel:'6'}});
+ await client.POST('/api/v1/admission-guardian-access-revocations',{body:{grantId:id,reason:'Verified authorization change'}});
+ await client.POST('/api/v1/admission-guardian-access-restorations',{body:{grantId:id,reason:'Verified authorization change'}});
+ // @ts-expect-error restoration must never reactivate revoked sessions
+ await client.POST('/api/v1/admission-guardian-access-restorations',{body:{grantId:id,reason:'Verified authorization change',restoreSessions:true}});
+}
