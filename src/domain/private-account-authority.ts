@@ -4,10 +4,12 @@ import { platformOwnerMayActAs } from "./platform-owner-delegation";
 
 /** Account possession is not mailbox ownership or an independent attestation.
  * Personal and ordinary operational roles may use an individual credential.
- * Protected institutional roles still require their separate identity evidence. */
+ * Protected institutional roles still require their separate identity evidence.
+ * Relationship manager is allowed for private demo credentials only; the
+ * relationship service independently denies any real-tenant consent by them. */
 export function privateAccountRoleEligible(role: string): boolean {
   return Object.hasOwn(roleCapabilities, role) &&
-    (["account_holder", "student", "guardian"].includes(role) || platformOwnerMayActAs(role));
+    (["account_holder", "student", "guardian", "reporting_relationship_manager"].includes(role) || platformOwnerMayActAs(role));
 }
 
 export function privateAccountGrantEligible(grant: {
