@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   campaignMaxAttempts, campaignOwnerScope, campaignProviderFailure,
   campaignRecipientLimit, campaignRetryable, campaignRetryAfterMs,
-  campaignRetryWindowMs, parseCampaignRecipients,
+  campaignRetryWindowMs, parseCampaignRecipients, campaignReplayMatchesRecipientSource,
 } from "@/domain/campaign-policy";
 
 describe("campaign policy", () => {
@@ -28,6 +28,17 @@ describe("campaign policy", () => {
     const site = campaignOwnerScope({ ownerKind: "site", organizationId: "org", siteId: "site", programId: null });
     expect(org.ownerScope).not.toBe(site.ownerScope);
     expect(org.senderScope).toBe(site.senderScope);
+  });
+
+  it("binds a campaign retry to the original recipient source", () => {
+    const saved={list_id:"saved",list_name:"Pilot recipients"};
+    const direct={list_id:"snapshot",list_name:"__direct__request-a"};
+    expect(campaignReplayMatchesRecipientSource(saved,{requestId:"request-a",listId:"saved"})).toBe(true);
+    expect(campaignReplayMatchesRecipientSource(saved,{requestId:"request-a",listId:"another"})).toBe(false);
+    expect(campaignReplayMatchesRecipientSource(saved,{requestId:"request-a"})).toBe(false);
+    expect(campaignReplayMatchesRecipientSource(direct,{requestId:"request-a"})).toBe(true);
+    expect(campaignReplayMatchesRecipientSource(direct,{requestId:"request-b"})).toBe(false);
+    expect(campaignReplayMatchesRecipientSource(direct,{requestId:"request-a",listId:"snapshot"})).toBe(false);
   });
 
   it("bounds retries inside the provider idempotency window", () => {
