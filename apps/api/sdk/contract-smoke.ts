@@ -16,3 +16,13 @@ export async function checkStudentContract(client:BecomunaBrowserApi, enrollment
  // @ts-expect-error the exact enrollment path parameter is required
  await client.GET('/api/v1/me/class-enrollments/{classEnrollmentId}/resume',{params:{path:{}}});
 }
+
+export async function checkParticipationContract(client:BecomunaBrowserApi, releaseId:string,registrationId:string){
+ const queue=await client.GET('/api/v1/me/noncredit-waitlist',{params:{query:{releaseId}}});
+ if(queue.data){const items=queue.data.items;void items;}
+ await client.POST('/api/v1/noncredit-waitlist-entries',{body:{releaseId,consentVersion:'v01',consentSha256:'a'.repeat(64),acceptedConsent:true,adultConfirmed:true}});
+ await client.POST('/api/v1/noncredit-waitlist-cancellations',{body:{releaseId}});
+ await client.POST('/api/v1/noncredit-registration-withdrawals',{body:{registrationId,confirm:true}});
+ // @ts-expect-error withdrawal cannot be authorized using a release ID
+ await client.POST('/api/v1/noncredit-registration-withdrawals',{body:{releaseId,confirm:true}});
+}
