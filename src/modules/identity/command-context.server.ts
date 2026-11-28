@@ -56,47 +56,16 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
   return rejectSession(request,"session_not_current");
  if(session.sharedDevice&&now.getTime()-session.lastActivityAt.getTime()>=5*60_000)
   return rejectSession(request,"session_not_current");
- const {grants,demoAccountSwitching}=await readSessionGrants(session.accountId,session.email,db,session.authenticationMethod);
- // A real login cannot change Person by switching its active grant. This
- // invariant applies across all Site and Organization roles, not just staff.
- if(!demoAccountSwitching){
-  // readSessionGrants deliberately filters some memberships (for example
-  // unaccepted sandbox invitations). That filtered set is NOT adequate to
-  // establish the one-Person account invariant. Check the underlying active
-  // grants instead, before selecting a persona or expanding Site authority.
-  const activePerson=grants.find(grant=>grant.id===session.activeGrantId)?.personId;
-  // The account Person anchor is authoritative and immutable. A valid
-  // membership cannot silently point at someone else after a role switch.
-  if(!activePerson || !session.accountPersonId ||
-     session.accountPersonId!==activePerson)
-   return rejectSession(request,"membership_unavailable");
-  try{await assertRawAccountPerson(session.accountId, activePerson);}
-  catch{return rejectSession(request,"membership_unavailable");}
-  try{assertSingleAccountPerson(session.accountId,grants);}
-  catch{return rejectSession(request,"membership_unavailable");}
- }
- const activeGrant=grants.find(grant=>grant.id===session.activeGrantId);
- if(!activeGrant)return rejectSession(request,"membership_unavailable");
- // Demo Admin is the only permitted cross-account switcher. The selected
- // Person is authenticated through the privileged owner's current session,
- // but their own account verification, identity and grants remain ordinary.
- // Invalid/revoked target credentials cannot silently become valid via demo.
- if(demoAccountSwitching && activeGrant.accountId!==session.accountId){
-  const [target]=await db.select({
-   personId:accessAccounts.personId,
-   email:accessAccounts.emailNormalized,
-   emailVerifiedAt:accessAccounts.emailVerifiedAt,
-   privateCredential:sql<boolean>`(${accessAccounts.privateAccessCodeHash} IS NOT NULL)`,
-  }).from(accessAccounts).where(and(
-   eq(accessAccounts.id,activeGrant.accountId),
-   eq(accessAccounts.disabled,false),
-  )).limit(1);
-  if(!target || target.privateCredential || target.personId!==activeGrant.personId ||
-     !isDemoAccountEmail(target.email) || !target.email.endsWith("@valorschool.demo"))
-   return rejectSession(request,"membership_unavailable");
-  try { await assertRawAccountPerson(activeGrant.accountId,activeGrant.personId); }
-  catch { return rejectSession(request,"membership_unavailable"); }
- }
+ const {grants}=await readSessionGrants(session.accountId,session.email,db,session.authenticationMethod);
+ // Every direct session belongs to exactly one immutable Person. No public
+ // credential or demo classification may switch to another Account.
+ const activeGrant=grants.find(grant=>grant.id===session.activeGrantId && grant.accountId===session.accountId);
+ if(!activeGrant || !session.accountPersonId || session.accountPersonId!==activeGrant.personId)
+  return rejectSession(request,"membership_unavailable");
+ try{
+  await assertRawAccountPerson(session.accountId,activeGrant.personId);
+  assertSingleAccountPerson(session.accountId,grants);
+ }catch{return rejectSession(request,"membership_unavailable");}
  // A Platform Owner's actual grant remains active on the original session.
  // The impersonated Person is an independently verified, expiring projection,
  // never a browser-provided role or permanent membership transfer.
@@ -165,13 +134,6 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
   context.delegationMode=ownerDelegation.mode;
   context.delegationExpiresAt=ownerDelegation.expiresAt.toISOString();
  }
- // Delegation is established ONLY by the server-verified Demo Admin login
- // and selected active target grant. Downstream services receive the ordinary
- // effective actor and use identical role, Site, Class and enrollment checks.
- // Keep the session owner separately for audit, not as a domain authorization
- // exclusion that turns demo data into a different application.
- if(!ownerDelegation && demoAccountSwitching && activeGrant.accountId!==session.accountId)
-  context.impersonatedByAccountId=session.accountId;
  // A relationship manager has consent-workflow authority only, not implicit
  // Site, Program or learner-record access. Resource choices are resolved by
  // the dedicated relationship service; ordinary academic scopes stay empty.
