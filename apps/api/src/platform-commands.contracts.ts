@@ -43,3 +43,28 @@ export const docs={
   approveResult:obj({manifestId:id,alreadyApproved:bool}),
   publishResult:obj({offeringVersionId:id,alreadyPublished:bool}),
 };
+
+const policyRead=policy.extend({independentAcademicReviewRequired:z.boolean(),rightsClearanceRequired:z.boolean(),accessibilityReviewRequired:z.boolean()}).strict();
+const count=z.number().int().nonnegative();
+const cursor=z.object({createdAt:z.string().datetime({offset:true}),id:uuid}).strict();
+export const queueQuery=z.object({createdAt:z.string().datetime({offset:true}).optional(),id:uuid.optional()}).strict().refine(v=>Boolean(v.createdAt)===Boolean(v.id),'Supply both cursor fields');
+export const releaseOverviewResult=z.object({
+ offeringVersionId:uuid,offeringTitle:z.string(),lifecycle:z.string(),courseCount:count,lessonCount:count,allCoursesPublished:z.boolean(),manuscriptHash:hash,
+ policies:z.array(policyRead).max(51),releasePoliciesComplete:z.boolean(),
+ availableAssets:z.array(z.object({id:uuid,title:z.string(),kind:z.string(),sha256:hash.nullable()}).strict()).max(100),assetsLimited:z.boolean(),
+ manifest:z.object({id:uuid,hash,status:z.string(),assetCount:count,assetUses:z.array(z.object({assetVersionId:uuid,usageKind:use}).strict()).max(50),current:z.boolean()}).strict().nullable()
+}).strict();
+export const releasePolicyResult=z.object({offeringVersionId:uuid,offeringTitle:z.string(),lifecycle:z.string(),manuscriptHash:hash,revision:hash,courses:z.array(z.object({courseVersionId:uuid,courseTitle:z.string(),isRequired:z.boolean()}).strict()),policies:z.array(policyRead).max(51)}).strict();
+const reviewStatus=z.enum(['approved','rejected','not_reviewed']);
+export const releaseQueueResult=z.object({items:z.array(z.object({id:uuid,offeringVersionId:uuid,offeringTitle:z.string(),manifestHash:hash,status:z.string(),current:z.boolean(),assetCount:count,releasePoliciesComplete:z.boolean(),courseCount:count,allCoursesPublished:z.boolean(),offeringPublished:z.boolean(),reviews:z.array(z.object({kind:reviewKind,decision:reviewStatus}).strict())}).strict()).max(60),nextCursor:cursor.nullable()}).strict();
+const countDoc={type:'integer' as const,minimum:0};
+const policyReadDoc=obj({...policyDoc.properties,independentAcademicReviewRequired:bool,rightsClearanceRequired:bool,accessibilityReviewRequired:bool});
+const courseDoc=obj({courseVersionId:id,courseTitle:string,isRequired:bool});
+const versionFields={offeringVersionId:id,offeringTitle:string,lifecycle:string,manuscriptHash:digest};
+export const releaseReadDocs={
+ overview:obj({...versionFields,courseCount:countDoc,lessonCount:countDoc,allCoursesPublished:bool,policies:arr(policyReadDoc,51),releasePoliciesComplete:bool,availableAssets:arr(obj({id,title:string,kind:string,sha256:{...digest,nullable:true}}),100),assetsLimited:bool,
+ manifest:{...obj({id,hash:digest,status:string,assetCount:countDoc,assetUses:arr(obj({assetVersionId:id,usageKind:choice(use.options)}),50),current:bool}),nullable:true}}),
+ policy:obj({...versionFields,revision:digest,courses:arr(courseDoc),policies:arr(policyReadDoc,51)}),
+ queue:obj({items:arr(obj({id,offeringVersionId:id,offeringTitle:string,manifestHash:digest,status:string,current:bool,assetCount:countDoc,releasePoliciesComplete:bool,courseCount:countDoc,allCoursesPublished:bool,offeringPublished:bool,reviews:arr(obj({kind:choice(reviewKind.options),decision:choice(reviewStatus.options)}))}),60),
+ nextCursor:{...obj({createdAt:{type:'string',format:'date-time'},id}),nullable:true}}),
+};

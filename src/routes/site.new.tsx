@@ -6,7 +6,7 @@ import {
   Globe2, Mail, ShieldCheck, Sun, UsersRound,
   type LucideIcon,
 } from "lucide-react";
-import { siteSignupSchema, publicSignupOrganizationTypeOptions } from "@/domain/school-setup";
+import { publicSignupOrganizationTypeOptions } from "@/domain/school-setup";
 import { useHydrated } from "@/lib/use-hydrated";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,6 @@ import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { WorkspacePanel, WorkspaceNotice, FormSection } from "@/components/workspace";
 
-const noStore = { "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" };
 
 /**
  * One public Site entry; identity approval determines when common provisioning runs.
@@ -22,42 +21,8 @@ const noStore = { "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" 
 export const Route = createFileRoute("/site/new")({
   server: { handlers: {
     POST: createServerOnlyFn(async ({ request }) => {
-      if (new URL(request.url).origin !== request.headers.get("origin")) {
-        return Response.json({ error: "Invalid request origin" }, { status: 403, headers: noStore });
-      }
-      try {
-        const gate = await import("@/modules/identity/anonymous-auth-admission.server");
-        const denial = gate.anonymousAuthAdmissionResponse(await gate.admitAnonymousAuthRequest("school_setup"));
-        if (denial) return denial;
-      } catch {
-        console.error("[site-signup] admission unavailable");
-        return Response.json({ error: "Site setup is temporarily unavailable." },
-          { status: 503, headers: { ...noStore, "Retry-After": "30" } });
-      }
-      let submitted: unknown;
-      try {
-        const text = await request.text();
-        if (text.length > 4096) {
-          return Response.json({ error: "Submission is too large." }, { status: 413, headers: noStore });
-        }
-        submitted = JSON.parse(text);
-      } catch {
-        return Response.json({ error: "Invalid submission." }, { status: 400, headers: noStore });
-      }
-      const parsed = siteSignupSchema.safeParse(submitted);
-      if (!parsed.success) {
-        return Response.json({ error: "Please check the Site and administrator details." },
-          { status: 400, headers: noStore });
-      }
-      try {
-        const { requestSiteSignup } = await import("@/modules/identity/passwordless-access.server");
-        const outcome = await requestSiteSignup(parsed.data);
-        return Response.json(outcome, { status: 202, headers: noStore });
-      } catch {
-        console.error("[site-signup] account setup unavailable");
-        return Response.json({ error: "Site setup could not be completed. Check your details or sign in if you already have an account." },
-          { status: 409, headers: noStore });
-      }
+      const {handleSiteSignupRequest}=await import("@/modules/identity/site-signup-http.server");
+      return handleSiteSignupRequest(request);
     }),
   } },
   component: SiteNewPage,

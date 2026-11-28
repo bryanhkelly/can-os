@@ -137,3 +137,18 @@ test('release contracts reject caller identities, stale-hash format and disabled
  assert.equal(c.publishBody.safeParse({manifestId:id,expectedHash:'bad'}).success,false);
  assert.equal(c.policyBody.safeParse({expectedManuscriptHash:hash,expectedPolicyRevision:hash,reviewEvidenceVersionId:id,rationale:'Evidence reviewed',requirements:[{courseVersionId:id,minimumApprovedPrimaryTracks:0,completeLessonCoverageRequired:false,independentAcademicReviewRequired:false,rightsClearanceRequired:true,accessibilityReviewRequired:true}]}).success,false);
 });
+
+test('publisher reads expose protected release and bounded review queue contracts',async()=>{
+ await withServer('0',async(url,document)=>{
+  const id='00000000-0000-4000-8000-000000000001';
+  for(const p of ['/api/v1/offering-versions/{offeringVersionId}/release','/api/v1/offering-versions/{offeringVersionId}/release-policy','/api/v1/offering-versions/release-review-queue']){
+    assert.ok(document.paths[p].get.security);
+    assert.ok(document.paths[p].get.responses['403']);
+    assert.equal((await fetch(url+p.replace('{offeringVersionId}',id))).status,401);
+  }
+ });
+ const {queueQuery}=require('../dist/platform-commands.contracts');
+ assert.equal(queueQuery.safeParse({}).success,true);
+ assert.equal(queueQuery.safeParse({createdAt:'2026-11-28T00:00:00Z'}).success,false);
+ assert.equal(queueQuery.safeParse({createdAt:'2026-11-28T00:00:00Z',id:'00000000-0000-4000-8000-000000000001'}).success,true);
+});

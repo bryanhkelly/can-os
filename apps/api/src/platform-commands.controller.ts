@@ -1,11 +1,15 @@
-import {Controller,Post,Body,Param,Req,HttpCode,applyDecorators} from '@nestjs/common';
-import {ApiTags,ApiCookieAuth,ApiOperation,ApiBody,ApiOkResponse,ApiParam,ApiHeader,ApiResponse} from '@nestjs/swagger';
+import {Controller,Get,Post,Body,Param,Query,Req,HttpCode,applyDecorators} from '@nestjs/common';
+import {ApiTags,ApiCookieAuth,ApiOperation,ApiBody,ApiOkResponse,ApiParam,ApiQuery,ApiHeader,ApiResponse} from '@nestjs/swagger';
 import type {FastifyRequest} from 'fastify';
-import {CanonicalWriteOperation,verifiedIdentity} from './security';
+import {CanonicalReadOperation,CanonicalWriteOperation,verifiedIdentity} from './security';
 import {CanonicalIdentityService} from './identity.service';
 import {problemOpenApiSchema} from './contracts';
 import {validated} from './learning.contracts';
 import * as c from './platform-commands.contracts';
+function GovernedRead(){
+ return applyDecorators(CanonicalReadOperation(),
+ ...[400,401,403,500,503].map(status=>ApiResponse({status,content:{'application/problem+json':{schema:problemOpenApiSchema}}})));
+}
 function GovernedCommand(){
  return applyDecorators(CanonicalWriteOperation(),HttpCode(200),ApiHeader({name:'Origin',required:true}),
  ...[400,401,403,409,415,500,503].map(status=>ApiResponse({status,content:{'application/problem+json':{schema:problemOpenApiSchema}}})));
@@ -30,6 +34,35 @@ export class SitesController{
 @Controller('offering-versions')
 export class OfferingReleaseController{
  constructor(private readonly identity:CanonicalIdentityService){}
+ @Get('release-review-queue')
+ @GovernedRead()
+ @ApiOperation({operationId:'listReleaseReviewQueue',summary:'Page through current independently appointed Offering reviews'})
+ @ApiQuery({name:'createdAt',required:false,type:String,description:'Supply together with id; previous nextCursor timestamp'})
+ @ApiQuery({name:'id',required:false,type:String,description:'Supply together with createdAt; previous nextCursor identifier'})
+ @ApiOkResponse({schema:c.releaseReadDocs.queue})
+ queue(@Req() req:FastifyRequest,@Query() query:unknown){
+   const q=validated(c.queueQuery,query);
+   const cursor=q.createdAt&&q.id?{createdAt:q.createdAt,id:q.id}:null;
+   return this.identity.run(verifiedIdentity(req),async actor=>c.releaseQueueResult.parse(await actor.readReleaseQueue({cursor})));
+ }
+ @Get(':offeringVersionId/release')
+ @GovernedRead()
+ @ApiParam({name:'offeringVersionId',required:true,type:String,format:'uuid'})
+ @ApiOperation({operationId:'getReleaseOverview',summary:'Read authorized Offering draft, immutable hash, asset and manifest state'})
+ @ApiOkResponse({schema:c.releaseReadDocs.overview})
+ overview(@Req() req:FastifyRequest,@Param() params:unknown){
+   const input=validated(c.versionParams,params);
+   return this.identity.run(verifiedIdentity(req),async actor=>c.releaseOverviewResult.parse(await actor.readReleaseOverview(input)));
+ }
+ @Get(':offeringVersionId/release-policy')
+ @GovernedRead()
+ @ApiParam({name:'offeringVersionId',required:true,type:String,format:'uuid'})
+ @ApiOperation({operationId:'getReleasePolicy',summary:'Read current release policy and revision as independent appointed reviewer'})
+ @ApiOkResponse({schema:c.releaseReadDocs.policy})
+ policy(@Req() req:FastifyRequest,@Param() params:unknown){
+   const input=validated(c.versionParams,params);
+   return this.identity.run(verifiedIdentity(req),async actor=>c.releasePolicyResult.parse(await actor.readReleasePolicy(input)));
+ }
  @Post(':offeringVersionId/release-submissions')
  @GovernedCommand()
  @ApiParam({name:'offeringVersionId',required:true,type:String,format:'uuid'})
