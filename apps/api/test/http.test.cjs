@@ -356,3 +356,16 @@ test('Site V6.1 planning separates existing Programs from private intent and req
  assert.equal(audiencesBody.safeParse({expectedRevision,intent}).success,false);
  assert.equal(audiencesBody.safeParse({intent:{...intent,customExperiences:[]}}).success,false);
 });
+
+test('Brand versions and website copy review remain independently protected',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const [method,path] of [["GET","/api/v1/sites/{siteId}/brand"],["POST","/api/v1/sites/{siteId}/brand-versions"],["POST","/api/v1/sites/{siteId}/brand-assets/{assetId}/revocation"],["GET","/api/v1/sites/{siteId}/publication-readiness"],["POST","/api/v1/sites/{siteId}/website-copy-reviews"]]){
+   assert.ok(document.paths[path][method.toLowerCase()].security);
+   const response=await fetch(url+path.replace(/\{[^}]+\}/g,'00000000-0000-4000-8000-000000000001'),method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);
+  }
+ });
+ const {bodies}=require('../dist/brand.contracts');
+ assert.equal(bodies.review.safeParse({expectedRevision:0,contentReviewed:true,publishSite:true}).success,false);
+ assert.equal(bodies.revoke.safeParse({reason:'Rights withdrawn',assetId:'forged'}).success,false);
+});

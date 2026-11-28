@@ -5,7 +5,6 @@ import type { PartnerLocalContentTx } from "./site-local-content.server";
 import { transitionAuthorizedGoLink } from "@/modules/engagement/go-link-lifecycle.server";
 import { nextSiteConfigurationRevision } from "@/domain/site-setup-configuration";
 import { createHash } from "node:crypto";
-import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, eq, ne, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { sites, siteBrandVersions, siteBrandAssets, siteGoLinks } from "@/db/schema";
@@ -79,9 +78,8 @@ async function authorizeReader(actor:Awaited<ReturnType<typeof getCommandContext
   return site;
 }
 
-export async function readSiteBrandVersionViewServer(data: {siteId:string;versionId?:string}) {
-  setResponseHeader("Cache-Control","private, no-store");
-  const actor=await getCommandContext(getRequest());
+export async function readSiteBrandVersionViewServer(request:Request,data: {siteId:string;versionId?:string}) {
+  const actor=await getCommandContext(request);
   const site=await authorizeReader(actor,data.siteId,false);
   const result=await readSavedBrandVersion(site.id,data.versionId);
   return {siteId:site.id,siteName:site.name,current:result,
@@ -170,17 +168,15 @@ export async function saveSiteBrandVersionWithinTransaction(
 
 }
 
-export async function saveSiteBrandVersionServer(data: SiteBrandSaveInput) {
-  setResponseHeader("Cache-Control","private, no-store");
-  const actor=await getCommandContext(getRequest());
+export async function saveSiteBrandVersionServer(request:Request,data: SiteBrandSaveInput) {
+  const actor=await getCommandContext(request);
   return db.transaction(tx=>saveSiteBrandVersionWithinTransaction(actor,data,tx));
 }
 
 /** Keep asset revocation and preview-link invalidation server-only. */
-export async function revokeSiteBrandAssetServer(data: {siteId:string;assetId:string;reason:string}) {
+export async function revokeSiteBrandAssetServer(request:Request,data: {siteId:string;assetId:string;reason:string}) {
   return db.transaction(async tx=>{
-    setResponseHeader("Cache-Control","private, no-store");
-    const actor=await getCommandContext(getRequest());
+    const actor=await getCommandContext(request);
     const site=await authorizeReader(actor,data.siteId,true,tx);
     if(!actor.actorPersonId)throw new DomainError("FORBIDDEN","Verified Site identity required.");
     const [asset]=await tx.select({id:siteBrandAssets.id,revokedAt:siteBrandAssets.revokedAt})
