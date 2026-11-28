@@ -62,3 +62,35 @@ export const admissionDocs={
  classCancel:obj({classEnrollmentId:id,reason:{...str,enum:['not_eligible','operator_decision']}}),
  classExitReceipt:obj({classEnrollmentId:id,status:{...str,enum:['withdrawn','cancelled']},releasedSeat:bool,alreadyClosed:bool}),
 };
+
+const credit=z.enum(['for_credit','audit','not_applicable']);
+const adultCredit=z.enum(['audit','not_applicable']);
+const creditDoc={...str,enum:['for_credit','audit','not_applicable']};
+const adultCreditDoc={...str,enum:['audit','not_applicable']};
+const nullableId={...id,nullable:true},nullableText={...str,nullable:true};
+const listDoc=(items:Record<string,any>)=>({type:'array' as const,items,maxItems:100});
+export const requestClassApprovalInput=z.object({classOfferingVersionId:uuid,requestId:uuid}).strict();
+export const decideClassApprovalInput=z.object({approvalRequestId:uuid,decision:z.enum(['approved','rejected']),reason:z.string().trim().min(3).max(1000)}).strict();
+export const classApprovalQueueInput=z.object({classId:uuid}).strict();
+export const issueClassInvitationInput=z.object({classOfferingVersionId:uuid,learnerPersonId:uuid,requestId:uuid,creditMode:adultCredit}).strict();
+export const declineClassInvitationInput=z.object({invitationId:uuid}).strict();
+export const assignAdultInput=z.object({classId:uuid,learnerPersonId:uuid,creditMode:adultCredit}).strict();
+export const classApprovalReceipt=z.object({approvalRequestId:uuid,state:z.string(),duplicate:z.boolean()}).strict();
+export const classInvitationReceipt=z.object({invitationId:uuid,expiresAt:date,duplicate:z.boolean()}).strict();
+export const declineInvitationReceipt=z.object({invitationId:uuid,alreadyDeclined:z.boolean()}).strict();
+export const myClassApprovalsResult=z.array(z.object({approvalRequestId:uuid,classId:uuid,classOfferingVersionId:uuid,title:z.string(),state:z.string(),expiresAt:date,acceptedEnrollmentId:uuid.nullable(),consentText:z.string().nullable(),allowedCreditModes:z.array(credit)}).strict()).max(100);
+export const classApprovalQueueResult=z.array(z.object({approvalRequestId:uuid,learnerPersonId:uuid,applicantPersonId:uuid,state:z.literal('pending'),requestedAt:date,expiresAt:date}).strict()).max(100);
+export const myClassInvitationsResult=z.array(z.object({invitationId:uuid,classId:uuid,classOfferingVersionId:uuid,title:z.string(),creditMode:credit,consentText:z.string().nullable(),consentVersion:z.string().nullable(),state:z.string(),expiresAt:date,acceptedEnrollmentId:uuid.nullable()}).strict()).max(100);
+export const classParticipationDocs={
+ request:obj({classOfferingVersionId:id,requestId:id}),
+ decide:obj({approvalRequestId:id,decision:{...str,enum:['approved','rejected']},reason:{...str,minLength:3,maxLength:1000}}),
+ issue:obj({classOfferingVersionId:id,learnerPersonId:id,requestId:id,creditMode:adultCreditDoc}),
+ decline:obj({invitationId:id}),
+ assign:obj({classId:id,learnerPersonId:id,creditMode:adultCreditDoc}),
+ approvalReceipt:obj({approvalRequestId:id,state:str,duplicate:bool}),
+ invitationReceipt:obj({invitationId:id,expiresAt:dateDoc,duplicate:bool}),
+ declineReceipt:obj({invitationId:id,alreadyDeclined:bool}),
+ myApprovals:listDoc(obj({approvalRequestId:id,classId:id,classOfferingVersionId:id,title:str,state:str,expiresAt:dateDoc,acceptedEnrollmentId:nullableId,consentText:nullableText,allowedCreditModes:{type:'array',items:creditDoc}})),
+ queue:listDoc(obj({approvalRequestId:id,learnerPersonId:id,applicantPersonId:id,state:{...str,enum:['pending']},requestedAt:dateDoc,expiresAt:dateDoc})),
+ myInvitations:listDoc(obj({invitationId:id,classId:id,classOfferingVersionId:id,title:str,creditMode:creditDoc,consentText:nullableText,consentVersion:nullableText,state:str,expiresAt:dateDoc,acceptedEnrollmentId:nullableId})),
+};
