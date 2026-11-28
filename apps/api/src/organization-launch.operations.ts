@@ -42,5 +42,10 @@ export type OrganizationLaunchOperation =
   | 'readSiteGeography'
   | 'listMySites'
   | 'getNetworkSites'
-  | 'createNetworkSite';
+  | 'createNetworkSite'
+  | 'readLaunchSiteFacilitiesV61'
+  | 'createLaunchSiteSpaceV61'
+  | 'saveLaunchSiteSpaceV61'
+  | 'readLaunchClassFacilitiesV61'
+  | 'saveLaunchClassPhysicalPlanV61';
 export type OrganizationLaunchWorkflow=Record<OrganizationLaunchOperation,(input:unknown)=>Promise<unknown>>;

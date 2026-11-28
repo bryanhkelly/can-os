@@ -13,3 +13,7 @@ This increment moves 39 existing governed workflow adapters and nine controllers
 ## Directory increment
 
 Extracts existing registrar Site directory and denomination HQ directly operated Site read/create operations into transport-independent services. Both legacy wrappers and REST call the same implementation. New routes: GET /me/sites, GET /me/network-sites, POST /me/network-sites. Existing exact scope, independently verified current agreement, Site replay, event and audit rules remain in place. The directory is not an affiliate reporting API. The underlying list operations retain existing unpaginated behavior; pagination and network-create error normalization need follow-up.
+
+## Facilities increment
+
+Five REST operations for Site room inventory, room creation, room revisions, Class facilities and Class physical-plan revisions. Legacy wrappers delegate to the same request-aware services; existing row locks, exact replay, capacity safeguards, approved facilitator assignment and in-transaction staff authority checks remain. CAN Site setup and canonical Class authorization remain separate. Existing source-based regression tests follow the extracted implementation. New contract/HTTP and generated SDK checks are added, not executed here.

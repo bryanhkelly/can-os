@@ -19,9 +19,16 @@ import {listLaunchOptionsService,getLaunchEntryService} from "@/modules/programs
 
 import {listMySitesService} from "@/modules/operations/site-directory.server";
 import {getNetworkSitesService,createNetworkSiteService,createSiteInput} from "@/modules/networks/network-sites.server";
+import {readLaunchSiteFacilitiesV61Service,createLaunchSiteSpaceV61Service,saveLaunchSiteSpaceV61Service} from "@/modules/operations/launch-site-facilities.server";
+import {readLaunchClassFacilitiesV61Service,saveLaunchClassPhysicalPlanV61Service} from "@/modules/classes/launch-class-facilities.server";
 const geographyInput=z.object({siteId:z.string().uuid()}).strict();
 export function organizationLaunchWorkflows(request:Request,mode:string){
  return {
+  readLaunchSiteFacilitiesV61:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Launch facilities context");return readLaunchSiteFacilitiesV61Service(request,raw);},
+  createLaunchSiteSpaceV61:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Launch facilities context");return createLaunchSiteSpaceV61Service(request,raw);},
+  saveLaunchSiteSpaceV61:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Launch facilities context");return saveLaunchSiteSpaceV61Service(request,raw);},
+  readLaunchClassFacilitiesV61:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Launch facilities context");return readLaunchClassFacilitiesV61Service(request,raw);},
+  saveLaunchClassPhysicalPlanV61:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Launch facilities context");return saveLaunchClassPhysicalPlanV61Service(request,raw);},
   listMySites:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Site directory context");parseCommandInput(z.object({}).strict(),raw);return listMySitesService(request);},
   getNetworkSites:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Network Site context");parseCommandInput(z.object({}).strict(),raw);return getNetworkSitesService(request);},
   createNetworkSite:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Network Site context");return createNetworkSiteService(request,parseCommandInput(createSiteInput,raw));},

@@ -702,3 +702,21 @@ test('WS03 directory and denomination HQ Site operations are session-scoped',asy
  assert.equal(create.safeParse({...valid,organizationId:'00000000-0000-4000-8000-000000000001'}).success,false);
  assert.equal(empty.safeParse({organizationId:'forged'}).success,false);
 });
+
+
+test('WS03 facilities preserve exact Site scope and distinct canonical Class authority',async()=>{
+ const id='00000000-0000-4000-8000-000000000001';
+ await withServer('0',async(url,document)=>{
+  for(const [method,path] of [["GET","/api/v1/sites/{siteId}/spaces"],["POST","/api/v1/sites/{siteId}/spaces"],["POST","/api/v1/sites/{siteId}/spaces/{spaceId}/revisions"],["GET","/api/v1/sites/{siteId}/class-facilities"],["POST","/api/v1/sites/{siteId}/classes/{classId}/physical-plan-revisions"]]){
+   assert.ok(document.paths[path][method.toLowerCase()].security);
+   const result=await fetch(url+path.replace(/\{\w+\}/g,id),method==='POST'?{method,headers:{origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(result.status,method==='POST'?503:401);
+  }
+ });
+ const {bodies,resourceInput}=require('../dist/launch-facilities.contracts');
+ assert.equal(resourceInput.parse({}).connectivity.internetAvailable,null);
+ assert.equal(resourceInput.safeParse({devices:[{category:'Laptop',quantity:1},{category:'laptop',quantity:2}]}).success,false);
+ assert.equal(bodies.create.safeParse({spaceId:id,name:'Room',maxOccupancy:30,resources:{},siteId:id}).success,false);
+ assert.equal(bodies.classPlan.safeParse({spaceId:null,facilitatorAssignmentId:id,expectedRevision:1}).success,false);
+ assert.equal(bodies.save.safeParse({name:'Room',maxOccupancy:30,resources:{},reason:'Changed room',expectedRevision:0}).success,false);
+});

@@ -28,3 +28,11 @@ export async function checkOrganizationLaunchContract(client:BecomunaBrowserApi,
  // @ts-expect-error Site scope must be explicit
  await client.GET('/api/v1/sites/{siteId}/geography',{params:{path:{}}});
 }
+
+export async function checkLaunchFacilitiesContract(client:BecomunaBrowserApi,siteId:string,classId:string){
+ const response=await client.GET('/api/v1/sites/{siteId}/spaces',{params:{path:{siteId}}});
+ if(response.data){const revision:number|undefined=response.data.spaces[0]?.revision;void revision;}
+ await client.POST('/api/v1/sites/{siteId}/classes/{classId}/physical-plan-revisions',{params:{path:{siteId,classId}},body:{spaceId:null,facilitatorAssignmentId:null,expectedRevision:1}});
+ // @ts-expect-error revision is mandatory
+ await client.POST('/api/v1/sites/{siteId}/classes/{classId}/physical-plan-revisions',{params:{path:{siteId,classId}},body:{spaceId:null,facilitatorAssignmentId:null}});
+}

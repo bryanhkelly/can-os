@@ -68,8 +68,8 @@ describe("V6.1 canonical physical facilities",()=>{
   });
 
   it("uses existing canonical entities, no Section or duplicated room-coverage store",()=>{
-    const site=read("src/modules/operations/launch-site-facilities.functions.ts");
-    const cls=read("src/modules/classes/launch-class-facilities.functions.ts");
+    const site=read("src/modules/operations/launch-site-facilities.server.ts");
+    const cls=read("src/modules/classes/launch-class-facilities.server.ts");
     const prepare=read("src/components/launch-studio/PrepareOperationsV61.tsx");
     const migration=read("database/production/2026-11-20-launch-v61-canonical-class-physical-space.sql");
     expect(site).toContain('from "@/db/canonical-v301"');

@@ -11,5 +11,6 @@ import {LaunchController} from './launch.controller';
 import {SitesController} from './sites.controller';
 import {SiteGeographyController} from './site-geography.controller';
 import {OrganizationSiteDirectoryController} from './organization-site-directory.controller';
-@Module({imports:[CanonicalIdentityModule],controllers:[SitesController,LaunchWorkspaceController,PreviewSharesController,WebsiteController,SitePublishingController,SiteProfileController,BrandController,SitePlanningController,LaunchController,SiteGeographyController,OrganizationSiteDirectoryController]})
+import {LaunchFacilitiesController} from './launch-facilities.controller';
+@Module({imports:[CanonicalIdentityModule],controllers:[SitesController,LaunchWorkspaceController,PreviewSharesController,WebsiteController,SitePublishingController,SiteProfileController,BrandController,SitePlanningController,LaunchController,SiteGeographyController,OrganizationSiteDirectoryController,LaunchFacilitiesController]})
 export class OrganizationLaunchModule {}
