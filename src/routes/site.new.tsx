@@ -6,8 +6,9 @@ import {
   Globe2, Mail, ShieldCheck, Sun, UsersRound,
   type LucideIcon,
 } from "lucide-react";
-import { publicSignupOrganizationTypeOptions } from "@/domain/school-setup";
+import { publicSignupOrganizationTypeOptions, publicSignupOrganizationTypeSchema } from "@/domain/school-setup";
 import { useHydrated } from "@/lib/use-hydrated";
+import { requestSiteSignup } from "@/lib/api/browser-access";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -73,10 +74,12 @@ function SiteNewPage() {
     const form = event.currentTarget;
     if (!form.reportValidity()) return;
     const values = new FormData(form);
+    const organizationType = publicSignupOrganizationTypeSchema.safeParse(values.get("organizationType"));
+    if (!organizationType.success) { setError("Select a valid organization type."); return; }
     const payload = {
       name: String(values.get("siteName") ?? "").trim(),
       organizationName: String(values.get("organizationName") ?? "").trim() || undefined,
-      organizationType: String(values.get("organizationType") ?? "").trim(),
+      organizationType: organizationType.data,
       organizationDomain: String(values.get("organizationDomain") ?? "").trim() || undefined,
       firstName: String(values.get("firstName") ?? "").trim(),
       lastName: String(values.get("lastName") ?? "").trim(),
@@ -85,13 +88,8 @@ function SiteNewPage() {
     setSending(true);
     setError("");
     try {
-      const response = await fetch("/site/new", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!response.ok) throw new Error("Request not accepted");
-      const result = await response.json() as { demo?: boolean; privateAccessCode?: string };
+      const { response, data: result } = await requestSiteSignup(payload);
+      if (!response.ok || !result?.accepted) throw new Error("Request not accepted");
       if (result.demo === true && !result.privateAccessCode) throw new Error("Private access credential unavailable");
       setSignupEmail(payload.email);
       setPrivateAccessCode(result.privateAccessCode ?? null);
