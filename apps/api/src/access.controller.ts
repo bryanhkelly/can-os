@@ -29,12 +29,12 @@ async function translateResponse(response:Response,reply:FastifyReply,status:num
  if(status===204){
    const expected=new Set(['__Host-can_os_session','__Host-can_os_v3_session']);
    for(const cookie of cookies){
-     const match=/^(__Host-can_os(?:_v3)?_session)=; Path=\\/; HttpOnly; Secure; SameSite=Lax; Max-Age=0$/.exec(cookie);
+     const match=/^(__Host-can_os(?:_v3)?_session)=; Path=\/; HttpOnly; Secure; SameSite=Lax; Max-Age=0$/.exec(cookie);
      if(!match||!expected.delete(match[1]!))throw new InternalServerErrorException();
    }
    if(expected.size!==0)throw new InternalServerErrorException();
  }else if(status===200&&schema===c.verified){
-   if(cookies.length!==1||!/^__Host-can_os_session=[A-Za-z0-9_-]{40,128}; Path=\\/; HttpOnly; Secure; SameSite=Lax; Max-Age=43200$/.test(cookies[0]!))throw new InternalServerErrorException();
+   if(cookies.length!==1||!/^__Host-can_os_session=[A-Za-z0-9_-]{40,128}; Path=\/; HttpOnly; Secure; SameSite=Lax; Max-Age=43200$/.test(cookies[0]!))throw new InternalServerErrorException();
  }else if(cookies.length)throw new InternalServerErrorException();
  if(cookies.length)reply.header('Set-Cookie',cookies);
  reply.header('Referrer-Policy','no-referrer');
