@@ -71,7 +71,7 @@ test('canonical reads cannot be enabled outside local development', () => {
 
 test('learner resource routes require the standard session and publish explicit UUID parameters', async ()=>{
   await withServer('0',async (url,document)=>{
-    for(const resource of ['resume','assignments','learning']){
+    for(const resource of ['resume','assignments','learning','assignment-workspace']){
       const path='/api/v1/me/class-enrollments/00000000-0000-4000-8000-000000000001/'+resource;
       const response=await fetch(url+path,{headers:{'x-role':'student','x-person-id':'forged'}});
       assert.equal(response.status,401);
@@ -670,4 +670,31 @@ test('full learning workspace contract rejects unprojected learner data',()=>{
  assert.equal(workspaceSchema.safeParse({...workspace,lessons:[{...lesson,rawContent:{}}]}).success,false);
  assert.equal(workspaceSchema.safeParse({...workspace,lessons:[{...lesson,observedAt:'not a timestamp'}]}).success,false);
  assert.equal(workspaceSchema.safeParse({...workspace,lessons:Array(501).fill(lesson)}).success,false);
+});
+
+test('detailed homework projection rejects raw submission and identity fields',()=>{
+ const {homeworkWorkspaceSchema}=require('../dist/learning.contracts');
+ const id='00000000-0000-4000-8000-000000000001';
+ const assignment={id,title:'Practice',dueAt:null,status:'not_started',submittedAt:null,instructions:'Write a response',responseText:'',practiceFeedback:null,practiceScore:null,practiceScoreMax:null,submitted:false};
+ const value={courseAttemptId:id,legacySectionId:null,assignments:[assignment]};
+ assert.equal(homeworkWorkspaceSchema.safeParse(value).success,true);
+ assert.equal(homeworkWorkspaceSchema.safeParse({...value,assignments:[{...assignment,response:{text:'private'}}]}).success,false);
+ assert.equal(homeworkWorkspaceSchema.safeParse({...value,personId:id}).success,false);
+ assert.equal(homeworkWorkspaceSchema.safeParse({...value,assignments:[{...assignment,practiceScore:'invalid'}]}).success,false);
+});
+test('learning module resolves the shared identity provider without a duplicate adapter',async()=>{
+ const {IdentityModule}=require('../dist/identity.module');
+ const {CanonicalIdentityService}=require('../dist/identity.service');
+ const {LearningModule}=require('../dist/learning.module');
+ const {LearningController}=require('../dist/learning.controller');
+ const {RoomController}=require('../dist/room.controller');
+ const {ClassroomController}=require('../dist/classroom.controller');
+ const {app}=await createApi(readConfig({}));
+ try{
+  const shared=app.select(IdentityModule).get(CanonicalIdentityService,{strict:true});
+  assert.equal(app.get(CanonicalIdentityService),shared);
+  const module=app.select(LearningModule);
+  for(const controller of [LearningController,RoomController,ClassroomController])
+   assert.equal(module.get(controller,{strict:true}).identity,shared);
+ }finally{await app.close();}
 });
