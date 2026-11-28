@@ -2,16 +2,18 @@ import {useEffect,useState} from "react";
 import {Button} from "@/components/ui/button";
 import {Checkbox} from "@/components/ui/choice";
 import {ActionFooter,DirectoryWindowPagination,EmptyState,QueryState,WorkspaceNotice,WorkspacePanel,StatusBadge} from "@/components/workspace";
-import {readCampaignListMembers,updateCampaignListMember} from "@/modules/communication/engagement-campaigns.functions";
-type Members=Awaited<ReturnType<typeof readCampaignListMembers>>;
-type MemberProps={engagementId:string;linkId:string;listId:string;onChange:()=>void};
+import {legacyCampaignTransport} from "@/modules/communication/campaign-workspace-transport";
+import type {CampaignTransport,CampaignWorkspaceApi} from "@/domain/campaign-workspace-api";
+type Members=Awaited<ReturnType<CampaignWorkspaceApi['readCampaignListMembers']>>;
+type MemberProps={transport?:CampaignTransport;engagementId:string;linkId:string;listId:string;onChange:()=>void};
 export function CampaignListMembers(props:MemberProps){
- return <CampaignMemberSession key={JSON.stringify([props.engagementId,props.linkId,props.listId])} {...props}/>;
+ return <CampaignMemberSession key={JSON.stringify([props.engagementId,props.linkId,props.listId,props.transport?.kind??'legacy'])} {...props}/>;
 }
-function CampaignMemberSession({engagementId,linkId,listId,onChange}:MemberProps){
+function CampaignMemberSession({engagementId,linkId,listId,onChange,transport=legacyCampaignTransport}:MemberProps){
+ const {readCampaignListMembers,updateCampaignListMember}=transport.api;
  const [page,setPage]=useState(0),[revision,setRevision]=useState(0),[data,setData]=useState<Members|null>(null),[error,setError]=useState(""),[busy,setBusy]=useState(false);
  const [selected,setSelected]=useState<{email:string;operation:"remove"|"withdraw"}|null>(null),[confirmed,setConfirmed]=useState(false);
- useEffect(()=>{let active=true;setData(null);setError("");readCampaignListMembers({data:{engagementId,linkId,listId,offset:page*50}}).then(v=>{if(active)setData(v);}).catch(()=>{if(active)setError("Recipient list unavailable.");});return()=>{active=false;};},[engagementId,linkId,listId,page,revision]);
+ useEffect(()=>{let active=true;setData(null);setError("");readCampaignListMembers({data:{engagementId,linkId,listId,offset:page*50}}).then(v=>{if(active)setData(v);}).catch(()=>{if(active)setError("Recipient list unavailable.");});return()=>{active=false;};},[engagementId,linkId,listId,page,revision,readCampaignListMembers]);
  async function apply(){
   if(!selected||!confirmed||busy)return;setBusy(true);setError("");
   try{await updateCampaignListMember({data:{engagementId,linkId,listId,...selected,confirmed:true}});setSelected(null);setConfirmed(false);setRevision(v=>v+1);onChange();}
