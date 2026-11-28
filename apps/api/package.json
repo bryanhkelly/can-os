@@ -9,7 +9,11 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/main.js",
     "test": "npm run build && node --test test/http.test.cjs",
-    "build:canonical": "node scripts/build-canonical.mjs"
+    "build:canonical": "node scripts/build-canonical.mjs",
+    "sdk:export": "node scripts/export-openapi.cjs",
+    "sdk:generate": "npm run build && npm run sdk:export && openapi-typescript sdk/generated/openapi.json -o sdk/generated/schema.ts",
+    "sdk:check": "tsc -p sdk/tsconfig.json",
+    "sdk:test": "node --test sdk/transport.test.mjs"
   },
   "dependencies": {
     "@nestjs/common": "11.2.12",
@@ -20,10 +24,12 @@
     "fastify": "5.12.8",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2",
-    "zod": "3.24.2"
+    "zod": "3.24.2",
+    "openapi-fetch": "0.13.4"
   },
   "devDependencies": {
     "@types/node": "24.0.0",
-    "typescript": "5.8.3"
+    "typescript": "5.8.3",
+    "openapi-typescript": "7.6.1"
   }
 }

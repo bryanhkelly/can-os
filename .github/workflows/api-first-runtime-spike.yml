@@ -58,4 +58,12 @@ jobs:
       - name: Build canonical bridge and reject frontend dependencies
         run: npm run build:canonical
       - run: npm test
+      - name: Generate typed SDK from the executable OpenAPI document
+        run: npm run sdk:generate && npm run sdk:check
+      - run: npm run sdk:test
+      - uses: actions/upload-artifact@v4
+        with:
+          name: api-contract-and-sdk-types
+          path: apps/api/sdk/generated/
+          if-no-files-found: error
       - run: npm audit --omit=dev --audit-level=high
