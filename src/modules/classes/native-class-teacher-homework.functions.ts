@@ -146,6 +146,36 @@ export const getNativeClassTeacherMissingWork=createServerFn({method:"GET"})
    });
  });
 
+/** Owned open follow-ups remain available after the learner submits work.
+ * This uses the same current Class population without requiring overdue status. */
+export const getNativeClassTeacherOpenFollowUps=createServerFn({method:"GET"})
+ .validator((raw:unknown)=>pageInput.parse(raw))
+ .handler(async({data})=>{
+   setResponseHeader("Cache-Control","private, no-store");
+   return db.transaction(async tx=>{
+     const {cls,actor}=await authorizedTeacher(tx,data.classId);
+     assertCapability(actor,"action.resolve");
+     const result=await tx.execute(sql`
+       SELECT a.id,a.status,w.title,p.preferred_name,p.legal_first_name,p.legal_last_name
+       FROM (${nativeClassWorkRows([cls.id])}) w
+       JOIN public.actions a ON a.subject_type='class_enrollment' AND a.subject_id=w.enrollment_id
+         AND a.metadata->>'assignmentId'=w.assignment_id::text
+       JOIN public.people p ON p.id=w.learner_person_id
+       WHERE a.type='missing_work_follow_up' AND a.status IN ('open','in_progress','waiting')
+         AND a.owner_person_id=${actor.actorPersonId}::uuid
+         AND a.organization_id=${cls.operatingOrganizationId}::uuid AND a.site_id=${cls.siteId}::uuid
+         AND a.program_id IS NULL AND a.section_id IS NULL
+         AND a.metadata->>'classId'=${cls.id} AND a.metadata->>'source'='native_class_missing_work'
+       ORDER BY a.created_at,a.id LIMIT 101 OFFSET ${data.offset}
+     `);
+     const rows=result.rows as Array<{id:string;status:string;title:string;preferred_name:string|null;legal_first_name:string|null;legal_last_name:string|null}>;
+     return {items:rows.slice(0,100).map(row=>({
+       actionId:row.id,status:row.status,assignmentTitle:row.title,
+       studentName:row.preferred_name??([row.legal_first_name,row.legal_last_name].filter(Boolean).join(" ")||"Learner"),
+     })),nextOffset:rows.length>100?data.offset+100:null};
+   });
+ });
+
 /** Open one canonical Action per enrollment/assignment while the work is overdue.
  * Lock enrollment before rechecking work, matching the learner submission lock.
  * Audit, event and private in-app notice are committed with the Action. */
