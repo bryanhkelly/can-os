@@ -26,3 +26,9 @@ export async function saveSiteProgramsAudiences(siteId: string, body: AudiencesB
     params: { path: { siteId } }, body,
   }));
 }
+
+export async function readSiteInformation(siteId: string, signal?: AbortSignal) {
+  return requireApiData(await createBrowserApiClient().GET("/api/v1/sites/{siteId}/information", {
+    params: { path: { siteId } }, signal,
+  }));
+}
