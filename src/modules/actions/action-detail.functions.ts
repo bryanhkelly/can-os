@@ -22,6 +22,18 @@ export const getActionDetail = createServerFn({ method: "GET" })
     return db.transaction(async tx => {
       const [action] = await tx.select().from(s.actions).where(eq(s.actions.id, data.actionId)).limit(1);
       if (!action) throw new AuthorizationError("Action detail scope");
+      if(action.subjectType==="class_enrollment"){
+        const {getCanonicalCommandContext}=await import("@/modules/identity/canonical-command-context.server");
+        const nativeActor=await getCanonicalCommandContext(getRequest());
+        const {assertNativeAcademicActionAuthority}=await import("./academic-action-policy.server");
+        const target=await assertNativeAcademicActionAuthority(tx,nativeActor,action);
+        return {
+          id:action.id,title:action.title,description:action.description,type:action.type,status:action.status,priority:action.priority,
+          dueAt:action.dueAt?.toISOString()??null,resolvedAt:action.resolvedAt?.toISOString()??null,
+          resolutionNote:action.resolutionNote,siteId:action.siteId,programId:action.programId,sectionId:null,
+          classId:target.classId,canReviewClass:true,canResolveMissingWork:true,canManageOperations:false,workspaceHome:"/class" as const,
+        };
+      }
       const delegatedAcademic = actor.role === "teacher" && action.type === "academic_intervention" &&
         action.subjectType === "student_profile" && action.sectionId !== null;
       // Earlier follow-up Actions may not have a Section ID. Use the original
@@ -70,7 +82,7 @@ export const getActionDetail = createServerFn({ method: "GET" })
         resolvedAt: action.resolvedAt?.toISOString() ?? null,
         resolutionNote: action.resolutionNote,
         siteId: action.siteId, programId: action.programId,
-        sectionId: missingSectionId ?? action.sectionId,
+        sectionId: missingSectionId ?? action.sectionId,classId:null,
         canReviewClass: (actor.role === "teacher" && action.type === "academic_intervention" && action.sectionId !== null) || teacherMissing,
         canResolveMissingWork: teacherMissing,
         canManageOperations: hasRegistrarAuthority(actor.role) && action.siteId !== null,
