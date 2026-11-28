@@ -17,7 +17,7 @@ import { AuthorizationError, assertCapability, type CommandContext } from "@/dom
  * pinned to exactly one active Course attempt and assessment administration.
  */
 export async function provisionNoncreditAssessmentAccess(
-  context:CommandContext,courseAttemptId:string,
+  context:CommandContext,courseAttemptId:string,phase:"baseline"|"final"="final",
 ) {
   if(!context.actorPersonId||!["registrar","site_admin"].includes(context.role??""))
     throw new AuthorizationError("authorized noncredit registrar");
@@ -38,12 +38,13 @@ export async function provisionNoncreditAssessmentAccess(
       throw new AuthorizationError("matching noncredit registration");
     const [training]=await tx.select().from(noncreditTrainingVersions)
       .where(eq(noncreditTrainingVersions.id,registration.trainingVersionId)).limit(1);
-    if(!training||training.state!=="published"||!training.assessmentVersionId||
+    const assessmentVersionId=phase==="baseline"?training?.baselineAssessmentVersionId:training?.assessmentVersionId;
+    if(!training||training.state!=="published"||!assessmentVersionId||
       !context.scope.organizationIds?.includes(training.providerOrganizationId))
       throw new AuthorizationError("published provider-owned training");
     const administrations=await tx.select().from(assessmentFormAdministrations)
       .where(and(
-        eq(assessmentFormAdministrations.assessmentVersionId,training.assessmentVersionId),
+        eq(assessmentFormAdministrations.assessmentVersionId,assessmentVersionId),
         eq(assessmentFormAdministrations.deploymentId,attempt.deploymentId),
         eq(assessmentFormAdministrations.courseVersionId,attempt.courseVersionId),
         eq(assessmentFormAdministrations.administeringOrganizationId,training.providerOrganizationId),

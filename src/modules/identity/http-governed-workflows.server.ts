@@ -1,3 +1,5 @@
+import * as knowledgeCheck from "@/modules/learning/noncredit-assessment-http.server";
+import {getNoncreditCompletionReadinessService} from "@/modules/learning/noncredit-completion.server";
 import {accessSessionCookie} from "@/domain/access-tokens";
 import {readCookie} from "@/domain/session-cookies";
 import * as pilotOutcomes from "@/modules/learning/noncredit-pilot-outcomes.server";
@@ -74,6 +76,13 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
  const context=await (mode==="operator-reporting"?(readCookie(request,accessSessionCookie)!==undefined?getIdentityContext(request):getCanonicalCommandContext(request)):mode==="planning"?getBlueprintPlanningContext(request):mode==="canonical"?getCanonicalCommandContext(request):mode==="learner"?getInstructionalLearnerContext(request):getIdentityContext(request));
  if(!context.actorPersonId)throw new AuthorizationError("verified Person");
  return {
+  getNoncreditKnowledgeCheck:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="learner")throw new AuthorizationError("Knowledge check context");return knowledgeCheck.getNoncreditKnowledgeCheckService(request,raw);},
+  beginNoncreditKnowledgeCheckAttempt:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="learner")throw new AuthorizationError("Knowledge check context");return knowledgeCheck.beginNoncreditKnowledgeCheckAttemptService(request,raw);},
+  saveNoncreditKnowledgeCheckAnswer:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="learner")throw new AuthorizationError("Knowledge check context");return knowledgeCheck.saveNoncreditKnowledgeCheckAnswerService(request,raw);},
+  submitNoncreditKnowledgeCheckAnswers:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="learner")throw new AuthorizationError("Knowledge check context");return knowledgeCheck.submitNoncreditKnowledgeCheckAnswersService(request,raw);},
+  finalizeNoncreditKnowledgeCheckResult:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Knowledge check context");return knowledgeCheck.finalizeNoncreditKnowledgeCheckResultService(request,raw);},
+  provisionNoncreditKnowledgeCheckAccess:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Knowledge check context");return knowledgeCheck.provisionNoncreditKnowledgeCheckAccessService(request,raw);},
+  getNoncreditCompletionReadiness:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="learner")throw new AuthorizationError("Knowledge check context");return getNoncreditCompletionReadinessService(request,raw);},
   getNoncreditPilotOutcomes:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="operator-reporting")throw new AuthorizationError("Operational reporting context");return {...await pilotOutcomes.getNoncreditPilotOutcomes(request,raw),disclosureApproved:false as const};},
   getNoncreditOperatorNetworkSummary:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="operator-reporting")throw new AuthorizationError("Operational reporting context");return operatorNetwork.getNoncreditOperatorNetworkSummary(request,raw);},
   getFacilitatedImpactReport:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Operational reporting context");return facilitatedImpact.getFacilitatedImpactReport(request);},

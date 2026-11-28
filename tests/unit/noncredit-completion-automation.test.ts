@@ -5,7 +5,7 @@ const schema=readFileSync("database/canonical/v3.0.1/schema.sql","utf8");
 const pin=readFileSync("database/canonical/v3.0.1/patch-noncredit-locked-policy.sql","utf8");
 const auto=readFileSync("database/canonical/v3.0.1/patch-noncredit-automatic-completion.sql","utf8");
 const baseline=readFileSync("database/canonical/v3.0.1/patch-noncredit-baseline-diagnostic.sql","utf8");
-const reader=readFileSync("src/modules/learning/noncredit-completion.functions.ts","utf8");
+const reader=readFileSync("src/modules/learning/noncredit-completion.server.ts","utf8");
 const policyApi=readFileSync("src/modules/learning/noncredit-completion-policy.functions.ts","utf8");
 const outcomes=readFileSync("src/modules/learning/noncredit-pilot-outcomes.server.ts","utf8");
 

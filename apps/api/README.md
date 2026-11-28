@@ -127,3 +127,6 @@ Five additional Class and classroom survey operations expose authorized campaign
 
 ## Private operational outcomes
 Three read-only APIs expose the existing pilot outcomes, organization operator rollup and facilitated delivery/feedback. The dual operator reporting mode retains exact existing CAN Site authorization or independent canonical provider credentials; a present CAN credential never falls back. Report responses keep distinct people separate from registrations and room pairing separate from attendance. Pilot disclosure preview is explicitly not external disclosure approval. Existing cohort/evidence limits and aggregate suppression remain; national cross-organization grants and authenticated outcome reconciliation are separate remaining work.
+
+## Knowledge checks and completion readiness
+Seven APIs reuse existing canonical grants, objective scoring, provider finalization, draft answer revisions and completion readiness. Provider grant provisioning now honors the requested baseline/final phase; default remains final. Completion readiness rejects ambiguous decision histories using the shared canonical projection. No answer key appears in response schemas. Authenticated execution and dependency build remain unverified.
