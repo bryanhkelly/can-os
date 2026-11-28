@@ -175,11 +175,11 @@ function SiteNewPage() {
               <CheckCircle2 className="size-9 text-success" aria-hidden="true" />
               <h2 className="font-serif text-3xl">{demoReady ? "Your demo Site is ready." : "Check your email."}</h2>
               <p className="leading-7 text-muted-foreground">
-                {demoReady ? "Your Site administrator is automatically approved without email verification. Use your private access code to sign in." : "If the address is eligible, you will receive a secure verification link. Follow it to create your Site and continue into Launch Studio."}
+                {demoReady ? "Your Site administrator is automatically approved without email verification. Use the demo access code 000000 to sign in." : "If the address is eligible, you will receive a secure verification link. Follow it to create your Site and continue into Launch Studio."}
               </p>
               {privateAccessCode && <div className="space-y-2">
-                <WorkspaceNotice>Save this private access code in your password manager now. It is shown only once. Do not share it with other users.</WorkspaceNotice>
-                <Field label="Private access code"><Input value={privateAccessCode} readOnly autoComplete="off" /></Field>
+                <WorkspaceNotice>This code is for synthetic demo accounts only. Never enter real learner or staff data in a demo Site.</WorkspaceNotice>
+                <Field label="Demo access code"><Input value={privateAccessCode} readOnly autoComplete="off" /></Field>
               </div>}
               <Button asChild variant="outline"><Link to="/access" search={{email:signupEmail || undefined}}>Go to sign in</Link></Button>
             </div> : <form onSubmit={submit} aria-busy={sending} className="space-y-5">
