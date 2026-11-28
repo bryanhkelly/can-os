@@ -1,0 +1,33 @@
+name: API-first runtime spike (not a release gate)
+on:
+  push:
+    branches: [architecture/api-first-nestjs]
+    paths: ['apps/api/**', '.github/workflows/api-first-runtime-spike.yml', 'docs/architecture/api-first-engineering-standard.md']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Resolve initial lock (temporary, spike only)
+        run: |
+          if [ ! -f package-lock.json ]; then npm install --package-lock-only --ignore-scripts; fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: api-dependency-lock
+          path: apps/api/package-lock.json
+          if-no-files-found: error
+      - run: npm ci
+      - run: npm test
+      - run: npm audit --omit=dev --audit-level=high
