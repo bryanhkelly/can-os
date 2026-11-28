@@ -1,0 +1,259 @@
+import {and,eq,inArray} from "drizzle-orm";
+import {z} from "zod";
+import {db} from "@/db/client";
+import {readAuthorizedOwnerClassification} from "@/modules/insights/reporting-population.server";
+import {
+  canonicalClasses,canonicalClassEnrollments,canonicalClassOfferingVersions,
+  canonicalClassSessions,canonicalClassOutcomes,canonicalClassAwards,
+  canonicalDeliverySessions,facilitatedClassroomPlans,facilitatedLearningSessions,
+  learnerCourseAttempts,assessmentFormAdministrations,
+  facilitatedRoomAttendanceAssertions,assessmentAccess,
+  assessmentExecutionAttempts,assessmentExecutionResults,
+} from "@/db/canonical-v301";
+import {AuthorizationError} from "@/domain/command-context";
+import {assertExactClassReportingScope} from "@/domain/participation-reporting-authority";
+import {getCanonicalCommandContext} from "@/modules/identity/canonical-command-context.server";
+import {validateClassAuthority} from "@/modules/classes/unified-class-authority.server";
+import {aggregateClassEvidence} from "@/domain/participation-reporting";
+
+const date=z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+export const nativeClassReportInput=z.object({
+  classId:z.string().uuid(),from:date,to:date,
+}).strict();
+function bounded<T>(rows:T[],limit:number,label:string){
+  if(rows.length>limit)throw new Error(label+" exceeds safe reporting window; narrow dates or request a partitioned export");
+  return rows;
+}
+function iso(value:Date){return value.toISOString();}
+
+/**
+ * WS6 read-only, provider-private Class report. The URL Class ID selects a
+ * resource, not an Organization, person, Site or network reporting grant.
+ * Current canonical principal, role/capability, organizational authority,
+ * Site scope, Deployment adoption, Course publication, and relationships are
+ * checked for EVERY request, including when dates change.
+ *
+ * A network membership must never grant access to this endpoint.
+ */
+import {DomainError} from "@/domain/errors";
+export async function getNativeClassReportService(request:Request,raw:unknown){
+ const data=nativeClassReportInput.parse(raw);
+    const from=new Date(data.from+"T00:00:00.000Z");
+    const to=new Date(data.to+"T00:00:00.000Z");
+    const asOf=new Date();
+    if(!Number.isFinite(from.getTime())||!Number.isFinite(to.getTime())||
+      from.getTime()>=to.getTime() || to.getTime()-from.getTime()>366*86400000 ||
+      from.toISOString().slice(0,10)!==data.from||to.toISOString().slice(0,10)!==data.to||
+      from.getTime()>asOf.getTime()||to.getTime()>Date.parse(asOf.toISOString().slice(0,10)+"T00:00:00.000Z")+86400000)
+      throw new DomainError("VALIDATION_FAILED","Choose a valid UTC report window of up to 366 days");
+    const actor=await getCanonicalCommandContext(request);
+    return db.transaction(async tx=>{
+      const [cls]=await tx.select().from(canonicalClasses)
+        .where(eq(canonicalClasses.id,data.classId)).limit(1);
+      if(!cls)throw new AuthorizationError("Class at a currently authorized Site");
+      assertExactClassReportingScope(actor,cls);
+      await validateClassAuthority(tx,{
+        actor,organizationId:cls.operatingOrganizationId,siteIds:actor.scope.siteIds??[],
+      },{
+        deploymentId:cls.deploymentId,adoptionId:cls.adoptionId,
+        offeringVersionId:cls.offeringVersionId,courseVersionId:cls.courseVersionId,
+        operatingOrganizationId:cls.operatingOrganizationId,siteId:cls.siteId,
+        title:cls.title,deliveryMode:cls.deliveryMode,
+      });
+      const classification=await readAuthorizedOwnerClassification(tx,cls.operatingOrganizationId);
+      const offerings=bounded(await tx.select({
+        id:canonicalClassOfferingVersions.id,
+        offeringId:canonicalClassOfferingVersions.classOfferingId,
+        state:canonicalClassOfferingVersions.state,
+        publishedAt:canonicalClassOfferingVersions.publishedAt,
+      }).from(canonicalClassOfferingVersions)
+        .where(eq(canonicalClassOfferingVersions.classId,cls.id)).limit(501),
+        500,"Class Offering versions");
+      const enrollments=bounded(await tx.select({
+        id:canonicalClassEnrollments.id,personId:canonicalClassEnrollments.learnerPersonId,
+        courseAttemptId:canonicalClassEnrollments.courseAttemptId,
+        status:canonicalClassEnrollments.status,
+        enrolledAt:canonicalClassEnrollments.enrolledAt,
+      }).from(canonicalClassEnrollments)
+        .where(eq(canonicalClassEnrollments.classId,cls.id)).limit(5001),
+        5000,"Class Enrollments");
+      const sessions=bounded(await tx.select({
+        id:canonicalClassSessions.id,
+        deliverySessionId:canonicalClassSessions.deliverySessionId,
+        planDeliverySessionId:facilitatedClassroomPlans.deliverySessionId,
+        scheduledAt:canonicalDeliverySessions.startsAt,
+        planState:facilitatedClassroomPlans.state,
+        roomId:facilitatedClassroomPlans.facilitatedSessionId,
+        planDeploymentId:facilitatedClassroomPlans.deploymentId,
+        planCourseVersionId:facilitatedClassroomPlans.courseVersionId,
+        planSiteId:facilitatedClassroomPlans.siteId,
+        planOrganizationId:facilitatedClassroomPlans.hostOrganizationId,
+        deliverySiteId:canonicalDeliverySessions.siteId,
+        roomSiteId:facilitatedLearningSessions.siteId,
+        roomCourseVersionId:facilitatedLearningSessions.courseVersionId,
+        roomDeploymentId:facilitatedLearningSessions.deploymentId,
+        roomOrganizationId:facilitatedLearningSessions.hostOrganizationId,
+        roomState:facilitatedLearningSessions.state,
+        roomEndedAt:facilitatedLearningSessions.endedAt,
+      }).from(canonicalClassSessions)
+        .innerJoin(facilitatedClassroomPlans,eq(
+          facilitatedClassroomPlans.id,canonicalClassSessions.classroomPlanId))
+        .innerJoin(canonicalDeliverySessions,eq(
+          canonicalDeliverySessions.id,canonicalClassSessions.deliverySessionId))
+        .leftJoin(facilitatedLearningSessions,eq(
+          facilitatedLearningSessions.id,facilitatedClassroomPlans.facilitatedSessionId))
+        .where(eq(canonicalClassSessions.classId,cls.id)).limit(2001),
+        2000,"Class Sessions");
+      // Cross-check the actual delivery identities before any aggregated
+      // metric can be returned. A joined room must not be borrowed from a
+      // different Course, Site, Deployment or operator.
+      for(const session of sessions){
+        if(session.planDeliverySessionId!==session.deliverySessionId ||
+          session.planDeploymentId!==cls.deploymentId ||
+          session.planCourseVersionId!==cls.courseVersionId ||
+          session.planSiteId!==cls.siteId ||
+          session.planOrganizationId!==cls.operatingOrganizationId ||
+          (session.deliverySiteId && session.deliverySiteId!==cls.siteId) ||
+          (session.roomId && (
+            session.roomSiteId!==cls.siteId ||
+            session.roomCourseVersionId!==cls.courseVersionId ||
+            session.roomDeploymentId!==cls.deploymentId ||
+            session.roomOrganizationId!==cls.operatingOrganizationId
+          )))
+          throw new Error("Class reporting Session authority does not reconcile");
+      }
+      // Retakes share the same canonical Class Enrollment. The selected
+      // courseAttemptId is only a pointer to the current attempt, not the
+      // historical source boundary for attendance or assessments.
+      const enrollmentIds=enrollments.map(e=>e.id);
+      const enrollmentById=new Map(enrollments.map(e=>[e.id,e] as const));
+      const courseAttempts=enrollmentIds.length?bounded(await tx.select({
+        id:learnerCourseAttempts.id,
+        classEnrollmentId:learnerCourseAttempts.classEnrollmentId,
+        enrollmentId:learnerCourseAttempts.enrollmentId,
+        noncreditRegistrationId:learnerCourseAttempts.noncreditRegistrationId,
+        sectionId:learnerCourseAttempts.sectionId,
+        deploymentId:learnerCourseAttempts.deploymentId,
+        adoptionId:learnerCourseAttempts.adoptionId,
+        offeringVersionId:learnerCourseAttempts.offeringVersionId,
+        courseVersionId:learnerCourseAttempts.courseVersionId,
+      }).from(learnerCourseAttempts)
+        .where(inArray(learnerCourseAttempts.classEnrollmentId,enrollmentIds))
+        .limit(10001),10000,"Canonical Class-owned Course Attempts"):[];
+      const authoritativeAttemptById=new Map(courseAttempts.map(a=>[a.id,a] as const));
+      const attemptsByEnrollment=new Map<string,string[]>();
+      for(const attempt of courseAttempts){
+        const owner=attempt.classEnrollmentId
+          ?enrollmentById.get(attempt.classEnrollmentId):null;
+        if(!owner||attempt.enrollmentId||attempt.noncreditRegistrationId||
+          attempt.sectionId||attempt.deploymentId!==cls.deploymentId||
+          attempt.adoptionId!==cls.adoptionId||
+          attempt.offeringVersionId!==cls.offeringVersionId||
+          attempt.courseVersionId!==cls.courseVersionId)
+          throw new Error("Course Attempt does not belong to this exact Class Enrollment");
+        const current=attemptsByEnrollment.get(owner.id)??[];
+        current.push(attempt.id);
+        attemptsByEnrollment.set(owner.id,current);
+      }
+      for(const entry of enrollments){
+        if(entry.courseAttemptId&&!authoritativeAttemptById.has(entry.courseAttemptId))
+          throw new Error("Selected Class Course Attempt reference is missing");
+        if(entry.courseAttemptId&&
+          !attemptsByEnrollment.get(entry.id)?.includes(entry.courseAttemptId))
+          throw new Error("Selected Course Attempt is not linked to exact Class Enrollment");
+      }
+      const attemptIds=courseAttempts.map(attempt=>attempt.id);
+      const roomIds=[...new Set(sessions.map(s=>s.roomId)
+        .filter((id):id is string=>id!==null))];
+      const attendance=attemptIds.length&&roomIds.length?bounded(await tx.select({
+        id:facilitatedRoomAttendanceAssertions.id,
+        roomId:facilitatedRoomAttendanceAssertions.facilitatedSessionId,
+        courseAttemptId:facilitatedRoomAttendanceAssertions.courseAttemptId,
+        status:facilitatedRoomAttendanceAssertions.status,
+        assertedAt:facilitatedRoomAttendanceAssertions.assertedAt,
+      }).from(facilitatedRoomAttendanceAssertions)
+        .where(and(inArray(facilitatedRoomAttendanceAssertions.facilitatedSessionId,roomIds),
+          inArray(facilitatedRoomAttendanceAssertions.courseAttemptId,attemptIds)))
+        .limit(20001),20000,"Attendance assertions"):[];
+      const assessments=attemptIds.length?bounded(await tx.select({
+        id:assessmentExecutionAttempts.id,
+        courseAttemptId:assessmentAccess.courseAttemptId,
+        state:assessmentExecutionAttempts.state,
+        createdAt:assessmentExecutionAttempts.createdAt,
+        submittedAt:assessmentExecutionAttempts.submittedAt,
+        attemptAdministrationId:assessmentExecutionAttempts.administrationId,
+        grantAdministrationId:assessmentAccess.administrationId,
+        attemptLearnerId:assessmentExecutionAttempts.learnerId,
+        grantLearnerId:assessmentAccess.learnerId,
+        assessmentDeploymentId:assessmentFormAdministrations.deploymentId,
+        assessmentCourseVersionId:assessmentFormAdministrations.courseVersionId,
+        assessmentOrganizationId:assessmentFormAdministrations.administeringOrganizationId,
+      }).from(assessmentExecutionAttempts)
+        .innerJoin(assessmentAccess,eq(
+          assessmentAccess.id,assessmentExecutionAttempts.accessGrantId))
+        .innerJoin(assessmentFormAdministrations,eq(
+          assessmentFormAdministrations.id,assessmentExecutionAttempts.administrationId))
+        .where(inArray(assessmentAccess.courseAttemptId,attemptIds))
+        .limit(10001),10000,"Assessment attempts"):[];
+      for(const assessment of assessments){
+        if(assessment.attemptAdministrationId!==assessment.grantAdministrationId||
+          assessment.attemptLearnerId!==assessment.grantLearnerId||
+          assessment.assessmentDeploymentId!==cls.deploymentId||
+          assessment.assessmentCourseVersionId!==cls.courseVersionId||
+          assessment.assessmentOrganizationId!==cls.operatingOrganizationId)
+          throw new Error("Class reporting assessment grant/administration scope mismatch");
+      }
+      const assessmentIds=assessments.map(a=>a.id);
+      const results=assessmentIds.length?bounded(await tx.select({
+        id:assessmentExecutionResults.id,
+        attemptId:assessmentExecutionResults.attemptId,
+        revision:assessmentExecutionResults.resultRevision,
+        status:assessmentExecutionResults.resultStatus,
+      }).from(assessmentExecutionResults)
+        .where(inArray(assessmentExecutionResults.attemptId,assessmentIds))
+        .limit(20001),20000,"Assessment results"):[];
+      const outcomes=enrollmentIds.length?bounded(await tx.select({
+        id:canonicalClassOutcomes.id,
+        enrollmentId:canonicalClassOutcomes.classEnrollmentId,
+        kind:canonicalClassOutcomes.outcomeKind,
+        resultCode:canonicalClassOutcomes.resultCode,
+        recordedAt:canonicalClassOutcomes.recordedAt,
+      }).from(canonicalClassOutcomes)
+        .where(inArray(canonicalClassOutcomes.classEnrollmentId,enrollmentIds))
+        .limit(10001),10000,"Class outcomes"):[];
+      const outcomeIds=outcomes.map(o=>o.id);
+      const awards=outcomeIds.length?bounded(await tx.select({
+        id:canonicalClassAwards.id,
+        outcomeId:canonicalClassAwards.classOutcomeId,
+        issuedAt:canonicalClassAwards.issuedAt,
+        revokedAt:canonicalClassAwards.revokedAt,
+      }).from(canonicalClassAwards)
+        .where(inArray(canonicalClassAwards.classOutcomeId,outcomeIds))
+        .limit(10001),10000,"Class awards"):[];
+      const report=aggregateClassEvidence({
+        classId:cls.id,asOf:iso(asOf),from:iso(from),to:iso(to),
+        offerings:offerings.map(o=>({...o,publishedAt:o.publishedAt?iso(o.publishedAt):null})),
+        enrollments:enrollments.map(e=>({...e,
+          enrolledAt:iso(e.enrolledAt),
+          courseAttemptIds:attemptsByEnrollment.get(e.id)??[],
+        })),
+        sessions:sessions.map(s=>({...s,scheduledAt:iso(s.scheduledAt),
+          roomEndedAt:s.roomEndedAt?iso(s.roomEndedAt):null})),
+        attendance:attendance.map(a=>({...a,assertedAt:iso(a.assertedAt)})),
+        assessments:assessments.map(a=>({...a,courseAttemptId:a.courseAttemptId??"",
+          createdAt:iso(a.createdAt),submittedAt:a.submittedAt?iso(a.submittedAt):null})),
+        results, outcomes:outcomes.map(o=>({...o,recordedAt:iso(o.recordedAt)})),
+        awards:awards.map(a=>({...a,issuedAt:iso(a.issuedAt),
+          revokedAt:a.revokedAt?iso(a.revokedAt):null})),
+      });
+      // No learner names, IDs, answers, personal attributes or small network
+      // grouping can escape this provider-private server response.
+      return {
+        ...report,title:cls.title,courseVersionId:cls.courseVersionId,
+        deliverySiteId:cls.siteId,operatorOrganizationId:cls.operatingOrganizationId,
+        ...classification,
+        visibility:"authorized_provider_private" as const,
+        publicationApproved:false as const,
+      };
+    },{isolationLevel:"repeatable read",accessMode:"read only"});
+}

@@ -5,6 +5,7 @@ import { healthOpenApiSchema, healthSchema, type Health } from './contracts';
 import { DefaultDenyGuard, PublicOperation } from './security';
 import {SitesController,OfferingReleaseController} from './platform-commands.controller';
 import {AccessController} from './access.controller';
+import {ReportingController} from './reporting.controller';
 import {ClassAdminController} from './class-admin.controller';
 import {RoomController} from './room.controller';
 import {ClassroomController} from './classroom.controller';
@@ -26,7 +27,7 @@ export class HealthController {
 }
 
 @Module({
-  controllers: [ClassAdminController, RoomController, ClassroomController, ParticipationController, WorkflowController, AccessController, HealthController, IdentityController, LearningController, SitesController, OfferingReleaseController],
+  controllers: [ReportingController, ClassAdminController, RoomController, ClassroomController, ParticipationController, WorkflowController, AccessController, HealthController, IdentityController, LearningController, SitesController, OfferingReleaseController],
   providers: [
     CanonicalIdentityService,
     { provide: APP_GUARD, useClass: DefaultDenyGuard },

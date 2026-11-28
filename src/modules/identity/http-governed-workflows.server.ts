@@ -27,6 +27,9 @@ import {activateReviewedNativeClassLearnerService} from "@/modules/classes/nativ
 import {createUnifiedClassDraftService,activateUnifiedClassService,getMyUnifiedClassDraftsService,publishUnifiedClassOfferingService,closeUnifiedClassOfferingService,createNextUnifiedClassOfferingVersionService,getNativeClassOperatorSitesService,getUnifiedClassCourseOptionsService} from "@/modules/classes/unified-class.server";
 import {getNativeOfferingAdoptionReviewQueueService} from "@/modules/programs/native-offering-adoption-queue.server";
 import {readCanonicalBlueprintHomeService} from "@/modules/blueprints/blueprint-commands.server";
+import {getNativeClassReportService} from "@/modules/reporting/native-class-report.server";
+import {requestReportingRelationshipService,decideRelationshipRequestService} from "@/modules/reporting/reporting-relationship-commands.server";
+import {readRelationshipPortfolio} from "@/modules/reporting/bottom-up-reporting-relationships.server";
 export type WorkflowMode="planning"|"canonical"|"can"|"learner";
 /** Existing independent native reviewer credentials remain distinct from CAN.
  * No fallback, new role, token or grant is manufactured by this adapter. */
@@ -35,6 +38,10 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
  const context=await (mode==="planning"?getBlueprintPlanningContext(request):mode==="canonical"?getCanonicalCommandContext(request):mode==="learner"?getInstructionalLearnerContext(request):getIdentityContext(request));
  if(!context.actorPersonId)throw new AuthorizationError("verified Person");
  return {
+  getNativeClassReport:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("reporting context");return getNativeClassReportService(request,raw);},
+  requestReportingRelationship:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("reporting context");return requestReportingRelationshipService(request,raw);},
+  decideRelationshipRequest:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("reporting context");return decideRelationshipRequestService(request,raw);},
+  getRelationshipPortfolio:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("reporting context");return readRelationshipPortfolio(request);},
   getNativeOfferingAdoptionReviewQueue:async()=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("adoption review context");return getNativeOfferingAdoptionReviewQueueService(request);},
   readCanonicalBlueprintHome:async()=>{if(request.method!=="GET"||mode!=="planning")throw new AuthorizationError("planning context");return readCanonicalBlueprintHomeService(request);},
   createUnifiedClassDraft:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("class operator context");return createUnifiedClassDraftService(request,raw);},

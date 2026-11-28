@@ -8,17 +8,15 @@ export const requestReportingRelationship=createServerFn({method:"POST"})
   .validator((value:unknown)=>relationshipProposalSchema.parse(value))
   .handler(async({data})=>{
     noStore();
-    const service=await import("./bottom-up-reporting-relationships.server");
-    const {id,status}=await service.proposeReportingRelationship(getRequest(),data);
-    return {id,status};
+    const {requestReportingRelationshipService}=await import("./reporting-relationship-commands.server");
+    return requestReportingRelationshipService(getRequest(),data);
   });
 export const decideRelationshipRequest=createServerFn({method:"POST"})
   .validator((value:unknown)=>z.object({agreementId:uuid,action:z.enum(["accept","decline","withdraw","revoke"])}).strict().parse(value))
   .handler(async({data})=>{
     noStore();
-    const service=await import("./bottom-up-reporting-relationships.server");
-    const {id,status}=await service.decideReportingRelationship(getRequest(),data);
-    return {id,status};
+    const {decideRelationshipRequestService}=await import("./reporting-relationship-commands.server");
+    return decideRelationshipRequestService(getRequest(),data);
   });
 export const findRelationshipRecipients=createServerFn({method:"GET"})
   .validator((value:unknown)=>z.object({query:z.string().trim().min(2).max(80),after:uuid.optional()}).strict().parse(value))

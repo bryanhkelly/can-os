@@ -276,3 +276,17 @@ test('independent reviewer discovery and exact manuscript reads have protected H
  assert.equal(exactReviewQuery.safeParse({manifestId:'00000000-0000-4000-8000-000000000001',expectedHash:'a'.repeat(64)}).success,true);
  assert.equal(exactReviewQuery.safeParse({manifestId:'00000000-0000-4000-8000-000000000001',expectedHash:'a'.repeat(64),reviewerPersonId:'forged'}).success,false);
 });
+
+test('reporting endpoints protect source-owned evidence and never approve public disclosure',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const [method,route] of [['GET','/api/v1/classes/{classId}/report'],['GET','/api/v1/me/reporting-relationship-portfolio'],['POST','/api/v1/reporting-relationships'],['POST','/api/v1/reporting-relationship-decisions']]){
+   const op=document.paths[route][method.toLowerCase()];assert.ok(op.security);assert.ok(op.responses['403']);
+   const response=await fetch(url+route.replace('{classId}','00000000-0000-4000-8000-000000000001'),method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);
+  }
+ });
+ const {docs,reportQuery,metricKeys}=require('../dist/reporting.contracts');
+ assert.deepEqual(docs.report.properties.publicationApproved.enum,[false]);
+ assert.equal(metricKeys.length,16);
+ assert.equal(reportQuery.safeParse({from:'2026-01-01',to:'2026-02-01',organizationId:'forged'}).success,false);
+});
