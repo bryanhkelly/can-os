@@ -58,13 +58,14 @@ if(release){
   if(rootReady&&apiReady&&bridge&&apiTests&&contract&&results.every(r=>r.status==="passed")){
     run("Attested database migration parity",process.execPath,["scripts/acceptance/run-pilot-qa.mjs","schema"]);
     run("Attested Nest signup, student isolation and replay",process.execPath,["scripts/acceptance/run-pilot-qa.mjs","nest-http"]);
+    run("Attested independent pilot learner journey",process.execPath,["scripts/acceptance/run-pilot-qa.mjs","nest-pilot1"]);
     run("Attested both-pilot report readback and cross-tenant denial",process.execPath,["scripts/acceptance/run-pilot-qa.mjs","nest-reporting"]);
-  }else for(const name of ["Attested database migration parity","Attested Nest signup, student isolation and replay","Attested both-pilot report readback and cross-tenant denial"])block(name,"Source, dependency or runtime preconditions failed");
+  }else for(const name of ["Attested database migration parity","Attested Nest signup, student isolation and replay","Attested independent pilot learner journey","Attested both-pilot report readback and cross-tenant denial"])block(name,"Source, dependency or runtime preconditions failed");
   // Deliberately fail closed until the following independent suites exist.
   // The older TanStack pilot runner is not equivalent evidence.
   for(const [name,reason] of [
-    ["Pilot 1 full standard Nest API journey","Provisioning through independent delivery, baseline/final, survey, completion and reporting not yet wired"],
-    ["Pilot 2 full standard Nest API journey","Two organizations, eight facilitated sessions, attendance corrections, assessments and outcomes not yet wired"],
+    ["Pilot 1 full standard Nest API journey","Prepared-release learner journey authored; standard publication/discovery, fresh provisioning, full cohort execution and persisted evidence still required"],
+    ["Pilot 2 full standard Nest API journey","Schedule and due-session API suites authored; eight exact-SHA delivery receipts plus media, assessments, staged surveys, completion and reconciled outcomes still required"],
     ["Database privileges, RLS and reconciled counts","Independent app-role database verification and two-tenant runtime reconciliation required"],
     ["Teacher, guardian, facilitator, owner and reviewer acceptance","Positive and foreign-scope role tests required"],
     ["National relationship disclosure and revocation","Exact metric/organization consent and before/after evidence required"],
