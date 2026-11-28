@@ -49,20 +49,22 @@ test("independent standard HTTP client validates both students and rejects forei
        const learning=await http.get(target+"/learning");expect(learning.status()).toBe(200);
        expect(await learning.json()).toMatchObject({classId:e.classId,classEnrollmentId:e.classEnrollmentId,courseAttemptId:e.courseAttemptId,lessons:expect.any(Array),outcomes:expect.any(Array),awards:expect.any(Array)});
        expect(learning.headers()["cache-control"]).toBe("no-store");
+       const detail=await http.get(target+"/assignment-workspace");expect(detail.status()).toBe(200);
+       expect(await detail.json()).toMatchObject({courseAttemptId:e.courseAttemptId,assignments:expect.any(Array)});
      }
      for(const foreign of fixture.students.filter(s=>s.personId!==student.personId)){
        expect((await http.post(api+"/me/session/membership",{headers:{Origin:origin},data:{grantId:foreign.grantId}})).status()).toBe(403);
        expect((await qaSession(context,"nest")).activeGrantId).toBe(student.grantId);
        for(const e of foreign.enrollments){
          expect(own.classes.some(c=>c.classId===e.classId||c.enrollmentId===e.classEnrollmentId)).toBe(false);
-         for(const resource of ["resume","assignments","learning"]){
+         for(const resource of ["resume","assignments","learning","assignment-workspace"]){
            const denied=await http.get(api+"/me/class-enrollments/"+e.classEnrollmentId+"/"+resource);
            expect(denied.status()).toBe(403);
            expect((await denied.json()).code).toBe("FORBIDDEN");
          }
        }
      }
-     for(const resource of ["resume","learning"])expect((await http.get(api+"/me/class-enrollments/not-a-uuid/"+resource)).status()).toBe(400);
+     for(const resource of ["resume","learning","assignment-workspace"])expect((await http.get(api+"/me/class-enrollments/not-a-uuid/"+resource)).status()).toBe(400);
    }
    if(fixture.write){
      const w=fixture.write;
@@ -97,6 +99,8 @@ test("independent standard HTTP client validates both students and rejects forei
      expect((await own.post(assignment,{...options,data:{responseText:"Different response must not overwrite"}})).status()).toBe(403);
      const latest=await own.get(target+"/assignments");expect(latest.status()).toBe(200);
      expect(homework.parse(await latest.json()).assignments.find(a=>a.id===w.assignmentId)?.status).toBe("submitted");
+     const detail=await own.get(target+"/assignment-workspace");expect(detail.status()).toBe(200);
+     expect((await detail.json()).assignments.find((a:{id:string})=>a.id===w.assignmentId)).toMatchObject({status:"submitted",responseText:input.responseText,submitted:true});
    }
    for(const http of clients.values()){
      const logout=await http.post(api+"/access/logout",{headers:{Origin:origin},data:{}});
