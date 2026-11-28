@@ -21,7 +21,7 @@ describe("one public Site and Organization identity",()=>{
   it("preserves restricted staff, reviewer and learner authorization on public Organization",()=>{
     const sql=read("database/production/2026-11-17-repoint-restricted-staff-identity-to-public.sql");
     const funcs=read("database/production/2026-11-17-repoint-five-canonical-organization-functions.sql");
-    const issuer=read("src/modules/identity/canonical-sensitive-approvals.functions.ts");
+    const issuer=read("src/modules/identity/canonical-sensitive-approvals.server.ts");
     expect(sql).toContain("JOIN public.organizations native_org");
     expect(sql).toContain("native_org.id = source.can_organization_id");
     expect(sql).toContain("JOIN public.sites native_site");
@@ -30,7 +30,7 @@ describe("one public Site and Organization identity",()=>{
     expect(funcs).toContain("JOIN public.organizations o");
     expect(funcs).toContain("FROM public.organizations o");
     expect(funcs).toContain("education_v30.v301_canonical_session_context");
-    expect(issuer).toContain("JOIN public.organizations native_org");
+    expect(issuer).toContain("FROM public.organizations o JOIN public.sites s");
     expect(issuer).not.toContain("JOIN education_v30.organizations native_org");
   });
 
