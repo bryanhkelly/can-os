@@ -11,14 +11,14 @@ import {buildSitePackageInput,parseSiteContentPackage,privatePackageSourcesMatch
 import {writeAudit} from "@/platform/mutation";
 import type {AccessContext} from "@/domain/access-context";
 import {readAuthorizedSiteContentBrief} from "./site-content-brief.server";
-import {generationEligibility,legacyGlooRetryEligible} from "@/domain/site-generation-status";
-import {generateSitePackageWithGloo,assertGlooConfiguration,safeGlooFailure,glooConfiguration} from "./gloo-content-provider.server";
+import {generationEligibility,legacyGlooRetryEligible,finalContentRecoveryFailure} from "@/domain/site-generation-status";
+import {generateSitePackageWithGloo,assertGlooConfiguration,safeGlooFailure,glooConfiguration,GLOO_PACKAGE_LEASE_MS} from "./gloo-content-provider.server";
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Consumer="website"|"outreach";
 type Request={siteId:string;consumer:Consumer;options:SiteGenerationOptions};
 const hash=(value:unknown)=>createHash("sha256").update(canonicalJson(value)).digest("hex");
 const scope=(siteId:string,organizationId:string)=>and(eq(inputs.siteId,siteId),eq(inputs.organizationId,organizationId));
-const leaseMs=120_000;
+const leaseMs=GLOO_PACKAGE_LEASE_MS;
 function assertActor(actor:AccessContext){
  if(!actor.actorPersonId||actor.delegationMode==="view")throw new AuthorizationError("Site content authoring authority");
 }
@@ -76,10 +76,13 @@ export async function readStoredSitePackage(actor:AccessContext,siteId:string,co
  return executor?read(executor):db.transaction(read);
 }
 export async function processSitePackage(actor:AccessContext,data:Request&{digest:string},resolveActor:()=>Promise<AccessContext>){
+ const started=Date.now();
+ const token=randomUUID();
+ const log=(stage:string,details:Record<string,unknown>={})=>console.info("Site Intelligence generation",{siteId:data.siteId,correlationId:token,stage,totalElapsedMs:Date.now()-started,...details});
  const before=await prepare(actor,data);
+ log("input_prepared");
  if(before.digest!==data.digest)throw new Error("Saved Site information changed. Review the input again.");
  const organizationId=before.brief.organizationId;
- const token=randomUUID();
  const claim=await db.transaction(async tx=>{
    await lockSite(tx,data.siteId,organizationId);
    const checked=await prepare(actor,data,tx);
@@ -116,17 +119,38 @@ export async function processSitePackage(actor:AccessContext,data:Request&{diges
    await writeAudit(tx,actor,{action:"site.content_generation.requested",entityType:"site",entityId:data.siteId,scope:{siteId:data.siteId,organizationId},after:{inputId,inputDigest:data.digest,provider:"gloo",externalProcessingConfirmed:true}});
    const attempt=nextAttempt;
    await emitReportableChange(tx,{eventType:EventTypes.SiteIntelligenceProcessingRequested,sourceId:inputId,sourceVersion:token,occurredAt:now,actorPersonId:actor.actorPersonId,dimensions:{organizationId,siteId:data.siteId},payload:{attempt}});
-   return {kind:"claimed" as const,inputId,attempt};
+   return {kind:"claimed" as const,inputId,attempt,finalContentRecovery:eligibility.code==="content_recovery"};
  });
- if(claim.kind==="failed")return {status:"failed" as const,code:claim.code,message:claim.message};
- if(claim.kind!=="claimed")return {status:claim.kind};
+ if(claim.kind==="failed"){log("claim_blocked",{code:claim.code});return {status:"failed" as const,code:claim.code,message:claim.message};}
+ if(claim.kind!=="claimed"){log(claim.kind);return {status:claim.kind};}
+ log("claim_acquired",{inputId:claim.inputId,attempt:claim.attempt,leaseMs,finalContentRecovery:claim.finalContentRecovery});
  let failureStage="provider";
  const fence=and(scope(data.siteId,organizationId),eq(inputs.id,claim.inputId),eq(inputs.status,"processing"),eq(inputs.leaseToken,token));
+ async function reauthorize(){
+   const current=await resolveActor();
+   if(current.actorPersonId!==actor.actorPersonId||current.accountId!==actor.accountId||current.grantId!==actor.grantId||current.sessionId!==actor.sessionId)throw new AuthorizationError("Site Intelligence authorization changed");
+   return current;
+ }
  try{
-   const result=await generateSitePackageWithGloo(before.input);
+   const result=await generateSitePackageWithGloo(before.input,fetch,{
+     onEvent:event=>{const {stage,...details}=event;log(stage,{inputId:claim.inputId,...details});},
+     beforeCorrection:async()=>{
+       failureStage="authorization";
+       const current=await reauthorize();
+       await db.transaction(async tx=>{
+         await lockSite(tx,data.siteId,organizationId);
+         const checked=await prepare(current,data,tx);
+         if(checked.digest!==data.digest||checked.brief.organizationId!==organizationId)throw new Error("Site source changed before correction");
+         const [active]=await tx.select({id:inputs.id}).from(inputs).where(and(fence,gt(inputs.leaseUntil,new Date()))).limit(1);
+         if(!active)throw new Error("Site Intelligence processing lease expired");
+       });
+       log("correction_authorized",{inputId:claim.inputId});
+       failureStage="provider";
+     },
+   });
    failureStage="authorization";
-   const currentActor=await resolveActor();
-   if(currentActor.actorPersonId!==actor.actorPersonId||currentActor.accountId!==actor.accountId||currentActor.grantId!==actor.grantId||currentActor.sessionId!==actor.sessionId)throw new AuthorizationError("Site Intelligence authorization changed");
+   const currentActor=await reauthorize();
+   log("authorization_rechecked",{inputId:claim.inputId});
    failureStage="persistence";
    await db.transaction(async tx=>{
      await lockSite(tx,data.siteId,organizationId);
@@ -142,11 +166,13 @@ export async function processSitePackage(actor:AccessContext,data:Request&{diges
      await emitReportableChange(tx,{eventType:EventTypes.SiteIntelligenceProcessingCompleted,sourceId:row.id,sourceVersion:token,occurredAt:new Date(),actorPersonId:currentActor.actorPersonId,dimensions:{organizationId,siteId:data.siteId},payload:{attempt:claim.attempt,outputId:saved.id}});
      await writeAudit(tx,currentActor,{action:"site.content_generation.completed",entityType:"site",entityId:data.siteId,scope:{siteId:data.siteId,organizationId},after:{inputId:row.id,outputId:saved?.id,inputDigest:data.digest,outputDigest,model:result.model}});
    });
+   log("package_persisted",{inputId:claim.inputId});
    return {status:"ready" as const};
  }catch(error){
    const safe=safeGlooFailure(error);
-   const failure=safe.code==="processing_failed"?{code:"processing_"+failureStage,message:"Site Intelligence failed during "+failureStage+". Contact support."}:safe;
-   console.error("Site Intelligence failure", {siteId:data.siteId,inputId:claim.inputId,stage:failureStage,code:failure.code,errorType:error instanceof Error?error.name:"unknown"});
+   const classified=safe.code==="processing_failed"?{code:"processing_"+failureStage,message:"Site Intelligence failed during "+failureStage+". Contact support."}:safe;
+   const failure={...classified,code:finalContentRecoveryFailure(classified.code,claim.finalContentRecovery)};
+   console.error("Site Intelligence failure", {siteId:data.siteId,inputId:claim.inputId,correlationId:token,stage:failureStage,code:failure.code,totalElapsedMs:Date.now()-started});
    await db.transaction(async tx=>{
      const [failed]=await tx.update(inputs).set({status:"failed",leaseToken:null,leaseUntil:null,errorCode:failure.code,updatedAt:new Date()}).where(fence).returning({id:inputs.id});
      if(failed)await emitReportableChange(tx,{eventType:EventTypes.SiteIntelligenceProcessingFailed,sourceId:failed.id,sourceVersion:token,occurredAt:new Date(),actorPersonId:actor.actorPersonId,dimensions:{organizationId,siteId:data.siteId},payload:{attempt:claim.attempt}});

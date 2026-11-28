@@ -1,5 +1,5 @@
 import {afterEach,describe,expect,it,vi} from "vitest";
-import {generateWithGloo,generateSitePackageWithGloo,testGlooConnection} from "@/modules/sites/gloo-content-provider.server";
+import {generateWithGloo,generateSitePackageWithGloo,testGlooConnection,GLOO_PACKAGE_TIMEOUT_MS,GLOO_PACKAGE_LEASE_MS} from "@/modules/sites/gloo-content-provider.server";
 import {buildSiteGenerationInput,siteGenerationTaskSchema} from "@/domain/site-content-generation";
 import {projectSiteContentBriefV61} from "@/domain/site-content-brief-v61";
 import {initialOutreachPlanV61} from "@/domain/marketing-package-v61";
@@ -48,6 +48,48 @@ describe("Gloo persistent package transport",()=>{
       status:"completed",id:"package-test",output:[{type:"message",content:[{type:"output_text",text:JSON.stringify(packageContent)}]}],
     })));
     expect(result.model).toBe("synthetic-model");
+  });
+  it("accepts only harmless outer JSON fences and whitespace",async()=>{
+    configure();
+    const text="\ufeff  "+"```json\r\n"+JSON.stringify(packageContent)+"\r\n```  ";
+    const send=vi.fn(async()=>new Response(JSON.stringify({status:"completed",output:[{type:"message",content:[{type:"output_text",text}]}]})));
+    expect((await generateSitePackageWithGloo(packageInput,send)).content.website.heroHeadline).toBe(packageContent.website.heroHeadline);
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+  it("retries the full package once using only allowlisted validation diagnostics",async()=>{
+    configure();
+    const invalid={...packageContent,website:{...packageContent.website,heroHeadline:"https://private.example/secret"}};
+    const sender=vi.fn(async(_url:RequestInfo|URL,_init?:RequestInit)=>envelope(packageContent)).mockImplementationOnce(async()=>envelope(invalid));
+    const events:unknown[]=[];
+    const authorize=vi.fn(async()=>{});
+    const result=await generateSitePackageWithGloo(packageInput,sender,{onEvent:event=>events.push(event),beforeCorrection:authorize});
+    expect(result.content.website.heroHeadline).toBe(packageContent.website.heroHeadline);
+    expect(sender).toHaveBeenCalledTimes(2);
+    expect(authorize).toHaveBeenCalledTimes(1);
+    const correction=JSON.parse(String(sender.mock.calls[1]?.[1]?.body));
+    expect(correction.instructions).toContain("website.heroHeadline");
+    expect(correction.instructions).not.toContain("private.example");
+    expect(JSON.parse(correction.input)).toEqual(packageInput);
+    expect(JSON.stringify(events)).not.toContain("private.example");
+    expect(events).toEqual(expect.arrayContaining([expect.objectContaining({stage:"contract_rejected"}),expect.objectContaining({stage:"correction_requested"}),expect.objectContaining({stage:"contract_validated"})]));
+  });
+  it("does not bypass authorization or retry a contract indefinitely",async()=>{
+    configure();
+    const invalid={...packageContent,audiences:[{id:"private-unknown-id",description:"Unverified"}]};
+    const sender=vi.fn(async()=>envelope(invalid));
+    await expect(generateSitePackageWithGloo(packageInput,sender,{beforeCorrection:async()=>{throw new Error("consent withdrawn");}})).rejects.toThrow("consent withdrawn");
+    expect(sender).toHaveBeenCalledTimes(1);
+    sender.mockClear();
+    await expect(generateSitePackageWithGloo(packageInput,sender)).rejects.toMatchObject({code:"gloo_content_contract",issues:[{field:"audiences",reason:"unapproved_or_duplicate_id"}]});
+    expect(sender).toHaveBeenCalledTimes(2);
+  });
+  it("uses a bounded shared timeout and a longer processing lease",async()=>{
+    configure();
+    const events:Array<{stage:string;timeoutMs?:number}>=[];
+    await generateSitePackageWithGloo(packageInput,async()=>envelope(packageContent),{onEvent:event=>events.push(event)});
+    expect(events.find(event=>event.stage==="provider_request")?.timeoutMs).toBeGreaterThan(45_000);
+    expect(events.find(event=>event.stage==="provider_request")?.timeoutMs).toBeLessThanOrEqual(GLOO_PACKAGE_TIMEOUT_MS);
+    expect(GLOO_PACKAGE_LEASE_MS).toBeGreaterThan(GLOO_PACKAGE_TIMEOUT_MS);
   });
   it("rejects incomplete, oversized and ungrounded packages",async()=>{
     configure();

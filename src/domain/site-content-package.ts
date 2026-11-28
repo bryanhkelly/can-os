@@ -38,21 +38,25 @@ export const siteContentPackageSchema=z.object({
  reviewNotes:z.array(z.string().trim().max(240)).max(8),
 }).strict();
 export type SiteContentPackage=z.infer<typeof siteContentPackageSchema>;
+export class SitePackageContractError extends Error {
+ constructor(readonly field:string,readonly reason:string,message:string){super(message);this.name="SitePackageContractError";}
+}
 export function parseSiteContentPackage(raw:string,input:SitePackageInput):SiteContentPackage{
- if(raw.length>64000)throw new Error("Content package exceeds limit");
+ if(raw.length>64000)throw new SitePackageContractError("$","too_large","Content package exceeds limit");
  const value=siteContentPackageSchema.parse(JSON.parse(raw));
- if(input.promptVersion===SITE_PACKAGE_PROMPT&&!value.websiteComposition)throw new Error("Website composition is required for this processing contract");
+ if(input.promptVersion===SITE_PACKAGE_PROMPT&&!value.websiteComposition)throw new SitePackageContractError("websiteComposition","required","Website composition is required for this processing contract");
  if(value.websiteComposition&&input.compositionCapabilities){
-   if(value.websiteComposition.navigation.some(path=>!input.compositionCapabilities!.pageTypes.includes(path))||value.websiteComposition.homeSections.some(key=>!input.compositionCapabilities!.homeSectionTypes.includes(key)))throw new Error("Website composition references an unsupported capability");
+   if(value.websiteComposition.navigation.some(path=>!input.compositionCapabilities!.pageTypes.includes(path)))throw new SitePackageContractError("websiteComposition.navigation","unsupported_capability","Website composition references an unsupported capability");
+   if(value.websiteComposition.homeSections.some(key=>!input.compositionCapabilities!.homeSectionTypes.includes(key)))throw new SitePackageContractError("websiteComposition.homeSections","unsupported_capability","Website composition references an unsupported capability");
  }
- const check=(items:readonly {id:string}[],ids:readonly string[])=>{
-   if(new Set(items.map(x=>x.id)).size!==items.length||items.some(x=>!ids.includes(x.id)))throw new Error("Generated topic is not in the approved input");
+ const check=(field:string,items:readonly {id:string}[],ids:readonly string[])=>{
+   if(new Set(items.map(x=>x.id)).size!==items.length||items.some(x=>!ids.includes(x.id)))throw new SitePackageContractError(field,"unapproved_or_duplicate_id","Generated topic is not in the approved input");
  };
- check(value.audiences,input.planning.audiences.map(x=>x.id));
- check(value.programs,[...input.planning.programInterests,...input.planning.programCodes]);
- check(value.experiences,input.planning.experiences.map(x=>x.id));
- if(new Set(value.leadership.map(x=>x.index)).size!==value.leadership.length||value.leadership.some(x=>x.index>=input.leadership.length))throw new Error("Generated leader is not in the approved input");
- if(!input.story&&value.story!==null)throw new Error("Founding narrative has no approved source");
+ check("audiences",value.audiences,input.planning.audiences.map(x=>x.id));
+ check("programs",value.programs,[...input.planning.programInterests,...input.planning.programCodes]);
+ check("experiences",value.experiences,input.planning.experiences.map(x=>x.id));
+ if(new Set(value.leadership.map(x=>x.index)).size!==value.leadership.length||value.leadership.some(x=>x.index>=input.leadership.length))throw new SitePackageContractError("leadership","unapproved_or_duplicate_index","Generated leader is not in the approved input");
+ if(!input.story&&value.story!==null)throw new SitePackageContractError("story","unapproved_source","Founding narrative has no approved source");
  return value;
 }
 /** Old packages can remain useful when plans change. Private source withdrawal
