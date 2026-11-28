@@ -1,6 +1,7 @@
-import {and,eq,gt,isNull,lte,or} from "drizzle-orm";
+import {and,eq,gt,inArray,isNull,lte,or} from "drizzle-orm";
 import {db} from "@/db/client";
-import {accessAccounts} from "@/db/schema";
+import {accessAccounts,guardianRelationships} from "@/db/schema";
+import {guardianRelationshipPredicate,schoolGuardianAuthorityCompatible} from "@/domain/guardian-relationship";
 import {canonicalPersons,guardianAuthorities,learnerProfiles} from "@/db/canonical-v301";
 import {AuthorizationError,assertCapability} from "@/domain/command-context";
 import {getIdentityContext} from "@/modules/identity/command-context.server";
@@ -16,7 +17,7 @@ type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
 export async function requireNativeGuardian(request:Request,_now:Date){
  const actor=await getIdentityContext(request);
  if(actor.role!=="guardian"||!actor.actorPersonId||
-    !actor.accountId||actor.sessionAccountId)
+    !actor.accountId||actor.sessionAccountId||actor.impersonatedByAccountId)
   throw new AuthorizationError("verified CAN guardian");
  assertCapability(actor,"enrollment.apply");
  const [account]=await db.select({
@@ -28,11 +29,26 @@ export async function requireNativeGuardian(request:Request,_now:Date){
  return {personId:actor.actorPersonId};
 }
 
-/** A current verified canonical guardian authority, not a caller-supplied
- * learner UUID, is required for placement.
- */
-export async function requireNativeGuardianChild(
+/** Shared live authority predicate: expired, future and unrelated authority
+ * types never enter the candidate set or consume its ambiguity limit. */
+export function currentNativeGuardianAuthorityPredicate(guardianPersonId:string,now:Date,
+ purpose:"enrollment"|"instruction"="enrollment"){
+ return and(
+  eq(guardianAuthorities.guardianPersonId,guardianPersonId),
+  lte(guardianAuthorities.startsAt,now),
+  lte(guardianAuthorities.verifiedAt,now),
+  or(isNull(guardianAuthorities.endsAt),gt(guardianAuthorities.endsAt,now)),
+  inArray(guardianAuthorities.authorityKind,purpose==="enrollment"?
+   ["parent","legal_guardian","guardian","enrollment"]:["parent","legal_guardian","guardian"]),
+ );
+}
+
+/** One native authority read shared by enrollment, communication and instruction.
+ * Neither table grants permission on behalf of the other. An overlapping
+ * inconsistent school relationship fails closed until independently reconciled. */
+export async function requireCurrentNativeGuardianAuthority(
  tx:Tx,guardianPersonId:string,learnerPersonId:string,now:Date,
+ purpose:"enrollment"|"instruction",
 ){
  const rows=await tx.select({
   id:guardianAuthorities.id,kind:guardianAuthorities.authorityKind,
@@ -42,15 +58,28 @@ export async function requireNativeGuardianChild(
  .innerJoin(learnerProfiles,eq(learnerProfiles.id,guardianAuthorities.learnerId))
  .innerJoin(canonicalPersons,eq(canonicalPersons.id,learnerProfiles.personId))
  .where(and(
-  eq(guardianAuthorities.guardianPersonId,guardianPersonId),
+  currentNativeGuardianAuthorityPredicate(guardianPersonId,now,purpose),
   eq(learnerProfiles.personId,learnerPersonId),
-  lte(guardianAuthorities.startsAt,now),
-  or(isNull(guardianAuthorities.endsAt),gt(guardianAuthorities.endsAt,now)),
- )).limit(10);
- const matches=rows.filter(row=>row.verifiedAt&&row.verifiedAt<=now&&
-  ["parent","legal_guardian","guardian","enrollment"].includes(row.kind));
- if(matches.length!==1)throw new AuthorizationError("current verified guardian authority");
- const birthDate=matches[0]!.birthDate;
+ )).for("share").limit(2);
+ if(rows.length!==1)throw new AuthorizationError("current verified guardian authority");
+ const [schoolRelationship]=await tx.select({
+  metadata:guardianRelationships.metadata,
+  canManageEnrollment:guardianRelationships.canManageEnrollment,
+  canViewAcademics:guardianRelationships.canViewAcademics,
+ }).from(guardianRelationships).where(guardianRelationshipPredicate({
+  guardianPersonId,studentPersonId:learnerPersonId,access:"relationship",
+ })).for("share").limit(1);
+ if(!schoolGuardianAuthorityCompatible(schoolRelationship,purpose))
+  throw new AuthorizationError("reconciled guardian authority");
+ return rows[0]!;
+}
+
+/** Placement additionally requires verified minor age. */
+export async function requireNativeGuardianChild(
+ tx:Tx,guardianPersonId:string,learnerPersonId:string,now:Date,
+){
+ const authority=await requireCurrentNativeGuardianAuthority(tx,guardianPersonId,learnerPersonId,now,"enrollment");
+ const birthDate=authority.birthDate;
  if(!birthDate||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(birthDate))
   throw new AuthorizationError("verified minor birth date");
  const [y,m,d]=birthDate.split("-").map(Number);
@@ -60,5 +89,5 @@ export async function requireNativeGuardianChild(
  const age=now.getUTCFullYear()-y!-
   ((now.getUTCMonth()+1<m!||(now.getUTCMonth()+1===m!&&now.getUTCDate()<d!))?1:0);
  if(age<0||age>=18)throw new AuthorizationError("minor guardian placement only");
- return matches[0]!;
+ return authority;
 }

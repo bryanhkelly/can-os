@@ -8,7 +8,6 @@ import {
   canonicalClassSessions, canonicalDeliverySessions, facilitatedClassroomPlans,
   canonicalEnrollmentSites, canonicalAccounts, canonicalAccountGrants,
   canonicalClassOfferingVersions,
-  guardianAuthorities, learnerProfiles,
 } from "@/db/canonical-v301";
 import {
   dispatchOutboundMessages, type OutboundAdapter, type OutboundClaim,
@@ -18,6 +17,8 @@ import {
   sendNotificationEmailWithReceipt, type NotificationEmailMessage,
 } from "@/modules/communication/notification-email.server";
 import { suppressDemoEmailDelivery } from "@/domain/email-delivery-policy";
+import { AuthorizationError } from "@/domain/command-context";
+import { requireNativeGuardianChild } from "./native-class-guardian-authority.server";
 import { classSessionCalendarUid, renderCalendarInvitation, type CalendarInvitationEvent } from "@/domain/calendar-invitations";
 
 const receipt = classParticipantDeliveries;
@@ -102,19 +103,12 @@ async function verifiedRecipient(
     if (enrollment.enrolledByPersonId !== recipientPersonId) return null;
     // A minor's welcome/calendar mail goes only to a currently authorized
     // guardian with a verified CAN email and active guardian account grant.
-    const authority = await db.select({ id: guardianAuthorities.id })
-      .from(guardianAuthorities)
-      .innerJoin(learnerProfiles, eq(learnerProfiles.id, guardianAuthorities.learnerId))
-      .where(and(
-        eq(guardianAuthorities.guardianPersonId, recipientPersonId),
-        eq(learnerProfiles.personId, enrollment.learnerPersonId),
-        isNotNull(guardianAuthorities.verifiedAt),
-        lte(guardianAuthorities.verifiedAt, now),
-        lte(guardianAuthorities.startsAt, now),
-        or(isNull(guardianAuthorities.endsAt), gt(guardianAuthorities.endsAt, now)),
-        inArray(guardianAuthorities.authorityKind, ["parent", "legal_guardian", "guardian", "enrollment"]),
-      )).limit(1);
-    if (!authority.length) return null;
+    try {
+      await db.transaction(tx=>requireNativeGuardianChild(tx,recipientPersonId,enrollment.learnerPersonId,now));
+    } catch(error) {
+      if(error instanceof AuthorizationError)return null;
+      throw error;
+    }
     const rows = await db.select({ email: accessAccounts.emailNormalized })
       .from(accessAccounts)
       .innerJoin(accountPersonGrants,

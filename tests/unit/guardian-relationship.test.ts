@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { guardianRelationships } from "@/db/schema/identity";
-import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
+import { guardianRelationshipPredicate, schoolGuardianAuthorityCompatible } from "@/domain/guardian-relationship";
 
 const dialect = new PgDialect();
 
@@ -76,5 +76,27 @@ describe("guardian relationship predicates", () => {
     }));
     expect(query.sql).toContain("false");
     expect(query.params).toEqual([true]);
+  });
+});
+
+describe("guardian authority convergence",()=>{
+  const verified={metadata:{verification:"verified"},canManageEnrollment:true,canViewAcademics:true};
+  it("requires independent native verification even when no school relationship exists",()=>{
+    // Compatibility is not an authorization grant; the owning native reader
+    // independently requires exactly one current verified native authority.
+    expect(schoolGuardianAuthorityCompatible(undefined,"enrollment")).toBe(true);
+  });
+  it.each(["pending","revoked","unverified","unknown"] as const)("denies contradictory %s school records",verification=>{
+    const row={...verified,metadata:{verification}};
+    expect(schoolGuardianAuthorityCompatible(row,"enrollment")).toBe(false);
+    expect(schoolGuardianAuthorityCompatible(row,"instruction")).toBe(false);
+  });
+  it("preserves independently restricted permissions",()=>{
+    const readOnly={...verified,canManageEnrollment:false};
+    expect(schoolGuardianAuthorityCompatible(readOnly,"instruction")).toBe(true);
+    expect(schoolGuardianAuthorityCompatible(readOnly,"enrollment")).toBe(false);
+    const enrollmentOnly={...verified,canViewAcademics:false};
+    expect(schoolGuardianAuthorityCompatible(enrollmentOnly,"instruction")).toBe(false);
+    expect(schoolGuardianAuthorityCompatible(enrollmentOnly,"enrollment")).toBe(true);
   });
 });

@@ -17,7 +17,6 @@ import {
   enrollments,
   formativePracticeAttempts,
   formativePracticeResponses,
-  guardianAuthorities,
   instructionalTrackMaterials,
   instructionalTrackPolicyVersions,
   instructionalTrackPolicyWithdrawals,
@@ -41,6 +40,7 @@ import {
 import { assertSectionScope, AuthorizationError } from "@/domain/command-context";
 import type { CommandContext } from "@/domain/command-context";
 import { authorizeCanonicalCourseAttempt } from "./canonical-course-participation.server";
+import { requireCurrentNativeGuardianAuthority } from "@/modules/classes/native-class-guardian-authority.server";
 import { DomainError } from "@/domain/errors";
 import {
   assertCurrentPracticeSelection,
@@ -211,20 +211,7 @@ async function loadAuthorizedParticipant(
     }
     assertLearningParticipantRole(context, "guardian");
     const now = new Date();
-    const [authority] = await tx.select().from(guardianAuthorities)
-      .where(and(
-        eq(guardianAuthorities.guardianPersonId, context.actorPersonId),
-        eq(guardianAuthorities.learnerId, learner.id),
-        lte(guardianAuthorities.startsAt, now),
-        or(
-          isNull(guardianAuthorities.endsAt),
-          gt(guardianAuthorities.endsAt, now),
-        ),
-      ))
-      .limit(1);
-    if (!authority?.verifiedAt || authority.verifiedAt > now) {
-      throw new AuthorizationError("verified current guardian relationship");
-    }
+    await requireCurrentNativeGuardianAuthority(tx,context.actorPersonId,learner.personId,now,"instruction");
     return {
       attempt,
       participant: {

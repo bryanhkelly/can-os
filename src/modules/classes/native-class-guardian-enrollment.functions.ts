@@ -18,7 +18,7 @@ import { createInitialNativeClassAttempt, withdrawNativeClassAttempts } from "./
 import {writeNativeClassAttribution} from "./native-class-attribution.server";
 import {requireNativeRepeatAuthorization} from "./native-class-repeats.server";
 import {consumeNativeClassRepeatAuthorization} from "./native-class-repeat-consumption.server";
-import {requireNativeGuardian,requireNativeGuardianChild} from
+import {requireNativeGuardian,requireNativeGuardianChild,currentNativeGuardianAuthorityPredicate} from
  "./native-class-guardian-authority.server";
 import {assertOperationalClassOfferingTerms,assertNativeClassSeatAvailable} from "@/domain/native-class-lifecycle";
 
@@ -53,10 +53,7 @@ export const getMyNativeGuardianLearners=createServerFn({method:"GET"})
     .innerJoin(learnerProfiles,eq(learnerProfiles.id,guardianAuthorities.learnerId))
     .innerJoin(canonicalPersons,eq(canonicalPersons.id,learnerProfiles.personId))
     .where(and(
-      eq(guardianAuthorities.guardianPersonId,guardian.personId),
-      lte(guardianAuthorities.startsAt,now),
-      or(isNull(guardianAuthorities.endsAt),gt(guardianAuthorities.endsAt,now)),
-      lte(guardianAuthorities.verifiedAt,now),
+      currentNativeGuardianAuthorityPredicate(guardian.personId,now),
     )).orderBy(asc(canonicalPersons.legalFirstName)).limit(100);
    const learners: Array<{learnerPersonId:string;name:string}>=[];
    for(const row of rows){

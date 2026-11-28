@@ -62,3 +62,15 @@ export function guardianRelationshipPredicate(
   if (!predicate) throw new Error("Guardian relationship subject is required");
   return predicate;
 }
+
+/** During authority convergence, a school relationship is not a grant of
+ * native authority. Where both records exist, however, a conflicting school
+ * restriction must be reconciled rather than silently bypassed. */
+export function schoolGuardianAuthorityCompatible(
+  relationship: {metadata: Record<string, unknown>; canManageEnrollment:boolean; canViewAcademics:boolean} | undefined,
+  purpose: "enrollment" | "instruction",
+): boolean {
+  if (!relationship) return true; // native authority is independently required
+  return relationship.metadata.verification === "verified" &&
+    (purpose === "enrollment" ? relationship.canManageEnrollment : relationship.canViewAcademics);
+}
