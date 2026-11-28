@@ -158,6 +158,13 @@ export const resolveMissingWorkFollowUp=createServerFn({method:"POST"})
   return db.transaction(async tx=>{
    const [action]=await tx.select().from(s.actions)
     .where(eq(s.actions.id,data.actionId)).for("update").limit(1);
+   if(action?.subjectType==="class_enrollment"){
+     const {getCanonicalCommandContext}=await import("@/modules/identity/canonical-command-context.server");
+     const nativeActor=await getCanonicalCommandContext(getRequest());
+     const {resolveActionInTransaction}=await import("@/modules/actions/resolve-action");
+     await resolveActionInTransaction(tx,nativeActor,data);
+     return {resolved:action.status!=="resolved"};
+   }
    if(!action||action.type!=="missing_work_follow_up"||
     action.ownerPersonId!==context.actorPersonId||
     action.subjectType!=="student_profile"||
