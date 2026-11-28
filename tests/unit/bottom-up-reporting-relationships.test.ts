@@ -81,3 +81,26 @@ describe("bottom-up relationship fact-level eligibility",()=>{
     expect(()=>matchingRelationshipIds(actor(other,decider,"relationships.report"),recipient,[accepted],metric,fact,now)).toThrow();
   });
 });
+
+describe("tagging without sharing and explicit reporting coverage",()=>{
+  it("allows a relationship without permission to use any metric",()=>{
+    const {recipientOrganizationId,scopeKind,scopeId,relationshipKind,validThrough}=pending;
+    const tag=validateRelationshipProposal({recipientOrganizationId,scopeKind,scopeId,relationshipKind,validThrough,metrics:[]},scope,registry,[],now);
+    expect(tag.metrics).toEqual([]);
+    expect(relationshipMatchesFact({...accepted,metrics:[]},recipient,metric,fact,now)).toBe(false);
+  });
+  it("permits historical evidence only with explicit accepted coverage",()=>{
+    const historical={...fact,occurredAt:"2026-11-19T12:00:00Z"};
+    expect(relationshipMatchesFact(accepted,recipient,metric,historical,now)).toBe(false);
+    expect(relationshipMatchesFact({...accepted,coverageMode:"all_history"},recipient,metric,historical,now)).toBe(true);
+    expect(relationshipMatchesFact({...accepted,coverageMode:"from_date",coverageFrom:"2026-11-18T00:00:00Z"},recipient,metric,historical,now)).toBe(true);
+    expect(relationshipMatchesFact({...accepted,coverageMode:"from_date",coverageFrom:"2026-11-20T00:00:00Z"},recipient,metric,historical,now)).toBe(false);
+    expect(relationshipMatchesFact({...accepted,coverageMode:"from_date",coverageFrom:null},recipient,metric,historical,now)).toBe(false);
+  });
+  it("does not equate initiation with consent or grant sibling Site access",()=>{
+    const initiator=actor(owner,proposer,"relationships.initiate",site);
+    expect(assertRelationshipActor(initiator,owner,"relationships.initiate",site)).toBe(proposer);
+    expect(()=>assertRelationshipActor(initiator,owner,"relationships.propose",site)).toThrow();
+    expect(()=>assertRelationshipActor(initiator,owner,"relationships.initiate",other)).toThrow();
+  });
+});
