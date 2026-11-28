@@ -1,3 +1,4 @@
+import {getMyCredentialIssuerApprovalService,listPendingCredentialIssuerApprovalsService,listActiveCredentialIssuerApprovalsService,requestCanonicalCredentialIssuerApprovalService,reviewCanonicalCredentialIssuerApprovalService,revokeCanonicalCredentialIssuerApprovalService} from "./canonical-sensitive-approvals.server";
 import {listScopedSitesService,listPeopleService,listAccessAccountsService,inviteStaffMemberService,setGrantActiveService} from "./staff-admin.server";
 import {completeNativeClassLesson,submitNativeClassHomeworkCommand} from "@/modules/classes/native-class-learner-write.server";
 import {selectCurrentSessionMembership,recordCurrentSessionActivity} from "./session-lifecycle.server";
@@ -58,6 +59,12 @@ export async function resolveHttpIdentity(request: Request) {
         ...(session.ownerDelegation?{ownerDelegation:session.ownerDelegation}:{}),
       };
     },
+    getMyCredentialIssuerApproval:async()=>{const row=await getMyCredentialIssuerApprovalService(actor);return row?{...row,requestedAt:row.requestedAt.toISOString(),reviewedAt:row.reviewedAt?.toISOString()??null,approvedUntil:row.approvedUntil?.toISOString()??null}:null;},
+    listPendingCredentialIssuerApprovals:async()=> (await listPendingCredentialIssuerApprovalsService(actor)).map(row=>({...row,requestedAt:row.requestedAt.toISOString()})),
+    listActiveCredentialIssuerApprovals:async()=> (await listActiveCredentialIssuerApprovalsService(actor)).map(row=>({...row,requestedAt:row.requestedAt.toISOString(),reviewedAt:row.reviewedAt?.toISOString()??null,approvedUntil:row.approvedUntil?.toISOString()??null})),
+    requestCanonicalCredentialIssuerApproval:(input:unknown)=>{requireWrite();return requestCanonicalCredentialIssuerApprovalService(actor,request,input);},
+    reviewCanonicalCredentialIssuerApproval:(input:unknown)=>{requireWrite();return reviewCanonicalCredentialIssuerApprovalService(actor,request,input);},
+    revokeCanonicalCredentialIssuerApproval:(input:unknown)=>{requireWrite();return revokeCanonicalCredentialIssuerApprovalService(actor,request,input);},
     listStaffSites:()=>listScopedSitesService(staffActor),
     listStaffPeople:(input:unknown)=>listPeopleService(staffActor,input),
     listStaffAccounts:()=>listAccessAccountsService(staffActor),
