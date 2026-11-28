@@ -27,7 +27,7 @@ export function PlatformGlooHealth(){
  }
  return <section className="mt-6 space-y-4 border border-border bg-card p-5" aria-label="AI provider health">
    <h2 className="font-serif text-xl">AI provider health</h2>
-   <p className="text-sm text-muted-foreground">Test Gloo using a small synthetic request. No Site information or credentials are displayed or transferred in this check.</p>
+   <p className="text-sm text-muted-foreground">Test Gloo using a small synthetic request. No Site information is sent. Credentials are used only for provider authentication and are never displayed.</p>
    <Button type="button" variant="outline" disabled={pending} onClick={()=>void check()}>{pending?"Checking…":"Test Gloo connection"}</Button>
    {probe&&<div className="space-y-2" role="status">
     <p className="text-sm">API key: {probe.keyConfigured?"Configured":"Missing"} · Model: {probe.modelConfigured?"Configured":"Missing"}</p>
