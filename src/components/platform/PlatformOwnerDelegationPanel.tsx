@@ -110,7 +110,7 @@ export function PlatformOwnerDelegationPanel({ compact = false }: {compact?:bool
       </p>
       <Button type="button" disabled={busy||reason.trim().length<12||(mode==="act"&&!target.canAct)}
         onClick={()=>void start()}>{busy?"Verifying permissions…":mode==="view"?"Start View as":"Start Act as"}</Button>
-      {!compact&&isDemoAccountEmail(target.email)&&platformOwnerMayActAs(target.role)&&<div className="space-y-3 border-t border-border pt-4">
+      {!compact&&isDemoAccountEmail(target.email)&&platformOwnerMayActAs(target.role)&&(target.privateAccessCodeEnabled||!target.syntheticSitePerson)&&<div className="space-y-3 border-t border-border pt-4">
         <p className="text-sm font-semibold">{target.privateAccessCodeEnabled?"Recover private access code":"Enroll individual access code"}</p>
         <WorkspaceNotice tone="attention">Issuing a private code invalidates previous credentials and revokes this account’s existing sessions. Independently confirm the recipient before securely transferring the code.</WorkspaceNotice>
         <Label htmlFor={id+"-private-code-confirm"}>Type ROTATE to confirm</Label>
