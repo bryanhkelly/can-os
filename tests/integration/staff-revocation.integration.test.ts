@@ -51,7 +51,7 @@ async function openSession(tx: Transaction, accountId: string, grantId: string):
     secretHash: hashAccessSecret(secret, PEPPER),
     expiresAt: new Date(Date.now() + 12 * 60 * 60 * 1000),
   });
-  return new Request("http://localhost", { headers: { cookie: `${accessSessionCookie}=${secret}` } });
+  return new Request("http://localhost", { method:"POST", headers: { cookie: `${accessSessionCookie}=${secret}` } });
 }
 
 /** Hand-built actor backed by a real grant row's verified identifiers. */
@@ -132,7 +132,7 @@ async function seedChurchCanProgram(tx: Transaction, suffix: string) {
 }
 
 integration("staff revocation enforcement", () => {
-  it("setGrantActive strips and restores command-context access and guards self-lockout", async () => {
+  it("setGrantActive revokes existing bearers permanently and guards self-lockout", async () => {
     const { db: realDb } = await vi.importActual<{ db: Database }>("@/db/client");
     const rollback = new Error("rollback-staff-grant-revocation");
     let checked = false;
@@ -152,7 +152,7 @@ integration("staff revocation enforcement", () => {
           legalFirstName: "Grant", legalLastName: `Registrar-${suffix}`,
         }).returning());
         const registrarAccount = first(await tx.insert(s.accessAccounts).values({
-          emailNormalized: `grant-registrar-${suffix}@example.invalid`, emailVerifiedAt: new Date(),
+          emailNormalized: `grant-registrar-${suffix}@example.invalid`, emailVerifiedAt: new Date(), personId:registrarPerson.id,
         }).returning());
         const registrarGrant = first(await tx.insert(s.accountPersonGrants).values({
           accountId: registrarAccount.id, personId: registrarPerson.id, role: "registrar",
@@ -162,7 +162,7 @@ integration("staff revocation enforcement", () => {
           legalFirstName: "Grant", legalLastName: `Staff-${suffix}`,
         }).returning());
         const staffAccount = first(await tx.insert(s.accessAccounts).values({
-          emailNormalized: `grant-staff-${suffix}@example.invalid`, emailVerifiedAt: new Date(),
+          emailNormalized: `grant-staff-${suffix}@example.invalid`, emailVerifiedAt: new Date(), personId:staffPerson.id,
         }).returning());
         const staffGrant = first(await tx.insert(s.accountPersonGrants).values({
           accountId: staffAccount.id, personId: staffPerson.id, role: "site_staff",
@@ -180,13 +180,15 @@ integration("staff revocation enforcement", () => {
           .rejects.toThrow("cannot deactivate your own active grant");
 
         const deactivated = await setGrantActive({ data: { grantId: staffGrant.id, active: false } });
+        expect(await setGrantActive({data:{grantId:staffGrant.id,active:false}})).toEqual(deactivated);
         expect(deactivated).toEqual({ grantId: staffGrant.id, active: false });
         // The deactivated grant immediately strips the resolved role/capabilities.
-        await expect(getCommandContext(staffRequest)).rejects.toThrow("active membership");
+        await expect(getCommandContext(staffRequest)).rejects.toThrow("authenticated session");
 
         const reactivated = await setGrantActive({ data: { grantId: staffGrant.id, active: true } });
         expect(reactivated).toEqual({ grantId: staffGrant.id, active: true });
-        const restored = await getCommandContext(staffRequest);
+        await expect(getCommandContext(staffRequest)).rejects.toThrow("authenticated session");
+        const restored = await getCommandContext(await openSession(tx,staffAccount.id,staffGrant.id));
         expect(restored).toMatchObject({ role: "site_staff", grantId: staffGrant.id });
         expect(restored.capabilities.has("onsite.attendance.record")).toBe(true);
 
@@ -206,7 +208,7 @@ integration("staff revocation enforcement", () => {
           legalFirstName: "Grant", legalLastName: `Outsider-${suffix}`,
         }).returning());
         const outsiderAccount = first(await tx.insert(s.accessAccounts).values({
-          emailNormalized: `grant-outsider-${suffix}@example.invalid`, emailVerifiedAt: new Date(),
+          emailNormalized: `grant-outsider-${suffix}@example.invalid`, emailVerifiedAt: new Date(), personId:outsiderPerson.id,
         }).returning());
         const outsiderGrant = first(await tx.insert(s.accountPersonGrants).values({
           accountId: outsiderAccount.id, personId: outsiderPerson.id, role: "site_staff",

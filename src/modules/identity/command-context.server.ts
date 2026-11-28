@@ -25,7 +25,7 @@ function rejectSession(_request: Request, reason: SessionFailure): never {
   console.warn("Session validation rejected", { reason });
  throw new AuthorizationError(reason === "membership_unavailable" ? "active membership" : "authenticated session");
 }
-export async function getIdentityContext(request: Request): Promise<AccessContext> {
+export async function getIdentityContext(request: Request, options: {allowExpiredOwnerRecovery?:boolean} = {}): Promise<AccessContext> {
  const value=readCookie(request,accessSessionCookie);
  if(!value) return rejectSession(request,"cookie_missing");
  if(!/^[A-Za-z0-9_-]{40,}$/.test(value)) return rejectSession(request,"cookie_invalid");
@@ -78,7 +78,7 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
   if(activeGrant.role!=="platform_owner"||activeGrant.id!==owner.grantId||
      owner.delegatedGrantId!==session.delegatedGrantId || owner.delegatedUntil?.getTime()!==session.delegatedUntil.getTime())
    return rejectSession(request,"membership_unavailable");
-  if(request.method!=="GET")throw new AuthorizationError("expired owner delegation: return to Platform Owner");
+  if(request.method!=="GET"||!options.allowExpiredOwnerRecovery)throw new AuthorizationError("expired owner delegation: return to Platform Owner");
   ownerDelegation={mode:"view",expiresAt:session.delegatedUntil};
  }else if(session.delegatedGrantId){
   const owner=await getVerifiedPlatformOwnerSession(request);

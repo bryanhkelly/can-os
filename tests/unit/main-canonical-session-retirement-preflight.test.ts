@@ -9,6 +9,7 @@ describe("main canonical session retirement safety",()=>{
     for(const marker of [
       "nativeSessionModel","nativeSessionIssuer","nativeIdentityCreator",
       "nativeSessionReader","nativeCookieContext","nativeSessionRevoker",
+      "nativeReviewedIdentityCreator","nativeSessionRecovery","nativeCourseRenewal","nativeActivityWriter","nativeLogout",
     ])expect(gate).toContain(marker);
     expect(gate).toContain("native_session_and_identity_runtime_paths_remain");
     expect(gate).toContain("native_identity_database_routines_remain");
@@ -22,6 +23,9 @@ describe("main canonical session retirement safety",()=>{
     expect(gate).toContain('MAIN="br-restless-sea-ar9ooo55"');
     expect(gate).toContain("CAN_MAIN_CANONICAL_SESSION_RETIREMENT_CHECK");
     expect(gate).toContain("readOnly:true");
+    expect(gate).toContain("isolationLevel:'RepeatableRead'");
+    expect(gate).toContain("noncredit-participant-identity.server.ts");
+    expect(gate).toContain("noncredit-self-registration.server.ts");
     expect(gate).not.toMatch(/sql`\s*(?:UPDATE|INSERT|DELETE|CREATE|DROP|ALTER|TRUNCATE|GRANT|REVOKE)\b/i);
   });
 

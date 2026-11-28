@@ -236,11 +236,18 @@ export async function startPlatformOwnerDelegation(request: Request, raw: unknow
   });
 }
 
+export async function readPlatformOwnerDelegationStatus(request: Request) {
+  const owner=await getVerifiedPlatformOwnerSession(request);
+  return {active:!!owner.delegatedGrantId&&!!owner.delegatedUntil&&owner.delegatedUntil>new Date(),
+    mode:owner.delegatedMode,expiresAt:owner.delegatedUntil?.toISOString()??null};
+}
+
 export async function stopPlatformOwnerDelegation(request: Request) {
   if (request.headers.get("origin") !== new URL(request.url).origin)
     throw new AuthorizationError("same-origin owner delegation");
-  const owner = await getVerifiedPlatformOwnerSession(request);
   return db.transaction(async tx => {
+    const owner = await getVerifiedPlatformOwnerSession(request,tx,true);
+    if(!owner.delegatedGrantId)return {stopped:true};
     const [changed] = await tx.update(accessSessions).set({
       delegatedGrantId: null, delegatedMode: null, delegatedUntil: null,
       delegatedReason: null, updatedAt: new Date(), lastActivityAt: new Date(),

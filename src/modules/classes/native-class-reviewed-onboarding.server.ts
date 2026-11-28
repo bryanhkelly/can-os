@@ -17,7 +17,7 @@ import { assertCurrentAdultReviewEvidence } from "@/modules/identity/reviewed-le
 import { verifiedAdultOn } from "@/domain/native-class-enrollment";
 import { probeCanonicalAuthReader } from "@/modules/identity/canonical-command-context.server";
 import {
-  resolveVerifiedAdultAccount, issueNativeLearnerSession,
+  resolveVerifiedAdultAccount, issueNativeLearnerSession, assertVerifiedAdultSessionForMutation,
 } from "@/modules/enrollment/noncredit-participant-identity.server";
 
 /**
@@ -34,6 +34,7 @@ export async function activateReviewedNativeClassLearnerService(request:Request)
   if(!await probeCanonicalAuthReader())
     throw new AuthorizationError("restricted native learner reader unavailable");
   const result=await db.transaction(async tx=>{
+      await assertVerifiedAdultSessionForMutation(tx,request,owner);
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"native-identity:"+owner.accountId}))`);
     const [can]=await tx.select({
       personId:accessAccounts.personId,email:accessAccounts.emailNormalized,
@@ -161,7 +162,7 @@ export async function activateReviewedNativeClassLearnerService(request:Request)
         enrollmentCreated:false,existingPersonReused:Boolean(linked),
       },
     });
-    const cookie=await issueNativeLearnerSession(tx,nativeAccountId,grantId,now);
+    const cookie=await issueNativeLearnerSession(tx,request,owner,nativeAccountId,grantId,now);
     return {cookie};
   });
   

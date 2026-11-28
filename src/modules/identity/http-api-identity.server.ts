@@ -1,3 +1,7 @@
+import {z} from "zod";
+import {listCANAcademicProgramStaff,delegateCANAcademicProgramStaff,revokeCANAcademicProgramStaff} from "@/modules/programs/can-academic-staff-delegation.server";
+import {getMyCredentialIssuerApprovalService,listPendingCredentialIssuerApprovalsService,listActiveCredentialIssuerApprovalsService,requestCanonicalCredentialIssuerApprovalService,reviewCanonicalCredentialIssuerApprovalService,revokeCanonicalCredentialIssuerApprovalService} from "./canonical-sensitive-approvals.server";
+import {listScopedSitesService,listPeopleService,listAccessAccountsService,inviteStaffMemberService,setGrantActiveService} from "./staff-admin.server";
 import {completeNativeClassLesson,submitNativeClassHomeworkCommand} from "@/modules/classes/native-class-learner-write.server";
 import {selectCurrentSessionMembership,recordCurrentSessionActivity} from "./session-lifecycle.server";
 import { getInstructionalLearnerContext } from "./learning-command-context.server";
@@ -16,6 +20,7 @@ export async function resolveHttpIdentity(request: Request) {
   const actor = await getIdentityContext(request);
   if (!actor.actorPersonId) throw new Error("Authenticated Person missing");
   const personId = actor.actorPersonId;
+  const staffActor={...actor,actorPersonId:personId};
   async function learner() {
     const context = await getInstructionalLearnerContext(request);
     if (context.actorPersonId !== personId) throw new AuthorizationError("one verified learning Person");
@@ -56,6 +61,20 @@ export async function resolveHttpIdentity(request: Request) {
         ...(session.ownerDelegation?{ownerDelegation:session.ownerDelegation}:{}),
       };
     },
+    getMyCredentialIssuerApproval:async()=>{const row=await getMyCredentialIssuerApprovalService(actor);return {approval:row?{...row,requestedAt:row.requestedAt.toISOString(),reviewedAt:row.reviewedAt?.toISOString()??null,approvedUntil:row.approvedUntil?.toISOString()??null}:null};},
+    listPendingCredentialIssuerApprovals:async()=> (await listPendingCredentialIssuerApprovalsService(actor)).map(row=>({...row,requestedAt:row.requestedAt.toISOString()})),
+    listActiveCredentialIssuerApprovals:async()=> (await listActiveCredentialIssuerApprovalsService(actor)).map(row=>({...row,requestedAt:row.requestedAt.toISOString(),reviewedAt:row.reviewedAt?.toISOString()??null,approvedUntil:row.approvedUntil?.toISOString()??null})),
+    requestCanonicalCredentialIssuerApproval:(input:unknown)=>{requireWrite();return requestCanonicalCredentialIssuerApprovalService(actor,request,input);},
+    reviewCanonicalCredentialIssuerApproval:(input:unknown)=>{requireWrite();return reviewCanonicalCredentialIssuerApprovalService(actor,request,input);},
+    revokeCanonicalCredentialIssuerApproval:(input:unknown)=>{requireWrite();return revokeCanonicalCredentialIssuerApprovalService(actor,request,input);},
+    listCANAcademicProgramStaff:(programId:string)=>listCANAcademicProgramStaff(actor,z.string().uuid().parse(programId)),
+    delegateCANAcademicProgramStaff:(input:unknown)=>{requireWrite();return delegateCANAcademicProgramStaff(actor,request,z.object({programId:z.string().uuid(),personId:z.string().uuid(),role:z.enum(["teacher","registrar"]),reason:z.string().trim().min(10).max(500)}).strict().parse(input));},
+    revokeCANAcademicProgramStaff:(input:unknown)=>{requireWrite();return revokeCANAcademicProgramStaff(actor,request,z.object({roleAssignmentId:z.string().uuid(),reason:z.string().trim().min(10).max(500)}).strict().parse(input));},
+    listStaffSites:()=>listScopedSitesService(staffActor),
+    listStaffPeople:(input:unknown)=>listPeopleService(staffActor,input),
+    listStaffAccounts:()=>listAccessAccountsService(staffActor),
+    inviteStaff:(input:unknown)=>{requireWrite();return inviteStaffMemberService(staffActor,request,input);},
+    setStaffGrantState:(input:unknown)=>{requireWrite();return setGrantActiveService(staffActor,request,input);},
     readStudentClasses: () => readStudentClasses(actor),
     readLearningResume: async (id:string) => readNativeClassResume(await learner(),id),
     readHomeworkSummary: async (id:string) => readNativeClassHomeworkSummary(await learner(),id),
@@ -73,3 +92,5 @@ export {handleAccessRequest,handleAccessVerification,handlePersonalRegistration,
 export {handleSiteSignupRequest} from "./site-signup-http.server";
 
 export {resolveGovernedWorkflow} from "./http-governed-workflows.server";
+
+export {resolveHttpOwnerControl} from "./http-owner-control.server";

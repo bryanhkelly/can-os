@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import {
-  getVerifiedPlatformOwnerSession, listPlatformOwnerTargets,
+  readPlatformOwnerDelegationStatus, listPlatformOwnerTargets,
   startPlatformOwnerDelegation, stopPlatformOwnerDelegation, rotatePrivateAccountAccessCode,
 } from "./platform-owner-delegation.server";
 
@@ -16,10 +16,7 @@ export const searchPlatformOwnerTargets=createServerFn({method:"GET"})
   .handler(async({data})=>{noStore();return listPlatformOwnerTargets(getRequest(),data.search);});
 
 export const readPlatformOwnerDelegation=createServerFn({method:"GET"})
-  .handler(async()=>{noStore();const owner=await getVerifiedPlatformOwnerSession(getRequest());
-    return {active:!!owner.delegatedGrantId&&!!owner.delegatedUntil&&owner.delegatedUntil>new Date(),
-      mode:owner.delegatedMode,expiresAt:owner.delegatedUntil?.toISOString()??null};
-  });
+  .handler(async()=>{noStore();return readPlatformOwnerDelegationStatus(getRequest());});
 
 export const beginPlatformOwnerDelegation=createServerFn({method:"POST"})
   .validator((raw:unknown)=>z.object({

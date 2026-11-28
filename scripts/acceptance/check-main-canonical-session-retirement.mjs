@@ -14,8 +14,13 @@ const MAIN="br-restless-sea-ar9ooo55";
 const sourcePath=(path)=>new URL("../../"+path,import.meta.url);
 const runtimePaths={
   nativeSessionModel:"src/db/canonical-v301/auth.ts",
-  nativeSessionIssuer:"src/modules/enrollment/noncredit-self-enrollment-identity.server.ts",
-  nativeIdentityCreator:"src/modules/enrollment/noncredit-self-enrollment.functions.ts",
+  nativeSessionIssuer:"src/modules/enrollment/noncredit-participant-identity.server.ts",
+  nativeIdentityCreator:"src/modules/enrollment/noncredit-self-registration.server.ts",
+  nativeReviewedIdentityCreator:"src/modules/classes/native-class-reviewed-onboarding.server.ts",
+  nativeSessionRecovery:"src/modules/classes/native-class-session-recovery.server.ts",
+  nativeCourseRenewal:"src/modules/enrollment/noncredit-self-enrollment-resume.functions.ts",
+  nativeActivityWriter:"src/modules/enrollment/noncredit-native-session-activity.functions.ts",
+  nativeLogout:"src/modules/identity/passwordless-access.server.ts",
   nativeSessionReader:"src/modules/identity/restricted-canonical-session-reader.server.ts",
   nativeCookieContext:"src/modules/identity/canonical-command-context.server.ts",
   nativeSessionRevoker:"src/modules/classes/native-class-adult-review.functions.ts",
@@ -24,6 +29,11 @@ const evidenceMarkers={
   nativeSessionModel:'educationV30.table("canonical_sessions"',
   nativeSessionIssuer:"tx.insert(canonicalSessions)",
   nativeIdentityCreator:"tx.insert(canonicalAccounts)",
+  nativeReviewedIdentityCreator:"tx.insert(canonicalAccounts)",
+  nativeSessionRecovery:"issueNativeLearnerSession(",
+  nativeCourseRenewal:"issueNativeLearnerSession(",
+  nativeActivityWriter:"tx.update(canonicalSessions)",
+  nativeLogout:"tx.update(canonicalSessions)",
   nativeSessionReader:"v301_canonical_session_context",
   nativeCookieContext:"canonicalSessionCookie",
   nativeSessionRevoker:"tx.update(canonicalSessions)",
@@ -39,7 +49,9 @@ async function main(){
   `;
   if(target?.project!==PROJECT||target?.branch!==MAIN||target?.db!=="neondb")
     throw Error("Refusing non-main CAN OS database");
-  const [counts]=await sql`
+  // All catalog/data evidence is taken in one read-only transaction snapshot.
+  const [countRows,dependencies,routineRows,securityRows]=await sql.transaction([
+    sql`
     SELECT (SELECT count(*)::int FROM education_v30.canonical_sessions) AS native_sessions,
       (SELECT count(*)::int FROM education_v30.canonical_accounts) AS native_accounts,
       (SELECT count(*)::int FROM education_v30.canonical_account_grants) AS native_grants,
@@ -47,8 +59,8 @@ async function main(){
       (SELECT count(*)::int FROM public.access_sessions) AS shared_sessions,
       (SELECT count(*)::int FROM public.access_accounts) AS shared_accounts,
       (SELECT count(*)::int FROM public.account_person_grants) AS shared_grants
-  `;
-  const dependencies=await sql`
+  `,
+  sql`
     SELECT target.relname AS referenced_table,count(*)::int AS inbound_foreign_keys
     FROM pg_constraint fk JOIN pg_class target ON target.oid=fk.confrelid
     JOIN pg_namespace ns ON ns.oid=target.relnamespace
@@ -56,11 +68,11 @@ async function main(){
       AND target.relname IN (
         'canonical_sessions','canonical_accounts','canonical_account_grants','persons')
     GROUP BY target.relname ORDER BY target.relname
-  `;
+  `,
   // pg_get_functiondef can reject aggregate/window catalog entries even
   // when a surrounding aggregate FILTER appears to exclude them. Inspect
   // function source only after selecting ordinary functions/procedures.
-  const [routines]=await sql`
+  sql`
     SELECT count(*) FILTER (
       WHERE p.prosrc ILIKE '%canonical_sessions%'
     )::int AS native_session_readers,
@@ -73,8 +85,8 @@ async function main(){
     FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace
     WHERE ns.nspname IN ('public','education_v30','education_v30_secure')
       AND p.prokind IN ('f','p')
-  `;
-  const [security]=await sql`
+  `,
+  sql`
     SELECT count(*)::int AS secured
     FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
     WHERE n.nspname='public'
@@ -82,7 +94,10 @@ async function main(){
       AND c.relrowsecurity AND c.relforcerowsecurity
       AND NOT has_table_privilege('authenticated',c.oid,'SELECT')
       AND NOT has_table_privilege('authenticated',c.oid,'UPDATE')
-  `;
+      AND NOT has_table_privilege('authenticated',c.oid,'INSERT')
+      AND NOT has_table_privilege('authenticated',c.oid,'DELETE')
+  `],{readOnly:true,isolationLevel:'RepeatableRead'});
+  const [counts]=countRows,[routines]=routineRows,[security]=securityRows;
   const activeRuntimePaths=Object.entries(runtimePaths).filter(([kind,path])=>
     readFileSync(sourcePath(path),"utf8").includes(evidenceMarkers[kind])
   ).map(([kind])=>kind);

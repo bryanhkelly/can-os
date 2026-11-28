@@ -16,6 +16,8 @@ test("anonymous access routes reject cross-origin and malformed credentials",asy
      expect((await http.post(api+"/access/"+path,{headers:{Origin:origin},data:{}})).status()).toBe(400);
    }
    expect((await http.get(api+"/access/session")).status()).toBe(401);
+   const duplicate=await http.post(api+"/access/logout",{headers:{Origin:origin,cookie:"__Host-can_os_session=a; __Host-can_os_session=b"},data:{}});
+   expect(duplicate.status()).toBe(401);
    expect((await http.get(api+"/access/session",{headers:{cookie:"__Host-can_os_session=invalid"}})).status()).toBe(401);
  }finally{await http.dispose();}
 });
@@ -35,8 +37,22 @@ test("verified personal and institutional signup through NestJS only",async()=>{
    expect((await personal.post(api+"/me/session/membership",{headers:{Origin:origin},data:{grantId:sg.id}})).status()).toBe(403);
    expect((await qaSession({request:personal},"nest")).activeGrantId).toBe(pg.id);
    for(const client of [personal,site]){
-     expect((await client.post(api+"/access/logout",{headers:{Origin:origin},data:{}})).status()).toBe(204);
+     for(const path of ["delegation","delegation-targets?search=QA"]){
+       expect((await client.get(api+"/owner/"+path,{headers:{"x-role":"platform_owner"}})).status()).toBe(403);
+     }
+     for(const [path,data] of [
+       ["delegation",{grantId:sg.id,mode:"view",reason:"Unauthorized QA delegation attempt"}],
+       ["delegation/return",{confirm:true}],
+       ["private-credential-recovery",{grantId:sg.id,reason:"Unauthorized QA credential recovery",confirm:true}],
+     ] as const){
+       expect((await client.post(api+"/owner/"+path,{headers:{Origin:origin},data})).status()).toBe(403);
+     }
+     const logout=await client.post(api+"/access/logout",{headers:{Origin:origin},data:{}});
+     expect(logout.status()).toBe(204);
+     expect(logout.headersArray().filter(h=>h.name.toLowerCase()==="set-cookie").map(h=>h.value).sort()).toEqual(["__Host-can_os_session=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0","__Host-can_os_v3_session=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0"].sort());
      expect((await client.get(api+"/access/session")).status()).toBe(401);
+     expect((await client.post(api+"/access/logout",{headers:{Origin:origin},data:{}})).status()).toBe(204);
+     expect((await client.post(api+"/access/logout",{headers:{Origin:"https://foreign.example"},data:{}})).status()).toBe(403);
    }
  }finally{await Promise.all([personal.dispose(),site.dispose()]);}
 });

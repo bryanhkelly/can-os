@@ -1,3 +1,5 @@
+import {canonicalSessions} from "@/db/canonical-v301";
+import {canonicalSessionCookie} from "@/domain/canonical-access";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { db } from "@/db/client";
 import { writeAudit } from "@/platform/mutation";
@@ -6,7 +8,7 @@ import { roleCapabilities } from "@/domain/access-context";
 import { assertMembershipSwitchIdentity } from "@/domain/membership-switch-policy";
 import { AuthorizationError } from "@/domain/command-context";
 import { AccessInfrastructureError, InvalidAccessCredentialError, type AccessFailureReason } from "@/domain/access-errors";
-import { clearSessionCookieHeader,hashAccessSecret,hashPrivateAccessCode,isPrivateAccessCode,equalSecretHashes,issueOpaqueSecret,normalizeAccessEmail,sessionCookieHeader,sessionIdleCutoff } from "@/domain/access-tokens";
+import { accessSessionCookie,clearSessionCookieHeader,hashAccessSecret,hashPrivateAccessCode,isPrivateAccessCode,equalSecretHashes,issueOpaqueSecret,normalizeAccessEmail,sessionCookieHeader,sessionIdleCutoff } from "@/domain/access-tokens";
 import {
  isDemoAccountEmail,LOCAL_DEMO_ACCESS_CODE,
 } from "@/domain/local-demo-access";
@@ -17,6 +19,7 @@ import { and,desc,eq,gt,inArray,isNull,isNotNull,lt,sql } from "drizzle-orm";
 import { sendAccessLinkViaResend,type AccessEmailSender } from "./resend-access-mail.server";
 import { acceptStaffInvitations,listPendingStaffInvitations } from "./staff-invitations.server";
 import { readDemoStaffBindings, matchesDemoStaffBinding } from "./demo-staff-access.server";
+import { readCookie } from "@/domain/session-cookies";
 import { safeAccessReturnTo } from "@/domain/access-navigation";
 import { realSchoolSetupSignupSchema, siteSignupSchema } from "@/domain/school-setup";
 
@@ -282,7 +285,7 @@ export async function redeemOneTimeAccess(rawToken:string,device?:SessionDeviceC
   const [boundAccount]=await tx.select({personId:accessAccounts.personId})
     .from(accessAccounts).where(eq(accessAccounts.id,account.id)).limit(1);
   const [chosenGrant]=await tx.select({personId:accountPersonGrants.personId})
-    .from(accountPersonGrants).where(eq(accountPersonGrants.id,activeGrant.id)).limit(1);
+    .from(accountPersonGrants).where(and(eq(accountPersonGrants.id,activeGrant.id),eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true))).for("share").limit(1);
   if(!boundAccount?.personId ||
      boundAccount.personId!==chosenGrant?.personId)
     throw new InvalidAccessCredentialError("Verified CAN Person unavailable");
@@ -360,6 +363,11 @@ export async function redeemDemoAccess(
   const grant=accountGrants.find(candidate=>candidate.role==="site_admin"&&candidate.siteId===launchSiteId)
    ?? [...accountGrants].sort((a,b)=>a.id.localeCompare(b.id))[0];
   if(!grant)throw new InvalidAccessCredentialError("Invalid demo credentials");
+  // Serialize session issuance with a membership revocation, including
+  // a grant that was active when the initial projection was read.
+  const [currentGrant]=await tx.select({personId:accountPersonGrants.personId})
+    .from(accountPersonGrants).where(and(eq(accountPersonGrants.id,grant.id),eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.personId,grant.personId),eq(accountPersonGrants.active,true))).for("share").limit(1);
+  if(!currentGrant)throw new InvalidAccessCredentialError("Invalid demo credentials");
   // Resolve the authenticated administrator's own operating Site, never a user-supplied ID.
   const adminSiteId=hasRegistrarAuthority(grant.role)?grant.siteId:undefined;
   const activeSchool=adminSiteId
@@ -403,8 +411,8 @@ export async function redeemDemoAccess(
 }
 /** Compatibility entry point used by the existing access-verification route. */
 export const redeemLocalDemoAccess=redeemDemoAccess;
-export async function revokeAccessSession(sessionId:string,accountId:string):Promise<string> {
- await db.transaction(async tx=>{
+type SessionRevocationTx=Parameters<Parameters<typeof db.transaction>[0]>[0];
+async function revokeAccessSessionInTransaction(tx:SessionRevocationTx,sessionId:string,accountId:string):Promise<void>{
   const [row]=await tx.update(accessSessions).set({revokedAt:new Date(),updatedAt:new Date()})
    .where(and(eq(accessSessions.id,sessionId),eq(accessSessions.accountId,accountId),isNull(accessSessions.revokedAt))).returning({activeGrantId:accessSessions.activeGrantId});
   if(row?.activeGrantId){
@@ -418,8 +426,42 @@ export async function revokeAccessSession(sessionId:string,accountId:string):Pro
     sessionId,grantId:row.activeGrantId,role:member?.role??null,
    });
   }
- });
+}
+export async function revokeAccessSession(sessionId:string,accountId:string):Promise<string>{
+ await db.transaction(tx=>revokeAccessSessionInTransaction(tx,sessionId,accountId));
  return clearSessionCookieHeader();
+}
+/** Browser logout revokes the exact presented bearers, not an entire account,
+ * and does not require an active business grant. Parse both names before any
+ * mutation and commit both revocations and their audit in one transaction. */
+export async function revokePresentedAccessSessions(request:Request):Promise<string[]>{
+ const token=readCookie(request,accessSessionCookie);
+ const native=readCookie(request,canonicalSessionCookie);
+ const valid=(value:string|undefined):value is string=>!!value&&/^[A-Za-z0-9_-]{40,128}$/.test(value);
+ const canDigest=valid(token)?hashAccessSecret(token,secretPepper()):null;
+ let nativeDigest:string|null=null;
+ if(valid(native)){
+  const pepper=process.env.CAN_CANONICAL_ACCESS_TOKEN_PEPPER;
+  if(!pepper||pepper.length<32)throw new AccessInfrastructureError("session_configuration");
+  nativeDigest=hashAccessSecret(native,pepper);
+ }
+ if(canDigest||nativeDigest)await db.transaction(async tx=>{
+  if(canDigest){
+   const [session]=await tx.select({id:accessSessions.id,accountId:accessSessions.accountId})
+    .from(accessSessions).where(and(eq(accessSessions.secretHash,canDigest),isNull(accessSessions.revokedAt))).limit(1);
+   if(session)await revokeAccessSessionInTransaction(tx,session.id,session.accountId);
+  }
+  if(nativeDigest){
+   const [session]=await tx.update(canonicalSessions).set({revokedAt:new Date()})
+    .where(and(eq(canonicalSessions.secretHash,nativeDigest),isNull(canonicalSessions.revokedAt)))
+    .returning({id:canonicalSessions.id,accountId:canonicalSessions.accountId,grantId:canonicalSessions.activeGrantId});
+   // Bearer possession authorizes revocation only, not acting as a Person.
+   if(session)await writeAudit(tx,{actorPersonId:null,action:"identity.native_session.revoked",
+    resourceType:"canonical_session",resourceId:session.id,scope:{},
+    context:{nativeAccountId:session.accountId,nativeGrantId:session.grantId,outcome:"success"}});
+  }
+ });
+ return [clearSessionCookieHeader(),`${canonicalSessionCookie}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`];
 }
 /** Selection is restricted to a grant assigned to the authenticated account. */
 export async function selectAccessGrant(sessionId:string,accountId:string,grantId:string):Promise<void> {

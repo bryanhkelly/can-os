@@ -1,0 +1,429 @@
+import { bindAuthorizedAccountPerson } from "./named-person-account.server";
+import { isDemoAccountEmail } from "@/domain/domain-classification";
+import { issuePrivateAccountCredential } from "./private-account-credential.server";
+import { canIssueIndividualCredential } from "@/modules/identity/individual-credential-issuer.server";
+import { individualStaffTargetEligible, requiresIndividualStaffCredential } from "@/domain/individual-staff-handoff";
+import { privateAccountRoleEligible } from "@/domain/private-account-authority";
+import { personLegalName } from "@/domain/person-name";
+import { and, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { z } from "zod";
+import {recordAudit,type Actor} from "./actor-audit.server";
+import {hasRegistrarAuthority} from "@/domain/school-roles";
+import {assertCurrentCANGrantForMutation} from "./current-can-grant-transaction.server";
+import {assertRawAccountPerson} from "./unambiguous-adult-account.server";
+import { AuthorizationError,assertCapability } from "@/domain/command-context";
+import { assertSafeguardingStaffInviteSite } from "@/domain/site-safeguarding-access";
+import { EventTypes } from "@/domain/event-types";
+import { emitEvent } from "@/platform/mutation";
+import { verifiedAdultSafetyEvidence } from "@/modules/operations/onsite-block-safety.server";
+import { requestOneTimeAccessWithDeliveryStatus } from "@/modules/identity/passwordless-access.server";
+import {
+  assertChurchLocalInvitationOrganization, localStaffInviteInput, localStaffInviteRoles, staffOnboardingState,
+} from "@/domain/staff-onboarding-policy";
+import {
+  listPendingStaffInvitations, STAFF_INVITATION_AGGREGATE, acceptStaffInvitations,
+} from "@/modules/identity/staff-invitations.server";
+import { provisionSiteWebsitePublisherRelationship } from "@/modules/sites/site-publisher-invitation.server";
+import { DomainError } from "@/domain/errors";
+import { matchesLegacyStaffInvitationScope } from "./demo-school-tenants.server";
+import { verifiedStaffIdentityPredicate } from "./verified-staff-identity.server";
+// The staff-invite flow must not grant student, guardian, or CAN institutional identities.
+const assignableRoles = localStaffInviteRoles;
+
+// A malformed historical Site/Organization edge is not a visible membership.
+// Keep the exact existing tenant filter as well as the canonical Person join.
+const currentSiteOwnership=(grant:typeof import("@/db/schema").accountPersonGrants)=>sql`(${grant.siteId} IS NULL OR EXISTS (SELECT 1 FROM public.sites AS scoped_site WHERE scoped_site.id=${grant.siteId} AND scoped_site.organization_id=${grant.organizationId}))`;
+
+/** Every admin function requires the registrar role, admin.manage, and a non-empty organization scope. */
+async function requireRegistrar(actor:Actor): Promise<Actor & { organizationIds: string[]; grantSiteId: string | null }> {
+  if(!actor.actorPersonId||!hasRegistrarAuthority(actor.role))throw new AuthorizationError("role: registrar");
+  assertCapability(actor,"admin.manage");
+  const organizationIds = actor.scope.organizationIds ?? [];
+  if (organizationIds.length !== 1) throw new AuthorizationError("organization scope");
+  // Do not infer organization-wide authority from expanded read scopes:
+  // a site-bound membership has only its own original grant authority.
+  const {db}=await import("@/db/client");
+  const {accountPersonGrants}=await import("@/db/schema");
+  const [grant]=await db.select({siteId:accountPersonGrants.siteId})
+   .from(accountPersonGrants).where(and(
+    eq(accountPersonGrants.id,actor.grantId),
+    eq(accountPersonGrants.accountId,actor.accountId),
+    eq(accountPersonGrants.personId,actor.actorPersonId),
+    eq(accountPersonGrants.organizationId,organizationIds[0]!),
+    eq(accountPersonGrants.role,actor.role),
+    eq(accountPersonGrants.active,true))).limit(1);
+  if(!grant||grant.siteId!==actor.grantSiteId)throw new AuthorizationError("active registrar grant");
+  return { ...actor, organizationIds, grantSiteId:grant.siteId };
+}
+
+/** Site select options for the invite form: all sites of the scoped organizations. */
+export async function listScopedSitesService(context:Actor) {
+  const actor = await requireRegistrar(context);
+  const { db } = await import("@/db/client");
+  const { sites } = await import("@/db/schema");
+  const scopedSiteIds = actor.scope.siteIds ?? [];
+  if(!scopedSiteIds.length)return {sites:[],requireSiteSelection:actor.grantSiteId!==null};
+  const rows = await db.select({
+    id: sites.id, name: sites.name, organizationId: sites.organizationId,
+  }).from(sites).where(and(
+    inArray(sites.organizationId, actor.organizationIds),
+    inArray(sites.id, scopedSiteIds),
+  ));
+  return { sites: rows, requireSiteSelection:actor.grantSiteId!==null };
+}
+
+/**
+ * People directory. Scoping join: a person is visible when they hold at least one
+ * account_person_grants row whose organizationId is in the registrar's organization
+ * scope (grants are the verified membership edge between an account and a person).
+ * Returns each person with their scoped grants per account. Limit 50 people.
+ */
+export const staffPeopleQuery=z.object({query:z.string().trim().max(120).optional()}).strict();
+export async function listPeopleService(context:Actor,raw:unknown) {
+    const data=staffPeopleQuery.parse(raw??{});
+    const actor = await requireRegistrar(context);
+    const { db } = await import("@/db/client");
+    const { people, accountPersonGrants, accessAccounts } = await import("@/db/schema");
+    const nameFilter = data.query
+      ? or(
+          ilike(people.legalFirstName, `%${data.query.replace(/[\\%_]/g, char => "\\" + char)}%`),
+          ilike(people.legalLastName, `%${data.query.replace(/[\\%_]/g, char => "\\" + char)}%`),
+          ilike(people.preferredName, `%${data.query.replace(/[\\%_]/g, char => "\\" + char)}%`),
+        )
+      : undefined;
+    const personRows = await db.selectDistinct({ personId: accountPersonGrants.personId })
+      .from(accountPersonGrants)
+      .innerJoin(people, eq(people.id, accountPersonGrants.personId))
+      .innerJoin(accessAccounts,and(eq(accessAccounts.id,accountPersonGrants.accountId),eq(accessAccounts.personId,accountPersonGrants.personId)))
+      .where(and(inArray(accountPersonGrants.organizationId, actor.organizationIds),currentSiteOwnership(accountPersonGrants),actor.grantSiteId?eq(accountPersonGrants.siteId,actor.grantSiteId):undefined,nameFilter))
+      .orderBy(accountPersonGrants.personId)
+      .limit(50);
+    const personIds = personRows.map(row => row.personId);
+    if (personIds.length === 0) return { people: [] };
+    const rows = await db.select({
+      personId: people.id,
+      firstName: people.legalFirstName,
+      lastName: people.legalLastName,
+      preferredName: people.preferredName,
+      personActive: people.active,
+      grantId: accountPersonGrants.id,
+      accountId: accountPersonGrants.accountId,
+      accountEmail: accessAccounts.emailNormalized,
+      role: accountPersonGrants.role,
+      organizationId: accountPersonGrants.organizationId,
+      siteId: accountPersonGrants.siteId,
+      grantActive: accountPersonGrants.active,
+    }).from(accountPersonGrants)
+      .innerJoin(people, eq(people.id, accountPersonGrants.personId))
+      .innerJoin(accessAccounts, and(eq(accessAccounts.id, accountPersonGrants.accountId),eq(accessAccounts.personId,accountPersonGrants.personId)))
+      .where(and(
+        inArray(accountPersonGrants.personId, personIds),
+        inArray(accountPersonGrants.organizationId, actor.organizationIds),
+        currentSiteOwnership(accountPersonGrants),
+        actor.grantSiteId?eq(accountPersonGrants.siteId,actor.grantSiteId):undefined,
+      ));
+    const byPerson = new Map<string, {
+      personId: string; firstName: string; lastName: string; preferredName: string | null; active: boolean;
+      grants: { grantId: string; accountId: string; accountEmail: string; role: string; organizationId: string | null; siteId: string | null; active: boolean }[];
+    }>();
+    for (const row of rows) {
+      const entry = byPerson.get(row.personId) ?? {
+        personId: row.personId, firstName: row.firstName, lastName: row.lastName,
+        preferredName: row.preferredName, active: row.personActive, grants: [],
+      };
+      entry.grants.push({
+        grantId: row.grantId, accountId: row.accountId, accountEmail: row.accountEmail,
+        role: row.role, organizationId: row.organizationId, siteId: row.siteId, active: row.grantActive,
+      });
+      byPerson.set(row.personId, entry);
+    }
+    return { people: [...byPerson.values()] };
+}
+
+/** Access accounts with invitation and independently verified onsite readiness. */
+export async function listAccessAccountsService(context:Actor) {
+  const actor = await requireRegistrar(context);
+  const { db } = await import("@/db/client");
+  const { accessAccounts, accountPersonGrants, domainEvents, people, qualificationClaims } = await import("@/db/schema");
+  const rows = await db.select({
+    accountId: accessAccounts.id,
+    email: accessAccounts.emailNormalized,
+    identityVerified: verifiedStaffIdentityPredicate(),
+    emailVerifiedAt: accessAccounts.emailVerifiedAt,
+    disabled: accessAccounts.disabled,
+    personId: people.id,
+    firstName: people.legalFirstName,
+    lastName: people.legalLastName,
+    grantId: accountPersonGrants.id,
+    role: accountPersonGrants.role,
+    organizationId: accountPersonGrants.organizationId,
+    siteId: accountPersonGrants.siteId,
+    grantActive: accountPersonGrants.active,
+  }).from(accountPersonGrants)
+    .innerJoin(accessAccounts, and(eq(accessAccounts.id, accountPersonGrants.accountId),eq(accessAccounts.personId,accountPersonGrants.personId)))
+    .innerJoin(people, eq(people.id, accountPersonGrants.personId))
+    .where(and(inArray(accountPersonGrants.organizationId, actor.organizationIds),currentSiteOwnership(accountPersonGrants),actor.grantSiteId?eq(accountPersonGrants.siteId,actor.grantSiteId):undefined));
+  const grantIds = rows.map(row => row.grantId);
+  const personIds = [...new Set(rows.map(row => row.personId))];
+  const invitationEvents = grantIds.length ? await db.select({
+    grantId: domainEvents.aggregateId, eventType: domainEvents.eventType,
+  }).from(domainEvents).where(and(
+    eq(domainEvents.aggregateType, STAFF_INVITATION_AGGREGATE),
+    inArray(domainEvents.aggregateId, grantIds),
+    inArray(domainEvents.eventType, [EventTypes.StaffInvitationIssued, EventTypes.StaffInvitationAccepted]),
+  )) : [];
+  const claims = personIds.length ? await db.select({ personId: qualificationClaims.personId })
+    .from(qualificationClaims).where(inArray(qualificationClaims.personId, personIds)) : [];
+  const evidence = await verifiedAdultSafetyEvidence(db, personIds);
+  const issued = new Set(invitationEvents.filter(event => event.eventType === EventTypes.StaffInvitationIssued).map(event => event.grantId));
+  const accepted = new Set(invitationEvents.filter(event => event.eventType === EventTypes.StaffInvitationAccepted).map(event => event.grantId));
+  const claimants = new Set(claims.map(claim => claim.personId));
+  const now = new Date();
+  const byAccount = new Map<string, {
+    accountId: string; email: string; disabled: boolean;
+    grants: { grantId: string; personId: string; personName: string; role: string; organizationId: string | null; siteId: string | null; active: boolean; onboarding: ReturnType<typeof staffOnboardingState> }[];
+  }>();
+  for (const row of rows) {
+    const entry = byAccount.get(row.accountId) ?? { accountId: row.accountId, email: row.email, disabled: row.disabled, grants: [] };
+    const adultEvidence = evidence.get(row.personId);
+    const current = (items: readonly { from: Date; through: Date | null }[] | undefined) =>
+      Boolean(items?.some(item => item.from <= now && item.through !== null && item.through > now));
+    const onboarding = staffOnboardingState({
+      active: row.grantActive,
+      invitationPending: issued.has(row.grantId) && !accepted.has(row.grantId),
+      emailVerified: row.emailVerifiedAt !== null,
+      demoIdentityAccepted: row.identityVerified && row.emailVerifiedAt === null,
+      role: row.role,
+      screeningCurrent: current(adultEvidence?.screening),
+      trainingCurrent: current(adultEvidence?.training),
+      hasQualificationClaims: claimants.has(row.personId),
+    });
+    entry.grants.push({
+      grantId: row.grantId, personId: row.personId,
+      personName: personLegalName({ legalFirstName: row.firstName, legalLastName: row.lastName }),
+      role: row.role, organizationId: row.organizationId, siteId: row.siteId, active: row.grantActive,
+      onboarding,
+    });
+    byAccount.set(row.accountId, entry);
+  }
+  return { accounts: [...byAccount.values()] };
+}
+
+/**
+ * Provision an inactive exact-Site invitation and deliver the canonical access
+ * link (or registered demo shared-code acceptance). Retries reuse the same
+ * account/person/grant and the access challenge's normal delivery cooldown.
+ */
+export async function inviteStaffMemberService(context:Actor,request:Request,raw:unknown) {
+    if(request.method!=="POST")throw new AuthorizationError("staff administration mutation");
+    const data=localStaffInviteInput.parse(raw);
+    assertSafeguardingStaffInviteSite(data.role, data.siteId);
+    const actor = await requireRegistrar(context);
+    const { db } = await import("@/db/client");
+    const { accessAccounts, accountPersonGrants, organizations, sites } = await import("@/db/schema");
+    const { lockAccountProvisioningEmail, provisioningAccountSelection, readLockedProvisioningAccount } = await import("./account-provisioning-store.server");
+    const organizationId = actor.organizationIds[0]!;
+    if(actor.grantSiteId && data.siteId!==actor.grantSiteId)
+      throw new AuthorizationError("site-limited registrar cannot create sibling school grants");
+    const [site] = await db.select({ id: sites.id, organizationType: organizations.type }).from(sites)
+      .innerJoin(organizations, eq(organizations.id, sites.organizationId))
+      .where(and(eq(sites.id, data.siteId), eq(sites.organizationId, organizationId)))
+      .limit(1);
+    const scopedSiteIds = actor.scope.siteIds ?? [];
+    if (!site || !scopedSiteIds.includes(site.id)) throw new AuthorizationError("site scope");
+    assertChurchLocalInvitationOrganization(site.organizationType);
+    const siteId = site.id;
+    const emailNormalized = data.email.toLowerCase();
+    const invitation = await db.transaction(async tx => {
+      await assertCurrentCANGrantForMutation(tx,request,actor,{roles:["registrar","site_admin"],organizationId,siteId:actor.grantSiteId});
+      // Recheck target Site ownership inside the mutation transaction.
+      const [currentSite]=await tx.select({id:sites.id,organizationType:organizations.type}).from(sites)
+        .innerJoin(organizations,eq(organizations.id,sites.organizationId))
+        .where(and(eq(sites.id,siteId),eq(sites.organizationId,organizationId))).for("share").limit(1);
+      if(!currentSite)throw new AuthorizationError("current site scope");
+      assertChurchLocalInvitationOrganization(currentSite.organizationType);
+      await lockAccountProvisioningEmail(tx, emailNormalized);
+      const localDemoIdentity = isDemoAccountEmail(emailNormalized);
+      const confirmation = data.privateIdentityConfirmation;
+      let [account] = await readLockedProvisioningAccount(tx, emailNormalized);
+      if (account?.disabled) throw new DomainError("FORBIDDEN", "Disabled account cannot be invited");
+      const sharedScope = localDemoIdentity && await matchesLegacyStaffInvitationScope(emailNormalized, organizationId, siteId, tx);
+      // An approved synthetic Site never issues a new private code merely
+      // because the operator entered optional identity-confirmation details.
+      // Existing individual credentials and independently governed live
+      // non-deliverable identities retain their stronger authentication.
+      const individual = requiresIndividualStaffCredential({
+        demoIdentity:localDemoIdentity, approvedSharedScope:sharedScope,
+        existingPrivateCredential:account?.privateCredential===true, confirmationProvided:!!confirmation,
+      });
+      if (confirmation && !localDemoIdentity)
+        throw new AuthorizationError("eligible individual staff identity");
+      if (confirmation?.existingPersonId && account?.personId !== confirmation.existingPersonId)
+        throw new AuthorizationError("confirmed existing Person");
+      if (individual) {
+        if (!privateAccountRoleEligible(data.role))
+          throw new AuthorizationError("eligible individual staff identity");
+        if (actor.sessionAccountId || actor.impersonatedByAccountId || actor.delegatedByPlatformOwner)
+          throw new AuthorizationError("direct administrator identity");
+        if (!await canIssueIndividualCredential(tx,actor))
+          throw new AuthorizationError("individually authenticated administrator");
+      }
+      if (localDemoIdentity && !individual && !sharedScope) {
+        throw new DomainError("FORBIDDEN", "Use governed individual identity enrollment or the approved synthetic credential scope");
+      }
+      let privateAccessCode:string|undefined;
+      if (account?.privateCredential && !individual)
+        throw new AuthorizationError("explicit individual identity confirmation required");
+      if (individual && !individualStaffTargetEligible(account,confirmation?.existingPersonId))
+        throw new AuthorizationError("independently confirmed existing individual Person");
+      if (!account) {
+        const credential=individual?issuePrivateAccountCredential():undefined;
+        privateAccessCode=credential?.privateAccessCode;
+        [account] = await tx.insert(accessAccounts).values({ emailNormalized,
+          ...(credential?{privateAccessCodeHash:credential.privateAccessCodeHash}:{})
+        }).returning(provisioningAccountSelection);
+        await recordAudit(tx, actor, {
+          action: "admin.access_account.create", resourceType: "access_account", resourceId: account!.id,
+          after: { emailNormalized },
+        });
+      }
+      if (localDemoIdentity && !individual) {
+        const foreign = await tx.select({ id: accountPersonGrants.id }).from(accountPersonGrants)
+          .where(and(eq(accountPersonGrants.accountId, account!.id),
+            sql`(${accountPersonGrants.organizationId} IS DISTINCT FROM ${organizationId}::uuid
+              OR ${accountPersonGrants.siteId} IS DISTINCT FROM ${siteId}::uuid)`)).limit(1);
+        if (foreign.length) throw new DomainError("FORBIDDEN", "An existing identity belongs to another school");
+      }
+      if(!account)throw new Error("Staff Account could not be provisioned");
+      const identity=await bindAuthorizedAccountPerson(tx,account,{
+        email:emailNormalized,firstName:data.firstName,lastName:data.lastName,
+      });
+      const personId=identity.personId;
+      if(identity.personCreated)await recordAudit(tx,actor,{
+        action:"admin.person.create",resourceType:"person",resourceId:personId,
+        after:{firstName:data.firstName,lastName:data.lastName,email:emailNormalized},
+      });
+      if (individual) {
+        await recordAudit(tx, actor, {
+          action:"identity.staff_individual_confirmation",resourceType:"access_account",resourceId:account!.id,
+          after:{personId,reason:confirmation!.reason,credentialIssued:!!privateAccessCode},
+          scope:{organizationId,siteId},
+        });
+      }
+      const [existingGrant] = await tx.select({ id: accountPersonGrants.id, active: accountPersonGrants.active })
+        .from(accountPersonGrants).where(and(
+          eq(accountPersonGrants.accountId, account!.id),
+          eq(accountPersonGrants.personId, personId),
+          eq(accountPersonGrants.role, data.role),
+          eq(accountPersonGrants.organizationId, organizationId),
+          eq(accountPersonGrants.siteId, siteId),
+        )).limit(1);
+      if (existingGrant) {
+        if (existingGrant.active) return { accountId: account!.id, personId, grantId: existingGrant.id, created: false as const, pending: false, privateCredential: individual };
+        const pending = (await listPendingStaffInvitations(tx, account!.id)).some(grant => grant.id === existingGrant.id);
+        if (!pending) throw new Error("An inactive grant already exists; review it separately instead of creating a replacement invitation");
+        if (localDemoIdentity) {
+          const invitations = await listPendingStaffInvitations(tx, account!.id);
+          const accepted = await acceptStaffInvitations(tx, account!.id, invitations.filter(item => item.id === existingGrant.id), new Date(), {actorPersonId:actor.actorPersonId!});
+          if (!accepted.length) throw new Error("Demo staff approval could not be recorded");
+          return { accountId: account!.id, personId, grantId: existingGrant.id, created: false as const, pending: false, privateCredential: individual };
+        }
+        return { accountId: account!.id, personId, grantId: existingGrant.id, created: false as const, pending: true, privateCredential: individual };
+      }
+      const [grant] = await tx.insert(accountPersonGrants).values({
+        accountId: account!.id, personId, role: data.role, organizationId, siteId, active: false,
+      }).returning({ id: accountPersonGrants.id });
+      if (!grant) throw new Error("Staff invitation grant could not be created");
+      const publisherRelationship = data.role === "site_website_editor"
+        ? await provisionSiteWebsitePublisherRelationship(tx, { personId, organizationId, siteId })
+        : null;
+      await emitEvent(tx, {
+        eventType: EventTypes.StaffInvitationIssued,
+        aggregateType: STAFF_INVITATION_AGGREGATE,
+        aggregateId: grant.id,
+        actorPersonId: actor.actorPersonId,
+        organizationId, siteId,
+        payload: { accountId: account!.id, personId, role: data.role, publisherRelationship,
+          invitationMode: individual ? "individual_credential" : localDemoIdentity ? "legacy_shared_credential" : "verified_email", emailNormalized,
+        },
+      });
+      await recordAudit(tx, actor, {
+        action: "admin.staff_invitation.issued", resourceType: STAFF_INVITATION_AGGREGATE, resourceId: grant.id,
+        after: { accountId: account!.id, personId, role: data.role, organizationId, siteId, active: false, publisherRelationship },
+        scope: { organizationId, siteId },
+      });
+      if (localDemoIdentity) {
+        const pending = await listPendingStaffInvitations(tx, account!.id);
+        const accepted = await acceptStaffInvitations(tx, account!.id, pending.filter(item => item.id === grant.id), new Date(), {actorPersonId:actor.actorPersonId!});
+        if (!accepted.length) throw new Error("Demo staff approval could not be recorded");
+        return { accountId: account!.id, personId, grantId: grant.id, created: true as const, pending: false, privateCredential: individual, ...(privateAccessCode?{privateAccessCode}:{}) };
+      }
+      return { accountId: account!.id, personId, grantId: grant.id, created: true as const, pending: true, privateCredential: individual };
+    });
+    if (!invitation.pending || isDemoAccountEmail(emailNormalized))
+      return { ...invitation, emailSent: false, demoAccess: isDemoAccountEmail(emailNormalized),
+        deliveryStatus: isDemoAccountEmail(emailNormalized) ? (invitation.privateCredential ? "private_code" as const : "demo_code" as const) : "already_active" as const };
+    try {
+      const deliveryStatus = await requestOneTimeAccessWithDeliveryStatus(
+        emailNormalized, data.role === "teacher" ? "/profiles" : undefined);
+      return { ...invitation, emailSent: deliveryStatus === "dispatched", deliveryStatus };
+    } catch {
+      // The durable invitation is retry-safe; do not fabricate email delivery.
+      return { ...invitation, emailSent: false, deliveryStatus: "failed" as const };
+    }
+}
+
+/** Toggle a grant's active flag, with before/after audit and a self-lockout guard. */
+export const staffGrantStateInput=z.object({grantId:z.string().uuid(),active:z.boolean()}).strict();
+export async function setGrantActiveService(context:Actor,request:Request,raw:unknown) {
+    if(request.method!=="POST")throw new AuthorizationError("staff administration mutation");
+    const data=staffGrantStateInput.parse(raw);
+    const actor = await requireRegistrar(context);
+    if (!data.active && data.grantId === actor.grantId) {
+      throw new AuthorizationError("cannot deactivate your own active grant");
+    }
+    const { db } = await import("@/db/client");
+    const { accountPersonGrants,accessAccounts,accessSessions,people,sites } = await import("@/db/schema");
+    return db.transaction(async tx => {
+      await assertCurrentCANGrantForMutation(tx,request,actor,{roles:["registrar","site_admin"],organizationId:actor.organizationIds[0]!,siteId:actor.grantSiteId});
+      const [grant] = await tx.select({
+        id: accountPersonGrants.id, accountId: accountPersonGrants.accountId, organizationId: accountPersonGrants.organizationId,
+        siteId:accountPersonGrants.siteId,personId:accountPersonGrants.personId,
+        active: accountPersonGrants.active, role: accountPersonGrants.role,
+      }).from(accountPersonGrants).where(eq(accountPersonGrants.id, data.grantId)).for("update").limit(1);
+      if (!grant || !assignableRoles.includes(grant.role as typeof assignableRoles[number]) || !grant.organizationId || !actor.organizationIds.includes(grant.organizationId) ||
+          (actor.grantSiteId && grant.siteId!==actor.grantSiteId)) {
+        throw new AuthorizationError("grant organization scope");
+      }
+      const pending = (await listPendingStaffInvitations(tx, grant.accountId)).some(invitation => invitation.id === grant.id);
+      if (pending) throw new AuthorizationError("pending staff invitations must be accepted through the recipient's sign-in");
+      if(grant.siteId){
+        const [site]=await tx.select({id:sites.id}).from(sites).where(and(eq(sites.id,grant.siteId),eq(sites.organizationId,grant.organizationId))).for("share").limit(1);
+        if(!site)throw new AuthorizationError("current grant Site ownership");
+      }
+      if(data.active){
+        const [target]=await tx.select({personId:accessAccounts.personId,disabled:accessAccounts.disabled,personActive:people.active})
+          .from(accessAccounts).innerJoin(people,eq(people.id,accessAccounts.personId))
+          .where(eq(accessAccounts.id,grant.accountId)).for("share").limit(1);
+        if(!target||target.disabled||!target.personActive||target.personId!==grant.personId)
+          throw new AuthorizationError("current canonical account Person");
+        await assertRawAccountPerson(grant.accountId,grant.personId,tx);
+      }
+      const now=new Date();
+      // Clean up historic stale bearers on both deactivation and restoration.
+      if(!data.active||!grant.active)await tx.update(accessSessions).set({revokedAt:now,updatedAt:now})
+        .where(and(sql`${accessSessions.revokedAt} IS NULL`,or(eq(accessSessions.activeGrantId,grant.id),eq(accessSessions.delegatedGrantId,grant.id))));
+      if(grant.active===data.active)return {grantId:grant.id,active:data.active};
+      const [updated] = await tx.update(accountPersonGrants)
+        .set({ active: data.active, updatedAt: now })
+        .where(eq(accountPersonGrants.id, grant.id))
+        .returning({ id: accountPersonGrants.id });
+      if (!updated) throw new Error("Grant could not be updated");
+      await recordAudit(tx, actor, {
+        action: "admin.grant.set_active", resourceType: "account_person_grant", resourceId: grant.id,
+        before: { active: grant.active }, after: { active: data.active },
+        scope: { organizationId: grant.organizationId,siteId:grant.siteId },
+      });
+      return { grantId: grant.id, active: data.active };
+    });
+}

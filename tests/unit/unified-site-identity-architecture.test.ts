@@ -98,7 +98,7 @@ describe("one public-schema Site and Organization model",()=>{
       "src/modules/sites/site-published-classes.server.ts",
       "src/modules/sites/site-noncredit-releases.server.ts",
       "src/modules/identity/platform-admin.functions.ts",
-      "src/modules/identity/canonical-sensitive-approvals.functions.ts",
+      "src/modules/identity/canonical-sensitive-approvals.server.ts",
     ]) {
       expect(read(path)).not.toContain("education_v30.sites");
     }

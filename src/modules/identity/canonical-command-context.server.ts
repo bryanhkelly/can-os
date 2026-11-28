@@ -118,7 +118,12 @@ export async function probeCanonicalAuthReader(): Promise<boolean> {
  * their separately reviewed identity/role mappings are supported. A broken
  * CAN session must never fall back to a native cookie or silently switch roles.
  */
-export async function getCanonicalCommandContext(request: Request): Promise<CommandContext> {
+export type ResolvedCanonicalCommandContext=CommandContext & {
+  /** Present ONLY for a native learner bearer independently bound to the
+   * current CAN Account and Person. Never derive this from a second read. */
+  nativeLearningSessionId?:string;
+};
+export async function getCanonicalCommandContext(request: Request): Promise<ResolvedCanonicalCommandContext> {
   const hasCan = readCookie(request, accessSessionCookie) !== undefined;
   const hasNative = readCookie(request, canonicalSessionCookie) !== undefined;
   if (hasCan) {
@@ -133,8 +138,8 @@ export async function getCanonicalCommandContext(request: Request): Promise<Comm
       return resolveCanonicalSiteStaffFromCan(actor, request);
     }
     // CAN school students use their server-resolved active Person and exact
-    // Site grant. A trusted admin account-switch session may act as that
-    // student; its active Person is still validated against the enrollment.
+    // Site grant. Any permitted owner delegation is independently governed;
+    // the effective Person still has to match active participation.
     // Course Attempt and Class Enrollment authorizers independently verify
     // Person, Site, Course and active participation on every request.
     if (actor.role === "student") {
@@ -225,7 +230,7 @@ export async function getCanonicalCommandContext(request: Request): Promise<Comm
          : adultReview.canonicalAccountId!==null||
            adultReview.canonicalPersonId!==null)))
       throw new AuthorizationError("current reviewed learner identity");
-    return projectCanonicalCommandContext(native);
+    return {...projectCanonicalCommandContext(native),nativeLearningSessionId:native.session_id};
   }
   // Legacy non-learner reviewers retain their separately scoped native
   // sessions until independent grant authority is fully migrated. Learners

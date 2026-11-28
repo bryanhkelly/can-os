@@ -148,12 +148,13 @@ async function requireLearnerGrant(tx:Tx, accountId:string, personId:string, org
  */
 export async function enrollMyselfInNoncreditService(request:Request,raw:unknown){
  const data=parseCommandInput(noncreditEnrollCommand,raw);
-    const { resolveVerifiedAdultAccount, issueNativeLearnerSession } = await import("./noncredit-participant-identity.server");
+    const { resolveVerifiedAdultAccount, issueNativeLearnerSession, assertVerifiedAdultSessionForMutation } = await import("./noncredit-participant-identity.server");
     const owner=await resolveVerifiedAdultAccount(request);
     if(!await probeCanonicalAuthReader())
       throw new Error("Secure native learning access is temporarily unavailable");
     const verifiedReferral=await verifyNoncreditGoReferral(data.referralCode,data.releaseId);
     const outcome=await db.transaction(async tx=>{
+      await assertVerifiedAdultSessionForMutation(tx,request,owner);
       // Serialize capacity and duplicate checks for one published release.
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"self-enroll:"+data.releaseId}))`);
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"native-identity:"+owner.accountId}))`);
@@ -339,7 +340,7 @@ export async function enrollMyselfInNoncreditService(request:Request,raw:unknown
       const grantId=await requireLearnerGrant(
         tx,native.accountId,native.personId,release.registeringOrganizationId,
       );
-      const cookie=await issueNativeLearnerSession(tx,native.accountId,grantId,now);
+      const cookie=await issueNativeLearnerSession(tx,request,owner,native.accountId,grantId,now);
       return {registrationId,courseAttemptId:attemptId,alreadyEnrolled,cookie,classId:placement?.classId??previouslyAssignedClassId,classEnrollmentId:placement?.classEnrollmentId??previouslyAssignedEnrollmentId};
     });
     const {cookie,...result}=outcome;

@@ -2,8 +2,7 @@ import {InvalidAccessCredentialError,logAuthenticationUnavailable} from "@/domai
 import {accessLandingPath,accessReturnCookieHeader,safeAccessReturnTo} from "@/domain/access-navigation";
 import {AuthorizationError} from "@/domain/command-context";
 import {readTrustedSessionDevice} from "./trusted-session-device.server";
-import {getCommandContext} from "./command-context.server";
-import {revokeAccessSession} from "./passwordless-access.server";
+import {revokePresentedAccessSessions} from "./passwordless-access.server";
 
 /** Shared Web Request handlers: original admission, challenge redemption, device
  * classification and session revocation. No additional identity mechanism. */
@@ -140,11 +139,16 @@ export async function handlePersonalRegistration(request:Request):Promise<Respon
 }
 
 export async function handleAccessLogout(request:Request):Promise<Response>{
+   if(request.method!=="POST")return Response.json({error:"Invalid request method"},{status:405,headers:{"Cache-Control":"no-store"}});
    if(new URL(request.url).origin!==request.headers.get("origin"))
     return Response.json({error:"Invalid request origin"},{status:403});
    try {
-    const {sessionId,accountId,sessionAccountId,impersonatedByAccountId}=await getCommandContext(request);
-    const cookie=await revokeAccessSession(sessionId,impersonatedByAccountId??sessionAccountId??accountId);
-    return new Response(null,{status:204,headers:{"Set-Cookie":cookie,"Cache-Control":"no-store"}});
-   }catch{return Response.json({error:"Unauthorized"},{status:401});}
+    const cookies=await revokePresentedAccessSessions(request);
+    const headers=new Headers({"Cache-Control":"no-store","Referrer-Policy":"no-referrer"});
+    for(const cookie of cookies)headers.append("Set-Cookie",cookie);
+    return new Response(null,{status:204,headers});
+   }catch(error){
+    if(error instanceof AuthorizationError)return Response.json({error:"Unauthorized"},{status:401,headers:{"Cache-Control":"no-store"}});
+    return Response.json({error:"Authentication temporarily unavailable."},{status:503,headers:{"Cache-Control":"no-store","Retry-After":"30"}});
+   }
 }

@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
+import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 
 const uuid=z.string().uuid();
@@ -15,6 +15,7 @@ export const listCANAcademicProgramStaffFn=createServerFn({method:"GET"})
       import("@/modules/identity/command-context.server"),
       import("./can-academic-staff-delegation.server"),
     ]);
+    setResponseHeader("Cache-Control","private, no-store");
     return listCANAcademicProgramStaff(await getCommandContext(getRequest()),data.programId);
   });
 
@@ -25,7 +26,8 @@ export const delegateCANAcademicProgramStaffFn=createServerFn({method:"POST"})
       import("@/modules/identity/command-context.server"),
       import("./can-academic-staff-delegation.server"),
     ]);
-    return delegateCANAcademicProgramStaff(await getCommandContext(getRequest()),data);
+    setResponseHeader("Cache-Control","private, no-store");
+    const request=getRequest();return delegateCANAcademicProgramStaff(await getCommandContext(request),request,data);
   });
 
 export const revokeCANAcademicProgramStaffFn=createServerFn({method:"POST"})
@@ -35,5 +37,6 @@ export const revokeCANAcademicProgramStaffFn=createServerFn({method:"POST"})
       import("@/modules/identity/command-context.server"),
       import("./can-academic-staff-delegation.server"),
     ]);
-    return revokeCANAcademicProgramStaff(await getCommandContext(getRequest()),data);
+    setResponseHeader("Cache-Control","private, no-store");
+    const request=getRequest();return revokeCANAcademicProgramStaff(await getCommandContext(request),request,data);
   });

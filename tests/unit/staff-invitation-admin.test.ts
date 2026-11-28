@@ -10,6 +10,8 @@ const state = vi.hoisted(() => ({
   inserts: [] as Array<{ table: unknown; value: any }>,
   requestAccess: vi.fn(),
   transactions: vi.fn(),
+  lockCurrent:vi.fn(),
+  approvedDemoScope:vi.fn(),
 }));
 vi.mock("@tanstack/react-start", () => ({
   createServerFn: () => {
@@ -20,11 +22,24 @@ vi.mock("@tanstack/react-start", () => ({
     return builder;
   },
 }));
-vi.mock("@/modules/identity/actors.server", () => ({
-  requireActor: vi.fn(async () => actor),
+vi.mock("@tanstack/react-start/server",()=>({getRequest:()=>new Request("http://localhost",{method:"POST"}),setResponseHeader:vi.fn()}));
+vi.mock("@/modules/identity/actors.server",()=>({requireActor:vi.fn(async()=>actor)}));
+vi.mock("@/modules/identity/current-can-grant-transaction.server",()=>({assertCurrentCANGrantForMutation:state.lockCurrent}));
+vi.mock("@/modules/identity/demo-school-tenants.server",async importOriginal=>({...await importOriginal<typeof import("@/modules/identity/demo-school-tenants.server")>(),matchesLegacyStaffInvitationScope:state.approvedDemoScope}));
+vi.mock("@/modules/identity/actor-audit.server", () => ({
   recordAudit: vi.fn(async (tx, _actor, entry) => {
     await tx.insert(auditEvents).values({ action: entry.action, resourceId: entry.resourceId });
   }),
+}));
+// This suite tests the invitation orchestrator; canonical Person binding has
+// its own unit/integration coverage. Mock only the binding boundary.
+vi.mock("@/modules/identity/named-person-account.server",()=>({
+ bindAuthorizedAccountPerson:vi.fn(async()=>({personId:"person-1",personCreated:true})),
+}));
+vi.mock("@/modules/identity/staff-invitations.server",async importOriginal=>({
+ ...await importOriginal<typeof import("@/modules/identity/staff-invitations.server")>(),
+ listPendingStaffInvitations:vi.fn(async()=>[{id:"grant-1"}]),
+ acceptStaffInvitations:vi.fn(async(_tx,_account,invitations)=>invitations),
 }));
 vi.mock("@/modules/identity/passwordless-access.server", () => ({ requestOneTimeAccessWithDeliveryStatus: state.requestAccess }));
 vi.mock("@/modules/operations/onsite-block-safety.server", () => ({ verifiedAdultSafetyEvidence: vi.fn() }));
@@ -40,7 +55,7 @@ const db = {
     const rows = state.selects.shift() ?? [];
     const query = {
       innerJoin: () => query,
-      where: () => ({ limit: async () => rows }),
+      where: () => ({ limit: async () => rows, for:()=>({limit:async()=>rows}) }),
     };
     return { from: () => query };
   }),
@@ -68,6 +83,8 @@ beforeEach(() => {
   actor.role = "registrar";
   state.selects.length = 0; state.inserts.length = 0;
   state.requestAccess.mockReset(); state.requestAccess.mockResolvedValue("dispatched");
+  state.lockCurrent.mockReset();state.lockCurrent.mockResolvedValue(undefined);
+  state.approvedDemoScope.mockReset();state.approvedDemoScope.mockResolvedValue(true);
   db.select.mockClear(); db.insert.mockClear(); db.transaction.mockClear();
 });
 
@@ -75,6 +92,7 @@ describe("authorized church-local invitation provisioning", () => {
   it("creates only an inactive exact-site grant and sends the canonical access link", async () => {
     state.selects.push(
       [{ siteId: actor.grantSiteId }],
+      [{ id: input.siteId, organizationType: "church" }],
       [{ id: input.siteId, organizationType: "church" }],
       [], [], [],
     );
@@ -97,6 +115,7 @@ describe("authorized church-local invitation provisioning", () => {
     state.selects.push(
       [{ siteId: actor.grantSiteId }],
       [{ id: input.siteId, organizationType: "church" }],
+      [{ id: input.siteId, organizationType: "church" }],
       [], [], [],
     );
 
@@ -108,6 +127,7 @@ describe("authorized church-local invitation provisioning", () => {
   it("provisions a pending publisher with only the exact-Site website relationship", async () => {
     state.selects.push(
       [{ siteId: actor.grantSiteId }],
+      [{ id: input.siteId, organizationType: "church" }],
       [{ id: input.siteId, organizationType: "church" }],
       [], [], [], [], [],
     );
@@ -148,23 +168,23 @@ describe("authorized church-local invitation provisioning", () => {
     state.selects.push(
       [{ siteId: actor.grantSiteId }],
       [{ id: input.siteId, organizationType: "christian_school" }],
-      [{ domain: "newschool.demo", enabled: true }],
+      [{ id: input.siteId, organizationType: "christian_school" }],
       [], [], [], [],
     );
     const result = await state.handlers[3]!({ data: {
       ...input, email: "teacher@newschool.demo", role: "teacher",
     } });
-    expect(result).toMatchObject({ created: true, pending: true, emailSent: false });
+    expect(result).toMatchObject({ created: true, pending: false, emailSent: false,deliveryStatus:"demo_code" });
     expect(state.requestAccess).not.toHaveBeenCalled();
     expect(state.inserts.find(row => row.table === accountPersonGrants)?.value).toMatchObject({
       siteId: input.siteId, active: false, role: "teacher",
     });
     expect(state.inserts.find(row => row.table === domainEvents)?.value).toMatchObject({
       eventType: EventTypes.StaffInvitationIssued, aggregateId: "grant-1",
-      payload: {
+      payload: expect.objectContaining({
         organizationId: actor.scope.organizationIds[0], siteId: input.siteId,
         accountId: "account-1", personId: "person-1", role: "teacher",
-      },
+      }),
     });
   });
   it("does not allow a registrar to deactivate the school's Site Admin", async () => {
@@ -183,7 +203,7 @@ describe("authorized church-local invitation provisioning", () => {
     state.selects.push(
       [{ siteId: actor.grantSiteId }],
       [{ id: input.siteId, organizationType: "christian_school" }],
-      [{ domain: "newschool.demo", enabled: true }],
+      [{ id: input.siteId, organizationType: "christian_school" }],
       [], [], [], 
     );
     const result = await state.handlers[3]!({ data: input });
@@ -195,10 +215,17 @@ describe("authorized church-local invitation provisioning", () => {
     });
   });
 
+  it("does not commit an invitation if the current registrar grant was revoked",async()=>{
+    state.selects.push([{siteId:actor.grantSiteId}],[{id:input.siteId,organizationType:"church"}]);
+    state.lockCurrent.mockRejectedValueOnce(new Error("current verified exact CAN grant"));
+    await expect(state.handlers[3]!({data:input})).rejects.toThrow("current verified exact CAN grant");
+    expect(state.inserts).toEqual([]);expect(state.requestAccess).not.toHaveBeenCalled();
+  });
   it("does not report an email as sent when the provider skipped dispatch", async () => {
     state.requestAccess.mockResolvedValue("cooldown");
     state.selects.push(
       [{ siteId: actor.grantSiteId }],
+      [{ id: input.siteId, organizationType: "church" }],
       [{ id: input.siteId, organizationType: "church" }],
       [], [], [],
     );
