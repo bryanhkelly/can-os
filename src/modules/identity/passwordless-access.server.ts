@@ -56,10 +56,13 @@ async function issueOneTimeAccess(rawEmail:string, sender:AccessEmailSender, ret
  // signup migration. Only new unbound accounts need the provisional lookup.
  const hasEstablishedAccess=memberships.some(g=>Object.hasOwn(roleCapabilities,g.role))||
    pendingInvitations.length>0||!!schoolSignup;
+ // An unfinished personal registration is recoverable. Its former expiry
+ // limits an old verification window, not the lifetime of the Account.
+ // Never reopen consumed registrations or expired institutional setup here.
  if(!hasEstablishedAccess){
   const [personalSignup]=await db.select({accountId:accessAccountSignups.accountId})
    .from(accessAccountSignups).where(and(eq(accessAccountSignups.accountId,account.id),
-    isNull(accessAccountSignups.consumedAt),gt(accessAccountSignups.expiresAt,new Date()))).limit(1);
+    isNull(accessAccountSignups.consumedAt))).limit(1);
   if(!personalSignup)return "ineligible";
  }
  const accessOrigin=publicOrigin();
@@ -72,18 +75,29 @@ async function issueOneTimeAccess(rawEmail:string, sender:AccessEmailSender, ret
   const recent=await tx.select({id:accessChallenges.id}).from(accessChallenges)
    .where(and(eq(accessChallenges.accountId,account.id),gt(accessChallenges.createdAt,new Date(now.getTime()-REQUEST_COOLDOWN_MS)))).limit(1);
   if(recent.length)return null;
+  const expiresAt=new Date(now.getTime()+CHALLENGE_LIFETIME_MS);
+  if(!hasEstablishedAccess){
+   // Renew in the same transaction as the challenge, only if still pending.
+   // GREATEST preserves any longer window granted by the registration flow.
+   const [renewed]=await tx.update(accessAccountSignups)
+    .set({expiresAt:sql`greatest(${accessAccountSignups.expiresAt}, ${expiresAt.toISOString()}::timestamptz)`})
+    .where(and(eq(accessAccountSignups.accountId,account.id),isNull(accessAccountSignups.consumedAt)))
+    .returning({accountId:accessAccountSignups.accountId});
+   if(!renewed)return "ineligible" as const;
+  }
   const token=issueOpaqueSecret(),hash=hashAccessSecret(token,secretPepper());
   await tx.insert(accessChallenges).values({
-   accountId:account.id,tokenHash:hash,expiresAt:new Date(now.getTime()+CHALLENGE_LIFETIME_MS),
+   accountId:account.id,tokenHash:hash,expiresAt,
   });
-  return token;
+  return {token};
  });
+ if(issued==="ineligible")return "ineligible";
  if(!issued)return "cooldown";
  try {
   const accessUrl=new URL("/access/verify",accessOrigin);
   const safeReturnTo=safeAccessReturnTo(returnTo);
   if(safeReturnTo)accessUrl.searchParams.set("returnTo",safeReturnTo);
-  accessUrl.hash="token="+encodeURIComponent(issued);
+  accessUrl.hash="token="+encodeURIComponent(issued.token);
   const schoolIds=new Set(memberships.map(grant=>grant.siteId));
   const siteId=schoolIds.size===1&&!pendingInvitations.length?memberships[0]?.siteId:null;
   await sender({to:email,accessUrl:accessUrl.toString(),...(siteId?{siteId}:{})});
