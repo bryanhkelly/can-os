@@ -36,14 +36,14 @@ describe("CAN V6.1 real/synthetic authorization parity",()=>{
     targetGrantId:"grant-two",grants:[teacher,{...second,personId:"foreign"}],
     activePersonIds:["person","foreign"],demoAccountSwitching:false})).toThrow(AuthorizationError);
  });
- it("only the privileged session switch can select a different active Person",()=>{
+ it("a direct session cannot select a different active Person even with the legacy flag",()=>{
   const other:VerifiedAccessGrant={...grant,id:"target",accountId:"target-account",personId:"target-person"};
   expect(()=>assertMembershipSwitchIdentity({accountId:"account",accountPersonId:"person",
     targetGrantId:"target",grants:[other],activePersonIds:["person"],
     demoAccountSwitching:false})).toThrow();
   expect(assertMembershipSwitchIdentity({accountId:"account",accountPersonId:"person",
     targetGrantId:"target",grants:[other],activePersonIds:[],
-    demoAccountSwitching:true})).toEqual(other);
+    demoAccountSwitching:true})).toThrow(AuthorizationError);
  });
  it("staff canonical authorization accepts the server-verified effective role",()=>{
   const actor={
@@ -89,6 +89,7 @@ describe("CAN V6.1 real/synthetic authorization parity",()=>{
   const canonicalAudit=source("src/platform/canonical-mutation.server.ts");
   const logout=source("src/routes/access.logout.ts");
   expect(session).toContain("context.impersonatedByAccountId=session.accountId");
+  expect(session).not.toContain("demoAccountSwitching");
   expect(audit).toContain("session.impersonatedByAccountId");
   expect(canonicalAudit).toContain("sessionAccountId: actor.impersonatedByAccountId");
   expect(logout).toContain("impersonatedByAccountId??sessionAccountId??accountId");
