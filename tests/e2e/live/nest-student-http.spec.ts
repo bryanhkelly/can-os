@@ -1,13 +1,14 @@
 import {test,expect,request,type APIRequestContext} from "@playwright/test";
+import {randomUUID} from "node:crypto";
 import {z} from "zod";
 import {authenticateQaActor,qaSession} from "../helpers/pilot-standard-access";
 const uuid=z.string().uuid();
 const enrollment=z.object({classId:uuid,classEnrollmentId:uuid,courseAttemptId:uuid}).strict();
 const actor=z.object({email:z.string().email().refine(v=>v===v.toLowerCase()&&v.endsWith(".test")),grantId:uuid,personId:uuid,organizationId:uuid,siteId:uuid,canonicalOnly:z.boolean(),enrollments:z.array(enrollment).min(1)}).strict();
-const fixture=z.object({students:z.array(actor).length(2),write:z.object({attestation:z.literal("fresh-synthetic-fixture"),personId:uuid,classEnrollmentId:uuid,lessonId:uuid,assignmentId:uuid}).strict().optional()}).strict().refine(f=>{
+const fixture=z.object({students:z.array(actor).length(2),recorded:z.object({attestation:z.literal("fresh-synthetic-recorded-choice-fixture"),personId:uuid,classEnrollmentId:uuid,trackVersionIds:z.tuple([uuid,uuid])}).strict().optional(),write:z.object({attestation:z.literal("fresh-synthetic-fixture"),personId:uuid,classEnrollmentId:uuid,lessonId:uuid,assignmentId:uuid}).strict().optional()}).strict().refine(f=>{
  const [a,b]=f.students;
  return !!a&&!!b&&a.email!==b.email&&a.personId!==b.personId&&a.grantId!==b.grantId&&a.siteId!==b.siteId&&a.canonicalOnly!==b.canonicalOnly&&
- a.enrollments.every(e=>!b.enrollments.some(x=>x.classEnrollmentId===e.classEnrollmentId||x.courseAttemptId===e.courseAttemptId))&&(!f.write||f.students.some(s=>s.personId===f.write!.personId&&s.enrollments.some(e=>e.classEnrollmentId===f.write!.classEnrollmentId)));
+ a.enrollments.every(e=>!b.enrollments.some(x=>x.classEnrollmentId===e.classEnrollmentId||x.courseAttemptId===e.courseAttemptId))&&(!f.recorded||(f.recorded.trackVersionIds[0]!==f.recorded.trackVersionIds[1]&&f.students.some(s=>s.personId===f.recorded!.personId&&s.enrollments.some(e=>e.classEnrollmentId===f.recorded!.classEnrollmentId))))&&(!f.write||f.students.some(s=>s.personId===f.write!.personId&&s.enrollments.some(e=>e.classEnrollmentId===f.write!.classEnrollmentId)));
 },"Two distinct reviewed students and Sites required").parse(JSON.parse(process.env.CAN_STUDENT_QA_JSON??"{}"));
 const api="http://localhost:3001/api/v1";
 const origin="http://localhost:3001";
@@ -53,11 +54,11 @@ test("independent standard HTTP client validates both students and rejects forei
        expect(await detail.json()).toMatchObject({courseAttemptId:e.courseAttemptId,assignments:expect.any(Array)});
        const instructionTarget=api+"/me/course-attempts/"+e.courseAttemptId;
        const choices=await http.get(instructionTarget+"/instructors");expect(choices.status()).toBe(200);
-       const choiceShape=z.object({choices:z.array(z.object({trackVersionId:uuid})),blocked:z.array(z.object({trackVersionId:uuid})),selection:z.object({trackVersionId:uuid,revision:z.number().int().positive()}).nullable()}).parse(await choices.json());
+       const choiceShape=z.object({choices:z.array(z.object({trackVersionId:uuid,policyVersionId:uuid})),blocked:z.array(z.object({trackVersionId:uuid})),selection:z.object({trackVersionId:uuid,revision:z.number().int().positive(),policyVersionId:uuid}).nullable()}).parse(await choices.json());
        const history=await http.get(instructionTarget+"/practice-history");expect(history.status()).toBe(200);
        expect(Array.isArray(await history.json())).toBe(true);
        expect((await http.get(instructionTarget+"/instructors?personId="+student.personId)).status()).toBe(400);
-       if(choiceShape.selection&&choiceShape.choices.some(c=>c.trackVersionId===choiceShape.selection?.trackVersionId)){
+       if(choiceShape.selection&&choiceShape.choices.some(c=>c.trackVersionId===choiceShape.selection?.trackVersionId&&c.policyVersionId===choiceShape.selection?.policyVersionId)){
          // A currently eligible selected presenter must open via the same course attempt.
          const selected=await http.get(instructionTarget+"/instruction");expect(selected.status()).toBe(200);
          expect(await selected.json()).toMatchObject({courseAttemptId:e.courseAttemptId,selection:{trackVersionId:choiceShape.selection.trackVersionId}});
@@ -130,4 +131,49 @@ test("independent standard HTTP client validates both students and rejects forei
      expect((await http.get(api+"/me")).status()).toBe(401);
    }
  } finally {await Promise.all(contexts.map(c=>c.dispose()));}
+});
+
+test("recorded instructor switch preserves enrollment and learning evidence through ordinary REST",async()=>{
+ test.skip(!fixture.recorded,"Reviewed fresh two-presenter fixture not supplied; switching acceptance is not established");
+ const w=fixture.recorded!;
+ const student=fixture.students.find(s=>s.personId===w.personId)!;
+ const enrollment=student.enrollments.find(e=>e.classEnrollmentId===w.classEnrollmentId)!;
+ const http=await request.newContext();
+ const options={headers:{Origin:origin}};
+ try{
+  const session=await authenticateQaActor({request:http},student.email,undefined,"nest");
+  expect(session.grants.find(g=>g.id===student.grantId)).toMatchObject({personId:student.personId,role:"student"});
+  expect((await http.post(api+"/me/session/membership",{...options,data:{grantId:student.grantId}})).status()).toBe(204);
+  const course=api+"/me/course-attempts/"+enrollment.courseAttemptId;
+  const classResource=api+"/me/class-enrollments/"+enrollment.classEnrollmentId;
+  const choices=async()=>{
+   const res=await http.get(course+"/instructors");expect(res.status()).toBe(200);
+   return z.object({choices:z.array(z.object({trackVersionId:uuid,allowSwitching:z.boolean()})),selection:z.object({trackVersionId:uuid,revision:z.number().int().positive()}).nullable()}).parse(await res.json());
+  };
+  const workspace=async()=>{
+   const res=await http.get(classResource+"/learning");expect(res.status()).toBe(200);
+   return z.object({classId:uuid,classEnrollmentId:uuid,courseAttemptId:uuid,courseVersionId:uuid,enrollmentStatus:z.string(),creditMode:z.string(),lessons:z.array(z.object({lessonId:uuid,progressStatus:z.string().nullable(),observedAt:z.string().nullable()})),outcomes:z.array(z.unknown()),awards:z.array(z.unknown())}).parse(await res.json());
+  };
+  const before=await workspace();
+  const initial=await choices();
+  for(const id of w.trackVersionIds)expect(initial.choices.find(c=>c.trackVersionId===id)?.allowSwitching).toBe(true);
+  if(initial.selection)expect(w.trackVersionIds).toContain(initial.selection.trackVersionId);
+  const target=w.trackVersionIds.find(id=>id!==initial.selection?.trackVersionId)!;
+  const priorRevision=initial.selection?.revision??0;
+  const command={requestId:randomUUID(),trackVersionId:target,expectedRevision:priorRevision};
+  const route=course+"/instructor-selections";
+  const result=await http.post(route,{...options,data:command});expect(result.status()).toBe(200);
+  const receipt=z.object({courseAttemptId:uuid,trackVersionId:uuid,revision:z.number().int().positive(),selectionId:uuid}).parse(await result.json());
+  expect(receipt).toMatchObject({courseAttemptId:enrollment.courseAttemptId,trackVersionId:target,revision:priorRevision+1});
+  const replay=await http.post(route,{...options,data:command});expect(replay.status()).toBe(200);expect(await replay.json()).toMatchObject(receipt);
+  const other=w.trackVersionIds.find(id=>id!==target)!;
+  expect((await http.post(route,{...options,data:{...command,trackVersionId:other}})).status()).toBe(409);
+  expect((await http.post(route,{...options,data:{requestId:randomUUID(),trackVersionId:other,expectedRevision:priorRevision}})).status()).toBe(409);
+  const selected=await http.get(course+"/instruction");expect(selected.status()).toBe(200);
+  expect(await selected.json()).toMatchObject({courseAttemptId:enrollment.courseAttemptId,selection:{trackVersionId:target,revision:receipt.revision}});
+  const switchBack=await http.post(route,{...options,data:{requestId:randomUUID(),trackVersionId:other,expectedRevision:receipt.revision}});expect(switchBack.status()).toBe(200);
+  expect(await switchBack.json()).toMatchObject({courseAttemptId:enrollment.courseAttemptId,trackVersionId:other,revision:receipt.revision+1});
+  expect(await workspace()).toEqual(before);
+  expect((await http.post(api+"/access/logout",{...options,data:{}})).status()).toBe(204);
+ }finally{await http.dispose();}
 });
