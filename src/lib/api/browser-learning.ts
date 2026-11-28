@@ -1,16 +1,20 @@
 import { createBrowserApiClient } from "../../../apps/api/sdk/client";
-import { requireApiData } from "./api-response";
+import { ApiResponseError, requireApiData } from "./api-response";
 
 export async function completeLearnerLesson(classEnrollmentId: string, lessonId: string) {
-  return requireApiData(await createBrowserApiClient().POST("/api/v1/me/class-enrollments/{classEnrollmentId}/lessons/{lessonId}/completion", {
+  const receipt = requireApiData(await createBrowserApiClient().POST("/api/v1/me/class-enrollments/{classEnrollmentId}/lessons/{lessonId}/completion", {
     params: { path: { classEnrollmentId, lessonId } }, body: {},
   }));
+  if (receipt.recorded !== true || typeof receipt.alreadyCompleted !== "boolean") throw new ApiResponseError(500);
+  return receipt;
 }
 
 export async function submitLearnerAssignment(classEnrollmentId: string, assignmentId: string, responseText: string) {
-  return requireApiData(await createBrowserApiClient().POST("/api/v1/me/class-enrollments/{classEnrollmentId}/assignments/{assignmentId}/submission", {
+  const receipt = requireApiData(await createBrowserApiClient().POST("/api/v1/me/class-enrollments/{classEnrollmentId}/assignments/{assignmentId}/submission", {
     params: { path: { classEnrollmentId, assignmentId } }, body: { responseText },
   }));
+  if (typeof receipt.submissionId !== "string" || !receipt.submissionId || typeof receipt.alreadySubmitted !== "boolean") throw new ApiResponseError(500);
+  return receipt;
 }
 
 export async function readLearnerClasses(signal?: AbortSignal) {
