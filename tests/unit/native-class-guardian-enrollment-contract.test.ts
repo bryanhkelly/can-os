@@ -3,8 +3,8 @@ import {describe,expect,it} from "vitest";
 const read=(path:string)=>readFileSync(path,"utf8");
 const guard=read("src/modules/classes/native-class-guardian-authority.server.ts");
 const service=read("src/modules/classes/native-class-guardian-enrollment.functions.ts");
-const review=read("src/modules/classes/native-class-approvals.functions.ts");
-const lifecycle=read("src/modules/classes/native-class-lifecycle.functions.ts");
+const review=read("src/modules/classes/native-class-approvals.server.ts");
+const lifecycle=read("src/modules/classes/native-class-lifecycle.server.ts");
 const ui=read("src/routes/guardian.native-classes.tsx");
 
 describe("native Class guardian and minor enrollment",()=>{

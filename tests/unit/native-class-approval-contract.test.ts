@@ -3,7 +3,7 @@ import {describe,expect,it} from "vitest";
 const read=(p:string)=>readFileSync(p,"utf8");
 
 describe("native Class adult approval source contract",()=>{
- const command=read("src/modules/classes/native-class-approvals.functions.ts");
+ const command=read("src/modules/classes/native-class-approvals.server.ts");
  const enrollment=read("src/modules/classes/native-class-enrollment.functions.ts");
  const migration=read("database/canonical/v3.0.1/patch-native-class-adult-approval-lifecycle.sql");
  const learner=read("src/routes/class.tsx");

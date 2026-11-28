@@ -45,7 +45,7 @@ check("WS2+WS5 native Class publication keeps operational enrollment/credit guar
     "WS5 publisher variation policy missing");
 });
 check("WS2 Class lifecycle retains transactional terminal and source validation",()=>{
-  const s=read("src/modules/classes/native-class-lifecycle.functions.ts");
+  const s=read("src/modules/classes/native-class-lifecycle.server.ts");
   required(s.includes('canonicalClasses')&&s.includes('for("update")'),
     "Missing parent Class row lock for seat mutation");
   const attempts=read("src/modules/classes/native-class-attempt.server.ts");

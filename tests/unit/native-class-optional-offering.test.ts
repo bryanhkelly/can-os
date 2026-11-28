@@ -32,7 +32,7 @@ describe("Class identity and optional enrollment publication",()=>{
     expect(server).toContain(".leftJoin(canonicalClassOfferings");
   });
   it("direct assignment must verify an adult, an active learner grant, and lock Class capacity",()=>{
-    const src=read("src/modules/classes/native-class-assignment.functions.ts");
+    const src=read("src/modules/classes/native-class-assignment.server.ts");
     for(const rule of [
       "for(\"update\")","verifiedAdultOn","canonicalAccountGrants",
       "eq(canonicalAccountGrants.roleCode,\"learner\")",

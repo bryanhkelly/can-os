@@ -59,7 +59,7 @@ describe("Level 1 Site interest without an approved Program",()=>{
   it("uses the existing guarded endpoint, canonical ledger and registrar inbox",()=>{
     const inquiry=readFileSync("src/routes/published-site.inquiry.ts","utf8");
     const server=readFileSync("src/modules/enrollment/public-admissions-interest.server.ts","utf8");
-    const reader=readFileSync("src/modules/enrollment/public-admissions-interest.functions.ts","utf8");
+    const reader=readFileSync("src/modules/enrollment/public-admissions-interest-http.server.ts","utf8");
     const migration=readFileSync("drizzle/0099_site_level_public_interest.sql","utf8");
     expect(inquiry).toContain('recordPublicSiteInterest(slug,inquiry.data)');
     expect(server).toContain('eq(sitePublications.status,"published")');
@@ -68,7 +68,7 @@ describe("Level 1 Site interest without an approved Program",()=>{
     expect(reader).toContain('isNull(publicAdmissionsInterests.programId)');
     expect(migration).toContain("ALTER COLUMN program_id DROP NOT NULL");
     expect(migration).toContain("public_site_interest_program_scope_ck");
-    const registrar=readFileSync("src/modules/enrollment/public-admissions-interest.functions.ts","utf8");
+    const registrar=readFileSync("src/modules/enrollment/public-admissions-interest-http.server.ts","utf8");
     expect(registrar).toContain("assignPublicSiteInterestToProgram");
     expect(registrar).toContain("resolvePrivateFamilyStartDestination(tx,data.programId)");
     expect(registrar).toContain("isNull(publicAdmissionsInterests.programId)");

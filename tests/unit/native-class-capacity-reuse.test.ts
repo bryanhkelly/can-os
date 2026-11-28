@@ -33,7 +33,7 @@ describe("canonical Class capacity and consent reuse",()=>{
   it("requires every current enrollment method to share the Class occupancy reader",()=>{
     const files=[
       ["src/modules/classes/native-class-enrollment.functions.ts",3],
-      ["src/modules/classes/native-class-assignment.functions.ts",1],
+      ["src/modules/classes/native-class-assignment.server.ts",1],
       ["src/modules/classes/native-class-transfers.functions.ts",1],
       ["src/modules/classes/native-class-guardian-enrollment.functions.ts",1],
       ["src/modules/enrollment/course-class-placement.server.ts",2],

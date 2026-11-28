@@ -1,3 +1,4 @@
+import {participationWorkflow} from "@/modules/enrollment/participation-http.server";
 import * as completionAdmin0 from "@/modules/learning/noncredit-completion-decisions.server";
 import * as completionAdmin1 from "@/modules/learning/noncredit-completion-policy.server";
 import * as completionAdmin2 from "@/modules/learning/noncredit-completion-review.server";
@@ -80,7 +81,48 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
  if(mode==="operator-reporting"&&request.method!=="GET")throw new AuthorizationError("read-only reporting context");
  const context=await (mode==="operator-reporting"?(readCookie(request,accessSessionCookie)!==undefined?getIdentityContext(request):getCanonicalCommandContext(request)):mode==="planning"?getBlueprintPlanningContext(request):mode==="canonical"?getCanonicalCommandContext(request):mode==="learner"?getInstructionalLearnerContext(request):getIdentityContext(request));
  if(!context.actorPersonId)throw new AuthorizationError("verified Person");
+ const participation=participationWorkflow(request,mode);
  return {
+  getAdmissionOfferOptions:participation.getAdmissionOfferOptions,
+  issueAdmissionOffer:participation.issueAdmissionOffer,
+  respondToAdmissionOffer:participation.respondToAdmissionOffer,
+  activateOfferedEnrollment:participation.activateOfferedEnrollment,
+  withdrawIssuedAdmissionOffer:participation.withdrawIssuedAdmissionOffer,
+  withdrawMyNativeClassEnrollment:participation.withdrawMyNativeClassEnrollment,
+  cancelNativeClassEnrollment:participation.cancelNativeClassEnrollment,
+  requestNativeClassApproval:participation.requestNativeClassApproval,
+  decideNativeClassApproval:participation.decideNativeClassApproval,
+  getMyNativeClassApprovals:participation.getMyNativeClassApprovals,
+  getNativeClassApprovalQueue:participation.getNativeClassApprovalQueue,
+  issueNativeClassInvitation:participation.issueNativeClassInvitation,
+  getMyNativeClassInvitations:participation.getMyNativeClassInvitations,
+  declineNativeClassInvitation:participation.declineNativeClassInvitation,
+  assignAdultToNativeClass:participation.assignAdultToNativeClass,
+  listAdmissionsIntakePrograms:participation.listAdmissionsIntakePrograms,
+  listAdmissionsExistingStudentsPage:participation.listAdmissionsExistingStudentsPage,
+  getAdmissionsStageCounts:participation.getAdmissionsStageCounts,
+  searchAdmissionsHouseholds:participation.searchAdmissionsHouseholds,
+  listAdmissionsIntake:participation.listAdmissionsIntake,
+  createAdmissionsInquiry:participation.createAdmissionsInquiry,
+  transitionAdmissionsStage:participation.transitionAdmissionsStage,
+  provisionInquiryGuardianAccount:participation.provisionInquiryGuardianAccount,
+  sendAdmissionsGuardianInvitation:participation.sendAdmissionsGuardianInvitation,
+  verifyAdmissionsGuardianRelationship:participation.verifyAdmissionsGuardianRelationship,
+  getGuardianFamilyApplicationWorkspace:participation.getGuardianFamilyApplicationWorkspace,
+  startGuardianFamilyApplication:participation.startGuardianFamilyApplication,
+  revokeAdmissionsGuardianAccess:participation.revokeAdmissionsGuardianAccess,
+  restoreAdmissionsGuardianAccess:participation.restoreAdmissionsGuardianAccess,
+  listPublicAdmissionsInterests:participation.listPublicAdmissionsInterests,
+  assignPublicSiteInterestToProgram:participation.assignPublicSiteInterestToProgram,
+  invitePublicAdmissionsInterestToApply:participation.invitePublicAdmissionsInterestToApply,
+  setPublicAdmissionsInterestStatus:participation.setPublicAdmissionsInterestStatus,
+  getGuardianAdmissionOffers:participation.getGuardianAdmissionOffers,
+  listPublicTransferDestinations:participation.listPublicTransferDestinations,
+  requestTransferDestinationFamilyStart:participation.requestTransferDestinationFamilyStart,
+  joinNoncreditWaitlist:participation.joinNoncreditWaitlist,
+  cancelMyNoncreditWaitlist:participation.cancelMyNoncreditWaitlist,
+  getMyNoncreditWaitlistPage:participation.getMyNoncreditWaitlistPage,
+  withdrawMyNoncreditRegistration:participation.withdrawMyNoncreditRegistration,
   decideNoncreditCompletion:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Completion administration context");return completionAdmin0.decideNoncreditCompletionService(request,raw);},
   getNoncreditCompletionPolicyCatalog:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Completion administration context");return completionAdmin1.getNoncreditCompletionPolicyCatalogService(request);},
   publishNoncreditCompletionPolicy:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Completion administration context");return completionAdmin1.publishNoncreditCompletionPolicyService(request,raw);},

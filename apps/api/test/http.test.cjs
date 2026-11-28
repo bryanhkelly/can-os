@@ -659,3 +659,154 @@ test('knowledge checks and completion require verified learner or provider autho
 test('noncredit enrollment publication protects provider scope and explicit Site selection',async()=>{await withServer('0',async(url,document)=>{for(const [route,method] of [["/api/v1/noncredit-enrollment-publisher","GET"],["/api/v1/noncredit-training-readiness","GET"],["/api/v1/noncredit-enrollment-releases","POST"],["/api/v1/noncredit-enrollment-closures","POST"],["/api/v1/noncredit-multisite-releases","POST"]]){assert.ok(document.paths[route][method.toLowerCase()].security);assert.equal((await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined)).status,method==='POST'?503:401);}assert.ok(document.paths['/api/v1/noncredit-enrollment-releases'].post.requestBody.content['application/json'].schema.required.includes('siteId'));});});
 
 test('completion administration requires canonical provider credentials and distinguishes decisions from corrections',async()=>{await withServer('0',async(url,document)=>{for(const [route,method] of [["/api/v1/noncredit-completion-decisions","POST"],["/api/v1/noncredit-completion-policy-catalog","GET"],["/api/v1/noncredit-completion-policies","POST"],["/api/v1/noncredit-completion-review","GET"],["/api/v1/noncredit-completion-queue","GET"],["/api/v1/noncredit-completion-corrections","POST"]]){assert.ok(document.paths[route][method.toLowerCase()].security);assert.equal((await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined)).status,method==='POST'?503:401);}});const c=require('../dist/completion-admin.contracts');assert.equal(c.queueQuery.safeParse({page:'101'}).success,false);assert.equal(c.queueQuery.parse({page:'2'}).page,2);});
+
+test('waitlist and withdrawal are private standard operations with strict distinct contracts',async()=>{
+ const id='00000000-0000-4000-8000-000000000001';
+ await withServer('0',async(url,document)=>{
+  for(const [method,path] of [['POST','/api/v1/noncredit-waitlist-entries'],['POST','/api/v1/noncredit-waitlist-cancellations'],['GET','/api/v1/me/noncredit-waitlist'],['POST','/api/v1/noncredit-registration-withdrawals']]){
+   const op=document.paths[path][method.toLowerCase()];
+   assert.ok(op.security);assert.ok(op.responses['403']);
+   if(method==='POST')assert.ok(op.requestBody);
+   const res=await fetch(url+path,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(res.status,method==='POST'?503:401);
+  }
+ });
+ const c=require('../dist/participation.contracts');
+ const terms={releaseId:id,consentVersion:'v01',consentSha256:'a'.repeat(64),acceptedConsent:true,adultConfirmed:true};
+ assert.equal(c.waitlistJoinInput.safeParse(terms).success,true);
+ for(const field of ['personId','accountId','siteId','classId','registrationId'])assert.equal(c.waitlistJoinInput.safeParse({...terms,[field]:id}).success,false);
+ assert.equal(c.waitlistJoinInput.safeParse({...terms,adultConfirmed:false}).success,false);
+ assert.equal(c.waitlistQuery.safeParse({joinedAt:'2026-11-28T00:00:00Z'}).success,false);
+ assert.equal(c.waitlistQuery.safeParse({joinedAt:'2026-11-28T00:00:00.123456Z',waitlistId:id}).success,true);
+ assert.equal(c.waitlistPageResult.safeParse({items:[],nextCursor:null}).success,true);
+ assert.equal(c.waitlistPageResult.safeParse({items:[],nextCursor:null,accountId:id}).success,false);
+ assert.equal(c.waitlistJoinResult.safeParse({status:'waiting',alreadyQueued:false,courseAttemptId:id}).success,false);
+ assert.equal(c.withdrawRegistrationInput.safeParse({registrationId:id,confirm:false}).success,false);
+ assert.equal(c.withdrawRegistrationResult.safeParse({withdrawn:true,alreadyWithdrawn:true}).success,true);
+});
+
+test('admission offer response is not enrollment activation and Class exits remain protected',async()=>{
+ const id='00000000-0000-4000-8000-000000000001';
+ await withServer('0',async(url,document)=>{
+  for(const [method,path] of [['GET','/api/v1/admission-offer-options'],['POST','/api/v1/admission-offers'],['POST','/api/v1/admission-offer-responses'],['POST','/api/v1/admission-enrollment-activations'],['POST','/api/v1/admission-offer-withdrawals'],['POST','/api/v1/class-enrollment-withdrawals'],['POST','/api/v1/class-enrollment-cancellations']]){
+   const op=document.paths[path][method.toLowerCase()];
+   assert.ok(op.security);assert.ok(op.responses['403']);
+   if(method==='POST')assert.ok(op.requestBody);
+   const res=await fetch(url+path,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(res.status,method==='POST'?503:401);
+  }
+ });
+ const c=require('../dist/participation.contracts');
+ assert.equal(c.respondOfferInput.safeParse({offerId:id,decision:'accept'}).success,true);
+ assert.equal(c.respondOfferInput.safeParse({offerId:id,decision:'accept',sectionId:id}).success,false);
+ assert.equal(c.offerReceipt.safeParse({offerId:id,enrollmentId:id}).success,false);
+ assert.equal(c.activationReceipt.safeParse({enrollmentId:id}).success,true);
+ assert.equal(c.withdrawOfferInput.safeParse({offerId:id,reason:'short',confirmed:true}).success,false);
+ assert.equal(c.classWithdrawInput.safeParse({classEnrollmentId:id,learnerPersonId:id}).success,false);
+ assert.equal(c.classCancelInput.safeParse({classEnrollmentId:id,reason:'requested'}).success,false);
+ assert.equal(c.classExitReceipt.safeParse({classEnrollmentId:id,status:'completed',releasedSeat:true,alreadyClosed:false}).success,false);
+});
+
+test('Class participation exposes distinct protected approvals, invitations and assignments',async()=>{
+ const id='00000000-0000-4000-8000-000000000001';
+ await withServer('0',async(url,document)=>{
+  for(const [method,path] of [['POST','/api/v1/class-approval-requests'],['POST','/api/v1/class-approval-decisions'],['GET','/api/v1/me/class-approvals'],['GET','/api/v1/class-approval-queue'],['POST','/api/v1/class-invitations'],['GET','/api/v1/me/class-invitations'],['POST','/api/v1/class-invitation-declines'],['POST','/api/v1/class-enrollment-assignments']]){
+   const op=document.paths[path][method.toLowerCase()];
+   assert.ok(op.security);assert.ok(op.responses['403']);
+   if(method==='POST')assert.ok(op.requestBody);
+   const res=await fetch(url+path,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(res.status,method==='POST'?503:401);
+  }
+ });
+ const c=require('../dist/participation.contracts');
+ assert.equal(c.requestClassApprovalInput.safeParse({classOfferingVersionId:id,requestId:id}).success,true);
+ assert.equal(c.requestClassApprovalInput.safeParse({classOfferingVersionId:id,requestId:id,learnerPersonId:id}).success,false);
+ assert.equal(c.decideClassApprovalInput.safeParse({approvalRequestId:id,decision:'approved',reason:'eligible'}).success,true);
+ assert.equal(c.classApprovalReceipt.safeParse({approvalRequestId:id,state:'approved',duplicate:false,classEnrollmentId:id}).success,false);
+ assert.equal(c.classInvitationReceipt.safeParse({invitationId:id,expiresAt:'2026-11-29T00:00:00Z',duplicate:false,courseAttemptId:id}).success,false);
+ assert.equal(c.assignAdultInput.safeParse({classId:id,learnerPersonId:id,creditMode:'for_credit'}).success,false);
+ assert.equal(c.assignAdultInput.safeParse({classId:id,learnerPersonId:id,creditMode:'audit'}).success,true);
+ assert.equal(c.classApprovalQueueResult.safeParse([{approvalRequestId:id,learnerPersonId:id,applicantPersonId:id,state:'approved',requestedAt:'2026-11-28T00:00:00Z',expiresAt:'2026-11-29T00:00:00Z'}]).success,false);
+});
+
+test('admissions intake and guardian onboarding routes fail closed and expose strict contracts',async()=>{
+ const id='00000000-0000-4000-8000-000000000001';
+ await withServer('0',async(url,document)=>{
+  for(const [method,path] of [['GET','/api/v1/admission-intake-programs'],['GET','/api/v1/admission-existing-students'],['GET','/api/v1/admission-stage-counts'],['GET','/api/v1/admission-household-search'],['GET','/api/v1/admission-applications'],['POST','/api/v1/admission-inquiries'],['POST','/api/v1/admission-stage-transitions'],['POST','/api/v1/admission-guardian-verifications'],['POST','/api/v1/admission-guardian-accounts'],['POST','/api/v1/admission-guardian-invitations']]){
+   const op=document.paths[path][method.toLowerCase()];
+   assert.ok(op.security);assert.ok(op.responses['403']);
+   if(method==='POST')assert.ok(op.requestBody);
+   const res=await fetch(url+path,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(res.status,method==='POST'?503:401);
+  }
+ });
+ const c=require('../dist/participation.contracts');
+ const common={requestId:id,programId:id};
+ const existingStudent={studentProfileId:id,guardianPersonId:id};
+ const newFamily={studentFirstName:'Student',studentLastName:'Example',guardianFirstName:'Guardian',guardianLastName:'Example',guardianEmail:'guardian@example.org'};
+ assert.equal(c.admissionsInquiryInput.safeParse({...common,...newFamily}).success,true);
+ assert.equal(c.admissionsInquiryInput.safeParse({...common,existingStudent:{...existingStudent,householdId:id}}).success,true);
+ assert.equal(c.admissionsInquiryInput.safeParse({...common,existingStudent:{...existingStudent,createHousehold:true}}).success,true);
+ assert.equal(c.admissionsInquiryInput.safeParse({...common,existingStudent:{...existingStudent,householdId:id,createHousehold:true}}).success,false);
+ assert.equal(c.admissionsInquiryInput.safeParse({...common,existingStudent,...newFamily}).success,false);
+ assert.equal(c.admissionsInquiryInput.safeParse({...common,...newFamily,guardianVerified:true}).success,false);
+ assert.equal(c.admissionsTransitionInput.safeParse({applicationId:id,decision:'accept'}).success,true);
+ assert.equal(c.admissionsTransitionInput.safeParse({applicationId:id,decision:'activate_enrollment'}).success,false);
+ assert.equal(c.guardianVerificationInput.safeParse({applicationId:id,method:'in_person_id',evidenceNote:'Independently reviewed identity'}).success,true);
+ assert.equal(c.guardianVerificationInput.safeParse({applicationId:id,method:'in_person_id',evidenceNote:'short'}).success,false);
+ assert.equal(c.admissionsApplicationInput.safeParse({applicationId:id,guardianPersonId:id}).success,false);
+ assert.equal(c.admissionsIntakeQuery.safeParse({page:'2',pageSize:'100'}).success,true);
+ assert.equal(c.admissionsIntakeQuery.safeParse({pageSize:'101'}).success,false);
+ assert.equal(c.inquiryReceipt.safeParse({applicationId:id,enrollmentId:id}).success,false);
+ assert.equal(c.guardianProvisionReceipt.safeParse({created:true,email:'guardian@example.org',accountId:id,privateCredential:false}).success,true);
+ assert.equal(c.guardianProvisionReceipt.safeParse({created:true,email:'guardian@example.org',accountId:id,privateCredential:false,sessionToken:'secret'}).success,false);
+});
+
+test('guardian family application and grant restoration are distinct governed operations',async()=>{
+ const id='00000000-0000-4000-8000-000000000001';
+ await withServer('0',async(url,document)=>{
+  for(const [method,path] of [['GET','/api/v1/me/family-application-workspace'],['POST','/api/v1/family-applications'],['POST','/api/v1/admission-guardian-access-revocations'],['POST','/api/v1/admission-guardian-access-restorations']]){
+   const op=document.paths[path][method.toLowerCase()];
+   assert.ok(op.security);assert.ok(op.responses['403']);
+   const res=await fetch(url+path,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(res.status,method==='POST'?503:401);
+  }
+ });
+ const c=require('../dist/participation.contracts');
+ const family={requestId:id,programId:id,studentFirstName:'Student',studentLastName:'Example',gradeLevel:'6'};
+ assert.equal(c.familyApplicationInput.safeParse(family).success,true);
+ assert.equal(c.familyApplicationInput.safeParse({...family,guardianPersonId:id}).success,false);
+ assert.equal(c.familyApplicationInput.safeParse({...family,guardianVerified:true}).success,false);
+ assert.equal(c.guardianAccessChangeInput.safeParse({grantId:id,reason:'Verified authorization change'}).success,true);
+ assert.equal(c.guardianAccessChangeInput.safeParse({grantId:id,reason:'short'}).success,false);
+ assert.equal(c.guardianAccessChangeInput.safeParse({grantId:id,reason:'Verified authorization change',restoreSessions:true}).success,false);
+ assert.equal(c.guardianRestoreReceipt.safeParse({restored:true,sessionId:id}).success,false);
+ assert.equal(c.familyWorkspaceResult.safeParse({programs:[],applications:[],households:[],students:[],transferRequests:[]}).success,true);
+});
+
+test('admissions interest, guardian offer visibility and transfer start use protected distinct APIs',async()=>{
+ const id='00000000-0000-4000-8000-000000000001';
+ await withServer('0',async(url,document)=>{
+  for(const [method,path] of [['GET','/api/v1/admission-interests'],['POST','/api/v1/admission-interest-assignments'],['POST','/api/v1/admission-interest-invitations'],['POST','/api/v1/admission-interest-status-changes'],['GET','/api/v1/me/admission-offers'],['GET','/api/v1/me/transfer-destinations'],['POST','/api/v1/transfer-destination-family-starts']]){
+   const op=document.paths[path][method.toLowerCase()];
+   assert.ok(op.security);assert.ok(op.responses['403']);
+   if(method==='POST')assert.ok(op.requestBody);
+   const res=await fetch(url+path,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(res.status,method==='POST'?503:401);
+  }
+ });
+ const c=require('../dist/participation.contracts');
+ assert.equal(c.publicInterestQuery.safeParse({programId:id,cursor:'x'.repeat(81)}).success,false);
+ assert.equal(c.publicInterestPageResult.safeParse({items:[],nextCursor:null}).success,true);
+ assert.equal(c.interestAssignmentInput.safeParse({interestId:id,programId:id,applicationId:id}).success,false);
+ assert.equal(c.interestStatusInput.safeParse({interestId:id,status:'converted'}).success,false);
+ assert.equal(c.interestInvitationInput.safeParse({interestId:id,contactConsent:true}).success,false);
+ assert.equal(c.interestInvitationReceipt.safeParse({requestId:id,created:true,delivered:true}).success,false);
+ assert.equal(c.guardianOffersQuery.safeParse({studentPersonId:id,guardianPersonId:id}).success,false);
+ assert.equal(c.guardianOffersResult.safeParse([]).success,true);
+ const transfer={originTransferActionId:id,destinationProgramId:id,requestId:id,confirmedDestination:true};
+ assert.equal(c.transferDestinationInput.safeParse(transfer).success,true);
+ assert.equal(c.transferDestinationInput.safeParse({...transfer,confirmedDestination:false}).success,false);
+ assert.equal(c.transferDestinationInput.safeParse({...transfer,studentPersonId:id}).success,false);
+ assert.equal(c.transferDestinationReceipt.safeParse({requested:true,alreadyHasAccess:false,destinationName:'School',enrollmentId:id}).success,false);
+});

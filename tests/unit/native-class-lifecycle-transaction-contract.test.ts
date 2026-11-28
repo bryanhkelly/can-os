@@ -8,8 +8,8 @@ const read=(path:string)=>readFileSync(path,"utf8");
 
 describe("WS2 native Class transaction and integration invariants",()=>{
   const self=read("src/modules/classes/native-class-enrollment.functions.ts");
-  const assigned=read("src/modules/classes/native-class-assignment.functions.ts");
-  const exit=read("src/modules/classes/native-class-lifecycle.functions.ts");
+  const assigned=read("src/modules/classes/native-class-assignment.server.ts");
+  const exit=read("src/modules/classes/native-class-lifecycle.server.ts");
   const classAuthority=read("src/modules/classes/native-class-authority.server.ts");
 
   it("checks all open enrollments instead of five recent history rows",()=>{
@@ -48,7 +48,7 @@ describe("WS2 native Class transaction and integration invariants",()=>{
     }
     expect(assigned).toContain("assertNativeClassOperatorExitScope(actor,cls)");
     expect(assigned).toContain(
-      "await assertCurrentCanonicalStaffForMutation(tx,getRequest(),actor)");
+      "await assertCurrentCanonicalStaffForMutation(tx,request,actor)");
   });
 
   it("revalidates current learner session inside both enrollment transactions",()=>{

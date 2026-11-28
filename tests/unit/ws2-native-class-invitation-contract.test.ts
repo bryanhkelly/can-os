@@ -1,7 +1,7 @@
 import {readFileSync} from "node:fs";
 import {describe,expect,it} from "vitest";
 const read=(path:string)=>readFileSync(path,"utf8");
-const command=read("src/modules/classes/native-class-invitations.functions.ts");
+const command=read("src/modules/classes/native-class-invitations.server.ts");
 const enroll=read("src/modules/classes/native-class-enrollment.functions.ts");
 const ddl=read("database/canonical/v3.0.1/patch-native-class-enrollment-authority-ws2.sql");
 const policy=read("src/domain/native-class-lifecycle.ts");

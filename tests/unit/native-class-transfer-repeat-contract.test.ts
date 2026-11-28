@@ -7,7 +7,7 @@ describe("native Class transfer and completed-repeat contracts",()=>{
  const repeat=read("src/modules/classes/native-class-repeats.server.ts");
  const repeatRpc=read("src/modules/classes/native-class-repeats.functions.ts");
  const enrollment=read("src/modules/classes/native-class-enrollment.functions.ts");
- const assignment=read("src/modules/classes/native-class-assignment.functions.ts");
+ const assignment=read("src/modules/classes/native-class-assignment.server.ts");
  const guardian=read("src/modules/classes/native-class-guardian-enrollment.functions.ts");
  const learner=read("src/routes/class.tsx");
 

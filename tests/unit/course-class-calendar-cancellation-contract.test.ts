@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 const source=(path:string)=>readFileSync(resolve(process.cwd(),path),"utf8");
 
 describe("Class calendar cancellation on Course withdrawal",()=>{
-  const withdrawal=source("src/modules/enrollment/noncredit-self-enrollment-withdraw.functions.ts");
+  const withdrawal=source("src/modules/enrollment/noncredit-self-enrollment-withdraw.server.ts");
   const events=source("src/modules/classes/class-participant-events.server.ts");
   const delivery=source("src/modules/classes/class-participant-delivery.server.ts");
   const migration=source("drizzle/0096_class_enrollment_calendar_cancellation.sql");

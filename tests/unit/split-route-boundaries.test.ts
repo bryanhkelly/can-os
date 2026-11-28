@@ -49,7 +49,7 @@ describe("split-route source ownership and canonical handoffs", () => {
   it("reuses the server's relationship- and capability-scoped read/write authorities", () => {
     const checks: Array<[string, string]> = [
       ["src/modules/identity/admin.functions.ts", 'requireActor(["registrar"], "admin.manage")'],
-      ["src/modules/enrollment/admissions-intake.functions.ts", 'assertCapability(actor,"enrollment.decide")'],
+      ["src/modules/enrollment/admissions-intake.server.ts", 'assertCapability(actor,"enrollment.decide")'],
       ["src/modules/learning/curriculum-marketplace.functions.ts", 'requireActor(["registrar"])'],
       ["src/modules/learning/curriculum-authoring.functions.ts", 'requireActor(["registrar"], "curriculum.publish")'],
       ["src/modules/communication/school-family-alerts.functions.ts", 'assertCapability(actor,"communication.send")'],

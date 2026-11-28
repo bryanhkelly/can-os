@@ -27,8 +27,8 @@ describe("first-class My Activity resilience and source-scoped enrollment",()=>{
   });
 
   it("queries an exact waiting-list release with signed-in account and Person ownership",()=>{
-    const source=read("src/modules/enrollment/noncredit-waitlist.functions.ts");
-    expect(source).toContain("getMyNoncreditWaitlistByRelease");
+    const source=read("src/modules/enrollment/noncredit-waitlist.server.ts");
+    expect(read("src/modules/enrollment/noncredit-waitlist.functions.ts")).toContain("getMyNoncreditWaitlistByRelease");
     expect(source).toContain("releaseId?eq(noncreditEnrollmentWaitlist.releaseId,releaseId):undefined");
     expect(source).toContain("eq(noncreditEnrollmentWaitlist.accessAccountId,owner.accountId)");
     expect(source).toContain("eq(noncreditEnrollmentWaitlist.accessPersonId,owner.personId)");
