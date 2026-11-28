@@ -85,6 +85,7 @@
 }
 
 :root {
+  color-scheme: light;
   --radius: 0px;
   --shell-pad: 1.5rem;
   /* Shell geometry: the sidebar brand block and the top bar share one height so
@@ -119,7 +120,7 @@
   --popover-foreground: #101d39;
 
   /* Blue is reserved for primary actions, active navigation, and information. */
-  --primary: #1769ef;
+  --primary: #135fdb;
   --primary-foreground: #ffffff;
 
   /* V6.1 analytical marks are independent of interaction, status and Site brand.
@@ -144,22 +145,22 @@
   --destructive-foreground: #ffffff;
 
   --border: #e2e8f0;
-  --input: #cbd5e1;
-  --ring: #1769ef;
+  --input: #7a899f;
+  --ring: #135fdb;
 
-  --success: #16845b;
-  --warning: #b86b00;
+  --success: #10724d;
+  --warning: #985700;
   --danger: #c93232;
-  --info: #1769ef;
+  --info: #135fdb;
 
   --sidebar: #ffffff;
   --sidebar-foreground: #101d39;
-  --sidebar-primary: #1769ef;
+  --sidebar-primary: #135fdb;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #eaf1ff;
   --sidebar-accent-foreground: #101d39;
   --sidebar-border: #e2e8f0;
-  --sidebar-ring: #1769ef;
+  --sidebar-ring: #135fdb;
 }
 
 /* Scoped, contrast-checked institutional/site branding. Dark mode keeps the
@@ -170,6 +171,7 @@
   --accent: var(--brand-accent);
   --accent-foreground: var(--brand-accent-foreground);
   --ring: var(--brand-primary);
+  --eyebrow-color: var(--workspace-accent-ink);
   --workspace-accent: var(--brand-primary);
   --workspace-accent-soft: var(--brand-accent);
   --workspace-accent-ink: var(--brand-primary);
@@ -209,11 +211,14 @@
 }
 
 .dark {
+  color-scheme: dark;
   --background: #101728;
   --stone-warm: #182238;
   --foreground: #f4f7fc;
   --ink: #f4f7fc;
   --ink-soft: #b6c2d6;
+  --eyebrow-color: var(--workspace-accent-ink);
+  --workspace-accent: var(--primary);
   --workspace-accent-soft: #1c3157;
   --workspace-accent-ink: #b8d0ff;
 
@@ -246,7 +251,7 @@
   --destructive-foreground: #101d39;
 
   --border: #33415a;
-  --input: #46556f;
+  --input: #74839a;
   --ring: #8ab4ff;
 
   --success: #5bd6a2;
@@ -264,13 +269,14 @@
   --sidebar-ring: #8ab4ff;
 }
 
-.dark [data-can-brand="true"] {
+.dark [data-can-brand="true"], .dark[data-can-brand="true"] {
   --primary: #8ab4ff;
   --primary-foreground: #101d39;
   --accent: #1c3157;
   --accent-foreground: #f4f7fc;
   --ring: #8ab4ff;
-  --workspace-accent: #8ab4ff;
+  --eyebrow-color: var(--workspace-accent-ink);
+  --workspace-accent: var(--primary);
   --workspace-accent-soft: #1c3157;
   --workspace-accent-ink: #b8d0ff;
   --sidebar-primary: #8ab4ff;
@@ -349,7 +355,7 @@
   color: inherit;
 }
 .student-day-hero a.bg-white {
-  color: var(--foreground);
+  color: var(--editorial-action-foreground);
 }
 .student-day-hero-landscape {
   background:
@@ -423,6 +429,9 @@
 .can-editorial-primary:hover { filter:brightness(.96); }
 .can-editorial-secondary { color:#ffffff; border:1px solid rgba(255,255,255,.65); }
 .can-editorial-secondary:hover { background:rgba(255,255,255,.12); }
+.student-day-hero[data-safety="true"] .can-editorial-secondary { color:var(--destructive-foreground); border-color:currentColor; }
+.student-day-hero[data-safety="true"] .can-editorial-secondary:hover { background:transparent; text-decoration:underline; }
+.student-day-hero[data-safety="true"] :is(.can-editorial-primary,.can-editorial-secondary):focus-visible { outline-color:var(--destructive-foreground); }
 .can-editorial-primary:focus-visible, .can-editorial-secondary:focus-visible { outline:2px solid #ffffff; outline-offset:4px; }
 /* All presentation surface radii inherit the zero-radius system. */
 .can-dashboard { font-family:var(--font-sans); }
@@ -438,8 +447,9 @@
 }
 .can-dashboard-hero::before {
   content:""; position:absolute; inset:0; z-index:-1;
-  background:linear-gradient(90deg,rgba(248,250,255,.92),rgba(248,250,255,.75) 45%,rgba(248,250,255,.04) 85%);
+  background:linear-gradient(90deg,rgba(248,250,255,.94),rgba(248,250,255,.88) 45%,rgba(248,250,255,.72) 100%);
 }
+.can-dashboard-hero .student-dashboard-date { color: var(--editorial-action-foreground); }
 .can-dashboard-hero h1 {
   margin:12px 0 9px; font-family:var(--font-serif); font-weight:400;
   font-size:clamp(43px,4.2vw,61px); letter-spacing:-.45px; line-height:1.02;
@@ -561,8 +571,8 @@
   .classroom-tools > section { margin-top:0; }
 }
 @media (max-width:1023px) {
-  .classroom-sidebar-expanded #classroom-primary-links nav span:not(.sr-only) { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
-  .classroom-sidebar-expanded #classroom-primary-links nav a { justify-content:center; padding-inline:4px; }
+  .classroom-sidebar-expanded [data-classroom-primary-links] nav span:not(.sr-only) { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+  .classroom-sidebar-expanded [data-classroom-primary-links] nav a { justify-content:center; padding-inline:4px; }
 }
 @media (max-width:760px) {
   .classroom-navigation { grid-template-columns:58px minmax(0,1fr); }

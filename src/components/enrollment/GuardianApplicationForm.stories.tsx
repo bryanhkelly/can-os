@@ -6,7 +6,7 @@ import { GuardianApplicationForm } from "./GuardianApplicationForm";
 
 const success = fn(async () => ({ applicationId: "application-story-001" }));
 const meta = {
-  title: "Workflows/GF22 Guardian application",
+  id: "workflows-gf22-guardian-application", title: "07 Persona experiences/Family/Guardian application",
   component: GuardianApplicationForm,
   args: {
     programs: [{ id: "program-high-school", name: "CAN High School · Grades 9–12",

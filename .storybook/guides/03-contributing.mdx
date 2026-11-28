@@ -1,0 +1,29 @@
+import { Meta } from '@storybook/addon-docs/blocks';
+
+<Meta title="12 Engineering and acceptance/Authoring standards" />
+
+# Author a production-quality story
+
+1. Locate the canonical component and owner. Use the actual implementation wherever possible.
+2. Create a colocated CSF story, with meaningful args, synthetic fixtures and a clear title. Preserve existing story IDs when reorganizing.
+3. Document intent, applicability, constraints, and what the story cannot prove. Keep fixture-only workflows separate from production code.
+4. Cover applicable empty, loading, blocked, disabled, permission-denied, invalid, pending, success, partial-success, conflict and retry states.
+5. Exercise user interactions with accessible queries and meaningful assertions. Verify keyboard navigation, focus restoration and visible errors.
+6. Exercise narrow content, long text, large lists, themes and responsive behavior. Use semantic tokens and governed components, not copied CSS.
+7. Update the route coverage registry when a consumer adopts a pattern. Attach independent evidence only after review.
+
+## Fixture policy
+
+Never fetch production records, use real credentials, send real emails, write to production storage, or expose identifiable participant data. Mock only at an explicit fixture boundary. Reuse the shared fixture alias map in both Storybook and Vitest. A synthetic save or approval must be described as synthetic.
+
+## Story categories
+
+Use stable names for default, state, interaction, layout, persona, feature and journey stories. Add specific tags for new stories where they materially improve filtering, such as journey, responsive and critical. Existing automatic documentation and accessibility checks remain enabled.
+
+## Review checklist
+
+- No duplicated production component or alternate authorization logic.
+- Accessible names, predictable focus, non-color-only states.
+- No horizontal page overflow at 320 CSS pixels; deliberate table scrolling may remain local.
+- Appropriate error, retry and unavailable behavior.
+- Reviewed visual diff and no implicit baseline approval.

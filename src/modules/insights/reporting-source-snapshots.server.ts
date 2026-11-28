@@ -42,7 +42,7 @@ export const createReportingSourceSnapshot = createServerFn({method:"POST"})
   .handler(async ({data}) => {
     setResponseHeader("Cache-Control","private, no-store");
     if (!reportingSnapshotsEnabled()) {
-      throw new Error("Private reporting snapshots are not activated");
+      throw new Error("Reporting snapshot creation is temporarily paused for maintenance");
     }
     const actor = await getCommandContext(getRequest());
     const from=new Date(data.from), to=new Date(data.to), asOf=new Date();
@@ -131,9 +131,6 @@ export const getReportingSourceSnapshot = createServerFn({method:"GET"})
   .validator((input:unknown)=>readInput.parse(input))
   .handler(async ({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
-    if(!reportingSnapshotsEnabled()) {
-      throw new Error("Private reporting snapshots are not activated");
-    }
     const actor=await getCommandContext(getRequest());
     return db.transaction(async tx=>{
       const [record]=await tx.select().from(reportingSourceSnapshots)

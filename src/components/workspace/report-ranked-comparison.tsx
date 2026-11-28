@@ -13,7 +13,7 @@ export function ReportRankedComparison({title,description,rows,format="count",se
   const maximum=Math.max(0,...ordered.map(row=>row.value??0));
   return <DashboardPanel title={title} description={description} headingLevel="h3">
     {!valid?<WorkspaceNotice tone="attention">Comparison is invalid or exceeds the safe display limit.</WorkspaceNotice>:!rows.length?<EmptyState title="No comparable records"/>:
-      <Table scrollLabel={title} aria-label={title}>
+      <Table scrollLabel={title+" scrollable values"} aria-label={title}>
         <TableCaption className="sr-only">Descending measured values; unavailable values appear last. Bars share the same maximum.</TableCaption>
         <TableHeader><TableRow><TableHead scope="col">Category</TableHead><TableHead scope="col" className="text-right">Value</TableHead>{onSelect&&<TableHead scope="col">Filter report</TableHead>}</TableRow></TableHeader>
         <TableBody>{ordered.map(row=><TableRow key={row.id}>
@@ -21,7 +21,7 @@ export function ReportRankedComparison({title,description,rows,format="count",se
             {row.value!==null&&<div aria-hidden="true" className="mt-2 h-2 w-full bg-muted print:hidden"><div className="h-full bg-[var(--report-series-1)]" style={{width:maximum?row.value/maximum*100+"%":"0%"}}/></div>}
           </TableRowHead>
           <TableCell className="text-right tabular-nums">{formatReportValue(row.value,format)}</TableCell>
-          {onSelect&&<TableCell><Button type="button" size="sm" variant="outline" aria-pressed={selectedId===row.id} aria-label={"Filter report to "+row.label} onClick={()=>onSelect(row.id)}>{selectedId===row.id?"Selected":"Filter"}</Button></TableCell>}
+          {onSelect&&<TableCell><Button type="button" size="sm" variant={selectedId===row.id?"outline-selected":"outline"} aria-pressed={selectedId===row.id} aria-label={"Filter report to "+row.label} onClick={()=>onSelect(row.id)}>Filter</Button></TableCell>}
         </TableRow>)}</TableBody>
       </Table>}
   </DashboardPanel>;

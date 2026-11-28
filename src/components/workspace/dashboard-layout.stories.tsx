@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, within } from "storybook/test";
 import { BookOpen, CalendarDays, Users } from "lucide-react";
 import { DailyCanvas } from "@/components/student/DailyCanvas";
 import { resolveEditorialCanvas } from "@/domain/editorial-campaigns";
@@ -6,12 +7,19 @@ import { DashboardLayout, DashboardPanel, DashboardShortcut } from "./dashboard-
 import { StatCard } from "./stat-card";
 import { StatusBadge } from "./workspace-panel";
 
-const meta = { title: "V6.1 templates/Role dashboards", parameters: { layout: "fullscreen" } } satisfies Meta;
+const meta = { id: "v6-1-templates-role-dashboards", title: "05 Page layouts/Role dashboards", parameters: { layout: "fullscreen" } } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
 const now = new Date("2026-11-03T12:00:00Z");
 
-export const StudentHome: Story = { render: () => <div className="bg-background p-4 sm:p-6">
+export const StudentHome: Story = { play: async ({canvasElement}) => {
+  const shortcuts=within(within(canvasElement).getByRole("navigation",{name:"Dashboard shortcuts"}));
+  for(const [title,description,href] of [["Continue learning","Pick up your next lesson","#learning"],["Assignments","Review your due work","#assignments"],["Today\x27s schedule","See your classes","#schedule"],["School life","Clubs and community","#school-life"]]){
+    const link=shortcuts.getByRole("link",{name:title+" "+description});
+    await expect(link).toBeVisible();
+    await expect(link).toHaveAttribute("href",href);
+  }
+}, render: () => <div className="bg-background p-4 sm:p-6">
   <DashboardLayout
     wallpaper={<DailyCanvas audience="student" content={{
       ...resolveEditorialCanvas("student", now)!,

@@ -4,7 +4,7 @@ import { DisclosureSection } from "./disclosure-section";
 import { Input } from "@/components/ui/input";
 import { expect, fn, userEvent, within } from "storybook/test";
 
-const meta = { title:"V6.1 foundations/Disclosure section",
+const meta = { id: "v6-1-foundations-disclosure-section", title: "03 Components/Disclosure section",
   component:DisclosureSection, parameters:{layout:"padded"} } satisfies Meta<typeof DisclosureSection>;
 export default meta;
 type Story=StoryObj<typeof meta>;

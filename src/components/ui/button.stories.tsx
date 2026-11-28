@@ -4,7 +4,7 @@ import { expect, userEvent, within } from "storybook/test";
 import { Button } from "./button";
 
 const meta = {
-  title: "Foundations/Button",
+  id: "foundations-button", title: "02 Primitives/Button",
   component: Button,
   args: { children: "Continue" },
 } satisfies Meta<typeof Button>;
@@ -36,6 +36,7 @@ export const KeyboardFocus: Story = {
   </div>,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    await expect(canvas.getByRole("button", { name: "Second action" })).toHaveClass("border-input");
     await userEvent.tab();
     await expect(canvas.getByRole("button", { name: "First action" })).toHaveFocus();
     await userEvent.tab();
@@ -57,10 +58,33 @@ export const UnavailableSaveActions: Story = {
     await expect(disabled).toBeDisabled();
     await expect(disabled).toHaveClass("bg-muted", "text-muted-foreground");
     await expect(disabled).not.toHaveClass("bg-primary");
-    await expect(canvas.getByRole("button", { name: "Save & Exit" })).toBeDisabled();
+    const exit = canvas.getByRole("button", { name: "Save & Exit" });
+    await expect(exit).toBeDisabled();
+    await expect(exit).toHaveStyle({ opacity: "1" });
     const link = canvas.getByRole("link", { name: "Unavailable link" });
     await expect(link).toHaveAttribute("aria-disabled", "true");
     await expect(link).toHaveAttribute("tabindex", "-1");
     await expect(link).toHaveClass("bg-muted");
+  },
+};
+
+/** Base colors and hover treatment; actual pointer hover is verified by Playwright on the compiled story. */
+export const FilledHoverContrast: Story = {
+  render: () => <div className="flex flex-wrap gap-3 bg-background p-6"><Button>Continue</Button><Button variant="destructive">Delete draft</Button></div>,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    for (const name of ["Continue", "Delete draft"]) {
+      const button = canvas.getByRole("button", { name });
+      await expect(button).toHaveClass("hover:underline", "underline-offset-4");
+      const style = getComputedStyle(button);
+      const scope = getComputedStyle(button.closest("[data-storybook-theme]") ?? button);
+      const token = name === "Continue" ? "--primary" : "--destructive";
+      // Compare normalized computed colors, not camelCase matcher declarations.
+      const probe = document.createElement("span");
+      probe.style.color = scope.getPropertyValue(token).trim();
+      button.append(probe);
+      try { await expect(style.backgroundColor).toBe(getComputedStyle(probe).color); }
+      finally { probe.remove(); }
+    }
   },
 };

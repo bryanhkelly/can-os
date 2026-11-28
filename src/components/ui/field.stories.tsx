@@ -10,7 +10,7 @@ import { Label } from "./label";
 import { Textarea } from "./textarea";
 
 const meta = {
-  title: "Foundations/Fields and choices",
+  id: "foundations-fields-and-choices", title: "02 Primitives/Fields and choices",
   parameters: { chromatic: { modes: { light: { theme: "light" }, dark: { theme: "dark" }, site: { theme: "site" } } } },
 } satisfies Meta;
 export default meta;
@@ -111,5 +111,20 @@ export const ControlledReview: Story = {
     await expect(action).toBeDisabled();
     await userEvent.type(reason, "Independently reviewed current evidence.");
     await expect(action).toBeEnabled();
+  },
+};
+
+export const ChildRequiredAndDisabledValue: Story = {
+  render: () => <div className="max-w-xl space-y-4 bg-background p-6">
+    <Field label="Reference"><Input required /></Field>
+    <Field label="Recorded reference"><Input disabled value="REF-123" readOnly /></Field>
+  </div>,
+  play: async ({ canvas }) => {
+    const reference = canvas.getByRole("textbox", { name: /^Reference\s*\(required\)$/ });
+    await expect(reference).toBeRequired();
+    const recorded = canvas.getByRole("textbox", { name: "Recorded reference" });
+    await expect(recorded).toBeDisabled();
+    await expect(recorded).toHaveValue("REF-123");
+    await expect(recorded).toHaveStyle({ opacity: "1" });
   },
 };

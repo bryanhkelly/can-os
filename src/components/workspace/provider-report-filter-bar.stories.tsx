@@ -31,8 +31,8 @@ function Fixture(){
    </ProviderReportFilterProvider>
  </div>;
 }
-const meta={title:"V6.1 foundations/Data Visualization/Provider report filters",component:Fixture,
- parameters:{chromatic:{viewports:[390,768,1024,1440],modes:{light:{theme:"light"},dark:{theme:"dark"},site:{theme:"site"}}}}} satisfies Meta<typeof Fixture>;
+const meta={id: "v6-1-foundations-data-visualization-provider-report-filters", title: "03 Components/Reporting/Provider report filters",component:Fixture,
+ parameters:{chromatic:{modes:{light:{theme:"light"},dark:{theme:"dark"},site:{theme:"site"}}}}} satisfies Meta<typeof Fixture>;
 export default meta;
 type Story=StoryObj<typeof meta>;
 export const CrossReportSelection:Story={play:async({canvasElement})=>{

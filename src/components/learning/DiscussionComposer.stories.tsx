@@ -17,7 +17,7 @@ function Preview({ reply = false }: { reply?: boolean }) {
 }
 
 const meta = {
-  title: "Student/Shared discussion composer",
+  id: "student-shared-discussion-composer", title: "08 Feature workspaces/Learning/Discussion composer",
   component: DiscussionComposer,
   args: { value: "", onChange: () => {}, onSubmit: () => {} },
   parameters: { chromatic: { modes: {

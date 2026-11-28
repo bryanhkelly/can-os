@@ -5,7 +5,7 @@ import { DashboardPanel } from "./dashboard-layout";
 import { StatusBadge } from "./workspace-panel";
 import { Button } from "@/components/ui/button";
 
-const meta = { title: "V6.1 templates/Directories and records", parameters: { layout: "fullscreen" } } satisfies Meta;
+const meta = { id: "v6-1-templates-directories-and-records", title: "05 Page layouts/Directories and records", parameters: { layout: "fullscreen" } } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
 

@@ -4,7 +4,7 @@ import { WebsiteTemplateGallery } from "./WebsiteTemplateGallery";
 import { sitePaletteIds, siteTypographyIds, type SiteTemplateId, type SitePaletteId, type SiteTypographyId } from "@/domain/site-theme";
 import { Label } from "@/components/ui/label";
 
-const meta = { title: "Workflows/Website Launch Studio",
+const meta = { id: "workflows-website-launch-studio", title: "08 Feature workspaces/Launch Studio/Website template gallery",
   parameters: { layout: "fullscreen" } } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -31,6 +31,7 @@ function GalleryFixture() {
           {siteTypographyIds.map(id=><option key={id} value={id}>{id}</option>)}
         </select></div>
     </div>
+    <h2 className="sr-only">Website layout preview</h2>
     <WebsiteTemplateGallery schoolName="Rivermere Academy" value={template} onChange={setTemplate}
       paletteId={palette} typographyId={typography} />
     <p role="status" className="mt-6 border border-border bg-card p-4 text-xs text-muted-foreground">

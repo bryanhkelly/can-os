@@ -5,11 +5,10 @@ import { Button } from "./button";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from "./table";
 
 const meta = {
-  title: "V6.1 foundations/Semantic tables",
+  id: "v6-1-foundations-semantic-tables", title: "02 Primitives/Semantic tables",
   parameters: {
     layout: "fullscreen",
-    chromatic: { modes: { light: { theme: "light" }, dark: { theme: "dark" }, site: { theme: "site" } },
-      viewports: [390, 768, 1024, 1440] },
+    chromatic: { modes: { light: { theme: "light" }, dark: { theme: "dark" }, site: { theme: "site" } } },
   },
 } satisfies Meta;
 export default meta;

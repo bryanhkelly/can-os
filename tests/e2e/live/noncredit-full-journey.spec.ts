@@ -1,5 +1,6 @@
 import { test, expect, type Browser, type Page, type Locator } from "@playwright/test";
 import { z } from "zod";
+import { assertPersistedPilotJourney } from "../helpers/pilot-persisted-journey";
 
 const base="http://localhost:5183";
 const fixture=z.object({
@@ -134,6 +135,10 @@ test("approved independent noncredit fixture: Go invitation to verified completi
       await expect(row).toHaveCount(1);
       await expect(row.getByRole("cell")).toHaveText(["1","1","1","1"]);
       await expect(evidence.getByText(/percentage points from 1 valid baseline\/final pairs/)).toBeVisible();
+    });
+    await test.step("Verify durable enrollment, ordered assessment and lesson history, survey and completion records",async()=>{
+      const proof=await assertPersistedPilotJourney(fixture);
+      await test.info().attach("persistent-learner-evidence",{body:JSON.stringify(proof,null,2),contentType:"application/json"});
     });
   }finally{
     await Promise.all([learner.close(),other.close(),provider.close()]);

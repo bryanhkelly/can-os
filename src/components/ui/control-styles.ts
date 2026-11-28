@@ -20,7 +20,7 @@ export const fieldSurfaceClasses =
 export const fieldControlClasses = [
   fieldSurfaceClasses,
   focusRingClasses,
-  disabledControlClasses,
+  "disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:placeholder:text-muted-foreground",
   invalidFieldClasses,
 ].join(" ");
 

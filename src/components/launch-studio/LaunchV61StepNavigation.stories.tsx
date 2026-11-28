@@ -4,7 +4,7 @@ import { expect, userEvent, within } from "storybook/test";
 import { GuidedSetupProgress, GuidedSetupShell } from "@/components/workflow/guided-setup-shell";
 
 const meta = {
-  title: "Workflows/Launch Studio/V6.1 internal steps",
+  id: "workflows-launch-studio-v6-1-internal-steps", title: "08 Feature workspaces/Launch Studio/Internal steps",
   component: GuidedSetupShell,
   parameters: { layout: "padded" },
   args: { title: "Site Information", steps: [], children: null },

@@ -103,3 +103,133 @@ A short-lived synthetic digest on the existing separately tagged QA auth fixture
 ### Canonical media publication handoff
 
 Existing ProviderVideoUploadForm and private R2 storage remain the only native recording ingestion path. Added an explicit creator submission marker on the existing asset-version metadata, Course-scoped independent reviewer inventory, private preview through ClassVideoPlayer, decisions in published_asset_reviews, exact content hash review receipts in the existing audit ledger, and a guarded immutable publication command. Publication requires latest independent academic, rights and accessibility approvals, same-publisher current verified evidence, intact R2 bytes and current Course appointment. The existing track and Offering publication services then consume the published version; no pilot-specific media table or storage convention was added. Reviewer UI uses existing V6.1 workspace controls. Evidence IDs are currently entered explicitly, consistent with the existing track review panel; governed evidence selection and caption delivery need further validation. Source-contract tests added, not executed. No storage upload, live review, asset publication or production migration was performed. Real restricted-session browser acceptance, review concurrency and storage readback are required before closing this gate.
+
+
+### Read-only QA readiness triage (November 27)
+
+Run `npm run verify:pilot:qa-readiness` before requesting HTTP or browser acceptance. It loads local environment settings if present, prints only configuration presence/shape (never values), and inventories branch-tagged synthetic training, published primary lesson coverage, sealed assessment items, open administrations, current policy/campaign counts, active self-paced Classes, open releases and current verified accounts. The database inventory requires the existing isolated Neon attestation settings; the command never publishes, grants authority, creates sessions or writes evidence. A candidate inventory is not strict fixture validation. The exact fixture preflight still validates the restricted auth connection, session digests, approvals, exact offering/site/adoption scope, one active matching Class, and registration freshness.
+
+On the dedicated QA branch `br-spring-frog-arnmih9w`, both diagnostic SQL queries executed successfully: one draft training, draft course and draft Offering, seven lessons, zero published primary coverage, zero sealed items, zero open assessment administrations, zero current completion policies, zero active survey campaigns, zero active self-paced Classes, zero open registration releases, zero registrations, one verified tagged QA account and zero accounts with current sessions. These are inventory observations, not an HTTP acceptance result.
+
+Rehearsal order: configure isolated runtime and prepare the existing draft answer keys using the canonical encryption helper; ingest the existing synthetic recordings through the native upload workflow; obtain actual independent QA academic/rights/accessibility decisions; publish the primary track, Course, Offering and training under the existing governance path; authorize deployment/adoption, assessment administrations, automatic completion policy and identified survey campaign; activate exactly one matching self-paced Class; publish/open the registration release and create its governed direct Go link. Establish distinct reviewed adult learner, unrelated learner and provider identities through approved identity workflows; obtain current QA sessions. Run strict preflight and `npm run test:e2e:noncredit:api`; use a separate fresh fixture for browser/media acceptance. Do not insert learner outcome evidence, forge reviews or use production credentials.
+
+The diagnostic source and exact-class preflight tightening are committed; only the inventory SQL has been executed against Neon in this pass. Full exact-revision Node/Playwright execution remains outstanding.
+
+
+### Permanent QA rehearsal runner (November 27)
+
+Use a **separate clean checkout** of the release branch, not the normal development checkout containing production or development environment files. The initial implementation is deliberately pinned to the existing dedicated Neon branch `br-spring-frog-arnmih9w`. Run Node 22+ and install the checked-in dependencies and Chromium first.
+
+```sh
+npm ci
+npx playwright install chromium
+npm run qa:pilot -- init
+```
+
+The initializer creates an ignored `.env.pilot-qa` with separate random access peppers and assessment encryption key. It refuses to overwrite an existing file. Preserve those values across fixture preparation and runtime execution; rotating a key invalidates existing sealed items or sessions. On Windows restrict the file ACL to the QA operator. Do not commit, paste or include its contents in artifacts.
+
+Fill in the isolated database URL, the **production hostname only** for the existing isolation comparison, and the dedicated restricted authentication login URL. The optional operations login must be the separate restricted `can_os_canonical_ops_app` on the same QA database; its role is not provisioned by this runner. For QA content and identity evidence use the dedicated private R2 bucket `can-os-pilot-qa` and a bucket-scoped credential. No real partner files or production storage credentials. Configure these through the approved DBA/storage operator path, not in source.
+
+```sh
+npm run qa:pilot -- readiness
+npm run qa:pilot -- keys
+```
+
+Readiness is a presence/shape check and branch-attested inventory, not publication approval. It is expected to exit nonzero until the fixture and sessions exist. The keys command seals the five existing QA draft items with the runtime key via the production crypto helper. It does not publish an assessment. It refuses a different branch, item set, or incompatible existing key. No credentials, sessions or approval records are minted by this script.
+
+#### Rehearsal completion sequence
+
+- Use the canonical signup/session workflow with individually controlled QA inboxes; verify each distinct adult learner, provider, author and reviewer through the existing workflow. Assign only the required roles. Tag synthetic Persons and Organizations `qa_only=true` and `intended_branch=br-spring-frog-arnmih9w` after verifying the exact records in the isolated branch. Do not use fixed school demo accounts, copy production sessions, create a second Person, fabricate birth-date review, or hand-insert session bearers.
+- Upload the seven existing synthetic MP4s and VTTs through the native private provider-media workflow. Complete independent academic, rights and accessibility reviews and publish each asset; bind coverage to the primary track. Complete actual track and Offering review/publication.
+- Publish the two assessment versions/forms, open exactly one administration per phase for the same deployment/course/provider, publish the approved automatic completion policy, and activate the exact identified feedback campaign.
+- Approve Site adoption, activate exactly one self-paced Class, publish/open registration, then publish a governed direct adult-training engagement Go link.
+- Generate the JSON fixture from the current published records using the command below. Place the emitted single JSON line in `CAN_PILOT_QA_FIXTURE_JSON` in the private local environment file. Obtain three fresh verified CAN sessions through the real application and set the three local session entries. The runner does not emit or provision session tokens.
+
+```sh
+npm run qa:pilot -- fixture
+npm run qa:pilot -- readiness
+npm run qa:pilot -- api
+```
+
+The API and browser journeys both **consume a fresh fixture**; do not run them sequentially on the same used training. A separately approved fresh fixture and the strict test configuration are required for the browser run. The convenience fixture generator currently supports only the original seven-lesson reference; generalized fresh-fixture authoring and provisioning remain follow-up work. The QA wrapper uses the exact clean checkout SHA, an explicit environment allowlist, no inherited app/provider credentials, and refuses normal Vite environment files. It attests the dedicated database and configured restricted login branch before starting a child process. It does not deploy Cloudflare, configure R2 credentials, or independently prove bucket access. Do not point a QA deployment at a production database, production R2, or production delivery providers.
+
+Current November 27 inventory on the isolated branch: one draft training, seven course lessons, five draft shared assessment items, zero published primary lesson coverage, zero sealed keys, zero open administrations, zero policies, zero active survey campaigns, zero active Classes, zero open releases, one verified tagged account and zero current tagged sessions. All six new fixture-generator SQL queries were executed read-only against the QA schema; zero qualifying published records are expected. No application test, provider upload, publication, or independent approval was completed by this source work. No production data was modified.
+
+
+### QA schema and persona gates — November 27 follow-up
+
+The existing QA branch is journaled through 0116, while the checked release has 0133. Two historical journal rows have malformed hash lengths (timestamps 1794690003000 and 1795462010000); 0116 differs from the same immutable SQL blob on main and release. Main's 0116 hash matches source and its journal has no malformed-length hashes. Main was queried read-only. Do not rewrite old ledger rows, run a partial migration chain as though it were complete, or delete a recovery branch to obtain quota.
+
+Creation of a separate fresh branch `pilot-acceptance-20261127` from current Neon main was attempted and rejected by Neon (HTTP 422, branches limit exceeded). The original QA branch and its draft training are retained. An approved additional branch slot or explicitly approved recovery/replacement plan is required. Rebind the QA runner and fixture authoring to the new attested branch only after creation; never target main for mutating acceptance. The current rehearsal authoring is pinned to the old branch, and the new fixture must be created and reviewed on the replacement.
+
+```sh
+npm run qa:pilot -- schema
+```
+
+The read-only schema gate checks exact committed SQL SHA-256 hashes for journal entries 0079 onward (the existing production parity boundary), malformed hashes across the ledger, duplicate timestamps, missing/extra modern migrations and required current application objects. Readiness reports this gate, and both HTTP/browser configurations enforce it before learner mutations. The rollback-only canonical regression is a separate historical-schema test; a pass does not override drift.
+
+Strict fixture preflight now independently maps the three supplied session digests to the intended actors, checks direct verified email-link authentication, fresh/nondelegated sessions and same-Person grants, and requires the primary learner's unconsumed independent adult review. The provider session must have an active Site Admin or Registrar grant for the exact registering Organization and delivery Site. These checks do not create personas, assign grants or replace the runtime independent identity evidence validation. Provisioning verified accounts, actual private identity evidence, and R2/media publication remain outstanding.
+
+
+### Replacement QA branch established — November 27
+
+After the explicitly authorized retirement of `main-pre-migration-recovery-20261102`, Neon branch `pilot-acceptance-20261127` (`br-solitary-art-arun91gj`) was created from current main and reached ready state. Default compute settings were used because the account does not permit a custom suspend interval. The original `br-spring-frog-arnmih9w` branch and its draft are preserved.
+
+All 55 migration SQL hashes (0079–0133) match the new branch's journal, all 135 ledger records have valid hash shape, and all seven required schema checks pass. The QA runner, fixture generator, draft bootstrap, planning scaffold and assessment key preparation now target only the replacement branch. Historical references above describe the previous branch, not current runtime instructions.
+
+The committed draft bootstrap and planning scaffold were executed twice on the replacement branch, retaining the exact same synthetic organization and training IDs on repeat:
+- Organization: `10e95da8-40d8-49db-b78e-786dec681040`, domain `pilot-acceptance.can.demo`
+- Training: `2b386aac-03ca-4b18-a901-2fb188006ead`
+- One draft Offering/Course/training, seven lessons, five objective questions, one draft survey, one draft Class, one draft primary instructor track; zero releases or registrations.
+
+The canonical 22-assertion SQL regression also passes on the migrated branch with rollback-only synthetic test records. No published content, verified adult identity, assessment key, active Class, enrollment release or application acceptance was created. The draft author is an unauthenticated synthetic Person, not an independent reviewer.
+
+**Data boundary:** this branch is a production-derived database clone, not a synthetic-only database. Keep it private, restrict access to authorized operators, use fresh branch-only credentials and secrets, and do not expose copied real accounts, data, sessions or media to QA testers. Do not deploy publicly or send real delivery traffic. A sanitized/schema-only QA environment or formal reviewed de-identification process is still required before broad tester access. No production row was changed during this work. New QA Personas must use independently verified controlled accounts and the standard identity-review flow; never reuse copied credentials or reviews.
+
+Runtime execution, actual R2 access, approved independent reviews and a full HTTP/browser journey remain outstanding.
+
+
+### Executive acceptance gate — November 27
+
+The provider HTTP test already asserts the authorized provider learning-outcome response against canonical database rows. It does not verify a national executive report, and the current report catalog marks `network-impact` as `not_available`; the network setup service returns `executionAvailable:false`. Do not mark national reporting accepted after the provider test.
+
+```sh
+npm run qa:pilot -- executive
+```
+
+The new count-only diagnostic independently attests migration parity, queries only branch-tagged rehearsal organizations/people, and reports enrollment and executive blockers separately. Its SQL was executed against the replacement branch: one tagged draft author Person, zero verified accounts/grants/adult reviews/verified identity documents/current sessions, zero published trainings/active Classes/open releases/registrations/course attempts/completion decisions, zero tagged denomination HQs, approved reporting memberships, current host grant records and accepted relationship records. Full Node execution remains unverified. The diagnostic intentionally exits blocked until a real governed executive report exists.
+
+Remaining work:
+1. Local private runtime with independent QA secrets, restricted auth connection, controlled test mailbox or approved email transport, isolated R2 and actual reviewed identity/media evidence. Existing access-mail outbox supports only .test recipients in APP_ENV=test/NODE_ENV=test; do not disable real authentication policies or expose outbox tokens, and do not use copied production accounts from the cloned database. The current pilot runner lacks an interactive provisioning command/outbox configuration; the HTTP test assumes pre-existing sessions.
+2. Provision the initial distinct learner, negative-control learner and provider plus independent authorized reviewers; publish the seven-lesson training, assessments, completion policy, campaign, Class and Go link via existing workflows. Verify provider results after the first HTTP journey, then use a distinct fresh fixture for browser acceptance and a dedicated multi-learner cohort acceptance scenario.
+3. Provision a branch-tagged synthetic HQ with separately authorized direct recipient/host actors and independently reviewed reporting agreements. Reuse governed reporting source contracts, canonical attribution and bottom-up relationship scope; no broad host grants substituted for narrower consent, no cross-tenant raw facts or copying provider dashboard totals. Existing pure relationship registration projection covers four count metrics; its source adapter, trusted disclosure policy and external endpoint are not complete. Add permitted learning outcome/feedback/engagement measures only through the versioned metric policy.
+4. Implement governed executive aggregate query and V6.1 reporting surface with explicit source reconciliation, distinct-person rollups, period/metric/permission definitions, denial, revocation, and disclosure tests. Five synthetic learners are appropriate for an internal private QA check, not public release: the current publication-safe helper defaults to ten distinct people and protects complementary cells too. Never lower the production threshold to make the demo pass. Synthetic data stays separate from real network totals; public-impact acceptance requires independently approved disclosure-safe fixtures.
+5. Verify actual browser rendering with an authorized HQ reader and denial for unrelated readers; verify suppression for small cells, duplicate-tag deduplication and metric totals against the same canonical facts. Distinguish zero from unavailable/suppressed. No claim of public report readiness until these tests pass.
+
+Cloudflare/R2 connector discovery returned no matching plugin; configuration and media operations remain unverified.
+
+
+### Standard capability availability — November 27
+
+QA acceptance is release evidence, not a runtime entitlement. The objective noncredit scoring service now selects automatic finalization by its actual noncredit source rather than the legacy CAN_NONCREDIT_AUTO_FINALIZATION_ENABLED opt-in. It checks the enabled canonical result trigger before finalizing. The trigger still independently validates assessment source, publication, scoring and accountable reviewer boundaries; Class/academic assessments remain provisional. Verified on both main and replacement QA: enabled assessment_result_consistency, objective auto-finalization marker, baseline support and independent reviewer requirement. The legacy variable is ignored and no longer required by the QA initializer, diagnostic or journey preflight.
+
+Source projection and private snapshot creation now operate by default. The old CAN_REPORTING_SOURCE_PROJECTION_ENABLED and CAN_REPORTING_SOURCE_SNAPSHOTS_ENABLED rollout variables are ignored. Explicit operational maintenance pauses are CAN_REPORTING_PROJECTION_MAINTENANCE_PAUSE=1 and CAN_REPORTING_SNAPSHOT_MAINTENANCE_PAUSE=1; these affect processing and creation, not authorized reads. Existing source quality, privacy, access and manifest reconciliation checks remain. Read-only Neon queries verified all three source receipt/snapshot tables on main and QA have forced RLS, owner read/write access, enabled triggers and no anonymous/authenticated SELECT. Actual application-role runtime execution has not been verified.
+
+The HQ workspace now opens with a V6.1 executive overview of directly operated Site records, distinct approved affiliated Sites/organizations and pending requests, using the existing authorized HQ loader. Reporting relationship inventory is visible by default and no longer returns a hardcoded global executionAvailable=false. Zero institutional records show as zero. The setup inventory is not an outcome report and no learner metric is inferred from affiliation or shown without its own permission. National cross-provider outcome source adapters and independently governed disclosure execution remain unimplemented; the separate network-impact catalog entry stays truthful about that limitation. Do not mark national learning outcomes accepted from these changes.
+
+No production database writes, deployment or end-to-end learner execution performed. Full exact-SHA build, typecheck, unit and browser suite execution remain required. Added tests cover default-on reporting, explicit maintenance pauses, empty HQ counts and deduplication, and updated assessment/readiness contracts.
+
+
+### Actual learner completion rehearsal — November 27 continuation
+
+The first acceptance target is the **browser** journey: one real QA account registers, completes the baseline assessment, plays every short video to its end, marks seven lessons complete, takes the final assessment, submits all five feedback answers and receives a recorded completion. Preserve these QA records after execution. The HTTP-only test is a separate fresh fixture and is not video-playback evidence.
+
+A new operator preparation mode launches the actual application locally before a release or learner session exists:
+```sh
+npm run qa:pilot -- prepare
+```
+It reuses branch and restricted-login attestation, migration parity, clean checkout, independent session peppers and the existing .test-only local access-mail outbox. The application binds to localhost:5183 and no external access mail is sent. Use a controlled .test personal signup; use the existing local outbox redemption convention (map the HTTPS app.can-os.test link's path and fragment to localhost:5183). Never print or share mail links or session tokens. The temporary outbox is cleaned up on normal runner exit. This mode does not grant roles, create verified evidence, upload content or approve reviews. Use the actual authorized provider/reviewer workflow. Keep production-derived QA data private and do not use copied real accounts.
+
+After preparation, populate the private fixture and session settings as already documented; stop the preparation server before running `npm run qa:pilot -- browser` so Playwright starts its own fresh runtime. Do not consume the one fresh reference training with the HTTP-only test first.
+
+The browser test now performs an independent read-only reconciliation joining the exact release/referral, branch-tagged participant, registration, course attempt, two finalized assessment results, all lesson progress, identified survey invitation/response, five answers, current completion decision and canonical attribution. It checks baseline before instruction, final after instruction, feedback after final, score improvement and final score at least 80%. Aggregate-only JSON evidence is attached to the test result. The query was executed against the replacement QA schema with a nonexistent release and correctly returned zero/null, not a pass. No actual student journey has been executed; latest inventory remains one draft training, seven lessons, zero open releases, zero registrations, zero attempts and zero verified tagged accounts. The execution environment's GitHub DNS resolution still fails, so no local application checkout/build or Playwright run occurred.

@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { UserFlowMap } from "./user-flow-map";
 
-const meta = { title: "V6.1 templates/Process and user-flow maps", parameters: { layout: "fullscreen" } } satisfies Meta;
+const meta = { id: "v6-1-templates-process-and-user-flow-maps", title: "05 Page layouts/Process and user-flow maps", parameters: { layout: "fullscreen" } } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
 

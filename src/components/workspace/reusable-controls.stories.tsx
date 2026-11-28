@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 
-const meta = { title: "Foundations/Reusable workflow controls",
+const meta = { id: "foundations-reusable-workflow-controls", title: "04 Application patterns/Reusable workflow controls",
   parameters: { chromatic: { modes: {
     light: { theme: "light" }, dark: { theme: "dark" }, site: { theme: "site" },
   } } },
@@ -75,7 +75,7 @@ export const ReasonDialog: Story = {
     await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
     await expect(trigger).toHaveFocus();
     await userEvent.click(trigger);
-    await userEvent.type(within(dialog).getByLabelText("Reason"), "Reviewed evidence");
+    await userEvent.type(within(dialog).getByRole("textbox", { name: /^Reason\s*\(required\)$/ }), "Reviewed evidence");
     await userEvent.click(within(dialog).getByRole("button", { name: "Confirm decision" }));
     await expect(canvas.getByText("Confirmed: 1")).toBeInTheDocument();
     await expect(trigger).toHaveFocus();
@@ -92,7 +92,7 @@ export const PendingDialog: Story = {
     await expect(confirm).toBeDisabled();
     await expect(confirm).toHaveAttribute("aria-busy", "true");
     await expect(dialog.querySelector("[data-dialog-actions]")).toBeInTheDocument();
-    await expect(within(dialog).getByLabelText("Reason")).toBeDisabled();
+    await expect(within(dialog).getByRole("textbox", { name: /^Reason\s*\(required\)$/ })).toBeDisabled();
     fireEvent(dialog, new Event("cancel", { cancelable: true }));
     await expect(dialog).toBeVisible();
     await expect(canvas.getByText("Confirmed: 0")).toBeInTheDocument();

@@ -2,7 +2,8 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
-import { mutationErrorMessage } from "@/lib/mutation-feedback";
+import { useMutationFeedback, mutationErrorMessage } from "@/lib/mutation-feedback";
+import { MutationFeedback, QueryState } from "@/components/workspace";
 import { OnsiteRoomPlanningPanel } from "@/components/operations/OnsiteRoomPlanningPanel";
 import { OperatingAgreementEvidencePicker } from "./OperatingAgreementEvidencePicker";
 import { useCallback, useEffect, useState } from "react";
@@ -19,18 +20,19 @@ type Desk=Awaited<ReturnType<typeof listCANOperatingAuthorizationDeskFn>>;
 export function CANOperatingAuthorizationDesk() {
   const [desk,setDesk]=useState<Desk|null>(null);
   const [inputs,setInputs]=useState<Record<string,{evidence:string;from:string;through:string;reason:string}>>({});
-  const [busy,setBusy]=useState(false);
   const [staffProgramId,setStaffProgramId]=useState("");
-  const [notice,setNotice]=useState("");
   const [error,setError]=useState("");
-  const load=useCallback(async()=>{setDesk(await listCANOperatingAuthorizationDeskFn());},[]);
+  const load=useCallback(async()=>{setDesk(await listCANOperatingAuthorizationDeskFn());setError("");},[]);
+  const feedback=useMutationFeedback(load);
+  const busy=feedback.pending||feedback.refreshFailed;
   useEffect(()=>{void load().catch(e=>setError(mutationErrorMessage(e, "Unable to load operating authorizations")));},[load]);
   const update=(id:string,key:"evidence"|"from"|"through"|"reason",value:string)=>
     setInputs(rows=>({...rows,[id]:{evidence:"",from:"",through:"",reason:"",...rows[id],[key]:value,...(key==="through"?{evidence:""}:{})}}));
   async function decide(id:string,decision:"approved"|"denied"|"revoked"|"suspended"|"resumed"|"renewed") {
     const value=inputs[id]??{evidence:"",from:"",through:"",reason:""};
-    setBusy(true);setNotice("");setError("");
-    try {
+    if(busy)return;
+    setError("");
+    await feedback.run(async()=>{
       if(decision==="revoked")
         await revokeProgramSiteAuthorizationFn({data:{authorizationId:id,reason:value.reason}});
       else if(decision==="suspended")
@@ -51,9 +53,7 @@ export function CANOperatingAuthorizationDesk() {
             effectiveThrough:new Date(value.through+"T00:00:00Z").toISOString(),
           }:{}),
         }});
-      await load();setNotice("Independent operating authorization decision recorded.");
-    }catch(e){setError(mutationErrorMessage(e, "Unable to record decision"));}
-    finally{setBusy(false);}
+    },{successMessage:"Independent operating authorization decision recorded.",commandErrorMessage:"Unable to record decision"});
   }
   return <section className="mt-6  border bg-card p-5">
     <h2 className="font-serif text-2xl">CAN–church institutional service agreements</h2>
@@ -61,9 +61,8 @@ export function CANOperatingAuthorizationDesk() {
       Only separately verified contracts may authorize CAN services at independently owned churches.
       Agreement approval does not issue user grants, certify child-safety readiness or activate schools.
     </p>
-    {error&&<p className="mt-3 text-sm" role="alert">{error}</p>}
-    {notice&&<p className="mt-3 text-sm" role="status">{notice}</p>}
-    {!desk?<p className="mt-3 text-sm">Loading scoped requests…</p>:
+    <MutationFeedback state={feedback} pendingMessage="Recording the independent decision…" className="mt-3"/>
+    {!desk?<QueryState loading={!error?"Loading scoped requests…":undefined} error={error||undefined} onRetry={()=>{setError("");void load().catch(e=>setError(mutationErrorMessage(e,"Unable to load operating authorizations")));}}/>:
       desk.authorizations.length===0?<p className="mt-3 text-sm">No church-site requests for this CAN institution.</p>:
       <div className="mt-3 space-y-3">{desk.authorizations.map(item=>{
         const value=inputs[item.id]??{evidence:"",from:"",through:"",reason:""};

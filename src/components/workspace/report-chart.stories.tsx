@@ -1,29 +1,54 @@
+import {chromaticWidthModes} from "../../../.storybook/viewports";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, within, waitFor } from "storybook/test";
 import { ReportChart } from "./report-chart";
-import type {ReportChartSpec} from "./report-chart-data";
+import { hasNonzeroReportChartValues, validateReportChart, type ReportChartSpec } from "./report-chart-data";
 const fixture={title:"Pilot participation",description:"Synthetic fixture only. Counts overlap.",valueLabel:"Registrations",kind:"comparison",format:"count",points:[{id:"registered",label:"Registered",value:102},{id:"engaged",label:"Engaged",value:87},{id:"completed",label:"Completed",value:69}]} satisfies ReportChartSpec;
 const meta = {
-  title:"V6.1 foundations/Data Visualization/Charts", component:ReportChart,
-  parameters:{chromatic:{viewports:[390,768,1024,1440],modes:{light:{theme:"light"},dark:{theme:"dark"},site:{theme:"site"}}}},
+  id: "v6-1-foundations-data-visualization-charts", title: "03 Components/Reporting/Charts", component:ReportChart,
+  parameters:{chromatic:{modes:{light:{theme:"light"},dark:{theme:"dark"},site:{theme:"site"}}}},
   args:{spec:fixture as ReportChartSpec},
+  // Resolve the real lazy adapter before starting an interactive story. This
+  // avoids competing cold module imports during parallel browser workers,
+  // without changing the application bundle or substituting a chart mock.
+  loaders: [async ({args}) => {
+    if(args.presentation!=="print" && args.spec && validateReportChart(args.spec) && hasNonzeroReportChartValues(args.spec)) {
+      await import("./report-chart-plot");
+    }
+    return {};
+  }],
 } satisfies Meta<typeof ReportChart>;
 export default meta;
 type Story = StoryObj<typeof meta>;
+
+async function requireRenderedPlot(canvasElement: HTMLElement) {
+  // A real nonzero SVG is required. Avoid instrumented assertions inside the
+  // polling callback, and retain a concise diagnostic if layout never settles.
+  await waitFor(() => {
+    const chart=canvasElement.querySelector("[data-report-chart]");
+    const plot=chart?.querySelector("[data-report-chart-plot]");
+    const svg=plot?.querySelector(".recharts-surface");
+    const bounds=svg?.getBoundingClientRect();
+    if(!bounds || bounds.width<=0 || bounds.height<=0) {
+      const size=plot?.getBoundingClientRect();
+      throw new Error(`Chart plot not rendered: chart=${Boolean(chart)}, plot=${Boolean(plot)}, SVG=${Boolean(svg)}, plotSize=${size?.width??0}x${size?.height??0}, state=${chart?.textContent?.includes("Chart unavailable")?"unavailable":chart?.textContent?.includes("Loading chart")?"loading":"measuring"}`);
+    }
+  },{timeout:15_000,onTimeout:error=>error});
+}
 export const Comparison: Story = {play:async({canvasElement})=>{
   const canvas=within(canvasElement);
   await expect(canvas.getByRole("table",{name:"Pilot participation exact values"})).toBeVisible();
   await expect(canvas.getByRole("rowheader",{name:"Completed"})).toBeVisible();
   await expect(within(canvas.getByRole("table",{name:"Pilot participation exact values"})).getByText("69",{exact:true})).toBeVisible();
-  await waitFor(()=>expect(canvasElement.querySelector("[data-report-chart-plot] .recharts-surface")).not.toBeNull());
+  await requireRenderedPlot(canvasElement);
 }};
 export const Trend: Story = {args:{spec:{...fixture,title:"Monthly participation",kind:"trend",
   points:[{id:"jan",label:"Jan",value:12},{id:"feb",label:"Feb",value:null},{id:"mar",label:"Mar",value:23}]}}};
 export const Missing: Story = {args:{spec:{...fixture,points:[{id:"missing",label:"Not measured",value:null}]}},
   play:async({canvasElement})=>{const canvas=within(canvasElement);await expect(canvas.getByText("Unavailable",{exact:true})).toBeVisible();}};
 export const Zero: Story = {args:{spec:{...fixture,points:[{id:"zero",label:"Registered",value:0}]}},play:async({canvasElement})=>{const canvas=within(canvasElement);await expect(canvas.getByText("All reported values are zero")).toBeVisible();await expect(canvas.getByText("0",{exact:true})).toBeVisible();}};
-export const Mobile: Story = {parameters:{chromatic:{viewports:[390]}},render:args=><div className="w-full max-w-[390px] p-3"><ReportChart {...args}/></div>,play:async({canvasElement})=>{await waitFor(()=>expect(canvasElement.querySelector(".recharts-surface")).not.toBeNull());const panel=canvasElement.querySelector("[data-report-chart]")!;expect(panel.scrollWidth).toBeLessThanOrEqual(panel.clientWidth+1);}};
-export const Dark: Story = {globals:{theme:"dark"},parameters:{chromatic:{viewports:[390,1440]}}};
+export const Mobile: Story = {parameters:{chromatic:{modes: chromaticWidthModes([390])}},render:args=><div className="w-full max-w-[390px] p-3"><ReportChart {...args}/></div>,play:async({canvasElement})=>{await requireRenderedPlot(canvasElement);const panel=canvasElement.querySelector("[data-report-chart]")!;expect(panel.scrollWidth).toBeLessThanOrEqual(panel.clientWidth+1);}};
+export const Dark: Story = {globals:{theme:"dark"},parameters:{chromatic:{modes: chromaticWidthModes([390,1440])}}};
 
 export const Distribution: Story={args:{spec:{title:"Receipt mix",description:"Synthetic mutually exclusive fixture.",valueLabel:"Events",
   kind:"distribution",format:"count",population:"100 eligible events",total:100,seriesOrder:["a","b","c","d"],

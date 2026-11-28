@@ -19,7 +19,7 @@ const session: AuthenticatedSession = {
 };
 
 const meta = {
-  title: "Shell/Workspace context switcher",
+  id: "shell-workspace-context-switcher", title: "03 Components/Shell/Workspace context switcher",
   component: WorkspaceContextSwitcher,
   args: { session, open: true, changing: false, error: "", onClose: fn(), onSwitch: fn() },
   parameters: { layout: "fullscreen" },

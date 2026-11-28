@@ -17,7 +17,8 @@ const profiles=args.filter(arg=>arg.startsWith("--profile="));
 if(profiles.length>1)throw new Error("Select one release profile");
 const profile=profiles[0]?.slice("--profile=".length)??"go";
 if(profile==="engineering"&&["--database","--browser","--live"].some(enabled))throw new Error("Engineering validation is source-only; use the pilot or go profile for runtime acceptance.");
-const npm=process.platform==="win32"?"npm.cmd":"npm";
+const npmEntry=process.env.npm_execpath;
+const npm=npmEntry?process.execPath:process.platform==="win32"?"npm.cmd":"npm";
 function git(args){
   const r=spawnSync("git",args,{encoding:"utf8"});
   if(r.status!==0)throw new Error("Unable to attest source revision");
@@ -42,7 +43,7 @@ function run(name,argv,env=sanitized){
   }
   const start=Date.now();
   console.log("\n[release] "+name);
-  const r=spawnSync(npm,argv,{stdio:"inherit",env,shell:process.platform==="win32"});
+  const r=spawnSync(npm,npmEntry?[npmEntry,...argv]:argv,{stdio:"inherit",env,shell:!npmEntry&&process.platform==="win32",windowsHide:true});
   results.push({name,status:r.status===0?"passed":"failed",exitCode:r.status??null,durationMs:Date.now()-start,...(r.error?{reason:r.error.code??"Unable to start npm"}:{})});
   return r.status===0;
 }

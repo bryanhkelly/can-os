@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import {neon,Pool} from "@neondatabase/serverless";
 import {createHash} from "node:crypto";
-import {verifyAdmissionsNeonBranch} from "../verify-admissions-neon-branch.mjs";
+import {checkPilotMigrationParity} from "./check-pilot-migration-parity.mjs";
 
 // No writes. The only accepted fixture is explicitly marked for this exact
 // dedicated QA branch, with a fresh approved, independent training release.
@@ -9,7 +9,8 @@ const env=process.env;
 const branch=env.CAN_PILOT_QA_BRANCH_ID;
 if(!branch||branch==="br-restless-sea-ar9ooo55"||branch==="br-bitter-feather-ar0u63x7")
   throw Error("Dedicated QA branch required");
-await verifyAdmissionsNeonBranch({...env,CAN_ADMISSIONS_TEST_BRANCH_ID:branch});
+const parity=await checkPilotMigrationParity(env);
+if(!parity.ready){console.error(JSON.stringify(parity,null,2));throw Error("QA migration parity required before any application acceptance");}
 const fixture=JSON.parse(env.CAN_PILOT_QA_FIXTURE_JSON??"{}");
 assert.match(fixture.releaseId,/^[0-9a-f-]{36}$/i);
 assert.match(fixture.goCode,/^[A-Za-z0-9_-]{12}$/);
@@ -21,7 +22,7 @@ assert.ok(authUrl,"Dedicated restricted QA authentication URL required");
 const auth=new URL(authUrl);
 assert.ok(["postgres:","postgresql:"].includes(auth.protocol)&&auth.username==="can_os_canonical_auth_app"&&auth.password&&!["user","role","options"].some(k=>auth.searchParams.has(k)),"Restricted application authentication login required");
 assert.ok((env.CAN_ACCESS_TOKEN_PEPPER?.length??0)>=32&&(env.CAN_CANONICAL_ACCESS_TOKEN_PEPPER?.length??0)>=32,"Isolated session peppers required");
-assert.ok(env.CAN_NONCREDIT_AUTO_FINALIZATION_ENABLED==="true"&&/^[a-f0-9]{64}$/i.test(env.CAN_NONCREDIT_ASSESSMENT_KEY_HEX??""),"Objective assessment key and auto-finalization configuration required");
+assert.ok(/^[a-f0-9]{64}$/i.test(env.CAN_NONCREDIT_ASSESSMENT_KEY_HEX??""),"Objective assessment key required");
 const authPool=new Pool({connectionString:authUrl,max:1});
 let client;
 try{
@@ -42,18 +43,34 @@ const sessionDigests=["LEARNER","OTHER","PROVIDER"].map(role=>{
  return createHash("sha256").update(env.CAN_ACCESS_TOKEN_PEPPER).update(":").update(token).digest("hex");
 });
 const identities=await sql`
- SELECT a.id AS account_id,p.id AS person_id,g.role
- FROM public.access_sessions s JOIN public.access_accounts a ON a.id=s.account_id
+ SELECT supplied.actor_index::int AS actor_index,a.id AS account_id,p.id AS person_id,g.role,
+  g.organization_id,g.site_id,
+  EXISTS(SELECT 1 FROM public.access_adult_learning_reviews review
+    WHERE review.access_account_id=a.id AND review.access_person_id=p.id
+      AND review.status='approved' AND review.consumed_at IS NULL
+      AND review.reviewed_by_account_id<>a.id AND review.reviewed_at<=now()
+      AND review.reviewed_at>now()-interval '365 days') AS fresh_adult_review
+ FROM unnest(${sessionDigests}::text[]) WITH ORDINALITY supplied(digest,actor_index)
+ JOIN public.access_sessions s ON s.secret_hash=supplied.digest JOIN public.access_accounts a ON a.id=s.account_id
  JOIN public.people p ON p.id=a.person_id
  JOIN public.account_person_grants g ON g.id=s.active_grant_id AND g.account_id=a.id AND g.person_id=p.id
- WHERE s.secret_hash=ANY(${sessionDigests}::text[]) AND s.revoked_at IS NULL AND s.expires_at>now()
+ WHERE s.revoked_at IS NULL AND s.expires_at>now()
   AND s.updated_at>now()-interval '30 minutes' AND s.delegated_grant_id IS NULL
-  AND a.email_verified_at IS NOT NULL AND NOT a.disabled AND p.active AND g.active
+  AND a.email_verified_at IS NOT NULL AND a.email_normalized NOT LIKE '%.demo' AND a.private_access_code_hash IS NULL
+  AND s.authentication_method='email_link' AND NOT a.disabled AND p.active AND g.active
+  AND (NOT s.shared_device OR s.last_activity_at>now()-interval '5 minutes')
+  AND s.delegated_mode IS NULL AND s.delegated_until IS NULL AND s.delegated_reason IS NULL
+  AND NOT EXISTS(SELECT 1 FROM public.account_person_grants other WHERE other.account_id=a.id AND other.active AND other.person_id<>p.id)
   AND p.metadata->>'qa_only'='true' AND p.metadata->>'intended_branch'=${branch}
 `;
 assert.ok(identities.length===3&&new Set(identities.map(r=>r.person_id)).size===3,"Three distinct branch-tagged current QA identities required");
+const learner=identities.find(r=>r.actor_index===1);
+const other=identities.find(r=>r.actor_index===2);
+const provider=identities.find(r=>r.actor_index===3);
+assert.ok(learner?.role==='account_holder'&&learner.fresh_adult_review&&other?.role==='account_holder',"Direct personal QA learners and an unconsumed independent adult review required");
+assert.ok(provider&&['site_admin','registrar'].includes(provider.role)&&provider.organization_id&&provider.site_id,"Provider session must select an authorized Site staff grant");
 const rows=await sql`
- SELECT r.id,t.title,
+ SELECT r.id,t.title,r.registering_organization_id,r.site_id,
   (SELECT count(*)::int FROM public.course_lessons l WHERE l.course_version_id=r.course_version_id) AS lessons,
   (SELECT count(*)::int FROM public.noncredit_registrations nr WHERE nr.training_version_id=t.id) AS registrations,
   (SELECT count(*)::int FROM public.noncredit_training_versions nt WHERE nt.provider_organization_id=r.provider_organization_id AND nt.state='published') AS published_trainings,
@@ -126,10 +143,11 @@ const rows=await sql`
    AND EXISTS(SELECT 1 FROM public.site_go_links g WHERE g.code=${fixture.goCode}
      AND g.organization_id=r.registering_organization_id AND g.site_id=r.site_id
      AND g.status='active' AND (g.starts_at IS NULL OR g.starts_at<=now()) AND (g.expires_at IS NULL OR g.expires_at>now()))
-   AND EXISTS(SELECT 1 FROM public.classes cls WHERE cls.site_id=r.site_id AND cls.deployment_id=r.deployment_id AND cls.adoption_id=r.adoption_id AND cls.offering_version_id=r.offering_version_id AND cls.course_version_id=r.course_version_id AND cls.state='active' AND cls.delivery_mode='self_paced')
+   AND (SELECT count(*) FROM public.classes cls WHERE cls.site_id=r.site_id AND cls.deployment_id=r.deployment_id AND cls.adoption_id=r.adoption_id AND cls.offering_version_id=r.offering_version_id AND cls.course_version_id=r.course_version_id AND cls.operating_organization_id=r.registering_organization_id AND cls.state='active' AND cls.delivery_mode='self_paced')=1
 `;
 assert.equal(rows.length,1,"Fresh independently approved QA release with branch-bound organization and policy required");
 const row=rows[0];
+assert.ok(provider.organization_id===row.registering_organization_id&&provider.site_id===row.site_id,"Provider session must match the exact QA release operator and Site");
 for(const [key,value] of Object.entries({lessons:fixture.lessons.length,registrations:0,published_trainings:1,baseline:1,final_check:1,surveys:1}))
  assert.equal(row[key],value,"Fixture check failed: "+key);
 const [definition]=await sql`SELECT pg_get_functiondef('education_v30.v301_provision_noncredit_knowledge_access(uuid)'::regprocedure) AS definition`;

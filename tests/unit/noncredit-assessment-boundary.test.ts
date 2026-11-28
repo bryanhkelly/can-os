@@ -25,7 +25,10 @@ describe("noncredit assessment isolation",()=>{
     expect(learner).toContain("openNoncreditAnswerKey");
     expect(learner).toContain("scoreNoncreditChoices");
     expect(learner).toContain("resultStatus:autoFinalize?");
-    expect(learner).toContain("CAN_NONCREDIT_AUTO_FINALIZATION_ENABLED");
+    expect(learner).not.toContain("CAN_NONCREDIT_AUTO_FINALIZATION_ENABLED");
+    expect(learner).toContain('const autoFinalize=scope.access.source==="noncredit"');
+    expect(learner).toContain("assessment_result_consistency");
+    expect(learner).toContain("Canonical objective assessment result guard is missing");
     expect(learner).toContain('const secret=process.env.CAN_NONCREDIT_ASSESSMENT_KEY_HEX');
     expect(learner).not.toContain("graded_submissions");
     expect(learner).not.toContain("official_course_grades");

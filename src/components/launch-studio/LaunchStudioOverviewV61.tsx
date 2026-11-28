@@ -5,12 +5,12 @@
  * navigation via the shared module registry. Render this under a Site-scoped
  * route only after the server has verified active Site access.
  */
-import { ArrowRight, BookOpen, CheckCircle2, ClipboardCheck, Globe, Rocket, Send, Shapes, Users, type LucideIcon } from "lucide-react";
+import { ArrowRight, BookOpen, Globe, Users } from "lucide-react";
 import { completedLaunchStageV61, type LaunchModuleCompletion } from "@/domain/launch-module-completion-v61";
 import { Button } from "@/components/ui/button";
 export { siteLaunchModules } from "@/domain/launch-site-navigation-v61";
-import { siteLaunchStagesV61, type SiteLaunchStageV61 } from "@/domain/launch-site-navigation-v61";
-import { WorkspaceShell, WorkspacePanel, StatusBadge, type StatusTone } from "@/components/workspace";
+import { siteLaunchStagesV61, siteLaunchModules, type SiteLaunchStageV61 } from "@/domain/launch-site-navigation-v61";
+import { WorkspaceShell, WorkspacePanel, StatusBadge, OutcomeMilestones, type StatusTone, type MilestoneState } from "@/components/workspace";
 import { SiteGuideV61 } from "./SiteGuideV61";
 import { ExistingSiteProgramsV61 } from "./ExistingSiteProgramsV61";
 import type { ExistingSiteProgramsStateV61 } from "@/domain/site-existing-programs-v61";
@@ -27,16 +27,12 @@ export type LaunchOverviewProps = {
   existingPrograms?: ExistingSiteProgramsStateV61;
 };
 
-const stagePresentation: Record<SiteLaunchStageV61, {
-  icon: LucideIcon;
-  summary: string;
-}> = {
-  Shape: { icon: Shapes, summary: "Define your community, who you hope to serve, and what you want to offer." },
-  Share: { icon: Send, summary: "Tell your story, invite ideas, and build community interest." },
-  Prepare: { icon: ClipboardCheck, summary: "Choose how to deliver your programs and get the right people and resources in place." },
-  Launch: { icon: Rocket, summary: "Welcome participants when each offering is ready and approved." },
+const stagePresentation: Record<SiteLaunchStageV61, string> = {
+  Shape: "Define your community, who you hope to serve, and what you want to offer.",
+  Share: "Tell your story, invite ideas, and build community interest.",
+  Prepare: "Choose how to deliver your programs and get the right people and resources in place.",
+  Launch: "Welcome participants when each offering is ready and approved.",
 };
-const stages = siteLaunchStagesV61.map(id => ({ id, ...stagePresentation[id] }));
 
 /**
  * Preview Website belongs in shared WorkspaceTopBar (not in the left nav).
@@ -56,6 +52,7 @@ export function LaunchStudioOverview({ site, mode, nextAction, previewUrl, works
     <WorkspacePanel title="Your website preview">
       <p className="text-sm leading-6 text-muted-foreground">Preview your saved website before publishing. You can also invite others to review a private preview link.</p>
       <div className="mt-4 text-xs text-muted-foreground">Preview: {previewUrl ? "Available" : "Save a website draft to enable preview"}</div>
+      {previewUrl && <Button asChild variant="outline" className="mt-3"><a href={previewUrl} target="_blank" rel="noopener noreferrer">Open website preview</a></Button>}
     </WorkspacePanel>
   </div>;
   return <WorkspaceShell title={mode === "first-visit" ? "Bring your community's vision to life." : `Continue preparing ${site.name}.`}
@@ -68,21 +65,13 @@ export function LaunchStudioOverview({ site, mode, nextAction, previewUrl, works
         <StatusBadge tone={site.statusTone}>{site.statusLabel}</StatusBadge>
       </div>
       {existingPrograms && <ExistingSiteProgramsV61 siteId={site.id} result={existingPrograms} onOverview />}
-      <section aria-labelledby="launch-stage-heading">
-        <h2 id="launch-stage-heading" className="mb-2 text-lg font-semibold">Your path to launch</h2>
-        <div className="grid gap-3 sm:grid-cols-2">{stages.map((stage, index) => {
-          const Icon = stage.icon;
-          return <article key={stage.id} className="border bg-card p-5">
-            <div className="flex items-center justify-between"><Icon aria-hidden="true" className="size-5 text-primary"/>
-              {completedLaunchStageV61(stage.id,completion)
-                ? <CheckCircle2 aria-label={stage.id+" saved setup complete"} className="size-5 text-success"/>
-                : <span className="text-xs text-muted-foreground">0{index + 1}</span>}
-            </div>
-            <h3 className="mt-3 font-semibold">{stage.id}</h3>
-            <p className="mt-1 text-xs leading-5 text-muted-foreground">{stage.summary}</p>
-          </article>;
-        })}</div>
-      </section>
+      <OutcomeMilestones title="Your path to launch" description="Confirmed saved milestones, not approval to operate."
+        items={siteLaunchStagesV61.map(stage => {
+          const states = siteLaunchModules.filter(item => item.stage === stage).map(item => completion[item.id]);
+          const state: MilestoneState = completedLaunchStageV61(stage, completion) ? "complete"
+            : states.includes("unavailable") ? "unavailable" : "pending";
+          return { id: stage, title: stage, detail: stagePresentation[stage], state };
+        })}/> 
       <WorkspacePanel title="Your work, connected">
         <div className="grid gap-4 sm:grid-cols-3">
           <div><BookOpen className="size-5 text-primary"/><h3 className="mt-2 text-sm font-semibold">Programs &amp; experiences</h3><p className="mt-1 text-xs text-muted-foreground">Plan classes, workshops, activities and gatherings</p></div>

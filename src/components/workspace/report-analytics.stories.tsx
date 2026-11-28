@@ -19,8 +19,8 @@ function AnalyticsFixture(){
     <ReportMetricCard item={{id:"selected",label:row?row.label+" registrations":"Choose a Site",value:row?.value??null}}/>
   </div>;
 }
-const meta={title:"V6.1 foundations/Data Visualization/Analytical components",component:AnalyticsFixture,
-  parameters:{chromatic:{viewports:[390,768,1024,1440],modes:{light:{theme:"light"},dark:{theme:"dark"},site:{theme:"site"}}}}} satisfies Meta<typeof AnalyticsFixture>;
+const meta={id: "v6-1-foundations-data-visualization-analytical-components", title: "03 Components/Reporting/Analytical components",component:AnalyticsFixture,
+  parameters:{chromatic:{modes:{light:{theme:"light"},dark:{theme:"dark"},site:{theme:"site"}}}}} satisfies Meta<typeof AnalyticsFixture>;
 export default meta;
 type Story=StoryObj<typeof meta>;
 export const Interactive:Story={play:async({canvasElement})=>{
@@ -30,6 +30,8 @@ export const Interactive:Story={play:async({canvasElement})=>{
  await userEvent.click(canvas.getByRole("button",{name:"Filter report to Site B"}));
  await expect(canvas.getByText("Site B registrations")).toBeVisible();
  await expect(canvas.getByRole("button",{name:"Filter report to Site B"})).toHaveAttribute("aria-pressed","true");
+ await expect(canvas.getByRole("button",{name:"Filter report to Site B"})).toHaveClass("border-primary","bg-accent","text-primary");
+ await expect(canvas.getByRole("button",{name:"Filter report to Site A"})).toHaveClass("border-input");
 }};
 export const Dark:Story={globals:{theme:"dark"}};
 export const SiteBrand:Story={globals:{theme:"site"}};

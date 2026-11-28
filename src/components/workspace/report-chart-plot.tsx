@@ -55,7 +55,7 @@ export default function ReportChartPlot({spec}: {spec: ReportChartSpec}){
       <ResponsiveContainer {...container} height={reportPlotStyle.distributionHeight}>
         <PieChart accessibilityLayer={false}>
           <defs>{points.map((p,i)=><ReportPatternDefinition key={p.id} prefix={prefix} index={reportSeriesSlot(spec,p.id,i)}/>)}</defs>
-          <Pie data={points} dataKey="value" nameKey="label" innerRadius="54%" outerRadius="83%" isAnimationActive={false}>
+          <Pie rootTabIndex={-1} data={points} dataKey="value" nameKey="label" innerRadius="54%" outerRadius="83%" isAnimationActive={false}>
             {points.map((p,i)=><Cell key={p.id} fill={reportSeriesPaint(prefix,reportSeriesSlot(spec,p.id,i))} stroke={reportPlotStyle.separator} strokeWidth={2}/>)}
           </Pie>
           <Tooltip content={renderTooltip} cursor={false} isAnimationActive={false}/>

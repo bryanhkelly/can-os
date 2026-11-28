@@ -6,7 +6,7 @@ const questions:LearningQuestion[]=[{
   id:"shared-question",type:"single_choice",required:true,prompt:"Choose an answer",
   options:[{id:"first",label:"First answer"},{id:"second",label:"Second answer"}],min:null,max:null,
 }];
-const meta={title:"V6.1 learning/Questionnaire",component:LearningQuestionnaire,
+const meta={id: "v6-1-learning-questionnaire", title: "08 Feature workspaces/Learning/Questionnaire",component:LearningQuestionnaire,
   args:{title:"Knowledge check",questions,onSubmit:fn(async()=>{})},
   parameters:{layout:"padded"}} satisfies Meta<typeof LearningQuestionnaire>;
 export default meta;

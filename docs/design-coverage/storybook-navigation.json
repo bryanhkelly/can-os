@@ -1,0 +1,973 @@
+{
+  "version": 1,
+  "note": "Explicit meta IDs retain existing story URLs after navigation moves. Built-index verification is required for baseline continuity.",
+  "migrations": [
+    {
+      "path": "src/components/ui/button.stories.tsx",
+      "previousTitle": "Foundations/Button",
+      "title": "02 Primitives/Button",
+      "metaId": "foundations-button",
+      "exports": [
+        "Variants",
+        "Loading",
+        "KeyboardFocus",
+        "UnavailableSaveActions"
+      ]
+    },
+    {
+      "path": "src/components/ui/field.stories.tsx",
+      "previousTitle": "Foundations/Fields and choices",
+      "title": "02 Primitives/Fields and choices",
+      "metaId": "foundations-fields-and-choices",
+      "exports": [
+        "Default",
+        "Validation",
+        "Pending",
+        "LongLabel",
+        "DarkValidation",
+        "ExplicitControlAssociations",
+        "ControlledReview"
+      ]
+    },
+    {
+      "path": "src/components/ui/form-controls.stories.tsx",
+      "previousTitle": "Foundations/Form controls",
+      "title": "02 Primitives/Form controls",
+      "metaId": "foundations-form-controls",
+      "exports": [
+        "Default",
+        "Validation",
+        "Disabled"
+      ]
+    },
+    {
+      "path": "src/components/ui/modal.stories.tsx",
+      "previousTitle": "Foundations/Modal",
+      "title": "02 Primitives/Modal",
+      "metaId": "foundations-modal",
+      "exports": [
+        "KeyboardAndDismissal"
+      ]
+    },
+    {
+      "path": "src/components/ui/table.stories.tsx",
+      "previousTitle": "V6.1 foundations/Semantic tables",
+      "title": "02 Primitives/Semantic tables",
+      "metaId": "v6-1-foundations-semantic-tables",
+      "exports": [
+        "ResponsiveGradebookSemantics",
+        "ReadOnlyEvidence"
+      ]
+    },
+    {
+      "path": "src/components/workspace/directory-table.stories.tsx",
+      "previousTitle": "Foundations/Directory table",
+      "title": "03 Components/Directory table",
+      "metaId": "foundations-directory-table",
+      "exports": [
+        "SortingAndPaging",
+        "Loading",
+        "Empty",
+        "ErrorWithRetry",
+        "DarkDirectory",
+        "DirectoryComposition",
+        "NoRecords",
+        "NoMatches",
+        "ReusableFilterBar"
+      ]
+    },
+    {
+      "path": "src/components/workspace/report-document.stories.tsx",
+      "previousTitle": "V6.1 templates/Reporting/Impact review",
+      "title": "05 Page layouts/Reporting/Impact review",
+      "metaId": "v6-1-templates-reporting-impact-review",
+      "exports": [
+        "Dashboard",
+        "PrintReview",
+        "InvalidDefinition",
+        "NarrowMetrics",
+        "DarkReview",
+        "BrandedReview"
+      ]
+    },
+    {
+      "path": "src/components/workspace/report-analytics.stories.tsx",
+      "previousTitle": "V6.1 foundations/Data Visualization/Analytical components",
+      "title": "03 Components/Reporting/Analytical components",
+      "metaId": "v6-1-foundations-data-visualization-analytical-components",
+      "exports": [
+        "Interactive",
+        "Dark",
+        "SiteBrand"
+      ]
+    },
+    {
+      "path": "src/components/workspace/dashboard-layout.stories.tsx",
+      "previousTitle": "V6.1 templates/Role dashboards",
+      "title": "05 Page layouts/Role dashboards",
+      "metaId": "v6-1-templates-role-dashboards",
+      "exports": [
+        "StudentHome",
+        "SiteLeader"
+      ]
+    },
+    {
+      "path": "src/components/workflow/workflow-patterns.stories.tsx",
+      "previousTitle": "Workflows/Patterns",
+      "title": "05 Page layouts/Guided setup and review",
+      "metaId": "workflows-patterns",
+      "exports": [
+        "GuidedSetup",
+        "ChecklistWorkspace",
+        "SplitReview"
+      ]
+    },
+    {
+      "path": "src/design-system/visual-grammar-v6-1.stories.tsx",
+      "previousTitle": "V6.1 foundations/Visual grammar",
+      "title": "01 Foundations/Visual grammar",
+      "metaId": "v6-1-foundations-visual-grammar",
+      "exports": [
+        "ColorAndTypography"
+      ]
+    },
+    {
+      "path": "src/design-system/brand-theme.stories.tsx",
+      "previousTitle": "Branding/Controlled tokens",
+      "title": "01 Foundations/Controlled brand tokens",
+      "metaId": "branding-controlled-tokens",
+      "exports": [
+        "SiteBrand",
+        "InvalidBrandFallsBack"
+      ]
+    },
+    {
+      "path": "src/components/communication/MessagesWorkspace.stories.tsx",
+      "previousTitle": "Communication/Messages",
+      "title": "08 Feature workspaces/Communication/Messages",
+      "metaId": "communication-messages",
+      "exports": [
+        "Conversation",
+        "SearchConversations",
+        "Empty",
+        "NewMessageLookup",
+        "Loading",
+        "Unavailable"
+      ]
+    },
+    {
+      "path": "src/components/communication/NotificationFeed.stories.tsx",
+      "previousTitle": "Communication/Notifications",
+      "title": "08 Feature workspaces/Communication/Notifications",
+      "metaId": "communication-notifications",
+      "exports": [
+        "ActivityFeed",
+        "Empty",
+        "Saving"
+      ]
+    },
+    {
+      "path": "src/components/learning/ClassroomWorkspace.stories.tsx",
+      "previousTitle": "Learning/Focused classroom",
+      "title": "08 Feature workspaces/Learning/Focused classroom",
+      "metaId": "learning-focused-classroom",
+      "exports": [
+        "Lesson",
+        "UnavailableCurriculum"
+      ]
+    },
+    {
+      "path": "src/components/student/StudentExperience.stories.tsx",
+      "previousTitle": "Student/Refined dashboard",
+      "title": "07 Persona experiences/Student dashboard",
+      "metaId": "student-refined-dashboard",
+      "exports": [
+        "LiveShapedData",
+        "Empty",
+        "IndependentFailures",
+        "MoreThanTwentyFivePriorities"
+      ]
+    },
+    {
+      "path": "src/components/student/DailyCanvas.stories.tsx",
+      "previousTitle": "Student/Daily canvas",
+      "title": "07 Persona experiences/Student daily canvas",
+      "metaId": "student-daily-canvas",
+      "exports": [
+        "Default",
+        "Verse",
+        "Holiday",
+        "Emergency",
+        "NoCampaign",
+        "ParentNotice",
+        "PrioritySelection",
+        "EditorialActions",
+        "DarkEditorialActions",
+        "SiteEditorialActions"
+      ]
+    },
+    {
+      "path": "src/components/shell/WorkspaceTopBar.stories.tsx",
+      "previousTitle": "Shell/Workspace top bar",
+      "title": "03 Components/Shell/Workspace top bar",
+      "metaId": "shell-workspace-top-bar",
+      "exports": [
+        "ActiveSchool",
+        "NotificationsOpen",
+        "OrganizationScope",
+        "DismissDemoInformation",
+        "OrdinarySessionRefreshError",
+        "DemoWorkspaceChange"
+      ]
+    },
+    {
+      "path": "src/components/shell/WorkspaceContextSwitcher.stories.tsx",
+      "previousTitle": "Shell/Workspace context switcher",
+      "title": "03 Components/Shell/Workspace context switcher",
+      "metaId": "shell-workspace-context-switcher",
+      "exports": [
+        "AuthorizedWorkspaces",
+        "SwitchError"
+      ]
+    },
+    {
+      "path": "src/components/launch-studio/LaunchStudioDestinations.stories.tsx",
+      "previousTitle": "Workflows/Launch Studio/V6.1 governed destination",
+      "title": "08 Feature workspaces/Launch Studio/Governed destination",
+      "metaId": "workflows-launch-studio-v6-1-governed-destination",
+      "exports": [
+        "FinalGate"
+      ]
+    },
+    {
+      "path": "src/components/launch-studio/WebsiteTemplateGallery.stories.tsx",
+      "previousTitle": "Workflows/Website Launch Studio",
+      "title": "08 Feature workspaces/Launch Studio/Website template gallery",
+      "metaId": "workflows-website-launch-studio",
+      "exports": [
+        "SevenWireframes"
+      ]
+    },
+    {
+      "path": "src/components/workspace/responsive-layout.stories.tsx",
+      "previousTitle": "Workspace/Responsive composition",
+      "title": "11 Accessibility and responsive/Responsive composition",
+      "metaId": "workspace-responsive-composition",
+      "exports": [
+        "NarrowWorkspace",
+        "StandardWorkspace"
+      ]
+    },
+    {
+      "path": "src/components/launch-studio/LaunchV61StepNavigation.stories.tsx",
+      "previousTitle": "Workflows/Launch Studio/V6.1 internal steps",
+      "title": "08 Feature workspaces/Launch Studio/Internal steps",
+      "metaId": "workflows-launch-studio-v6-1-internal-steps",
+      "exports": [
+        "FourSiteInformationSteps",
+        "TwoProgramsAudiencesSteps",
+        "PassiveMarketingPackageProgress",
+        "SixWebsiteBrandSteps"
+      ]
+    },
+    {
+      "path": "src/components/launch-studio/LaunchPrepareV61.stories.tsx",
+      "previousTitle": "Workflows/Launch Studio/V6.1 Prepare",
+      "title": "08 Feature workspaces/Launch Studio/Prepare",
+      "metaId": "workflows-launch-studio-v6-1-prepare",
+      "exports": [
+        "Facilities",
+        "Team",
+        "Scheduling",
+        "Funding",
+        "Safety",
+        "PublishSite"
+      ]
+    },
+    {
+      "path": "src/components/workspace/report-chart.stories.tsx",
+      "previousTitle": "V6.1 foundations/Data Visualization/Charts",
+      "title": "03 Components/Reporting/Charts",
+      "metaId": "v6-1-foundations-data-visualization-charts",
+      "exports": [
+        "Comparison",
+        "Trend",
+        "Missing",
+        "Zero",
+        "Mobile",
+        "Dark",
+        "Distribution",
+        "Stacked",
+        "Funnel",
+        "SiteBrand",
+        "Empty",
+        "Invalid",
+        "LongLabelsAndLargeValues",
+        "Dense",
+        "CategoricalFourSeries",
+        "CategoricalDark",
+        "CategoricalSiteBrand",
+        "CategoricalMobile",
+        "PrintExactValues",
+        "DarkTokenResolution",
+        "FixedSharedAxis",
+        "ReservedSeriesSlots"
+      ]
+    },
+    {
+      "path": "src/components/workspace/master-detail-workspace.stories.tsx",
+      "previousTitle": "V6.1 templates/Master detail explorer",
+      "title": "05 Page layouts/Master detail explorer",
+      "metaId": "v6-1-templates-master-detail-explorer",
+      "exports": [
+        "AdmissionsQueue"
+      ]
+    },
+    {
+      "path": "src/components/workspace/record-layout.stories.tsx",
+      "previousTitle": "V6.1 templates/Directories and records",
+      "title": "05 Page layouts/Directories and records",
+      "metaId": "v6-1-templates-directories-and-records",
+      "exports": [
+        "SchoolSiteDirectory",
+        "ApplicantRecord",
+        "CompactRecordFacts",
+        "SchoolDayEvidenceTiles"
+      ]
+    },
+    {
+      "path": "src/components/workspace/workspace-primitives.stories.tsx",
+      "previousTitle": "Foundations/Workspace primitives",
+      "title": "03 Components/Workspace primitives",
+      "metaId": "foundations-workspace-primitives",
+      "exports": [
+        "PanelAndStatuses",
+        "Metrics",
+        "InteractiveMetric",
+        "Loading",
+        "Empty",
+        "ErrorWithRetry",
+        "AttentionNotice",
+        "SuccessConfirmation",
+        "AuthorizedActionLink",
+        "NarrowWorkspace",
+        "NestedPanels"
+      ]
+    },
+    {
+      "path": "src/components/workspace/reusable-controls.stories.tsx",
+      "previousTitle": "Foundations/Reusable workflow controls",
+      "title": "04 Application patterns/Reusable workflow controls",
+      "metaId": "foundations-reusable-workflow-controls",
+      "exports": [
+        "ScopeSelection",
+        "ReasonDialog",
+        "PendingDialog",
+        "DuplicateConfirmProtection",
+        "DestructiveConfirmation",
+        "ExplicitTimezone",
+        "FileSelection",
+        "SavedButRefreshFailed",
+        "UploadedNotRecorded",
+        "RetrySavedRefresh",
+        "DarkRefreshRecovery",
+        "RetryQuery"
+      ]
+    },
+    {
+      "path": "src/components/workspace/report-geography-filter.stories.tsx",
+      "previousTitle": "Foundations/V6.1 reporting geography filter",
+      "title": "03 Components/Reporting/Geography filter",
+      "metaId": "foundations-v6-1-reporting-geography-filter",
+      "exports": [
+        "MarketSelection",
+        "Historical",
+        "Unknown",
+        "OutsideMarket",
+        "Loading",
+        "ErrorState",
+        "StaleSelection",
+        "Mobile",
+        "Dark"
+      ]
+    },
+    {
+      "path": "src/components/workspace/report-table.stories.tsx",
+      "previousTitle": "Foundations/V6.1 reporting tables and navigation",
+      "title": "03 Components/Reporting/Tables and navigation",
+      "metaId": "foundations-v6-1-reporting-tables-and-navigation",
+      "exports": [
+        "Desktop",
+        "Tablet",
+        "Mobile",
+        "Dark",
+        "CursorPagingInteractions"
+      ]
+    },
+    {
+      "path": "src/components/workspace/provider-report-filter-bar.stories.tsx",
+      "previousTitle": "V6.1 foundations/Data Visualization/Provider report filters",
+      "title": "03 Components/Reporting/Provider report filters",
+      "metaId": "v6-1-foundations-data-visualization-provider-report-filters",
+      "exports": [
+        "CrossReportSelection",
+        "Dark",
+        "SiteBrand",
+        "ScopeIsolation"
+      ]
+    },
+    {
+      "path": "src/components/launch-studio/LaunchStudio.stories.tsx",
+      "previousTitle": "Workflows/Launch Studio",
+      "title": "08 Feature workspaces/Launch Studio/Overview and shell",
+      "metaId": "workflows-launch-studio",
+      "exports": [
+        "Entry",
+        "Welcome",
+        "PendingReview",
+        "Unavailable",
+        "Forbidden",
+        "Unconfigured",
+        "SchoolForm",
+        "NeedsJurisdictionReview",
+        "ReturningWithSavedShape",
+        "CompletionUnavailable"
+      ]
+    },
+    {
+      "path": "src/components/workspace/form-page.stories.tsx",
+      "previousTitle": "Foundations/Dedicated form page",
+      "title": "05 Page layouts/Dedicated form page",
+      "metaId": "foundations-dedicated-form-page",
+      "exports": [
+        "GroupedFieldsAndActions",
+        "Pending",
+        "SingleColumnEvidenceReview",
+        "InlineRecordActions",
+        "StepNavigationActions",
+        "NarrowFormAndValidation"
+      ]
+    },
+    {
+      "path": "src/components/communication/DeliveryReceiptFacts.stories.tsx",
+      "previousTitle": "Communication/Delivery receipt facts",
+      "title": "08 Feature workspaces/Communication/Delivery receipt facts",
+      "metaId": "communication-delivery-receipt-facts",
+      "exports": [
+        "AwaitingProvider",
+        "ProviderAccepted"
+      ]
+    },
+    {
+      "path": "src/components/enrollment/GuardianApplicationForm.stories.tsx",
+      "previousTitle": "Workflows/GF22 Guardian application",
+      "title": "07 Persona experiences/Family/Guardian application",
+      "metaId": "workflows-gf22-guardian-application",
+      "exports": [
+        "Ready",
+        "RequiredFieldValidation",
+        "SuccessfulSubmission",
+        "Loading",
+        "ServerError",
+        "NoEligiblePrograms",
+        "ProgramDeepLinkChange"
+      ]
+    },
+    {
+      "path": "src/components/evidence/EvidenceDocumentLink.stories.tsx",
+      "previousTitle": "Evidence/Private document link",
+      "title": "04 Application patterns/Evidence/Private document link",
+      "metaId": "evidence-private-document-link",
+      "exports": [
+        "Default",
+        "UnauthorizedDocument",
+        "Disabled",
+        "BlockedPopupAndDuplicateClicks",
+        "AuthorizedDocument"
+      ]
+    },
+    {
+      "path": "src/components/evidence/EvidenceReviewForm.stories.tsx",
+      "previousTitle": "Evidence/Review form",
+      "title": "04 Application patterns/Evidence/Review form",
+      "metaId": "evidence-review-form",
+      "exports": [
+        "Default",
+        "Disabled",
+        "IndependentReview",
+        "ApproveWithKeyboard",
+        "FailedReviewRetainsRationale"
+      ]
+    },
+    {
+      "path": "src/components/evidence/EvidenceUploader.stories.tsx",
+      "previousTitle": "Evidence/Uploader",
+      "title": "04 Application patterns/Evidence/Uploader",
+      "metaId": "evidence-uploader",
+      "exports": [
+        "Default",
+        "UploadsDisabled",
+        "UploadAndFinalize",
+        "RefreshFailureDoesNotRepeatFinalization",
+        "RetryFinalizationWithoutReupload",
+        "ChangeDocumentAfterFailedFinalization",
+        "BlocksRepeatedSubmissionWhileUploading"
+      ]
+    },
+    {
+      "path": "src/components/evidence/EvidenceWorkflow.stories.tsx",
+      "previousTitle": "Evidence/Workflow",
+      "title": "04 Application patterns/Evidence/Workflow",
+      "metaId": "evidence-workflow",
+      "exports": [
+        "Pending",
+        "Rejected",
+        "LongContent"
+      ]
+    },
+    {
+      "path": "src/components/field-trips/FieldTripFacts.stories.tsx",
+      "previousTitle": "Field trips/Shared trip facts",
+      "title": "08 Feature workspaces/Field trips/Shared trip facts",
+      "metaId": "field-trips-shared-trip-facts",
+      "exports": [
+        "ScheduledTrip",
+        "DeadlineNotSet"
+      ]
+    },
+    {
+      "path": "src/components/launch-studio/AudienceIntentFieldsV61.stories.tsx",
+      "previousTitle": "Launch Studio/Shape/Audiences",
+      "title": "08 Feature workspaces/Launch Studio/Shape/Audiences",
+      "metaId": "launch-studio-shape-audiences",
+      "exports": [
+        "Empty",
+        "Typical",
+        "AllAudiences",
+        "Saving",
+        "SaveError"
+      ]
+    },
+    {
+      "path": "src/components/launch-studio/EstablishExperiencesV61.stories.tsx",
+      "previousTitle": "Launch Studio/Shape/Experiences",
+      "title": "08 Feature workspaces/Launch Studio/Shape/Experiences",
+      "metaId": "launch-studio-shape-experiences",
+      "exports": [
+        "Browse",
+        "FiveSelected",
+        "Personalize",
+        "EmptySearch",
+        "Disabled",
+        "LocalTopicValidation"
+      ]
+    },
+    {
+      "path": "src/components/launch-studio/LaunchJourneyForms.stories.tsx",
+      "previousTitle": "Workflows/Launch Studio audience forms",
+      "title": "08 Feature workspaces/Launch Studio/Audience forms",
+      "metaId": "workflows-launch-studio-audience-forms",
+      "exports": [
+        "DraftSaveKeepsLaterEdits",
+        "ParentApplication",
+        "StudentProfile",
+        "StaffQualification"
+      ]
+    },
+    {
+      "path": "src/components/learning/ClassOfferingTermsFields.stories.tsx",
+      "previousTitle": "Learning/Shared Class Offering terms",
+      "title": "08 Feature workspaces/Learning/Class Offering terms",
+      "metaId": "learning-shared-class-offering-terms",
+      "exports": [
+        "PrivateAssignmentDraft"
+      ]
+    },
+    {
+      "path": "src/components/learning/ClassParticipationAcknowledgments.stories.tsx",
+      "previousTitle": "Learning/Shared Class participation",
+      "title": "08 Feature workspaces/Learning/Class participation",
+      "metaId": "learning-shared-class-participation",
+      "exports": [
+        "IndependentAcknowledgments"
+      ]
+    },
+    {
+      "path": "src/components/learning/ClassVideoPlayer.stories.tsx",
+      "previousTitle": "Learning/Class video player",
+      "title": "08 Feature workspaces/Learning/Class video player",
+      "metaId": "learning-class-video-player",
+      "exports": [
+        "LinkedVideo",
+        "PrivateVideo",
+        "InvalidPrivateSource",
+        "ExternalOnly"
+      ]
+    },
+    {
+      "path": "src/components/learning/CredentialDeliveryHistory.stories.tsx",
+      "previousTitle": "Learning/Credential delivery history",
+      "title": "08 Feature workspaces/Learning/Credential delivery history",
+      "metaId": "learning-credential-delivery-history",
+      "exports": [
+        "ProviderTransportHistory",
+        "NoDeliveryRecords"
+      ]
+    },
+    {
+      "path": "src/components/learning/CurriculumLibrary.stories.tsx",
+      "previousTitle": "Learning/Curriculum",
+      "title": "08 Feature workspaces/Learning/Curriculum",
+      "metaId": "learning-curriculum",
+      "exports": [
+        "SelectedCurriculum",
+        "NoSelection",
+        "LicenseUnavailable"
+      ]
+    },
+    {
+      "path": "src/components/learning/DiscussionComposer.stories.tsx",
+      "previousTitle": "Student/Shared discussion composer",
+      "title": "08 Feature workspaces/Learning/Discussion composer",
+      "metaId": "student-shared-discussion-composer",
+      "exports": [
+        "NewPost",
+        "Reply",
+        "Pending"
+      ]
+    },
+    {
+      "path": "src/components/learning/LearningQuestionnaire.stories.tsx",
+      "previousTitle": "V6.1 learning/Questionnaire",
+      "title": "08 Feature workspaces/Learning/Questionnaire",
+      "metaId": "v6-1-learning-questionnaire",
+      "exports": [
+        "IndependentQuestionnaires",
+        "RequiredQuestion"
+      ]
+    },
+    {
+      "path": "src/components/links/GoDestinationChoiceField.stories.tsx",
+      "previousTitle": "Workflows/Go Links/Destination choice",
+      "title": "04 Application patterns/Go Links/Destination choice",
+      "metaId": "workflows-go-links-destination-choice",
+      "exports": [
+        "Available",
+        "Selected",
+        "Empty",
+        "UnavailableSelection",
+        "Disabled"
+      ]
+    },
+    {
+      "path": "src/components/links/GoLinkLifecycleActions.stories.tsx",
+      "previousTitle": "Workflows/Go Links/Lifecycle actions",
+      "title": "04 Application patterns/Go Links/Lifecycle actions",
+      "metaId": "workflows-go-links-lifecycle-actions",
+      "exports": [
+        "Active",
+        "Paused",
+        "Revoked",
+        "Busy",
+        "RevokeOnly"
+      ]
+    },
+    {
+      "path": "src/components/operations/AppointmentExpiryField.stories.tsx",
+      "previousTitle": "Operations/Appointment expiry",
+      "title": "08 Feature workspaces/Operations/Appointment expiry",
+      "metaId": "operations-appointment-expiry",
+      "exports": [
+        "Default",
+        "Disabled"
+      ]
+    },
+    {
+      "path": "src/components/operations/LaunchPortfolio.stories.tsx",
+      "previousTitle": "Operations/Launch portfolio",
+      "title": "08 Feature workspaces/Operations/Launch portfolio",
+      "metaId": "operations-launch-portfolio",
+      "exports": [
+        "BlockingRequirements",
+        "JourneyUnavailable"
+      ]
+    },
+    {
+      "path": "src/components/operations/SiteStaffingFeedback.stories.tsx",
+      "previousTitle": "Operations/Site staffing feedback",
+      "title": "08 Feature workspaces/Operations/Site staffing feedback",
+      "metaId": "operations-site-staffing-feedback",
+      "exports": [
+        "Recorded",
+        "RefreshRequired",
+        "RefreshPending",
+        "CommandFailed"
+      ]
+    },
+    {
+      "path": "src/components/operations/SiteTodayPriorities.stories.tsx",
+      "previousTitle": "Operations/Site Today priorities",
+      "title": "08 Feature workspaces/Operations/Site Today priorities",
+      "metaId": "operations-site-today-priorities",
+      "exports": [
+        "StaffingAndAttendanceExceptions",
+        "QuietDay"
+      ]
+    },
+    {
+      "path": "src/components/platform/PlatformAccountHealth.stories.tsx",
+      "previousTitle": "Platform/Account health",
+      "title": "08 Feature workspaces/Platform/Account health",
+      "metaId": "platform-account-health",
+      "exports": [
+        "Inventory",
+        "EmptyInventory",
+        "Unavailable"
+      ]
+    },
+    {
+      "path": "src/components/profiles/ProfilePhotoEditor.stories.tsx",
+      "previousTitle": "V6.1 templates/People/Profile picture",
+      "title": "08 Feature workspaces/People/Profile picture",
+      "metaId": "v6-1-templates-people-profile-picture",
+      "exports": [
+        "Empty",
+        "RemovalFailure",
+        "Cropping",
+        "InvalidFile"
+      ]
+    },
+    {
+      "path": "src/components/shell/WorkspaceSearchDialog.stories.tsx",
+      "previousTitle": "Shell/Workspace search dialog",
+      "title": "03 Components/Shell/Workspace search dialog",
+      "metaId": "shell-workspace-search-dialog",
+      "exports": [
+        "KeyboardNavigation",
+        "NoResults",
+        "SearchUnavailable",
+        "Loading",
+        "DarkSearch"
+      ]
+    },
+    {
+      "path": "src/components/shell/ShellAlignment.stories.tsx",
+      "previousTitle": "Shell/Layout alignment",
+      "title": "11 Accessibility and responsive/Shell alignment",
+      "metaId": "shell-layout-alignment",
+      "exports": [
+        "WorkspacePage",
+        "WidePage",
+        "RoleHome",
+        "WithSharedCredentialNotice",
+        "CollapsibleSidebar"
+      ]
+    },
+    {
+      "path": "src/components/workflow/recorded-time.stories.tsx",
+      "previousTitle": "Foundations/Recorded time",
+      "title": "03 Components/Recorded time",
+      "metaId": "foundations-recorded-time",
+      "exports": [
+        "SameSourceInstant",
+        "UnverifiedInstant"
+      ]
+    },
+    {
+      "path": "src/components/workflow/status-timeline.stories.tsx",
+      "previousTitle": "Foundations/Status timeline",
+      "title": "04 Application patterns/Status timeline",
+      "metaId": "foundations-status-timeline",
+      "exports": [
+        "RecordedDecisions",
+        "NoRecordedEvents",
+        "SiteLocalAuditTime"
+      ]
+    },
+    {
+      "path": "src/components/workflow/user-flow-map.stories.tsx",
+      "previousTitle": "V6.1 templates/Process and user-flow maps",
+      "title": "05 Page layouts/Process and user-flow maps",
+      "metaId": "v6-1-templates-process-and-user-flow-maps",
+      "exports": [
+        "ChurchToSchoolLaunch",
+        "StudentLearningJourney"
+      ]
+    },
+    {
+      "path": "src/components/workflow/workflow-workspace.stories.tsx",
+      "previousTitle": "V6.1 templates/User and workflow flows",
+      "title": "05 Page layouts/User and workflow flows",
+      "metaId": "v6-1-templates-user-and-workflow-flows",
+      "exports": [
+        "AdmissionsApplication",
+        "SchoolLaunch",
+        "ProgressOnly"
+      ]
+    },
+    {
+      "path": "src/components/workspace/action-dialog.stories.tsx",
+      "previousTitle": "Workspace/Action dialog",
+      "title": "04 Application patterns/Action dialog",
+      "metaId": "workspace-action-dialog",
+      "exports": [
+        "NestedConfirmation",
+        "PendingCannotDismiss"
+      ]
+    },
+    {
+      "path": "src/components/workspace/context-tray.stories.tsx",
+      "previousTitle": "Foundations/Context tray",
+      "title": "03 Components/Context tray",
+      "metaId": "foundations-context-tray",
+      "exports": [
+        "RetainedRecovery"
+      ]
+    },
+    {
+      "path": "src/components/workspace/dashboard-widgets.stories.tsx",
+      "previousTitle": "V6.1 templates/Dashboard widgets",
+      "title": "03 Components/Dashboard widgets",
+      "metaId": "v6-1-templates-dashboard-widgets",
+      "exports": [
+        "StudentDashboardWidgets",
+        "MissingData"
+      ]
+    },
+    {
+      "path": "src/components/workspace/dashboard-home.stories.tsx",
+      "previousTitle": "V6.1 templates/Shared dashboard homes",
+      "title": "05 Page layouts/Shared dashboard homes",
+      "metaId": "v6-1-templates-shared-dashboard-homes",
+      "exports": [
+        "Teacher",
+        "Family",
+        "Operations",
+        "SiteLeader",
+        "OnsiteStaff",
+        "Specialist",
+        "Counselor",
+        "NetworkPartner",
+        "NetworkSteward"
+      ]
+    },
+    {
+      "path": "src/components/workspace/directory-navigation.stories.tsx",
+      "previousTitle": "Foundations/Directory search and navigation",
+      "title": "03 Components/Directory navigation",
+      "metaId": "foundations-directory-search-and-navigation",
+      "exports": [
+        "SearchAndRetry",
+        "LateSearchResponse",
+        "DisabledPageBoundary",
+        "UnknownPageCount"
+      ]
+    },
+    {
+      "path": "src/components/workspace/disclosure-section.stories.tsx",
+      "previousTitle": "V6.1 foundations/Disclosure section",
+      "title": "03 Components/Disclosure section",
+      "metaId": "v6-1-foundations-disclosure-section",
+      "exports": [
+        "IndependentPanels",
+        "UncontrolledObserver",
+        "RetainsEditorState"
+      ]
+    },
+    {
+      "path": "src/components/workspace/report-period-comparison.stories.tsx",
+      "previousTitle": "V6.1 foundations/Data Visualization/Period comparison",
+      "title": "03 Components/Reporting/Period comparison",
+      "metaId": "v6-1-foundations-data-visualization-period-comparison",
+      "exports": [
+        "Comparison",
+        "Mobile",
+        "Dark",
+        "SiteBrand"
+      ]
+    },
+    {
+      "path": "src/components/workspace/section-tabs.stories.tsx",
+      "previousTitle": "V6.1 templates/Section tabs",
+      "title": "03 Components/Section tabs",
+      "metaId": "v6-1-templates-section-tabs",
+      "exports": [
+        "OneCurrentTab",
+        "ScopedLocation",
+        "RecordSections"
+      ]
+    },
+    {
+      "path": "src/components/workspace/selection-card.stories.tsx",
+      "previousTitle": "Workspace/V6.1 Selection Cards",
+      "title": "03 Components/Selection cards",
+      "metaId": "workspace-v6-1-selection-cards",
+      "exports": [
+        "RadioCheckboxAndDisabled"
+      ]
+    },
+    {
+      "path": "src/components/workspace/selection-chip.stories.tsx",
+      "previousTitle": "Workspace/Selection Chip",
+      "title": "03 Components/Selection chip",
+      "metaId": "workspace-selection-chip",
+      "exports": [
+        "Compact",
+        "Standard",
+        "AllStates",
+        "KeyboardAndLimit",
+        "NarrowWrapping"
+      ]
+    },
+    {
+      "path": "src/components/workspace/selection-patterns.stories.tsx",
+      "previousTitle": "Workspace/Selection Patterns",
+      "title": "04 Application patterns/Selection patterns",
+      "metaId": "workspace-selection-patterns",
+      "exports": [
+        "ComparisonGuide"
+      ]
+    },
+    {
+      "path": "src/components/workspace/workflow-intro.stories.tsx",
+      "previousTitle": "Foundations/Workflow introduction",
+      "title": "04 Application patterns/Workflow introduction",
+      "metaId": "foundations-workflow-introduction",
+      "exports": [
+        "SchoolLaunch",
+        "WithActions"
+      ]
+    },
+    {
+      "path": "src/components/workspace/workspace-link-navigation.stories.tsx",
+      "previousTitle": "V6.1 foundations/Shared navigation",
+      "title": "03 Components/Shared navigation",
+      "metaId": "v6-1-foundations-shared-navigation",
+      "exports": [
+        "ResponsiveRecordTabs",
+        "RelatedDestinations",
+        "PlainDestinationLinks"
+      ]
+    },
+    {
+      "path": "src/components/reporting/ReportingRelationshipPanel.stories.tsx",
+      "previousTitle": "V6.1/Reporting/Organization relationships",
+      "title": "08 Feature workspaces/Reporting/Organization relationships",
+      "metaId": "v6-1-reporting-organization-relationships",
+      "exports": [
+        "Proposal",
+        "Incoming"
+      ]
+    },
+    {
+      "path": "src/components/communication/ContactLookup.stories.tsx",
+      "previousTitle": "Communication/Contact lookup",
+      "title": "08 Feature workspaces/Communication/Contact lookup",
+      "metaId": "communication-contact-lookup",
+      "exports": [
+        "SearchAndSelect",
+        "Saving"
+      ]
+    }
+  ]
+}

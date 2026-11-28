@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, lte, or, gt, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lte, or, gt, isNull, sql } from "drizzle-orm";
 import { randomInt } from "node:crypto";
 import { db } from "@/db/client";
 import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
@@ -513,10 +513,29 @@ export async function submitNoncreditKnowledgeCheck(context:CommandContext,input
     const evaluated=evaluateKnowledgeCheckResult(
       earned,total,scope.form.passingFraction===null?null:Number(scope.form.passingFraction),
     );
-    // Keep legacy canonical SQL deployments safe: until the additional
-    // noncredit result gate is installed and verified, stay provisional.
-    const autoFinalize=scope.access.source==="noncredit" &&
-      process.env.CAN_NONCREDIT_AUTO_FINALIZATION_ENABLED==="true";
+    // Automatic objective noncredit finalization is a normal capability.
+    // The installed database result trigger independently verifies source,
+    // published assessment, item scoring, and accountable review requirements.
+    // Academic/Class assessments remain provisional. A schema missing the
+    // canonical trigger must fail closed rather than silently accept results.
+    const autoFinalize=scope.access.source==="noncredit";
+    if(autoFinalize){
+      const gate=await tx.execute(sql`
+        SELECT EXISTS(
+          SELECT 1 FROM pg_trigger t JOIN pg_proc p ON p.oid=t.tgfoid
+          JOIN pg_namespace n ON n.oid=p.pronamespace
+          WHERE t.tgrelid='public.assessment_attempt_results'::regclass
+            AND t.tgname='assessment_result_consistency' AND NOT t.tgisinternal
+            AND t.tgenabled IN ('O','A')
+            AND n.nspname='education_v30' AND p.proname='validate_assessment_result'
+            AND position('noncreditAutoFinalized' in pg_get_functiondef(p.oid))>0
+            AND position('baseline_assessment_version_id' in pg_get_functiondef(p.oid))>0
+            AND position('Reviewed/final result requires an accountable reviewer' in pg_get_functiondef(p.oid))>0
+        ) AS installed
+      `);
+      if(gate.rows[0]?.installed!==true)
+        throw new Error("Canonical objective assessment result guard is missing; repair database schema.");
+    }
     const [result]=await tx.insert(assessmentExecutionResults).values({
       attemptId:attempt.id,resultRevision:1,
       resultStatus:autoFinalize?"finalized":"provisional",

@@ -11,6 +11,8 @@ export interface R2Config {
   bucket: string;
   accessKey: string;
   secret: string;
+  sessionToken?: string;
+  namespace?: string;
 }
 
 /** Resolve the private bucket connection, failing closed on missing or malformed configuration. */
@@ -19,7 +21,26 @@ export function resolveR2Config(): R2Config {
   if (!account || !/^[a-f0-9]{32}$/.test(account) || !bucket || !/^[a-z0-9][a-z0-9.-]{2,62}$/.test(bucket) || !accessKey || !secret) {
     throw new Error("Private R2 storage is not configured");
   }
-  return { account, bucket, accessKey, secret };
+  const branch = process.env.CAN_PILOT_QA_BRANCH_ID;
+  const sessionToken = process.env.CAN_R2_SESSION_TOKEN || undefined;
+  let namespace: string | undefined;
+  if (branch) {
+    if (process.env.APP_ENV !== "test" || process.env.NODE_ENV !== "test" ||
+        process.env.CAN_TEST_DB_WRITES_ENABLED !== "true" ||
+        !/^br-[a-z0-9-]+$/.test(branch) ||
+        ["br-restless-sea-ar9ooo55", "br-bitter-feather-ar0u63x7"].includes(branch)) {
+      throw new Error("Invalid isolated R2 namespace");
+    }
+    // Dedicated legacy QA buckets retain their existing keys. Shared buckets
+    // require a scoped temporary session and always map every logical key.
+    if (bucket !== "can-os-pilot-qa" || sessionToken) {
+      namespace = "qa/" + branch + "/";
+      if (!sessionToken) throw new Error("Shared QA storage requires scoped temporary credentials");
+    }
+  } else if (sessionToken) {
+    throw new Error("Scoped QA credentials require an isolated branch");
+  }
+  return { account, bucket, accessKey, secret, sessionToken, namespace };
 }
 
 export interface SignPrivateObjectOptions {
@@ -42,7 +63,13 @@ export function signPrivateObjectUrl({ method, key, keyPattern, contentType, exp
   const day = stamp.slice(0, 8);
   const host = cfg.account + ".r2.cloudflarestorage.com";
   const scope = day + "/auto/s3/aws4_request";
-  const path = "/" + cfg.bucket + "/" + escapeKey(key);
+  // Preserve canonical domain keys in the database and existing production
+  // paths. A physical namespace is never accepted from a domain caller.
+  if (key.startsWith("qa/") || key.split("/").some(part =>
+      !part || part === "." || part === ".." || /[\\\\%\x00-\x1f\x7f]/.test(part))) {
+    throw new Error("Invalid logical R2 object key");
+  }
+  const path = "/" + cfg.bucket + "/" + escapeKey((cfg.namespace ?? "") + key);
   const signedHeaders = (contentType ? "content-type;host" : "host") + (preventOverwrite ? ";if-none-match" : "");
   const headers = (contentType ? "content-type:" + contentType + "\nhost:" + host + "\n" : "host:" + host + "\n") +
     (preventOverwrite ? "if-none-match:*\n" : "");
@@ -53,6 +80,7 @@ export function signPrivateObjectUrl({ method, key, keyPattern, contentType, exp
     "X-Amz-Expires": String(expiresSeconds),
     "X-Amz-SignedHeaders": signedHeaders,
   });
+  if (cfg.sessionToken) params.set("X-Amz-Security-Token", cfg.sessionToken);
   params.sort();
   const query = params.toString().replace(/\+/g, "%20").replace(/%7E/gi, "~");
   const canonical = [method, path, query, headers, signedHeaders, "UNSIGNED-PAYLOAD"].join("\n");

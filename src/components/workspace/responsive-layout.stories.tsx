@@ -6,7 +6,7 @@ import { WorkspacePanel } from "./workspace-panel";
 import { DashboardPanel } from "./dashboard-layout";
 import { QueryState } from "./query-state";
 
-const meta = {title:"Workspace/Responsive composition",parameters:{layout:"padded"}} satisfies Meta;
+const meta = {id: "workspace-responsive-composition", title: "11 Accessibility and responsive/Responsive composition",parameters:{layout:"padded"}} satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
 const longTitle = "CommunityLearningCenterWithAnUnusuallyLongUnbrokenName";
@@ -16,7 +16,7 @@ export const NarrowWorkspace: Story = {
   render:()=> <div data-testid="narrow-workspace" className="w-full max-w-72 space-y-4">
     <PageHeader title={longTitle} subtitle="An example of a narrow workspace with long source-owned content." actions={actions}/>
     <WorkspacePanel title={longTitle} actions={actions}><p>Workspace content</p></WorkspacePanel>
-    <DashboardPanel title={longTitle} action={actions}><p>Dashboard content</p></DashboardPanel>
+    <DashboardPanel title={`${longTitle}ParticipationOverview`} action={actions}><p>Dashboard content</p></DashboardPanel>
     <QueryState error={longTitle} onRetry={()=>{}}/>
   </div>,
   play:async({canvasElement})=>{

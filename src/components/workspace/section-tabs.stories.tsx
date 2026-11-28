@@ -1,6 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect } from "storybook/test";
-import { createMemoryHistory, createRootRoute, createRouter, RouterProvider } from "@tanstack/react-router";
+import { expect, userEvent } from "storybook/test";
+import { useState } from "react";
+import { useRouter } from "@tanstack/react-router";
+import { Button } from "@/components/ui/button";
+import { FixtureRouter } from "../../../.storybook/fixture-router";
 import { DetailNavigation, SectionTab } from "./workspace-panel";
 
 const tabs = [["overview", "Overview"], ["calendar", "Calendar"], ["announcements", "Announcements"]] as const;
@@ -12,12 +15,9 @@ function RecordTabs({ tab, variant = "default" }: { tab: string; variant?: "defa
   </div>;
 }
 
-const withLocation = (path: string) => (Story: () => React.JSX.Element) => {
-  const root = createRootRoute({ component: Story });
-  return <RouterProvider router={createRouter({ routeTree: root, history: createMemoryHistory({ initialEntries: [path] }) })} />;
-};
+const withLocation = (path: string) => (Story: () => React.JSX.Element) => <FixtureRouter initialPath={path}><Story /></FixtureRouter>;
 
-const meta = { title: "V6.1 templates/Section tabs", component: RecordTabs, parameters: { layout: "fullscreen" } } satisfies Meta<typeof RecordTabs>;
+const meta = { id: "v6-1-templates-section-tabs", title: "03 Components/Section tabs", component: RecordTabs, parameters: { layout: "fullscreen" } } satisfies Meta<typeof RecordTabs>;
 export default meta;
 type Story = StoryObj<typeof meta>;
 
@@ -55,5 +55,27 @@ export const RecordSections: Story = {
     for (const link of links) await expect(link.getBoundingClientRect().height).toBeGreaterThanOrEqual(44);
     links[0]!.focus();
     await expect(links[0]).toHaveFocus();
+  },
+};
+
+function RouterIdentity({ revision }: { revision: number }) {
+  const router = useRouter();
+  const [initialRouter] = useState(() => router);
+  return <p role="status">Revision {revision}: {router === initialRouter ? "same router" : "replaced router"}</p>;
+}
+function RouterStabilityExample() {
+  const [revision, setRevision] = useState(0);
+  return <div className="bg-background p-5">
+    <Button onClick={() => setRevision(value => value + 1)}>Update fixture data</Button>
+    <FixtureRouter initialPath="/"><RouterIdentity revision={revision} /></FixtureRouter>
+  </div>;
+}
+export const FixtureRouterPreservesState: Story = {
+  args: { tab: "overview" },
+  render: () => <RouterStabilityExample />,
+  play: async ({ canvas }) => {
+    await expect(canvas.getByRole("status")).toHaveTextContent("Revision 0: same router");
+    await userEvent.click(canvas.getByRole("button", { name: "Update fixture data" }));
+    await expect(canvas.getByRole("status")).toHaveTextContent("Revision 1: same router");
   },
 };

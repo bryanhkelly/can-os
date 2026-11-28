@@ -4,7 +4,7 @@ import { ClassVideoPlayer } from "./ClassVideoPlayer";
 import { DomainError } from "@/domain/errors";
 
 const meta = {
-  title: "Learning/Class video player",
+  id: "learning-class-video-player", title: "08 Feature workspaces/Learning/Class video player",
   component: ClassVideoPlayer,
   args: { title: "Teacher lesson video", url: "https://www.youtube.com/watch?v=abcdefghijk" },
 } satisfies Meta<typeof ClassVideoPlayer>;

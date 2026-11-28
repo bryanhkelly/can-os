@@ -401,9 +401,9 @@ build so layout and accessibility assertions exercise generated utility styles.
 | Ink | `#101d39` | Main typography and values |
 | Muted ink | `#52627c` | Help, sublabels, timestamps |
 | Stroke | `#e2e8f0` | Neutral borders |
-| Primary blue | `#1769ef` | Primary CTA, focus, navigation, active links |
-| Verified success | `#16845b` | Confirmed positive outcomes only |
-| Attention | `#b86b00` | Required review/deadline risk |
+| Primary blue | `#135fdb` | Primary CTA, focus, navigation, active links |
+| Verified success | `#10724d` | Confirmed positive outcomes only |
+| Attention | `#985700` | Required review/deadline risk |
 | Danger | `#c93232` | Confirmed blocking/critical problems |
 
 Never use brand hues to infer review, authorization, enrollment, learning mastery, compliance or opening permissions. Dark and site-branded themes retain meaningful semantic contrast.
@@ -782,3 +782,15 @@ and path containment. It does not decode all image content, authenticate the
 reviewer, prove correct rendering, or replace accessibility and authenticated
 journey acceptance. Use actual browser evidence; never populate the manifest
 with synthetic fixtures or placeholder screenshots.
+
+### Accessible interaction states
+
+Filled primary and destructive buttons retain their validated foreground and background colors on hover; a text underline distinguishes the hover state without diluting contrast. Native disabled and loading states continue to use the canonical muted styling and do not underline. Shared table column headers default to `scope="col"`; use `TableRowHead` for row headings or explicitly set scope where a more complex table requires it. Institutional action colors must reach 4.5:1 on card, canvas, accent and muted surfaces before the complete brand token set is accepted.
+
+Disabled selection cards and disabled text actions preserve readable explanatory text using the muted semantic foreground instead of reducing whole-control opacity. Outline buttons use the contrast-checked input boundary token; decorative panel borders retain the quieter stroke token. Modal keyboard traversal excludes native disabled, hidden, inert and visibility-hidden controls while retaining discoverable focusable `aria-disabled` controls.
+
+Native form controls inherit the current light/dark color scheme. Disabled text-entry controls use the readable muted palette without reducing whole-control opacity; native checkbox and radio affordances retain their disabled styling. The Field wrapper reflects the effective required flag (including one declared on its child). Student emergency notices use the destructive foreground throughout, including supporting text, summaries and secondary editorial actions; the light editorial action surface keeps its independent dark ink in either theme.
+
+Scoped theme aliases are resolved at each light, dark and institutional theme boundary. Do not inherit a computed light-mode alias into a nested dark surface: `--eyebrow-color` must reference the current scope's `--workspace-accent-ink`, and dark institutional surfaces retain the canonical dark palette whether the dark class is on the brand wrapper or an ancestor. Sidebar controls use instance-specific IDs; a closed mobile navigation toggle identifies the persistent dialog element rather than an unmounted descendant. Styling hooks use data attributes independently of accessibility IDs.
+
+Institutional accent backgrounds must preserve the canonical foreground and muted foreground (4.5:1), in addition to the brand's declared foreground and action color. This protects selected cards, search results and launch guidance that contain ordinary supporting text. The shared photographic dashboard hero is an intentionally light editorial surface in every theme; its label uses fixed audited editorial ink and its light overlay maintains a readable surface across the entire content width.

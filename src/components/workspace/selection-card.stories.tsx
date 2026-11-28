@@ -4,7 +4,7 @@ import { expect, userEvent, within } from "storybook/test";
 import { SelectionCard } from "./selection-card";
 
 const meta = {
-  title: "Workspace/V6.1 Selection Cards",
+  id: "workspace-v6-1-selection-cards", title: "03 Components/Selection cards",
   component: SelectionCard,
   parameters: { layout: "padded" },
   args: {
@@ -65,6 +65,11 @@ export const RadioCheckboxAndDisabled: Story = {
     const summer = canvas.getByRole("checkbox", { name: /Summer & Breaks/ });
     await userEvent.click(summer);
     await expect(summer).toBeChecked();
-    await expect(canvas.getByRole("checkbox", { name: /Grades 9–12/ })).toBeDisabled();
+    const unavailable = canvas.getByRole("checkbox", { name: /Grades 9–12/ });
+    await expect(unavailable).toBeDisabled();
+    const card = unavailable.closest("label");
+    if (!card) throw new Error("Expected a labelled selection card");
+    await expect(card).toHaveStyle({ opacity: "1" });
+    await expect(within(card).getByText(/School-year authorization required/)).toBeVisible();
   },
 };
