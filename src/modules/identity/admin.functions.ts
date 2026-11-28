@@ -4,7 +4,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { issuePrivateAccountCredential } from "./private-account-credential.server";
 import { canIssueIndividualCredential } from "@/modules/identity/individual-credential-issuer.server";
-import { individualStaffTargetEligible } from "@/domain/individual-staff-handoff";
+import { individualStaffTargetEligible, requiresIndividualStaffCredential } from "@/domain/individual-staff-handoff";
 import { privateAccountRoleEligible } from "@/domain/private-account-authority";
 import { personLegalName } from "@/domain/person-name";
 import { and, eq, ilike, inArray, or, sql } from "drizzle-orm";
@@ -232,8 +232,10 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
       // because the operator entered optional identity-confirmation details.
       // Existing individual credentials and independently governed live
       // non-deliverable identities retain their stronger authentication.
-      const individual = localDemoIdentity && !!confirmation &&
-        (account?.privateCredential === true || !sharedScope);
+      const individual = requiresIndividualStaffCredential({
+        demoIdentity:localDemoIdentity, approvedSharedScope:sharedScope,
+        existingPrivateCredential:account?.privateCredential===true, confirmationProvided:!!confirmation,
+      });
       if (confirmation && !localDemoIdentity)
         throw new AuthorizationError("eligible individual staff identity");
       if (confirmation?.existingPersonId && account?.personId !== confirmation.existingPersonId)
