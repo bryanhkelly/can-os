@@ -3,7 +3,7 @@ import {randomUUID} from "node:crypto";
 import {neon} from "@neondatabase/serverless";
 import {z} from "zod";
 import {authenticateQaActor,qaSession} from "../helpers/pilot-standard-access";
-import {pilotRpcPage,pilotRpc as rpc} from "../helpers/pilot-governed-rpc";
+import {pilotRpcPage,pilotRpc as rpc,expectPilotDenial as deny} from "../helpers/pilot-governed-rpc";
 
 const uuid=z.string().uuid();
 const actor=z.object({email:z.string().email().refine(v=>v===v.toLowerCase()&&(v.endsWith(".test")||v.endsWith(".demo"))),
@@ -12,7 +12,7 @@ const actor=z.object({email:z.string().email().refine(v=>v===v.toLowerCase()&&(v
 const meeting=z.object({requestId:uuid,startsAt:z.string().datetime({offset:true}),endsAt:z.string().datetime({offset:true}),lessonId:uuid,agendaRequestId:uuid}).strict();
 const metric=z.object({metricKey:z.enum(["class.registrations","class.uniquePeople","noncredit.registrations","noncredit.distinctLearners"]),definitionVersion:z.string().min(1).max(64)}).strict();
 const siteScope=z.object({host:actor,classId:uuid,siteId:uuid,meetings:z.array(meeting).length(4)}).strict();
-const learner=z.object({actor,courseAttemptId:uuid,paired:z.boolean()}).strict();
+const learner=z.object({actor,courseAttemptId:uuid,paired:z.boolean(),present:z.boolean().optional()}).strict();
 const manifest=z.object({offeringVersionId:uuid,manifestId:uuid,expectedHash:z.string().regex(/^[a-f0-9]{64}$/)}).strict();
 const hash=z.string().regex(/^[a-f0-9]{64}$/);
 const releaseAsset=z.object({assetVersionId:uuid,usageKind:z.enum(["required_instruction","supporting","accessibility","assessment"])}).strict();
@@ -62,7 +62,7 @@ async function authorizeFixture(a:Actor){
       AND o.metadata->>'qa_only'='true' AND o.metadata->>'intended_branch'=${branch}`;
   expect(row?.count).toBe(1);
 }
-async function openActor(browser:Browser,a:Actor,contexts:BrowserContext[]):Promise<Page>{
+async function openActor(browser:Browser,a:Actor,contexts:BrowserContext[],learner=false):Promise<Page>{
   await authorizeFixture(a);
   const context=await browser.newContext();contexts.push(context);
   if(a.privateAccessCode){
@@ -74,13 +74,27 @@ async function openActor(browser:Browser,a:Actor,contexts:BrowserContext[]):Prom
   }
   const initial=a.privateAccessCode?await qaSession(context):await authenticateQaActor(context,a.email);
   const grant=initial.grants.find(g=>g.id===a.grantId);
-  if(!grant||grant.organizationId!==a.organizationId)throw Error("Exact authorized QA membership required");
+  if(!grant||!(grant.organizationId===a.organizationId||
+     learner&&grant.role==="account_holder"&&grant.organizationId===null&&!a.privateAccessCode))
+    throw Error("Exact authorized QA membership required");
   if(initial.activeGrantId!==a.grantId){
     const switched=await context.request.post("http://localhost:5183/access/session",{headers:{Origin:"http://localhost:5183"},data:{grantId:a.grantId}});
     expect(switched.ok()).toBe(true);
   }
   expect((await qaSession(context)).activeGrantId).toBe(a.grantId);
-  return pilotRpcPage(context);
+  const page=await pilotRpcPage(context);
+  if(learner&&grant.role==="account_holder"){
+    // Use the normal reviewed adult identity bridge. Do not retry activation
+    // after a consumed decision; resume the existing linked native identity.
+    const [review]=await sql`SELECT r.consumed_at IS NOT NULL AS consumed
+      FROM public.access_adult_learning_reviews r JOIN public.access_accounts ac ON ac.id=r.access_account_id
+      WHERE ac.email_normalized=${a.email} AND r.access_person_id=${grant.personId}::uuid
+      AND r.organization_id=${a.organizationId}::uuid AND r.status='approved'`;
+    if(!review)throw Error("Current independently reviewed learner home required");
+    if(!review.consumed)expect(await rpc(page,"onboarding","activateReviewedNativeClassLearner")).toMatchObject({ready:true});
+    expect(await rpc(page,"recovery","resumeLinkedNativeClassLearner")).toMatchObject({ready:true});
+  }
+  return page;
 }
 async function classScope(classId:string,siteId:string,ownerId:string){
   const [row]=await sql`SELECT count(*)::int AS count FROM public.classes c
@@ -97,7 +111,7 @@ async function enrollOne(browser:Browser,contexts:BrowserContext[],selection:Enr
   const [target]=await sql`SELECT count(*)::int AS count FROM public.class_offering_versions
     WHERE id=${classOfferingVersionId}::uuid AND class_id=${classId}::uuid AND state='published'`;
   expect(target?.count).toBe(1);
-  const page=await openActor(browser,learner,contexts);
+  const page=await openActor(browser,learner,contexts,true);
   const counts=async()=> (await sql`SELECT
     (SELECT count(*)::int FROM public.noncredit_registrations n JOIN public.access_accounts a ON a.person_id=n.participant_person_id
       WHERE a.email_normalized=${learner.email}) AS registrations,
@@ -140,7 +154,7 @@ test("governed pilot API stage",async({browser},info)=>{
       expect(submitted?.count).toBe(1);
       const authorPage=await openActor(browser,author,contexts);
       const reviewerPage=await openActor(browser,reviewer,contexts);
-      await expect(rpc(authorPage,"release","getNativeOfferingReviewContent",offering)).rejects.toThrow();
+      await deny(authorPage,"release","getNativeOfferingReviewContent",offering);
       const content=await rpc<{reviewedManifestHash:string;offeringVersionId:string}>(
         reviewerPage,"release","getNativeOfferingReviewContent",offering);
       expect(content).toMatchObject({reviewedManifestHash:offering.expectedHash,offeringVersionId:offering.offeringVersionId});
@@ -177,7 +191,7 @@ test("governed pilot API stage",async({browser},info)=>{
       for(const [i,site] of sites.entries()){
         const input={classId:site.classId,from,to};
         const page=pages[i]!,foreign=pages[1-i]!;
-        await expect(rpc(foreign,"report","getNativeClassReport",input)).rejects.toThrow();
+        await deny(foreign,"report","getNativeClassReport",input);
         const [persisted]=await sql`WITH rooms AS (
           SELECT cs.id,r.id AS room_id FROM public.class_sessions cs
           JOIN public.facilitated_classroom_plans p ON p.id=cs.classroom_plan_id
@@ -356,12 +370,12 @@ test("governed pilot API stage",async({browser},info)=>{
       if(!room.pairingCode)throw Error("Fresh due Class Session is required");
       const scope={facilitatedSessionId:room.facilitatedSessionId};
       try{
-        const outside=await openActor(browser,foreign.actor,contexts);
-        await expect(rpc(outside,"room","pairWithFacilitatedRoom",{courseAttemptId:foreign.courseAttemptId,pairingCode:room.pairingCode})).rejects.toThrow();
+        const outside=await openActor(browser,foreign.actor,contexts,true);
+        await deny(outside,"room","pairWithFacilitatedRoom",{courseAttemptId:foreign.courseAttemptId,pairingCode:room.pairingCode});
         const pairedActors=new Map<string,Page>();
         for(const l of learners){
           if(l.paired){
-            const participant=await openActor(browser,l.actor,contexts);
+            const participant=await openActor(browser,l.actor,contexts,true);
             pairedActors.set(l.courseAttemptId,participant);
             expect(await rpc(participant,"room","pairWithFacilitatedRoom",{courseAttemptId:l.courseAttemptId,pairingCode:room.pairingCode})).toMatchObject({paired:true});
           }
@@ -372,7 +386,7 @@ test("governed pilot API stage",async({browser},info)=>{
           const media=await rpc<{media:{lessonId:string;assetVersionId:string}[]}>(
             page,"room","getFacilitatedRoomMedia",scope);
           expect(media.media.some(m=>m.lessonId===lessonId&&m.assetVersionId===assetVersionId)).toBe(true);
-          await expect(rpc(outside,"room","getFacilitatedRoomMediaAccess",{...scope,lessonId,assetVersionId})).rejects.toThrow();
+          await deny(outside,"room","getFacilitatedRoomMediaAccess",{...scope,lessonId,assetVersionId});
           const access=await rpc<{downloadUrl:string;expiresInSeconds:number}>(page,"room","getFacilitatedRoomMediaAccess",{...scope,lessonId,assetVersionId});
           // Never attach the signed media URL or manufacture played/ended events.
           if(!access.downloadUrl.startsWith("https://"))throw Error("Expected authorized HTTPS media access");
@@ -380,7 +394,7 @@ test("governed pilot API stage",async({browser},info)=>{
           const released=await rpc<{id:string;duplicate:boolean}>(page,"activity","releaseClassroomActivity",input);
           expect(released.duplicate).toBe(false);
           expect(await rpc(page,"activity","releaseClassroomActivity",input)).toMatchObject({id:released.id,duplicate:true});
-          await expect(rpc(outside,"activity","getClassroomLearnerActivities",{...scope,courseAttemptId:foreign.courseAttemptId})).rejects.toThrow();
+          await deny(outside,"activity","getClassroomLearnerActivities",{...scope,courseAttemptId:foreign.courseAttemptId});
           for(const [courseAttemptId,participant] of pairedActors){
             const learnerScope={...scope,courseAttemptId};
             const visible=await rpc<{activities:{id:string;responded:boolean}[]}>(participant,"activity","getClassroomLearnerActivities",learnerScope);
@@ -403,16 +417,21 @@ test("governed pilot API stage",async({browser},info)=>{
           const input={...scope,courseAttemptId:l.courseAttemptId,requestId:randomUUID(),status:"present",method:"in_person_roll_call",evidenceNote:"Synthetic QA role-play observation; not real attendance"};
           expect(await rpc(page,"attendance","attestClassroomParticipation",input)).toMatchObject({saved:true,noDeviceEvidence:!l.paired});
           expect(await rpc(page,"attendance","attestClassroomParticipation",input)).toMatchObject({duplicate:true});
-          if(!l.paired){
+          if(!(l.present??l.paired)){
             expect(await rpc(page,"attendance","attestClassroomParticipation",{...input,requestId:randomUUID(),status:"absent",evidenceNote:"Synthetic QA correction of initial role-play observation"})).toMatchObject({saved:true});
           }
         }
         const after=await rpc<typeof before>(page,"attendance","getClassroomAttendanceRoster",scope);
-        for(const l of learners)expect(after.members.find(m=>m.courseAttemptId===l.courseAttemptId)?.latestStatus).toBe(l.paired?"present":"absent");
-        evidence={...evidence,sessionDelivered:1,participants:learners.length,paired:learners.filter(l=>l.paired).length,
-          corrected:learners.filter(l=>!l.paired).length,authorizedMediaAccess:Boolean(instruction),formativeResponses:activityResponses,playbackVerified:false};
+        for(const l of learners)expect(after.members.find(m=>m.courseAttemptId===l.courseAttemptId)?.latestStatus).toBe((l.present??l.paired)?"present":"absent");
+        const [attendanceProof]=await sql`SELECT count(*)::int AS assertions,
+          count(DISTINCT course_attempt_id)::int AS learners FROM public.facilitated_room_attendance_assertions
+          WHERE facilitated_session_id=${scope.facilitatedSessionId}::uuid`;
+        expect(attendanceProof).toEqual({assertions:learners.length+learners.filter(l=>!(l.present??l.paired)).length,learners:learners.length});
+        evidence={...evidence,instructionalApiJourneyPassed:1,participants:learners.length,paired:learners.filter(l=>l.paired).length,
+          corrected:learners.filter(l=>!(l.present??l.paired)).length,authorizedMediaAccess:Boolean(instruction),formativeResponses:activityResponses,playbackVerified:false};
       }finally{
         expect(await rpc(page,"room","endFacilitatedLearningRoom",scope)).toMatchObject({ended:true});
+        expect(await rpc(page,"room","endFacilitatedLearningRoom",scope)).toMatchObject({ended:true,alreadyEnded:true});
       }
     }else{
       const {owner,recipient,foreign,siteId,metrics}=scenario;
@@ -427,8 +446,8 @@ test("governed pilot API stage",async({browser},info)=>{
         recipientOrganizationId:recipient.organizationId,scopeKind:"site",scopeId:siteId,relationshipKind:"affiliation",metrics,validThrough:null});
       expect(request.status).toBe("pending");
       const input={agreementId:request.id,action:"accept"};
-      await expect(rpc(host,"relationships","decideRelationshipRequest",input)).rejects.toThrow();
-      await expect(rpc(outside,"relationships","decideRelationshipRequest",input)).rejects.toThrow();
+      await deny(host,"relationships","decideRelationshipRequest",input);
+      await deny(outside,"relationships","decideRelationshipRequest",input);
       expect(await rpc(hq,"relationships","decideRelationshipRequest",input)).toMatchObject({status:"accepted"});
       const accepted=await rpc<typeof before>(hq,"relationships","getRelationshipPortfolio");
       expect(accepted.acceptedRelationships).toBe(before.acceptedRelationships+1);

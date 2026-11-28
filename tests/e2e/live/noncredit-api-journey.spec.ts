@@ -39,6 +39,15 @@ async function rpc<T>(page:Page,module:keyof typeof modules,name:string,data:unk
 const selection=z.object({email:z.string().email().refine(v=>v===v.toLowerCase()&&v.endsWith(".test")),grantId:uuid}).strict();
 const actors=z.object({learner:selection,other:selection,provider:selection}).strict()
  .parse(JSON.parse(process.env.CAN_PILOT_QA_API_ACTORS_JSON??"{}"));
+async function deny(page:Page,module:keyof typeof modules,name:string,data:unknown,codes:readonly string[]=["FORBIDDEN"]){
+ const result=await page.evaluate(async({url,name,data})=>{
+   const api=await import(/* @vite-ignore */ url);const command=api[name];
+   if(typeof command!=="function")throw Error("Missing transformed application command");
+   try{await command({data});return null;}
+   catch(error){return error&&typeof error==="object"&&"code" in error&&typeof error.code==="string"?error.code:null;}
+ },{url:modules[module],name,data});
+ if(!result||!codes.includes(result))throw Error("Expected explicit domain denial was not returned");
+}
 async function actor(browser:Browser,key?:keyof typeof actors){
  const context=await browser.newContext({baseURL:origin});
  try{
@@ -95,8 +104,8 @@ test("actual application RPC and canonical evidence: independent pilot",async({b
    const release=await rpc<{id:string;title:string;consentVersion:string;consentSha256:string}>(visitor.page,"enrollment","getOpenNoncreditSelfEnrollmentById",{releaseId:fixture.releaseId});
    expect(release.id).toBe(fixture.releaseId);expect(release.title).toBe(fixture.trainingTitle);
    const enrollment={releaseId:release.id,consentVersion:release.consentVersion,consentSha256:release.consentSha256,acceptedConsent:true,adultConfirmed:true,referralCode:fixture.goCode};
-   await expect(rpc(visitor.page,"enrollment","enrollMyselfInNoncredit",enrollment)).rejects.toThrow();
-   await expect(rpc(learner.page,"enrollment","enrollMyselfInNoncredit",{...enrollment,consentSha256:"0".repeat(64)})).rejects.toThrow();
+   await deny(visitor.page,"enrollment","enrollMyselfInNoncredit",enrollment,["AUTHENTICATION_REQUIRED","FORBIDDEN"]);
+   await deny(learner.page,"enrollment","enrollMyselfInNoncredit",{...enrollment,consentSha256:"0".repeat(64)},["VALIDATION_FAILED","CONFLICT","FORBIDDEN","CANONICAL_LEARNER_SESSION_REQUIRED"]);
    // Activate the existing independent review without creating another Person.
    expect(await rpc(learner.page,"onboarding","activateReviewedNativeClassLearner",undefined)).toMatchObject({ready:true});
    expect(await rpc(learner.page,"recovery","resumeLinkedNativeClassLearner",undefined)).toMatchObject({ready:true});
@@ -121,8 +130,8 @@ test("actual application RPC and canonical evidence: independent pilot",async({b
    const retry=await rpc<typeof first>(learner.page,"enrollment","enrollMyselfInNoncredit",enrollment);
    expect(retry).toMatchObject({...first,alreadyEnrolled:true});
    const course={courseAttemptId:first.courseAttemptId};
-   await expect(rpc(other.page,"resume","openMyNoncreditCourse",course)).rejects.toThrow();
-   await expect(rpc(other.page,"assessments","getNoncreditKnowledgeCheck",{...course,phase:"baseline"})).rejects.toThrow();
+   await deny(other.page,"resume","openMyNoncreditCourse",course,["FORBIDDEN","CANONICAL_LEARNER_SESSION_REQUIRED","CANONICAL_LEARNER_ONBOARDING_REQUIRED"]);
+   await deny(other.page,"assessments","getNoncreditKnowledgeCheck",{...course,phase:"baseline"},["FORBIDDEN","CANONICAL_LEARNER_SESSION_REQUIRED","CANONICAL_LEARNER_ONBOARDING_REQUIRED"]);
    expect(await rpc(learner.page,"resume","openMyNoncreditCourse",course)).toMatchObject({ready:true});
    const before=await knowledge(learner.page,course.courseAttemptId,"baseline",fixture.baselineAnswers);
    expect(await rpc(learner.page,"surveys","listNoncreditCourseSurveys",course)).toEqual([]);
@@ -148,7 +157,7 @@ test("actual application RPC and canonical evidence: independent pilot",async({b
    expect(feedback.alreadySubmitted).toBe(false);
    expect(await rpc(learner.page,"surveys","submitCourseSurvey",{...scope,answers})).toMatchObject({responseId:feedback.responseId,alreadySubmitted:true});
    expect(await rpc(learner.page,"completion","getNoncreditCompletionReadiness",course)).toMatchObject({recordedCompletion:true});
-   await expect(rpc(other.page,"report","getNoncreditPilotOutcomes",{geography:""})).rejects.toThrow();
+   await deny(other.page,"report","getNoncreditPilotOutcomes",{geography:""});
    const report=await rpc<{distinctLearners:number;deliverySites:number;byTraining:{title:string;summary:Record<string,number|null>}[]}>(provider.page,"report","getNoncreditPilotOutcomes",{geography:""});
    const rows=report.byTraining.filter(r=>r.title===fixture.trainingTitle);expect(rows).toHaveLength(1);
    expect(rows[0]!.summary).toMatchObject({registrations:1,lessonsMarkedComplete:fixture.lessons.length,knowledgeCheckSubmissions:1,knowledgeCheckPasses:1,surveyRespondents:1,confirmedNoncreditCompletions:1,pairedKnowledgeChecks:1,verifiedParticipationMinutes:0});

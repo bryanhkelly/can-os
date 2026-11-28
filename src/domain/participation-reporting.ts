@@ -56,7 +56,7 @@ export const CLASS_METRIC_DEFINITIONS:readonly MetricDefinition[]=[
   {key:"withdrawn",label:"Withdrawn",source:"class_enrollments",denominator:"in-period registrations",rule:"Current source status withdrawn; history preserved",timeBasis:"enrolled_at + current status"},
   {key:"waitlisted",label:"Waitlisted",source:"WS2 lifecycle contract",denominator:"distinct current pending waitlist positions",rule:"Unavailable until native Class waitlist authority is ratified; never display zero as inferred",timeBasis:"pending"},
   {key:"sessionsScheduled",label:"Sessions scheduled",source:"class_sessions + delivery_sessions + facilitated_classroom_plans",denominator:"delivery Session IDs",rule:"Distinct scheduled Session links; includes subsequently cancelled sessions",timeBasis:"delivery_sessions.starts_at"},
-  {key:"sessionsDelivered",label:"Sessions delivered",source:"class_sessions + facilitated_learning_sessions",denominator:"delivery Session IDs",rule:"Linked live room must have ended; a scheduled or merely started plan is not delivered",timeBasis:"delivery_sessions.starts_at"},
+  {key:"sessionsDelivered",label:"Sessions closed",source:"class_sessions + facilitated_learning_sessions",denominator:"delivery Session IDs",rule:"Linked live room has ended; closure alone does not verify instructional delivery, attendance or completion",timeBasis:"delivery_sessions.starts_at"},
   {key:"verifiedAttendance",label:"Verified attendance occurrences",source:"facilitated_room_attendance_assertions",denominator:"room ID and canonical Course Attempt ID pairs",rule:"Latest explicit host assertion is present; excludes device pairing and playback",timeBasis:"linked Session scheduled time, assertions as of query"},
   {key:"verifiedAttendees",label:"Verified attendees",source:"facilitated_room_attendance_assertions + class_enrollments",denominator:"canonical Person IDs",rule:"Unique Class-enrolled people with one or more latest present assertions in scoped rooms",timeBasis:"linked Session scheduled time, assertions as of query"},
   {key:"assessmentsSubmitted",label:"Assessment attempts submitted",source:"assessment_attempts + assessment_access_grants",denominator:"assessment attempt IDs",rule:"Submitted/scored/finalized attempts by actual submitted timestamp, including earlier registrants",timeBasis:"assessment_attempts.submitted_at"},
@@ -184,6 +184,7 @@ export function aggregateClassEvidence(input:EvidenceInput){
       "Formal Class completion outcome mapping awaits WS3 contract ratification.",
       "Waitlists are unavailable until WS2 confirms the native Class waitlist authority.",
       "Attendance counts explicit facilitator assertions, not school attendance or watch time.",
+      "The legacy sessionsDelivered key counts closed rooms, not verified instructional delivery. A failed or interrupted session may be closed.",
       "Provider-private figures require independently reviewed disclosure controls before external publication.",
     ]};
 }

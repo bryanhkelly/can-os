@@ -12,7 +12,7 @@ const actor=z.object({email:z.string().email().refine(v=>v===v.toLowerCase()&&(v
  .refine(a=>a.email.endsWith(".demo")===Boolean(a.privateAccessCode),"Existing individual demo credential or ordinary email link required");
 const meeting=z.object({requestId:uuid,agendaRequestId:uuid,startsAt:z.string().datetime({offset:true}),endsAt:z.string().datetime({offset:true}),lessonId:uuid,assetVersionId:uuid,prompt:z.string().min(5).max(1000),choices:z.array(z.string().min(1).max(200)).min(2).max(8)}).strict();
 const site=z.object({host:actor,manager:actor,classId:uuid,siteId:uuid,classOfferingVersionId:uuid,
- learners:z.array(z.object({actor,paired:z.boolean()}).strict()).min(2).max(20),
+ learners:z.array(z.object({actor,paired:z.boolean(),present:z.boolean().optional()}).strict()).min(2).max(20),
  meetings:z.array(meeting).length(4)}).strict();
 const planSchema=z.object({pilot2:z.object({sites:z.array(site).length(2),from:day,to:day,
  relationship:z.object({owner:actor,recipient:actor,foreign:actor,siteId:uuid,metrics:z.array(z.object({metricKey:z.enum(["class.registrations","class.uniquePeople","noncredit.registrations","noncredit.distinctLearners"]),definitionVersion:z.string().min(1).max(64)}).strict()).min(1).max(4)}).strict()
@@ -102,7 +102,7 @@ export async function runPilotAcceptance({mode,env,root,modes}){
     if(Date.now()>=Date.parse(m.endsAt))throw Error("Missed authorized meeting window; no clock override");
     governed("Pilot 2 Site "+(i+1)+" meeting "+(j+1),{stage:"deliver",host:c.s.host,classId:c.s.classId,siteId:c.s.siteId,classSessionId:c.sessionIds[j],learners:c.learners,foreign:cohorts[1-i].learners[0],instruction:{lessonId:m.lessonId,assetVersionId:m.assetVersionId,prompt:m.prompt,choices:m.choices}});
    }
-   governed("Pilot 2 provider report reconciliation",{stage:"cohort-report",from,to,sites:cohorts.map(c=>({manager:c.s.manager,classId:c.s.classId,siteId:c.s.siteId,sessionIds:c.sessionIds,expectedDistinctPeople:c.learners.length,expectedPresentOccurrences:4*c.learners.filter(l=>l.paired).length}))});
+   governed("Pilot 2 provider report reconciliation",{stage:"cohort-report",from,to,sites:cohorts.map(c=>({manager:c.s.manager,classId:c.s.classId,siteId:c.s.siteId,sessionIds:c.sessionIds,expectedDistinctPeople:c.learners.length,expectedPresentOccurrences:4*c.learners.filter(l=>l.present??l.paired).length}))});
    governed("Site reporting relationship acceptance and revocation",{stage:"relationships",...relationship});
   }
   summary.status="passed";
