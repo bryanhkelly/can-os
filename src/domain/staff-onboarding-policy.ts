@@ -9,7 +9,7 @@ export const localStaffInviteRoles = [
 ] as const;
 
 export const localStaffInviteInput = z.object({
-  email: z.string().trim().email(),
+  email: z.string().trim().email().max(254),
   firstName: z.string().trim().min(1).max(80),
   lastName: z.string().trim().min(1).max(80),
   role: z.enum(localStaffInviteRoles),
