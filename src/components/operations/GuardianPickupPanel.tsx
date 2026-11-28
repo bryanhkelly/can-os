@@ -162,8 +162,8 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
                         onChange={event => setRevocationReasons(current => ({ ...current, [adult.id]: event.target.value }))}
                         className="mt-1" />
                     </Label>
-                    <Button variant="outline" type="button" disabled={busy || (revocationReasons[adult.id] ?? "").trim().length < 10}
-                      className="mt-2  border px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                    <Button variant="outline" size="sm" type="button" disabled={busy || (revocationReasons[adult.id] ?? "").trim().length < 10}
+                      className="mt-2"
                       onClick={() => void run(adult.id, `Pickup authorization revoked for ${adult.pickupName}.`, (mutationId) => revokePickupAuthorization({ data: {
                         authorizationId: adult.id,
                         reason: revocationReasons[adult.id] ?? "",
@@ -214,7 +214,7 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
               <p className="mt-3 text-xs text-muted-foreground">Only enter the adult's legal name. Never enter identity-document numbers in CAN OS. The default start date uses the school's local calendar day, not your device's time zone.</p>
               <p className="mt-2 text-xs text-muted-foreground">Enter both legal names, a relationship of at least two characters, and a valid date range to save.</p>
               <Button variant="default" type="button" disabled={busy || !authorizationReady}
-                className="mt-3  bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+                className="mt-3"
                 onClick={() => void run(key, `Pickup authorization added for ${student.studentName}.`, (mutationId) => createPickupAuthorization({ data: {
                   studentProfileId: student.studentProfileId,
                   programId: student.programId,
@@ -237,8 +237,8 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
                   onChange={event => setHoldReasons(current => ({ ...current, [key]: event.target.value }))}
                   className="mt-1" />
               </Label>
-              <Button variant="outline" type="button" disabled={busy || activeHold || (holdReasons[key] ?? "").trim().length < 10}
-                className="mt-3  border px-3 py-2 text-xs font-semibold disabled:opacity-50"
+              <Button variant="outline" size="sm" type="button" disabled={busy || activeHold || (holdReasons[key] ?? "").trim().length < 10}
+                className="mt-3"
                 onClick={() => window.confirm("Pause every pickup release for this child until an authorized site leader resolves the custody hold?") && void run(key + ":hold", `Disputed custody reported for ${student.studentName}; all release is paused.`, (mutationId) => createPickupCustodyHold({ data: {
                   studentProfileId: student.studentProfileId,
                   programId: student.programId,

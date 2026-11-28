@@ -11,11 +11,11 @@ export function WorkspaceAccountTrigger({ member, accountOpen, onOpenAccount }: 
   accountOpen: boolean;
   onOpenAccount: () => void;
 }) {
-  return <Button variant="ghost" size="icon" aria-label="Account menu"
+  return <Button variant="outline" size="icon" aria-label="Account menu"
     aria-haspopup="dialog" aria-expanded={accountOpen}
     title={member ? `${member.firstName} ${member.lastName}` : "My CAN account"}
     aria-description={member ? `Signed in as ${member.firstName} ${member.lastName}` : undefined}
-    onClick={onOpenAccount} className="border bg-muted">
+    onClick={onOpenAccount}>
     <UserRound aria-hidden="true" />
   </Button>;
 }

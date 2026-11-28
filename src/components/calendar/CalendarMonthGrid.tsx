@@ -54,7 +54,7 @@ export function CalendarMonthGrid({
                       onKeyDown={event=>onDayKeyDown(event,cell.key)}
                       tabIndex={selectedDay===cell.key||(!selectedDay&&cell.day===1)?0:-1}
                       aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown"
-                      className="block h-auto min-h-10 w-full p-0 text-left font-normal"
+                      className="block h-auto min-h-10 w-full text-left"
                       aria-label={`Select ${cell.key}`}
                     >
                       <span className="font-semibold">{cell.day}</span>

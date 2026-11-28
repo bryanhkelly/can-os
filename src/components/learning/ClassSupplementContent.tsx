@@ -39,6 +39,6 @@ export function ClassSupplementContent({
     programId={programId} sectionId={sectionId} resourceId={item.resourceId}/>;
   if (item.kind === "pdf") return <Button variant="ghost" size="sm" type="button"
     disabled={disabled} onClick={() => void onDownload(item.id)}
-    className="underline disabled:opacity-50">{item.title} (private PDF)</Button>;
+    className="underline">{item.title} (private PDF)</Button>;
   return <span>{item.title} (unavailable document)</span>;
 }

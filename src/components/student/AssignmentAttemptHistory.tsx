@@ -17,7 +17,7 @@ export function AssignmentAttemptHistory({ assessmentId }: { assessmentId: strin
   }
   return <section className="mt-4  border p-4" aria-label="Submission history">
     <h3 className="text-sm font-semibold">Submission history</h3>
-    {!attempts && <Button variant="ghost" type="button" disabled={busy} onClick={load} className="mt-3 text-sm underline">
+    {!attempts && <Button variant="ghost" type="button" disabled={busy} onClick={load} className="mt-3 underline">
       {busy ? "Loading attempts…" : "Review responses and feedback"}
     </Button>}
     {error && <p role="alert" className="mt-2 text-sm">{error}</p>}

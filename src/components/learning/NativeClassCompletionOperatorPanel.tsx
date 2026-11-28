@@ -215,8 +215,8 @@ export function NativeClassCompletionOperatorPanel({classId}:{classId:string}){
           </details>
           <div className="divide-y divide-border border border-border">
             {list.data.participants.map(person=>
-              <Button variant="ghost" key={person.classEnrollmentId} type="button"
-                className="flex w-full items-start justify-between gap-4 p-3 text-left hover:bg-muted"
+              <Button variant={selectedId===person.classEnrollmentId?"secondary":"ghost"} key={person.classEnrollmentId} type="button"
+                className="flex h-auto w-full items-start justify-between gap-4 text-left"
                 aria-pressed={selectedId===person.classEnrollmentId}
                 onClick={()=>{
                   setSelectedId(person.classEnrollmentId);
@@ -269,7 +269,7 @@ export function NativeClassCompletionOperatorPanel({classId}:{classId:string}){
             </p>
             <Label className="block space-y-1 text-sm font-medium">
               Completion decision
-              <Select className="w-full border border-input bg-background p-2"
+              <Select className="w-full"
                 value={outcome} onChange={e=>setOutcome(e.target.value as typeof outcome)}>
                 <option value="completed">Completed</option>
                 <option value="not_yet_completed">Not yet completed</option>

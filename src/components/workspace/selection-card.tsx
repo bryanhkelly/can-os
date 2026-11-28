@@ -1,5 +1,6 @@
 import type { ChangeEvent, ReactNode } from "react";
 import { Checkbox, Radio } from "@/components/ui/choice";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
 export type SelectionCardProps = {
@@ -24,12 +25,8 @@ export function SelectionCard({
   kind, value, name, title, detail, icon, checked, disabled = false,
   onChange, compact = false, className,
 }: SelectionCardProps) {
-  const controlProps = {
-    value, name, checked, disabled,
-    onChange: (event: ChangeEvent<HTMLInputElement>) => onChange(event.currentTarget.checked),
-    className: "mt-0.5",
-  };
-  return <label className={cn(
+  const handleChange = (event: ChangeEvent<HTMLInputElement>) => onChange(event.currentTarget.checked);
+  return <Label className={cn(
     "min-w-0 cursor-pointer border bg-card text-sm focus-within:ring-2 focus-within:ring-ring",
     "focus-within:ring-offset-1",
     compact ? "flex min-h-11 items-start gap-3 p-3" : "flex min-h-20 items-start gap-3 p-4",
@@ -37,11 +34,11 @@ export function SelectionCard({
       checked ? "border-primary bg-accent" : "border-border hover:border-primary/60",
     className,
   )}>
-    {kind === "checkbox" ? <Checkbox {...controlProps}/> : <Radio {...controlProps}/>}
+    {kind === "checkbox" ? <Checkbox value={value} name={name} checked={checked} disabled={disabled} onChange={handleChange} className="mt-0.5"/> : <Radio value={value} name={name} checked={checked} disabled={disabled} onChange={handleChange} className="mt-0.5"/>}
     {icon && <span aria-hidden="true" className="shrink-0 text-primary">{icon}</span>}
     <span className="min-w-0">
       <span className="block font-semibold">{title}</span>
       {detail && <span className="mt-1 block text-xs leading-5 text-muted-foreground">{detail}</span>}
     </span>
-  </label>;
+  </Label>;
 }

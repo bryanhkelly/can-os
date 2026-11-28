@@ -118,8 +118,8 @@ export function CurriculumEditor({programId,courseCode,release,onSaved,mode="com
      <summary className="cursor-pointer text-sm font-medium">View {content.blueprint.targetInstructionalWeeks}-week course plan</summary>
      <p className="mt-2 text-xs text-muted-foreground">Weeks are a planning sequence within this publisher's complete course, not separate releases or school adoptions. Planned units without authored lessons are not student content.</p>
      <ol className="mt-3 grid max-h-64 gap-2 overflow-y-auto sm:grid-cols-2">{content.blueprint.weeks.map(week=><li key={week.week}>
-      <Button type="button" variant="outline" disabled={!content.modules.some(module=>module.id===week.unitId)}
-       onClick={()=>setSelectedModuleId(week.unitId)} className="w-full  border p-2 text-left text-xs disabled:opacity-50">
+      <Button type="button" variant="outline" size="sm" disabled={!content.modules.some(module=>module.id===week.unitId)}
+       onClick={()=>setSelectedModuleId(week.unitId)} className="w-full justify-start text-left">
        Week {week.week}: {week.title} · {week.status}
       </Button>
      </li>)}</ol>

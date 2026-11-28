@@ -84,7 +84,7 @@ export function SiteAffiliationPanel({ siteId }: { siteId: string }) {
           <span className="font-semibold">{entry.denominationName}</span> · {entry.status}
           {entry.decisionReason && <p className="mt-1 text-muted-foreground">HQ decision: {entry.decisionReason}</p>}
           {(entry.status === "pending" || entry.status === "approved") &&
-            <Button variant="ghost" type="button" className="mt-2 block text-sm underline disabled:opacity-50"
+            <Button variant="ghost" type="button" className="mt-2 block underline"
               disabled={busy} onClick={() => void withdraw(entry.id)}>Withdraw affiliation</Button>}
         </li>)}
       </ul>}

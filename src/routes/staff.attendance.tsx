@@ -268,16 +268,16 @@ function StaffAttendanceWorkspace({ workspace }: { workspace: Awaited<ReturnType
         {conflicts.map(item=><div key={item.mutationId} className="mt-3 flex flex-wrap items-center gap-2 border-t pt-2">
          <span className="text-xs">{students.find(s=>s.studentProfileId===item.studentProfileId&&s.programId===item.programId)?.studentName??item.studentProfileId}
           {" · "}{item.date}{" · pending "}{item.status}</span>
-         <Button variant="outline" size="sm" type="button" onClick={()=>discardConflict(item)} className=" border px-2 py-1 text-xs">Discard local change</Button>
-         <Button variant="outline" size="sm" type="button" onClick={()=>void overrideConflict(item)} className=" border px-2 py-1 text-xs">Apply as reasoned correction</Button>
+         <Button variant="outline" size="sm" type="button" onClick={()=>discardConflict(item)}>Discard local change</Button>
+         <Button variant="outline" size="sm" type="button" onClick={()=>void overrideConflict(item)}>Apply as reasoned correction</Button>
         </div>)}
         <Button variant="outline" size="sm" type="button" onClick={()=>{setConflicts([]);void load();}}
-          className="mt-2  border px-3 py-2 text-xs">Refresh school records</Button>
+          className="mt-2">Refresh school records</Button>
       </div>}
       {queued.length>0&&<div className="mt-4 flex flex-wrap items-center gap-3  border p-3 text-sm">
         <span>{queued.length} attendance {queued.length===1?"entry":"entries"} stored on this device pending synchronization.</span>
         <Button variant="outline" size="sm" type="button" disabled={syncing||!navigator.onLine} onClick={()=>void synchronize()}
-          className=" border px-3 py-2 text-xs font-semibold disabled:opacity-50">
+          >
           {syncing?"Synchronizing…":"Synchronize now"}
         </Button>
       </div>}
@@ -361,13 +361,13 @@ function StaffAttendanceWorkspace({ workspace }: { workspace: Awaited<ReturnType
               <Button variant="outline" size="sm"
                 type="button"
                 disabled={busy !== "" || !excuse.canReview}
-                className=" border px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                
                 onClick={() => review(excuse, "approved")}
               >Approve excuse</Button>
               <Button variant="outline" size="sm"
                 type="button"
                 disabled={busy !== "" || !excuse.canReview}
-                className=" border px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                
                 onClick={() => review(excuse, "rejected")}
               >Reject</Button>
             </div>

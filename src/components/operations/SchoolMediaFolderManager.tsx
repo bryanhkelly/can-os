@@ -149,7 +149,7 @@ export function SchoolMediaFolderManager({siteId,canPublish,enabled}:{
       Upload a school media folder (including subfolders)
       <Input ref={folderRef} type="file" multiple accept="image/jpeg,image/png"
         disabled={!canPublish||!enabled||working} onChange={event=>void stageFolder(event)}
-        className="mt-2 block w-full  border p-3 text-sm"/>
+        className="mt-2 w-full"/>
     </Label>
     {!canPublish&&<p className="mt-2 text-sm">Only a verified Site website editor with publishing authority can import or approve photos.</p>}
     {!enabled&&<p role="status" className="mt-2 text-sm">Photo folder uploads are not enabled for this deployment. CAN original artwork remains available automatically; ask your administrator to configure the private media service.</p>}
@@ -195,7 +195,7 @@ export function SchoolMediaFolderManager({siteId,canPublish,enabled}:{
           placeholder="Document the source and image-use permissions" className="mt-1"/>
       </Label>
       <Button variant="default" type="button" disabled={!rights||!release||!consents||reason.trim().length<10||working}
-        onClick={()=>void approve()} className="min-h-11  bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+        onClick={()=>void approve()} >
         Approve entire folder for automatic placement
       </Button>
     </fieldset>}
@@ -204,12 +204,12 @@ export function SchoolMediaFolderManager({siteId,canPublish,enabled}:{
       <p className="mt-2 text-sm text-muted-foreground">Revocation stops new public requests from serving these images. Original CAN artwork will be used where no other approved photo is available.</p>
       <Label className="mt-2 block text-sm">Reason for revocation
         <Textarea rows={2} value={revokeReason} onChange={event=>setRevokeReason(event.target.value)}
-          className="mt-1 w-full  border p-2"/>
+          className="mt-1 w-full"/>
       </Label>
       <Label className="mt-2 flex gap-2 text-sm"><Checkbox checked={confirmRevoke}
         onChange={event=>setConfirmRevoke(event.target.checked)}/>Revoke all currently approved photos displayed here</Label>
       <Button variant="outline" type="button" disabled={!canPublish||working||!confirmRevoke||revokeReason.trim().length<10}
-        onClick={()=>void revokeAll()} className="mt-3 min-h-11  border px-4 text-sm font-semibold disabled:opacity-50">
+        onClick={()=>void revokeAll()} className="mt-3">
         Revoke approved photos
       </Button>
     </details>}

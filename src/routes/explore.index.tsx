@@ -42,7 +42,7 @@ function ExplorePage(){
             <Search className="pointer-events-none absolute left-3 top-3.5 size-4 text-muted-foreground" aria-hidden="true"/>
             <Input id="explore-query" type="search" value={text} onChange={event=>chooseText(event.target.value)}
               maxLength={100} placeholder="Program, site, city or region"
-              className="min-h-11 pl-10"/>
+              leadingIconInset className="min-h-11"/>
           </span>
         </Label>
         <Label className="block text-sm font-semibold" htmlFor="explore-type">Program type

@@ -1,12 +1,14 @@
 import { Link } from "@tanstack/react-router";
-import type { Dispatch, SetStateAction } from "react";
+import { useState, type Dispatch, type SetStateAction } from "react";
 import { Button } from "@/components/ui/button";
-import { DisclosureSection, WorkspaceNotice } from "@/components/workspace";
+import { DisclosureSection, SelectionCard } from "@/components/workspace";
 import { ChurchSourceSuggestionReview } from "@/components/operations/ChurchSourceSuggestionReview";
 import {
   isChurchSiteIdentityV61, isFaithBasedSiteIdentityV61, siteIdentityEditorialContextV61,
 } from "@/domain/site-identity-v61";
-import { SiteIntelligenceContentPanel } from "./SiteIntelligenceContentPanel";
+import { previewLabels, Structure } from "./WebsiteTemplateGallery";
+import { publicSitePagePaths, type PublicSitePath } from "@/domain/public-site-paths";
+import { orderEligibleWebsitePages } from "@/domain/website-composition";
 import { WebsiteCopyField, type WebsiteCopyFieldSpec } from "./WebsiteCopyField";
 import { WebsiteLeadershipEditor } from "./WebsiteLeadershipEditor";
 import {
@@ -34,13 +36,14 @@ const contentFields:ReadonlyArray<WebsiteCopyFieldSpec>=[
 /** All copy controls consume the one saved Site Story and the one Website
  * document. No second editor, source field store or Brand implementation. */
 export function WebsiteSiteContentStep({
-  data,content,setContent,busy,onSavePrivateDraft,
+  data,content,setContent,busy,
 }:{
   data:Awaited<ReturnType<typeof getPartnerWebsitePreviewView>>;
   content:SiteLocalContent;
   setContent:Dispatch<SetStateAction<SiteLocalContent>>;
-  busy:boolean;onSavePrivateDraft?:()=>void;
+  busy:boolean;
 }){
+  const [selectedPage,setSelectedPage]=useState<PublicSitePath>("/");
   const canReuse=content.contentReuseConsent === "granted";
   const canApplyExperienceWelcome=canReuse &&
     (!content.welcomeMessage.trim() ||
@@ -114,6 +117,8 @@ export function WebsiteSiteContentStep({
       onChange={value=>setContent(old=>({...old,[field.key]:value}))}
       onRestore={()=>setContent(old=>restoreOriginalWebsiteField(old,field.key))}/>;
 
+  const available=orderEligibleWebsitePages(publicSitePagePaths.filter(path=>path==="/"||path==="/about"||path==="/leadership"||Object.prototype.hasOwnProperty.call(data.previewPages,path)),content.websiteComposition);
+  const page=available.includes(selectedPage)?selectedPage:"/";
   return <div className="space-y-5">
     <div>
       <h3 className="font-serif text-2xl">Tell your story</h3>
@@ -130,7 +135,13 @@ export function WebsiteSiteContentStep({
 
     </div>
 
-    {data.plannedExperienceNames.length>0&&<div className="space-y-3 border p-4">
+    <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(16rem,21rem)_minmax(0,1fr)]">
+      <div role="group" aria-label="Website content pages" className="space-y-2">
+        {available.map(path=><SelectionCard key={path} kind="radio" name="website-content-page" value={path} checked={page===path} onChange={checked=>{if(checked)setSelectedPage(path);}} title={previewLabels[path]} detail={path==="/"? "Headline, welcome, story and vision":path==="/about"?"Mission, community and values":path==="/leadership"?"Leadership profiles and welcome":"Managed Site information"} icon={<span className="block w-16 shrink-0"><Structure id={content.branding.templateId??"heritage"} page={path} viewport="desktop" thumbnail/></span>} className="w-full"/>)}
+      </div>
+      <section className="min-w-0 space-y-5 border border-border bg-card p-4" aria-label={previewLabels[page]+" content"}>
+        <h3 className="font-serif text-xl font-semibold">{previewLabels[page]}</h3>
+    {page==="/"&&data.plannedExperienceNames.length>0&&<div className="space-y-3 border p-4">
       <h4 className="text-sm font-semibold">Experiences from your Site plan</h4>
       <p className="text-xs text-muted-foreground">
         These are ideas you're exploring. Your website draws on the saved Site plan; launch and enrollment approval remain separate.
@@ -154,7 +165,7 @@ export function WebsiteSiteContentStep({
         Your authored welcome copy is preserved. Edit it directly if you want to mention Experiences.
       </p>}
     </div>}
-    {refreshable.length>0&&<div className="flex flex-wrap items-center justify-between gap-3 border border-border p-4" role="status">
+    {page==="/"&&refreshable.length>0&&<div className="flex flex-wrap items-center justify-between gap-3 border border-border p-4" role="status">
       <div>
         <p className="text-sm font-semibold">Updated starter wording is available</p>
         <p className="mt-1 text-xs text-muted-foreground">
@@ -168,7 +179,7 @@ export function WebsiteSiteContentStep({
         Update suggestions
       </Button>
     </div>}
-    {canReuse&&data.siteStoryCopyCandidates.length>0&&
+    {page==="/"&&canReuse&&data.siteStoryCopyCandidates.length>0&&
       <div className="flex flex-wrap items-center justify-between gap-3 border p-3">
         <span className="text-sm">
           {data.siteStoryCopyCandidates.length} suggestions available.
@@ -179,7 +190,7 @@ export function WebsiteSiteContentStep({
           Use suggested text
         </Button>
       </div>}
-    {canReuse&&data.siteStorySourceChoices&&<div className="border bg-muted/20 p-4 text-sm" role="note">
+    {page==="/about"&&canReuse&&data.siteStorySourceChoices&&<div className="border bg-muted/20 p-4 text-sm" role="note">
       <p className="font-semibold">Ideas from what you've shared</p>
       <p className="mt-2 text-muted-foreground">
         Values: {data.siteStorySourceChoices.values.join(", ")||"not selected"}.
@@ -192,23 +203,23 @@ export function WebsiteSiteContentStep({
         Review Site Information
       </Link>
     </div>}
-    {canReuse&&data.editingContent?.contentReuseConsent!=="granted"&&onSavePrivateDraft&&<WorkspaceNotice tone="info"><p>Save your private website draft to record your content reuse choice before using Gloo. Nothing will be published.</p><Button type="button" variant="outline" size="sm" className="mt-2" disabled={busy||!data.canEdit||!data.draftStorageReady} onClick={onSavePrivateDraft}>Save private draft</Button></WorkspaceNotice>}
-    {canReuse&&<SiteIntelligenceContentPanel key={data.siteId+":website:"+data.currentRevision} siteId={data.siteId} target="website" disabled={busy||!data.canEdit} onApply={draft=>{if(draft.website)setContent(old=>({...old,...draft.website,...(draft.websiteComposition&&!old.websiteComposition?{websiteComposition:draft.websiteComposition}:{})}));}}/>}
-    {primaryFields.map(renderField)}
-    {canReuse&&churchSite&&<DisclosureSection title="Suggested text (optional)">
+    {page==="/"&&primaryFields.filter(field=>field.key!=="communityOutreach").map(renderField)}
+    {page==="/about"&&primaryFields.filter(field=>["localDescription","schoolVision","communityOutreach"].includes(field.key)).map(renderField)}
+    {page==="/about"&&canReuse&&churchSite&&<DisclosureSection title="Suggested text (optional)">
       <ChurchSourceSuggestionReview currentRevision={data.currentRevision}/>
     </DisclosureSection>}
-    <DisclosureSection title="Leadership and local traditions (optional)">
-      <div className="space-y-5">{additionalFields.map(renderField)}</div>
-    </DisclosureSection>
-    {showFaithFields&&<DisclosureSection title={faithBased ? (churchSite ? "Your church and faith information" : "Faith and values (optional)") : "Previously saved faith information"}>
+    {page==="/about"&&additionalFields.filter(field=>field.key==="localTraditions").map(renderField)}
+    {page==="/leadership"&&additionalFields.filter(field=>field.key==="leadershipWelcome").map(renderField)}
+    {page==="/about"&&showFaithFields&&<DisclosureSection title={faithBased ? (churchSite ? "Your church and faith information" : "Faith and values (optional)") : "Previously saved faith information"}>
       <p className="mt-2 text-xs text-muted-foreground">
         {faithBased ? "Use only descriptions that reflect your Site. Formal affiliations are reviewed separately."
           : "These earlier answers are preserved so you can review, edit or clear them after changing Site identity."}
       </p>
       <div className="mt-4 space-y-5">{faithFields.map(renderField)}</div>
     </DisclosureSection>}
-    <WebsiteLeadershipEditor content={content} setContent={setContent} disabled={busy||!data.canEdit}/>
+    {page==="/leadership"&&<WebsiteLeadershipEditor content={content} setContent={setContent} disabled={busy||!data.canEdit}/>}
+    {!["/","/about","/leadership"].includes(page)&&<div className="space-y-3 text-sm"><p>This page uses governed Site information and approved learning opportunities rather than independent website copy.</p><Link to="/launch/site" search={{siteId:data.siteId,module:page==="/contact"?"site-information":"programs-audiences"}} className="font-semibold text-primary underline">Manage source information</Link></div>}
+    </section></div>
     <p className="text-xs text-muted-foreground">Your website pages and sections are prepared from your Site information and evolve with your approved learning opportunities.</p>
   </div>;
 }

@@ -69,7 +69,7 @@ export function OnsiteRoomPlanningPanel({programId, initialDate, onChanged}:{
       <Input type="date" value={date} onChange={event=>{setDate(event.target.value);setModel(null);}}
         className="mt-2"/>
     </Label>
-    <Button variant="ghost" type="button" onClick={()=>void load()} disabled={loading||!date} className="mt-2 text-sm underline">Refresh room plans</Button>
+    <Button variant="ghost" type="button" onClick={()=>void load()} disabled={loading||!date} className="mt-2 underline">Refresh room plans</Button>
     {loading&&<p role="status" className="mt-3 text-sm">Loading current schedule and eligible adults…</p>}
     {error&&<p role="alert" className="mt-3 text-sm">{error}</p>}
     {model&&!loading&&<>

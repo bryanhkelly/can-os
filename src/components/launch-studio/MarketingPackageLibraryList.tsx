@@ -9,11 +9,12 @@ export type MarketingPackageRecord = Awaited<ReturnType<typeof listSiteMarketing
  * The parent manages revisions, commands, and independently governed releases.
  */
 export function MarketingPackageLibraryList({
-  records, busy, onOpen, onDuplicate, onArchiveToggle, onDelete,
+  records, busy, onOpen, onSendEmail, onDuplicate, onArchiveToggle, onDelete,
 }: {
   records: readonly MarketingPackageRecord[];
   busy: boolean;
   onOpen: (record: MarketingPackageRecord) => void;
+  onSendEmail?: (record: MarketingPackageRecord) => void;
   onDuplicate: (record: MarketingPackageRecord) => void | Promise<void>;
   onArchiveToggle: (record: MarketingPackageRecord) => void | Promise<void>;
   onDelete: (record: MarketingPackageRecord) => void;
@@ -29,7 +30,8 @@ export function MarketingPackageLibraryList({
               {" · "}{new Date(item.updatedAt).toLocaleDateString()}
             </p>
           </div>
-          <Button variant="outline" size="sm" onClick={()=>onOpen(item)}>Open</Button>
+          {onSendEmail&&item.status!=="archived"&&item.content.formats?.includes("email")&&<Button type="button" size="sm" disabled={busy} onClick={()=>onSendEmail(item)}>Send Email</Button>}
+          <Button variant="outline" size="sm" disabled={busy} onClick={()=>onOpen(item)}>Open</Button>
           <Button variant="ghost" size="sm" disabled={busy} onClick={()=>void onDuplicate(item)}
             aria-label={"Duplicate "+item.title}><Copy aria-hidden="true"/></Button>
           <Button variant="ghost" size="sm" disabled={busy} onClick={()=>void onArchiveToggle(item)}

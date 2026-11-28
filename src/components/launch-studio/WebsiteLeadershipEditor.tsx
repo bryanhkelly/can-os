@@ -1,3 +1,4 @@
+import { Label } from "@/components/ui/label";
 import { useState, type Dispatch, type SetStateAction } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,22 +67,22 @@ export function WebsiteLeadershipEditor({content,setContent,disabled}:{
             Remove
           </Button>
         </div>
-        <label className="block space-y-1 text-sm font-medium">
+        <Label className="block space-y-1 text-sm font-medium">
           Full name
           <Input required maxLength={120} disabled={disabled} value={person.name}
             onChange={event=>update(person.id,{name:event.target.value})}/>
-        </label>
-        <label className="block space-y-1 text-sm font-medium">
+        </Label>
+        <Label className="block space-y-1 text-sm font-medium">
           Role or title
           <Input required maxLength={120} disabled={disabled} value={person.title}
             onChange={event=>update(person.id,{title:event.target.value})}/>
-        </label>
-        <label className="block space-y-1 text-sm font-medium">
+        </Label>
+        <Label className="block space-y-1 text-sm font-medium">
           Short biography
           <Textarea rows={4} maxLength={1600} disabled={disabled} value={person.biography}
             onChange={event=>update(person.id,{biography:event.target.value})}/>
-        </label>
-        <label className="block space-y-1 text-sm font-medium">
+        </Label>
+        <Label className="block space-y-1 text-sm font-medium">
           LinkedIn profile URL (optional)
           <Input inputMode="url" placeholder="https://www.linkedin.com/in/profile"
             maxLength={240} disabled={disabled} value={person.linkedinUrl??""}
@@ -89,35 +90,35 @@ export function WebsiteLeadershipEditor({content,setContent,disabled}:{
           <span className="block text-xs font-normal text-muted-foreground">
             Link to an authorized personal profile. No automatic LinkedIn retrieval.
           </span>
-        </label>
-        <label className="block space-y-1 text-sm font-medium">
+        </Label>
+        <Label className="block space-y-1 text-sm font-medium">
           Portrait PNG (optional; max 160 KB)
-          <input type="file" accept="image/png" disabled={disabled}
-            className="block w-full text-sm" onChange={event=>
+          <Input type="file" accept="image/png" disabled={disabled}
+            className="w-full" onChange={event=>
               void upload(person,event.target.files?.[0]??null)}/>
-        </label>
+        </Label>
         {person.photo&&<div className="space-y-2">
           <p className="text-xs text-muted-foreground">Portrait selected</p>
-          <label className="block space-y-1 text-sm font-medium">
+          <Label className="block space-y-1 text-sm font-medium">
             Image description
             <Input maxLength={180} disabled={disabled} value={person.photo.altText}
               onChange={event=>update(person.id,{photo:{...person.photo!,altText:event.target.value}})}/>
-          </label>
-          <label className="flex items-center gap-2 text-sm">
+          </Label>
+          <Label className="flex items-center gap-2 text-sm">
             <Checkbox disabled={disabled} checked={person.photo.rightsConfirmed}
               onChange={event=>update(person.id,{photo:{
                 ...person.photo!,rightsConfirmed:event.target.checked,
               }})}/>
             <span>I have permission to display this portrait</span>
-          </label>
+          </Label>
           <Button variant="outline" size="sm" type="button" disabled={disabled}
             onClick={()=>update(person.id,{photo:null})}>Remove portrait</Button>
         </div>}
-        <label className="flex items-center gap-2 text-sm">
+        <Label className="flex items-center gap-2 text-sm">
           <Checkbox disabled={disabled} checked={person.consentConfirmed}
             onChange={event=>update(person.id,{consentConfirmed:event.target.checked})}/>
           <span>Permission to publish this person's name, title, biography and profile link is confirmed</span>
-        </label>
+        </Label>
       </section>)}
       <Button type="button" variant="outline" disabled={disabled||people.length>=16}
         onClick={add}>Add a leader</Button>

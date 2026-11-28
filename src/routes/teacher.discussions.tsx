@@ -113,7 +113,7 @@ export function TeacherDiscussionsView({ data }: { data: Awaited<ReturnType<type
       <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => thread.locked
         ? void run(() => setCourseDiscussionLock({ data: { threadId: thread.id, locked: false } }))
         : setDecision({ type: "lock", threadId: thread.id, title: thread.subject })}
-        className="text-sm underline">{thread.locked ? "Unlock discussion" : "Lock discussion"}</Button>
+        className="underline">{thread.locked ? "Unlock discussion" : "Lock discussion"}</Button>
       <div className="mt-4 grid gap-3">{thread.messages.map(message => <article key={message.id} className={"border border-border bg-card p-4 text-sm " + (message.parentMessageId ? "ml-4 border-l-2 border-l-primary/50" : "")}>
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-xs text-muted-foreground">{message.authorLabel} · <time dateTime={message.createdAt}>{new Date(message.createdAt).toLocaleString()}</time></p>
@@ -123,7 +123,7 @@ export function TeacherDiscussionsView({ data }: { data: Awaited<ReturnType<type
         {message.canModerate && <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => message.hidden
           ? void run(() => moderateDiscussionMessage({ data: { messageId: message.id, hidden: false } }))
           : setDecision({ type: "hide", messageId: message.id, title: thread.subject })}
-          className="mt-3 text-xs underline">{message.hidden ? "Restore post" : "Hide post"}</Button>}
+          className="mt-3 underline">{message.hidden ? "Restore post" : "Hide post"}</Button>}
       </article>)}</div>
       {!thread.locked && <form noValidate className="mt-4 grid gap-3" onSubmit={event => {
         event.preventDefault();

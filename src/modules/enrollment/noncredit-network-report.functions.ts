@@ -28,8 +28,8 @@ export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
   .validator((value:unknown)=>z.object({geography:geographyFilterSchema}).strict().optional().parse(value)??{geography:""})
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
-    const {requireCanonicalLabProvider}=await import("@/modules/operations/canonical-capability-lab-access.server");
-    const provider=await requireCanonicalLabProvider("noncredit.enrollment.read");
+    const {requireOperatorReportingScope}=await import("@/modules/reporting/operator-reporting-scope.server");
+    const provider=await requireOperatorReportingScope();
     return db.transaction(async tx=>{
     const asOf=new Date().toISOString();
     const releases=await tx.select({

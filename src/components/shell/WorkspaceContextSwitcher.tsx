@@ -58,7 +58,7 @@ export function WorkspaceContextSwitcher({ session, open, changing, error, onClo
         const active = grant.id === session.activeGrantId;
         return <Button key={grant.id} type="button" variant="outline" disabled={changing} aria-current={active ? "true" : undefined}
           onClick={() => { if (active) close(); else onSwitch(grant.id); }}
-          className="min-h-20 w-full flex-col items-start gap-0  px-4 py-3 text-left">
+          className="min-h-20 w-full flex-col items-start gap-0 text-left">
           <span className="flex flex-wrap items-center gap-2 text-sm font-semibold capitalize">
             {grant.role.replaceAll("_", " ")}{active && <StatusBadge tone="success">Active</StatusBadge>}
           </span>

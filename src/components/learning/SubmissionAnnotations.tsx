@@ -51,7 +51,7 @@ export function SubmissionAnnotations({ submissionId, responseText }: { submissi
               setRange({ start: target.selectionStart, end: target.selectionEnd, quote: target.value.slice(target.selectionStart, target.selectionEnd) });
               requestId.current = null;
             }
-          }} className="mt-2 block w-full  border bg-muted/40 p-3"/>
+          }} className="mt-2 w-full"/>
       </Field>
       {range && <blockquote className="mt-3 whitespace-pre-wrap border-l-2 pl-3 text-sm">{range.quote}</blockquote>}
       <form noValidate onSubmit={event => { event.preventDefault(); void save(); }} className="mt-3 grid gap-3">

@@ -45,7 +45,7 @@ export function MessagesWorkspace({ threads, selectedId, detail, loading, loadin
         <Label className="relative block">
           <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-3 size-4 text-muted-foreground" />
           <Input aria-label="Search conversations" placeholder="Search conversations..." value={query}
-            onChange={event => setQuery(event.target.value)} className="pl-9" />
+            onChange={event => setQuery(event.target.value)} leadingIconInset />
         </Label>
         <p className="mt-3 text-xs text-muted-foreground">{visible.length} {visible.length === 1 ? "conversation" : "conversations"}</p>
       </div>
@@ -54,11 +54,9 @@ export function MessagesWorkspace({ threads, selectedId, detail, loading, loadin
           {query ? "No conversations match your search." : "No conversations yet. Start a new message to connect."}
         </p>}>
         <nav aria-label="Conversations" className="max-h-[36rem] overflow-y-auto">
-          {visible.map(thread => <Button variant="ghost" key={thread.id} type="button" aria-current={thread.id === selectedId ? "true" : undefined}
+          {visible.map(thread => <Button variant={thread.id === selectedId ? "secondary" : "ghost"} key={thread.id} type="button" aria-current={thread.id === selectedId ? "true" : undefined}
             disabled={busy} onClick={() => { onSelect(thread.id); setMobileListFor(null); }}
-            className={`block w-full min-w-0 border-b border-l-2 p-4 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:opacity-50 ${
-              thread.id === selectedId ? "border-l-primary bg-accent/60" : "border-l-transparent"
-            }`}>
+            className="block h-auto w-full min-w-0 text-left">
             <div className="flex items-start gap-3">
               <span className="flex size-9 shrink-0 items-center justify-center border bg-muted text-muted-foreground"><MessageSquare aria-hidden="true" className="size-4" /></span>
               <div className="min-w-0 flex-1">

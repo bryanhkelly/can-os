@@ -19,16 +19,16 @@ export function WebsitePreviewPanel({ data, draftPreview }: {
     <h2 id="partner-preview-title" className="flex items-center gap-2 font-serif text-2xl font-semibold"><Eye className="size-5 text-primary" /> {draftPreview ? "Preview of current changes · not saved" : !saved ? "No saved website design yet" : data.localContentStatus === "published" ? "Latest saved and published website" : "Latest saved private design · revision " + data.currentRevision}</h2>
     <p className="mt-2 text-sm text-muted-foreground">This read-only preview uses the same design as the hosted site. It does not submit forms or publish changes.</p>
     {pages.length > 0 && <div role="group" aria-label="Preview a website page" className="mt-4 flex flex-wrap gap-2">
-      {pages.map(([path]) => <Button variant="outline" key={path} type="button" aria-pressed={selected === path}
-        onClick={() => setSelected(path)} className=" border px-3 py-2 text-sm aria-pressed:bg-primary aria-pressed:text-primary-foreground">
+      {pages.map(([path]) => <Button variant={selected === path ? "default" : "outline"} key={path} type="button" aria-pressed={selected === path}
+        onClick={() => setSelected(path)}>
         {path === "/" ? "Home" : path.slice(1).replace(/-/g, " ")}
       </Button>)}
     </div>}
     <div role="group" aria-label="Preview width" className="mt-4 flex flex-wrap gap-2">
-      <Button variant="outline" type="button" aria-pressed={device==="desktop"} onClick={()=>setDevice("desktop")}
-        className="border px-3 py-2 text-xs font-semibold aria-pressed:border-primary aria-pressed:text-primary">Desktop</Button>
-      <Button variant="outline" type="button" aria-pressed={device==="mobile"} onClick={()=>setDevice("mobile")}
-        className="border px-3 py-2 text-xs font-semibold aria-pressed:border-primary aria-pressed:text-primary">Mobile</Button>
+      <Button variant={device==="desktop"?"default":"outline"} size="sm" type="button" aria-pressed={device==="desktop"} onClick={()=>setDevice("desktop")}
+        >Desktop</Button>
+      <Button variant={device==="mobile"?"default":"outline"} size="sm" type="button" aria-pressed={device==="mobile"} onClick={()=>setDevice("mobile")}
+        >Mobile</Button>
     </div>
     {activeHtml ? <iframe key={selected+"-"+device} title={`${data.siteName} ${selected} read-only website preview`}
       srcDoc={activeHtml} sandbox="" referrerPolicy="no-referrer" loading="lazy"

@@ -81,7 +81,7 @@ export function WebsiteVisualIdentityStep({data,content,brandDirection,busy,setC
               <Select value={content.branding.typographyId ?? "editorial"}
                 onChange={event=>setContent(old=>({...old,branding:{...old.branding,
                   typographyId:event.target.value as SiteTypographyId,headingFontId:undefined,bodyFontId:undefined}}))}
-                className="mt-2 min-h-11 w-full border bg-background px-3">
+                className="mt-2 min-h-11 w-full">
                 {siteTypographyIds.map(id=><option key={id} value={id}>
                   {id==="editorial"?"Editorial serif + modern sans":
                     id==="traditional"?"Heritage serif + clean sans":"Contemporary humanist sans"}
@@ -91,7 +91,7 @@ export function WebsiteVisualIdentityStep({data,content,brandDirection,busy,setC
             <div className="grid gap-3 sm:grid-cols-2">
               {(["headingFontId","bodyFontId"] as const).map(key=><Label key={key} className="block text-sm">
                 {key==="headingFontId"?"Heading font":"Body font"}
-                <Select className="mt-2 min-h-11 w-full border bg-background px-3"
+                <Select className="mt-2 min-h-11 w-full"
                   value={content.branding[key] ?? ""}
                   onChange={event=>setContent(old=>({...old,branding:{...old.branding,
                     [key]:event.target.value?event.target.value as SiteFontId:undefined}}))}>

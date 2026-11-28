@@ -391,7 +391,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
               setRecipePlan(null);setRecipeCourseId(null);setRecipeOfferingVersionId(null);
               setChoice("");setSiteId("");}}
             placeholder="Paste versioned publisher rollout instructions from an approved partner"
-            className="mt-1 font-mono text-xs"/>
+            className="mt-1 font-mono"/>
           <div className="mt-3 flex flex-wrap gap-2">
             <Button type="button" variant="outline" disabled={!selected}
               onClick={()=>void exportLaunchRecipe()}>Copy Offering rollout</Button>

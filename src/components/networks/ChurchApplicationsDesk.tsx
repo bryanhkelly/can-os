@@ -89,7 +89,7 @@ export function ChurchApplicationsDesk() {
           <p className="mt-1 text-xs text-muted-foreground">Received {new Date(request.createdAt).toLocaleDateString()} · Request {request.id}</p>
           {request.status!=="verified" ? <div className="mt-4 space-y-3">
             {request.status==="needs_evidence" && <p role="status" className=" border p-3 text-sm">Additional evidence requested. Fresh independent verification is required before approval. Do not rely on an applicant-submitted claim alone.</p>}
-            {request.status==="needs_evidence" && <Button variant="outline" type="button" disabled={!!working} className=" border px-3 py-2 text-sm disabled:opacity-50" onClick={async ()=>{
+            {request.status==="needs_evidence" && <Button variant="outline" type="button" disabled={!!working}  onClick={async ()=>{
               setWorking(request.id); setError(""); setNotice("");
               try { const result = await resendChurchEvidenceNotice({ data: request.id });
                 setNotice(result.providerAccepted ? "Evidence reminder accepted by the provider; delivery not confirmed." : "Evidence reminder not accepted by the provider. Follow up through an established channel.");
@@ -146,7 +146,7 @@ export function ChurchApplicationsDesk() {
             </Label>
             <Button variant="outline" type="button" disabled={!!working||(followupNote[request.id] ?? "").trim().length<15}
               onClick={()=>void act(request.id,"followup")}
-              className="mt-2  border px-4 py-2 text-sm disabled:opacity-50">
+              className="mt-2">
               Request evidence and notify applicant
             </Button>
           </details>}
@@ -160,7 +160,7 @@ export function ChurchApplicationsDesk() {
             </Label>
             <Button variant="outline" type="button" disabled={!!working || !cancelConfirm[request.id]}
               onClick={()=>void act(request.id,"cancel")}
-              className="mt-2  border px-4 py-2 text-sm disabled:opacity-50">
+              className="mt-2">
               Confirm cancellation
             </Button>
           </details>
@@ -171,7 +171,7 @@ export function ChurchApplicationsDesk() {
                 onChange={e=>setDeclineNote(previous=>({...previous,[request.id]:e.target.value}))}/>
             </Label>
             <Button variant="outline" type="button" disabled={!!working||(declineNote[request.id] ?? "").trim().length<10}
-              onClick={()=>void act(request.id,"decline")} className="mt-2  border px-4 py-2 text-sm disabled:opacity-50">
+              onClick={()=>void act(request.id,"decline")} className="mt-2">
               Confirm decline
             </Button>
           </details>
@@ -189,7 +189,7 @@ export function ChurchApplicationsDesk() {
               ? `Leader accepted secure access on ${new Date(x.invitationAcceptedAt).toLocaleString()}. School setup is available under their Site.`
               : "Leader has not accepted the invitation. School setup remains inaccessible until secure acceptance."}
           </p>
-          {!x.invitationAcceptedAt&&<Button variant="outline" type="button" disabled={!!working} className="mt-2  border px-2 py-1 text-xs disabled:opacity-50"
+          {!x.invitationAcceptedAt&&<Button variant="outline" size="sm" type="button" disabled={!!working} className="mt-2"
             onClick={async ()=>{
               setWorking(x.id);setError("");setNotice("");
               try { const result=await resendApprovedChurchInvitation({data:x.id});setNotice(result.deliveryStatus==="dispatched" ? "Email accepted by the configured sender; leader acceptance is still pending." : result.deliveryStatus==="cooldown" ? "Recent access link still in cooldown; try again shortly." : result.deliveryStatus==="already_accepted" ? "The leader has already accepted access; refresh the desk." : "Access link not sent; review the account and pending invitation."); }

@@ -1,5 +1,7 @@
+"$schema" = "https://open-api.netlify.com/netlify.schema.json"
+
 [build]
-command = "vite build"
+command = "npm run build"
 publish = "dist/client"
 
 # WS00 development-only main consolidation safeguard.

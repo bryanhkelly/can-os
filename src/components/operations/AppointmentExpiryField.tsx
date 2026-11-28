@@ -8,8 +8,9 @@ export function AppointmentExpiryField({ label, value, disabled, onChange }: {
   disabled?: boolean;
   onChange: (value: string) => void;
 }) {
+  const { min, max } = appointmentExpiryBounds();
   return <Field label={label}>
-    <Input type="date" disabled={disabled} value={value} {...appointmentExpiryBounds()}
+    <Input type="date" disabled={disabled} value={value} min={min} max={max}
       onChange={event => onChange(event.target.value)}/>
   </Field>;
 }

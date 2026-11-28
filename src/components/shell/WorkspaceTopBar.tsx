@@ -56,9 +56,9 @@ export function WorkspaceTopBar({ member, sites, authenticated, sessionAvailable
         <Menu aria-hidden="true" />
       </Button>}
       {member
-        ? <Button ref={switcherRef} variant="outline" disabled={changing} aria-haspopup="dialog"
+        ? <Button ref={switcherRef} variant="outline" size="sm" disabled={changing} aria-haspopup="dialog"
           aria-expanded={switcherOpen} onClick={onOpenSwitcher}
-          className="mr-auto flex h-auto min-w-0 max-w-[22rem] shrink items-center justify-start gap-2  border-border/70 bg-background px-3 py-1.5 text-left">
+          className="mr-auto flex h-auto min-w-0 max-w-[22rem] shrink items-center justify-start gap-2 text-left">
           <span className="sr-only">Switch workspace:</span>{" "}
           <span className="min-w-0">
             <span className="block truncate text-xs font-semibold">{formatWorkspaceRole(member.role)}</span>{" "}

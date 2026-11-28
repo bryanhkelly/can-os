@@ -20,7 +20,7 @@ export function WebsiteArtworkField({ field, value, disabled, onSelect, onChange
         PNG or JPEG, re-encoded to a metadata-free PNG. No remote URLs or embeds.
       </span>
       <Input type="file" accept="image/png,image/jpeg" onChange={event=>onSelect(event,field)}
-        aria-label={`Choose ${label.toLowerCase()}`} className="mt-3 block w-full text-sm"/>
+        aria-label={`Choose ${label.toLowerCase()}`} className="mt-3 block w-full"/>
     </Label>
     {value && <div className="space-y-3 border bg-muted/30 p-3">
       <img src={value.dataUrl} alt={field === "logoImage" ? "Selected logo preview" : "Selected artwork preview"}

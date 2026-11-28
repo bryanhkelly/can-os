@@ -23,7 +23,7 @@ export function ExcuseAttachments({ attendanceEventId, attachments, disabled }: 
       type="button"
       key={file.documentId}
       disabled={disabled}
-      className="mt-1 block text-xs underline disabled:opacity-50"
+      className="mt-1 block underline"
       onClick={async () => {
         setError("");
         try {

@@ -31,7 +31,7 @@ export function NoncreditNetworkReportPanel(){
     {ready&&(report.isPending||report.isFetching)&&<p role="status" className="mt-4 text-sm">Reconciling registration and verified learning evidence…</p>}
     {ready&&report.isError&&<p role="alert" className="mt-4 text-sm">
       Reporting is unavailable or its bounded dataset needs partitioning.
-      <Button variant="ghost" type="button" className="ml-2 text-primary underline" onClick={()=>void report.refetch()}>Retry</Button>
+      <Button variant="ghost" type="button" className="ml-2 underline" onClick={()=>void report.refetch()}>Retry</Button>
     </p>}
     {totals&&<>
       <dl className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-3">

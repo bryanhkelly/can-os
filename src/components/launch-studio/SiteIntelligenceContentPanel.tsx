@@ -5,7 +5,8 @@ import {Button} from "@/components/ui/button";
 import {Select} from "@/components/ui/select";
 import {Textarea} from "@/components/ui/textarea";
 import {WorkspaceNotice} from "@/components/workspace";
-import {readSiteIntelligenceContent,previewSiteIntelligence,processSiteIntelligence} from "@/modules/sites/site-content-generation.functions";
+import {readSiteIntelligenceContent,previewSiteIntelligence} from "@/modules/sites/site-content-generation.functions";
+import {runSiteGeneration} from "./useSiteGeneration";
 import type {SiteContentPackage} from "@/domain/site-content-package";
 import type {SiteGenerationOptions} from "@/domain/site-content-generation";
 import type {MarketingPackageContent} from "@/domain/marketing-package-v61";
@@ -34,7 +35,7 @@ function SiteIntelligenceSession({siteId,target,purpose="site-announcement",disa
  const generation=useRef(0);
  useEffect(()=>{
    const requestId=++generation.current;
-   setStored(null);setSelected([]);setError("");
+   setStored(null);setSelected([]);
    void readSiteIntelligenceContent({data:{siteId,consumer:target}}).then(value=>{
      if(generation.current===requestId)setStored(value);
    }).catch(()=>{
@@ -54,11 +55,12 @@ function SiteIntelligenceSession({siteId,target,purpose="site-announcement",disa
    finally{setPending(false);}
  }
  async function process(){
-   if(target!=="website"||!preview||!approved||!canUse)return;
+   if(target!=="website"||!preview?.eligibility.allowed||!approved||!canUse)return;
    setPending(true);setError("");setNotice("");
    try{
-     const outcome=await processSiteIntelligence({data:{...request,digest:preview.digest,externalProcessingConfirmed:true}});
-     setNotice(outcome.status==="processing"?"A Site Intelligence package is already processing. Reload stored content to check its status.":"Site Intelligence package is available in both Website and Marketing.");
+     const result=await runSiteGeneration(request,preview);
+     if(result.success)setNotice("Site Intelligence package is available in both Website and Marketing.");
+     else setError(result.message);
      setPreview(null);setApproved(false);setRefresh(n=>n+1);
    }catch{setError("Processing did not finish. Your previously stored content is unchanged. Review the input and retry if permitted.");}
    finally{setPending(false);}
@@ -71,6 +73,7 @@ function SiteIntelligenceSession({siteId,target,purpose="site-announcement",disa
      <p className="text-sm">{item?("Stored content v"+item.revision+" · "+(item.language==="es"?"Spanish":"English")):stored?.status==="consent-required"?"Saved content reuse permission is required.":stored?.status==="processing"?"Processing is in progress.":stored?.status==="refresh-required"?"A new processing run is required.":stored?.status==="not-generated"?"No content package has been processed yet.":error?"Stored content unavailable.":"Reading stored content…"}</p>
      <Button type="button" size="sm" variant="outline" disabled={pending} onClick={()=>setRefresh(n=>n+1)}>Reload stored content</Button>
    </div>
+   {stored?.generation&&<p role="status" className="text-xs text-muted-foreground">Latest generation: {stored.generation.status} · {stored.generation.attempts} attempts{stored.generation.errorCode?" · "+stored.generation.errorCode:""}</p>}
    {stored?.status==="ready"&&stored.latestStatus==="processing"&&<WorkspaceNotice>New content is processing. The displayed version is the last compatible stored package.</WorkspaceNotice>}
    {stored?.status==="ready"&&stored.latestStatus==="failed"&&<WorkspaceNotice tone="attention">The latest processing attempt failed. The displayed version remains available for review.</WorkspaceNotice>}
    {item?.stale&&<WorkspaceNotice tone="attention">Saved Site information has changed since this package was generated. Review all wording against current information before use.</WorkspaceNotice>}
@@ -105,7 +108,8 @@ function SiteIntelligenceSession({siteId,target,purpose="site-announcement",disa
        <WorkspaceNotice tone="attention">Review the exact data to be sent to Gloo. Only approve information you are authorized to share. Public references are not automatically fetched.</WorkspaceNotice>
        <details className="border p-3"><summary className="cursor-pointer text-sm font-medium">Exact JSON input sent to Gloo</summary><pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-words text-xs">{JSON.stringify(preview.input,null,2)}</pre></details>
        <label className="flex items-start gap-2 text-sm"><Checkbox checked={approved} disabled={!canUse} onChange={e=>setApproved(e.target.checked)}/>I have permission to send this exact input to Gloo AI Studio for editorial processing.</label>
-       <Button type="button" disabled={!canUse||!approved} onClick={()=>void process()}>{pending?"Processing…":"Process and store content package"}</Button>
+       {!preview.eligibility.allowed&&<WorkspaceNotice tone="attention">{preview.eligibility.message}</WorkspaceNotice>}
+       <Button type="button" disabled={!canUse||!approved||!preview.eligibility.allowed} loading={pending} loadingLabel="Processing…" onClick={()=>void process()}>Process and store content package</Button>
      </div>}
    </details>}
    {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}

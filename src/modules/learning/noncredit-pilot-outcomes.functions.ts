@@ -20,7 +20,7 @@ import {
   countDistinctNoncreditLearners,buildPilotDisclosureEvidence,
   type PilotParticipantFact,
 } from "@/domain/noncredit-pilot-outcomes";
-import { requireCanonicalLabProvider } from "@/modules/operations/canonical-capability-lab-access.server";
+import { requireOperatorReportingScope } from "@/modules/reporting/operator-reporting-scope.server";
 import { countVerifiedNoncreditMinutes } from "@/domain/noncredit-completion";
 import { currentNoncreditCompletionStates } from "@/domain/verified-completion-projection";
 
@@ -50,7 +50,7 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
   .validator((value:unknown)=>params.parse(value))
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
-    const {organizationId,siteIds}=await requireCanonicalLabProvider("noncredit.enrollment.read");
+    const {organizationId,siteIds}=await requireOperatorReportingScope();
     const selectedSite=await requireSelectedProviderReportSite(db,{organizationId,siteIds},data.siteId);
     const generatedAt=new Date();
     const to=data.to?new Date(data.to):generatedAt;

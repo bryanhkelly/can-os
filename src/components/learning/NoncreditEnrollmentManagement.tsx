@@ -130,7 +130,7 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
           <div className="mt-3 flex flex-wrap gap-3">
             {item.invitationActive&&<Link to="/learn/enroll" search={{release:item.releaseId}} className="text-sm underline text-primary">Claim reserved place</Link>}
             <Button variant="ghost" type="button" size="sm" disabled={changeBusy||busy!==null}
-              className="text-sm underline text-muted-foreground"
+              className="underline"
               onClick={()=>{setWithdrawConfirm(null);setCancelWaitlist(item.releaseId);}}>
               Leave waiting list
             </Button>
@@ -190,7 +190,7 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
               <p className="text-sm text-muted-foreground">Learning access is not currently active</p>}
             {["registered","active"].includes(course.registrationStatus)&&
               <Button type="button" variant="ghost" size="sm"
-                className="text-xs font-semibold text-muted-foreground underline underline-offset-4"
+                className="underline underline-offset-4"
                 disabled={changeBusy||busy!==null}
                 onClick={()=>{setCancelWaitlist(null);setWithdrawConfirm(course.registrationId);}}>
                 Withdraw registration

@@ -90,9 +90,8 @@ export function CANAcademicStaffDelegationPanel({programId}:{programId:string}) 
             const person=desk.candidates.find(c=>c.personId===grant.personId);
             return <li key={grant.id} className="flex items-center justify-between gap-2  border p-2">
               <span>{person?person.firstName+" "+person.lastName:"Previously delegated CAN employee"} · {grant.role}</span>
-              <Button type="button" variant="outline" disabled={busy}
-                onClick={()=>void revoke(grant.id)}
-                className="px-2 py-1 text-xs">
+              <Button type="button" variant="outline" size="sm" disabled={busy}
+                onClick={()=>void revoke(grant.id)}>
                 Revoke
               </Button>
             </li>;

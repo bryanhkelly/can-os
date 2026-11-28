@@ -281,7 +281,7 @@ export function EstablishExperiencesV61({
           return <Button key={topic.id} type="button" size="sm"
             variant={currentId===topic.id?"default":"outline"}
             aria-pressed={currentId===topic.id} disabled={disabled}
-            className="h-auto min-h-16 min-w-0 flex-col items-start justify-center gap-1 whitespace-normal px-3 py-2 text-left"
+            className="h-auto min-h-16 min-w-0 flex-col items-start justify-center gap-1 whitespace-normal text-left"
             onClick={()=>setActiveId(topic.id)}>
             <span className="text-3xs font-semibold uppercase tracking-eyebrow">
               {index+1} OF {count} · {priorityLabel(detail.priority)}
@@ -315,10 +315,7 @@ export function EstablishExperiencesV61({
                     aria-label={"Priority for "+topic.title}
                     onChange={event=>patchDetail(topic.id,{
                       priority:event.currentTarget.value as SiteExperienceDetail["priority"]})}
-                    className={"min-h-8 w-auto px-2 text-xs font-semibold "+
-                      (detail.priority==="featured"
-                        ?"border-primary/40 bg-accent text-primary"
-                        :"border-border bg-card text-muted-foreground")}>
+                    className="min-h-8 w-auto">
                     {priorities.map(priority=><option key={priority} value={priority}>
                       {priorityLabel(priority)}
                     </option>)}

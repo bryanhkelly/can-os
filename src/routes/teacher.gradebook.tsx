@@ -398,7 +398,7 @@ function TeacherGradebookPage() {
            data-cell={`${rowIndex}:${colIndex}`}
            onKeyDown={event => onCellKeyDown(event, rowIndex, colIndex)}
            aria-label={`${student.displayName}, ${assessment.title}: ${label.text}${gradeable ? ". Open grading" : reviewable ? ". View grade" : ""}`}
-           className={`h-auto min-h-0 shrink-0 justify-start px-3 py-1 text-xs ${label.tone}`}
+           className="h-auto min-h-0 shrink-0 justify-start"
            onClick={() => {
             void navigate({search:{section:selected,assessment:assessment.id,student:student.studentProfileId}});
            }}

@@ -19,7 +19,7 @@ export function CurriculumPdfPicker({
     </p>
     <Input key={fileKey} type="file" accept=".pdf,application/pdf" disabled={busy || !enabled}
       onChange={event => onFileChange(event.currentTarget.files?.[0] ?? null)}
-      className="block w-full text-sm" aria-label="Supplemental PDF"/>
+      className="w-full" aria-label="Supplemental PDF"/>
     <Label className="flex items-start gap-2 text-xs">
       <Checkbox checked={rightsConfirmed} disabled={busy || !enabled}
         onChange={event => onRightsChange(event.currentTarget.checked)}/>

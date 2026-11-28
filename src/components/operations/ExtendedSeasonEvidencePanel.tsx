@@ -68,7 +68,7 @@ function ExtendedSeasonEvidenceWorkspace({ seasonId, onChange }: {
       Scheduled sessions must also have currently active, assigned onsite staff.
       Expired or superseded evidence blocks new registrations immediately.
     </p>
-    <Button variant="ghost" type="button" className="mt-2 text-xs underline" onClick={() => void load()} disabled={loading}>
+    <Button variant="ghost" size="sm" type="button" className="mt-2 underline" onClick={() => void load()} disabled={loading}>
       {loading ? "Refreshing…" : "Refresh evidence"}
     </Button>
     {error && <p role="alert" className="mt-2 text-xs">{error}</p>}

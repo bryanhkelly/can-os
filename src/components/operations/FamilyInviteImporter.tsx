@@ -202,7 +202,7 @@ export function FamilyInviteImporter({
           className="mt-2" />
       </Label>
       <Label className="mt-4 block text-sm font-semibold">Or upload CSV / text (up to 1 MB)
-        <Input type="file" disabled={awaitingVerification} accept=".csv,.txt,text/csv,text/plain" className="mt-2 block w-full text-sm font-normal"
+        <Input type="file" disabled={awaitingVerification} accept=".csv,.txt,text/csv,text/plain" className="mt-2 w-full"
           onChange={event => void loadFile(event.target.files?.[0])} />
       </Label>
       <div className="mt-5 grid gap-3 sm:grid-cols-3" aria-live="polite">
@@ -233,9 +233,9 @@ export function FamilyInviteImporter({
         </Label>
       </div>
       <p className="mt-3 text-xs text-muted-foreground">Email uses the approved CAN sender. Application links use the CAN access-mail service; pre-opening notices use the notification delivery service. A typed sender address cannot override either.</p>
-      <Button variant="default" type="button" disabled={awaitingVerification || !selectedProgram || busy || !parsed.contacts.length || tooMany || !subject.trim() || !introduction.trim()}
+      <Button variant="default" size="lg" type="button" disabled={awaitingVerification || !selectedProgram || busy || !parsed.contacts.length || tooMany || !subject.trim() || !introduction.trim()}
         onClick={() => { setPreview(true); setConfirmed(false); }}
-        className="mt-5 min-h-11  bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">Preview invitation</Button>
+        className="mt-5">Preview invitation</Button>
       {preview && <div className="mt-6  border p-5" aria-label="Invitation preview">
         <h3 className="font-semibold">Invitation preview · {parsed.contacts.length} families</h3>
         <p className="mt-2 font-semibold">{subject}</p>
@@ -245,7 +245,7 @@ export function FamilyInviteImporter({
           : `Each email includes a single-use, 10-minute link directly to ${selectedProgram?.name}\u0027s verified application.`}</p>
         <Label className="mt-5 flex items-start gap-2 text-sm"><Checkbox checked={confirmed} onChange={event => setConfirmed(event.target.checked)} />I reviewed the recipients and message and have a school-approved basis to contact these families.</Label>
         <Button variant="default" type="button" disabled={awaitingVerification || !selectedProgram || !confirmed || busy} onClick={() => void send()}
-          className="mt-4 min-h-11  bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">{busy ? "Saving and queueing…" : "Save and queue invitations"}</Button>
+          className="mt-4">{busy ? "Saving and queueing…" : "Save and queue invitations"}</Button>
       </div>}
     </>}
 
@@ -253,7 +253,7 @@ export function FamilyInviteImporter({
     <MutationFeedback state={{...mutation,retryRefresh:verifySavedBatch}} className="mt-3"
       pendingMessage="Updating invitation records…"/>
     {awaitingVerification && !mutation.refreshFailed && <Button variant="outline" type="button" disabled={busy}
-      onClick={()=>void verifySavedBatch()} className="mt-3  border px-3 py-2 text-sm font-semibold">
+      onClick={()=>void verifySavedBatch()} className="mt-3">
       Verify saved invitation batch
     </Button>}
     {result && <p role="status" className="mt-4  border p-3 text-sm">{result}</p>}
@@ -274,7 +274,7 @@ export function FamilyInviteImporter({
         <summary className="cursor-pointer text-sm font-semibold">{batch.subject} · {batch.programName} · {batch.purpose === "interest" ? "Pre-opening information" : "Applications"} · {batch.recipients.length} recipients</summary>
         <p className="mt-2 text-xs text-muted-foreground">Queued {new Date(batch.createdAt).toLocaleString()} · {progress.label}</p>
         {progress.canRetry && <Button variant="outline" type="button" disabled={busy || awaitingVerification} onClick={() => void retryFailed(batch.id)}
-          className="mt-3 min-h-11  border px-4 py-2 text-sm font-semibold disabled:opacity-50">
+          className="mt-3">
           {busy ? "Queueing retry…" : `Retry ${progress.failedRecipients} failed recipient${progress.failedRecipients === 1 ? "" : "s"}`}
         </Button>}
         <ul className="mt-3 space-y-2">{batch.recipients.map(recipient => <li key={recipient.email} className="flex flex-col gap-1 border-b pb-2 text-sm sm:flex-row sm:items-center sm:justify-between">

@@ -1,3 +1,4 @@
+import { Radio } from "@/components/ui/choice";
 import { WorkspaceNotice } from "@/components/workspace";
 import type { WebsiteContentReuseConsent } from "@/domain/site-local-content";
 
@@ -16,7 +17,7 @@ export function WebsiteContentConsentStep({
       <h3 id="website-consent-title" className="font-serif text-2xl">Build on what you've shared</h3>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">
         We can use what you've shared about your organization, story, programs,
-        and community to suggest website and outreach wording you can edit.
+        and community to suggest website and outreach wording you can edit. If you agree, Continue sends your Site identity, planned programs, audiences, experiences and saved Site Story to Gloo AI Studio for editorial processing. Leadership biographies, existing website copy and profile links are excluded from this automatic request.
       </p>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">
         You review and edit the content before it is shared or published.
@@ -26,17 +27,17 @@ export function WebsiteContentConsentStep({
     <fieldset className="space-y-3" disabled={disabled}>
       <legend className="text-sm font-semibold">May we use what you've shared to suggest content?</legend>
       <label className={"flex cursor-pointer items-start gap-3 border p-4 "+(value==="granted"?"border-primary bg-primary/5":"border-border")}>
-        <input className="mt-1 size-4 accent-primary" type="radio" name="website-content-reuse"
+        <Radio className="mt-1" name="website-content-reuse"
           checked={value==="granted"} onChange={()=>onChange("granted")} />
         <span className="space-y-1">
           <span className="block font-semibold">Yes, use my information</span>
           <span className="block text-sm text-muted-foreground">
-            Use the information I've shared to suggest website and outreach text I can review.
+            Save my choice and allow Gloo AI Studio to generate website and outreach text I can review.
           </span>
         </span>
       </label>
       <label className={"flex cursor-pointer items-start gap-3 border p-4 "+(value==="denied"?"border-primary bg-primary/5":"border-border")}>
-        <input className="mt-1 size-4 accent-primary" type="radio" name="website-content-reuse"
+        <Radio className="mt-1" name="website-content-reuse"
           checked={value==="denied"} onChange={()=>onChange("denied")} />
         <span className="space-y-1">
           <span className="block font-semibold">No, don't reuse my saved information</span>

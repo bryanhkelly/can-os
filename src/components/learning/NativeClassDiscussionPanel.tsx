@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { normalizeClientError } from "@/lib/client-error";
 import {
   getNativeClassDiscussions, submitNativeClassDiscussionMessage,
@@ -79,14 +80,14 @@ export function NativeClassDiscussionPanel({classEnrollmentId,classId}:Discussio
           <p className="mt-2 whitespace-pre-line text-sm">{message.body}</p>
         </li>)}
       </ol>
-      <label className="block space-y-2">
+      <Label className="block space-y-2">
         <span className="text-sm font-medium">Reply privately</span>
         <Textarea rows={4} maxLength={1500}
           placeholder={mode==="teacher"?"Respond to the student…":"Ask your teacher a Class question…"}
           value={drafts[thread.id]??""}
           disabled={!!busy}
           onChange={event=>setDrafts(previous=>({...previous,[thread.id]:event.target.value}))}/>
-      </label>
+      </Label>
       <Button type="button" disabled={!!busy||(drafts[thread.id]??"").trim().length<5}
         onClick={()=>void send(thread.id)}>
         {busy===thread.id?"Saving…":"Send private reply"}

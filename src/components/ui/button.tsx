@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { focusRingClasses } from "./control-styles";
 
 const buttonVariants = cva(
-  cn("inline-flex min-w-0 max-w-full shrink-0 items-center justify-center gap-2 whitespace-normal break-words text-center text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0", focusRingClasses),
+  cn("inline-flex min-w-0 max-w-full shrink-0 items-center justify-center gap-2 whitespace-normal break-words text-center text-sm font-semibold transition-colors disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0", focusRingClasses),
   {
     variants: {
       variant: {
@@ -15,12 +15,20 @@ const buttonVariants = cva(
         outline: "border border-border bg-card text-foreground hover:bg-muted",
         ghost: "text-foreground hover:bg-muted",
         destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+        "selection-chip": "border border-input bg-card text-foreground hover:bg-muted",
+        "selection-chip-selected": "border border-primary bg-accent text-primary hover:bg-accent",
+        "selection-chip-recommended": "border border-primary/60 bg-accent/50 text-primary hover:bg-accent",
+        "local-tab": "border-b-2 border-transparent text-muted-foreground hover:text-foreground",
+        "local-tab-selected": "border-b-2 border-primary text-primary",
       },
       size: {
         default: "min-h-10 px-4 py-2",
         sm: "min-h-9 px-3 text-xs",
         lg: "min-h-11 px-5",
         icon: "size-10",
+        "chip-compact": "min-h-7 px-2 py-1 text-xs font-medium",
+        "chip-standard": "min-h-9 px-3 py-1 text-sm font-medium",
+        tab: "min-h-12 px-4 py-3 text-sm",
       },
     },
     defaultVariants: { variant: "default", size: "default" },
@@ -36,12 +44,14 @@ export interface ButtonProps extends React.ComponentProps<"button">, VariantProp
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, type, loading = false, loadingLabel, disabled, children, ...props }, ref) => {
-    const classes = cn(buttonVariants({ variant, size }), className);
+    const inactive = disabled || loading;
+    const filled = !variant || variant === "default" || variant === "secondary" || variant === "destructive";
+    const classes = cn(buttonVariants({ variant, size }), className,
+      inactive && (filled ? "bg-muted text-muted-foreground hover:bg-muted" : "text-muted-foreground opacity-60"));
     // Radix Slot requires one element and doesn't confer native button
     // disabled semantics on an <a>. Give slotted actions the same pending
     // guard as native buttons, without emitting an invalid disabled attribute.
     if (asChild) {
-      const inactive = disabled || loading;
       // Radix Slot gives child props precedence. Apply disabled semantics
       // directly to the child so an existing tabIndex/aria-disabled or
       // capture callback cannot re-enable a pending navigation.
@@ -56,7 +66,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         onClickCapture: event => { event.preventDefault(); event.stopPropagation(); },
       }) : child;
       return <Slot ref={ref} {...props}
-        className={cn(classes, inactive && "pointer-events-none opacity-50")}
+        className={cn(classes, inactive && "pointer-events-none")}
         aria-busy={loading || props["aria-busy"] || undefined}
         aria-disabled={inactive || props["aria-disabled"] || undefined}
         tabIndex={inactive ? -1 : props.tabIndex}

@@ -16,12 +16,11 @@ export function CoachCaseloadList({
   return <section>
               <div className="space-y-3">
                 {students.map((student) => (
-                  <Button type="button" variant="ghost"
+                  <Button type="button" variant={selected === student.studentProfileId ? "secondary" : "outline"}
+                    aria-pressed={selected === student.studentProfileId}
                     key={student.studentProfileId}
                     onClick={() => onSelect(student.studentProfileId)}
-                    className={`w-full  border bg-card p-5 text-left hover:border-foreground/40 ${
-                      selected === student.studentProfileId ? "border-foreground" : "border-border"
-                    }`}
+                    className="h-auto w-full flex-col items-stretch text-left"
                   >
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
                       <h2 className="text-base font-semibold">{student.name}</h2>

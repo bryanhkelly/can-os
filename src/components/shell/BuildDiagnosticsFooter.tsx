@@ -85,7 +85,7 @@ export function BuildDiagnosticsFooter() {
     </div>
     <details className="mt-2 border-t border-border/70 pt-2 text-left"
       onToggle={event => { if (event.currentTarget.open) void checkServerRevision(); }}>
-      <summary className="mx-auto w-fit cursor-pointer rounded px-2 py-2 text-center font-medium text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+      <summary className="mx-auto w-fit cursor-pointer px-2 py-2 text-center font-medium text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
         Deployment diagnostics
       </summary>
       <dl className="mt-2 grid grid-cols-[minmax(0,1fr)] gap-3 border bg-card p-3 sm:grid-cols-[8rem_minmax(0,1fr)]">

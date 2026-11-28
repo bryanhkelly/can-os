@@ -415,7 +415,7 @@ export function OnsitePickupPanel({ date, onChanged }: {
         })}
       </div>
       <Button variant="ghost" type="button" onClick={() => void load()} disabled={!!busy}
-        className="mt-5 text-sm underline">Refresh pickup roster</Button>
+        className="mt-5 underline">Refresh pickup roster</Button>
     </>}
   </WorkspacePanel>;
 }

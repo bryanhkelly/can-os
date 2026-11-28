@@ -48,7 +48,7 @@ export function LaunchOrientationTask({ launch, busy, save }: {
   }}>
     <div className="flex flex-wrap items-center justify-between gap-3">
       <p className="text-sm font-semibold">Schedule the canonical orientation event</p>
-      <Button type="button" variant="ghost" onClick={useRecommendation} className="text-sm font-semibold underline">
+      <Button type="button" variant="ghost" onClick={useRecommendation} className="underline">
         Use a suggested 45-minute time
       </Button>
     </div>
