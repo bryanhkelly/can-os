@@ -517,3 +517,24 @@ test('actual browser SDK projection retains all operations while canonical write
   assert.ok(writes>0);
  });
 });
+
+test('campaign management contracts keep recipient consent and provider credentials separate',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const [route,method] of [["/api/v1/engagement-campaigns/workspace","GET"],["/api/v1/campaign-recipient-lists","POST"],["/api/v1/engagement-campaigns","POST"],["/api/v1/engagement-campaign-cancellations","POST"],["/api/v1/campaign-recipient-lists/members","GET"],["/api/v1/campaign-recipient-list-member-decisions","POST"]]){
+   const op=document.paths[route][method.toLowerCase()];
+   assert.ok(op.security);assert.ok(op.responses['403']);
+   const response=await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);
+   assert.equal(response.headers.get('cache-control'),'no-store');
+  }
+  const schema=document.paths['/api/v1/engagement-campaigns/workspace'].get.responses['200'].content['application/json'].schema;
+  assert.deepEqual(Object.keys(schema.properties).sort(),['campaigns','lists','senderIssues','senderLabel','senderReady']);
+  assert.ok(!JSON.stringify(schema).includes('apiKey'));
+ });
+ const c=require('../dist/campaign.contracts');
+ const id='00000000-0000-4000-8000-000000000001';
+ assert.deepEqual(c.membersQuery.parse({engagementId:id,linkId:id,listId:id,offset:'50'}).offset,50);
+ for(const offset of ['','-1','1001','1.5','1e2'])assert.equal(c.membersQuery.safeParse({engagementId:id,linkId:id,listId:id,offset}).success,false);
+ assert.equal(c.membersQuery.safeParse({engagementId:id,linkId:id,listId:id,offset:'0',ownerScope:'forged'}).success,false);
+ assert.equal(c.results.workspace.safeParse({lists:[],campaigns:[],senderReady:true,senderIssues:[],senderLabel:'Organization',apiKey:'forbidden'}).success,false);
+});

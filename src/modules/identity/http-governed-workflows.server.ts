@@ -1,3 +1,6 @@
+import {parseCommandInput} from "@/domain/command-input";
+import * as campaign from "@/modules/communication/engagement-campaigns-service.server";
+import * as campaignInput from "@/modules/communication/engagement-campaigns.inputs";
 import {getIdentityContext} from "./command-context.server";
 import {getCanonicalCommandContext} from "./canonical-command-context.server";
 import {getBlueprintPlanningContext} from "@/modules/blueprints/verified-site-planning.server";
@@ -54,6 +57,12 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
  const context=await (mode==="planning"?getBlueprintPlanningContext(request):mode==="canonical"?getCanonicalCommandContext(request):mode==="learner"?getInstructionalLearnerContext(request):getIdentityContext(request));
  if(!context.actorPersonId)throw new AuthorizationError("verified Person");
  return {
+  readEngagementCampaignWorkspace:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Campaign read context");const result=await campaign.readEngagementCampaignWorkspace(request,parseCommandInput(campaignInput.readEngagementCampaignWorkspaceInput,raw));return {...result,campaigns:result.campaigns.map(row=>({...row,scheduled_at:new Date(row.scheduled_at).toISOString(),cancelled_at:row.cancelled_at===null?null:new Date(row.cancelled_at).toISOString()}))};},
+  saveCampaignRecipientList:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Campaign command context");const result=await campaign.saveCampaignRecipientList(request,parseCommandInput(campaignInput.saveCampaignRecipientListInput,raw));return result;},
+  queueEngagementCampaign:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Campaign command context");const result=await campaign.queueEngagementCampaign(request,parseCommandInput(campaignInput.queueEngagementCampaignInput,raw));return result;},
+  cancelEngagementCampaign:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Campaign command context");const result=await campaign.cancelEngagementCampaign(request,parseCommandInput(campaignInput.cancelEngagementCampaignInput,raw));return result;},
+  readCampaignListMembers:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Campaign read context");const result=await campaign.readCampaignListMembers(request,parseCommandInput(campaignInput.readCampaignListMembersInput,raw));return {...result,members:result.members.map(row=>({...row,consent_at:new Date(row.consent_at).toISOString()}))};},
+  updateCampaignListMember:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Campaign command context");const result=await campaign.updateCampaignListMember(request,parseCommandInput(campaignInput.updateCampaignListMemberInput,raw));return result;},
   getStaffLaunchWorkspace:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Launch workspace context");return getStaffLaunchWorkspaceService(request);},
   getLaunchStudioDraft:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Launch workspace context");return getLaunchStudioDraftService(request,raw);},
   saveLaunchStudioDraft:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Launch workspace context");return saveLaunchStudioDraftService(request,raw);},

@@ -1,3 +1,4 @@
+import {DomainError} from "@/domain/errors";
 import type { CampaignDeliveryMetrics } from "@/domain/campaign-metrics";
 import type {
   readEngagementCampaignWorkspaceInput,
@@ -50,15 +51,15 @@ export const readEngagementCampaignWorkspace = async (request:Request,data: z.ou
 export const saveCampaignRecipientList = async (request:Request,data: z.output<typeof saveCampaignRecipientListInput>) =>{
  const s=await scope(request,data.engagementId);
  const parsed=parseCampaignRecipients(data.raw);
- if(data.name.startsWith("__direct__"))throw new Error("Reserved list name.");
- if(!parsed.recipients.length||parsed.invalid.length||parsed.tooMany)throw new Error("Enter valid, consented addresses within the campaign limit.");
+ if(data.name.startsWith("__direct__"))throw new DomainError("VALIDATION_FAILED","Reserved list name.");
+ if(!parsed.recipients.length||parsed.invalid.length||parsed.tooMany)throw new DomainError("VALIDATION_FAILED","Enter valid, consented addresses within the campaign limit.");
  return db.transaction(async tx=>{
  const [list]=await campaignRows<{id:string}>(tx,sql`INSERT INTO public.campaign_recipient_lists(owner_scope,sender_scope,name,created_by_person_id)
  VALUES(${s.ownerScope},${s.senderScope},${data.name},${s.actor.actorPersonId}) ON CONFLICT(owner_scope,name) DO UPDATE SET name=excluded.name RETURNING id`);
  if(!list)throw new Error("Recipient list write returned no record.");
  const addresses = sql`ARRAY[${sql.join(parsed.recipients.map(email=>sql`${email}`),sql`,`)}]::text[]`;
  const [count]=await campaignRows<{count:number}>(tx,sql`SELECT count(*)::int count FROM public.campaign_list_members WHERE list_id=${list.id} AND NOT(email=ANY(${addresses}))`);
- if((count?.count??0)+parsed.recipients.length>campaignRecipientLimit)throw new Error("List exceeds the current campaign limit.");
+ if((count?.count??0)+parsed.recipients.length>campaignRecipientLimit)throw new DomainError("VALIDATION_FAILED","List exceeds the current campaign limit.");
  await tx.execute(sql`INSERT INTO public.campaign_contacts(owner_scope,email,consent_source,consent_by_person_id)
  SELECT ${s.ownerScope},email,${data.consentSource},${s.actor.actorPersonId}::uuid FROM unnest(${addresses}) AS entries(email)
  ON CONFLICT(owner_scope,email) DO NOTHING`);
@@ -69,23 +70,23 @@ export const saveCampaignRecipientList = async (request:Request,data: z.output<t
  };
 export const queueEngagementCampaign = async (request:Request,data: z.output<typeof queueEngagementCampaignInput>) =>{
  const s=await scope(request,data.engagementId);
- const sender=(await readCampaignSenderReadiness(s.record.organizationId??null)).sender;if(!sender)throw new Error("Campaign sender and postal address are not configured.");
+ const sender=(await readCampaignSenderReadiness(s.record.organizationId??null)).sender;if(!sender)throw new DomainError("UNAVAILABLE","Campaign sender and postal address are not configured.");
  const draft=await readAuthorizedEngagementInvitation(data.engagementId,data.linkId,s.actor);
- const scheduledAt=new Date(data.scheduledAt);if(scheduledAt.getTime()>Date.now()+90*86400000)throw new Error("Schedule within 90 days.");
+ const scheduledAt=new Date(data.scheduledAt);if(scheduledAt.getTime()>Date.now()+90*86400000)throw new DomainError("VALIDATION_FAILED","Schedule within 90 days.");
  const queued=await db.transaction(async tx=>{
  // Serialize on the same identity as the unique constraint, even when two
  // requests reuse an idempotency key with different recipient lists.
  const requestLock=JSON.stringify(["engagement-campaign",s.ownerScope,data.requestId]);
  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${requestLock},0))`);
  const direct="raw" in data?parseCampaignRecipients(data.raw):null;
- if(direct&&(!direct.recipients.length||direct.invalid.length||direct.tooMany))throw new Error("Enter valid, consented addresses within the campaign limit.");
+ if(direct&&(!direct.recipients.length||direct.invalid.length||direct.tooMany))throw new DomainError("VALIDATION_FAILED","Enter valid, consented addresses within the campaign limit.");
  const [existing]=await campaignRows<{id:string;list_id:string;link_id:string;engagement_id:string;scheduled_at:string|Date}>(tx,sql`SELECT id,list_id,link_id,engagement_id,scheduled_at FROM public.engagement_campaigns WHERE owner_scope=${s.ownerScope} AND request_id=${data.requestId}`);
  if(existing){
-  if(existing.link_id!==data.linkId||existing.engagement_id!==data.engagementId||new Date(existing.scheduled_at).getTime()!==scheduledAt.getTime())throw new Error("Request already used.");
-  if("listId" in data){if(existing.list_id!==data.listId)throw new Error("Request already used.");}
+  if(existing.link_id!==data.linkId||existing.engagement_id!==data.engagementId||new Date(existing.scheduled_at).getTime()!==scheduledAt.getTime())throw new DomainError("CONFLICT","Request already used.");
+  if("listId" in data){if(existing.list_id!==data.listId)throw new DomainError("CONFLICT","Request already used.");}
   else{
    const members=await campaignRows<{email:string}>(tx,sql`SELECT email FROM public.campaign_deliveries WHERE campaign_id=${existing.id} ORDER BY email`);
-   if(JSON.stringify(members.map(m=>m.email).sort())!==JSON.stringify([...direct!.recipients].sort()))throw new Error("Request already used.");
+   if(JSON.stringify(members.map(m=>m.email).sort())!==JSON.stringify([...direct!.recipients].sort()))throw new DomainError("CONFLICT","Request already used.");
   }
   return {id:existing.id};
  }
@@ -104,7 +105,7 @@ export const queueEngagementCampaign = async (request:Request,data: z.output<typ
   await tx.execute(sql`INSERT INTO public.campaign_list_members(owner_scope,list_id,email)
    SELECT ${s.ownerScope},${list.id}::uuid,email FROM unnest(${addresses}) AS entries(email)`);
  }
- if(!list)throw new Error("Recipient list unavailable.");
+ if(!list)throw new DomainError("UNAVAILABLE","Recipient list unavailable.");
  const [campaign]=await campaignRows<{id:string}>(tx,sql`INSERT INTO public.engagement_campaigns(owner_scope,sender_scope,engagement_id,link_id,list_id,request_id,subject,body,public_url,sender_from,sender_address,sender_version_id,created_by_person_id,scheduled_at)
  VALUES(${s.ownerScope},${s.senderScope},${data.engagementId},${data.linkId},${list.id},${data.requestId},${draft.subject},${draft.body+"\n\nInvited by "+s.senderLabel},${draft.url},${sender.from},${sender.address},${sender.versionId},${s.actor.actorPersonId},${data.scheduledAt}::timestamptz) RETURNING id`);
  if(!campaign)throw new Error("Campaign write returned no record.");
@@ -112,7 +113,7 @@ export const queueEngagementCampaign = async (request:Request,data: z.output<typ
  SELECT m.owner_scope,${campaign.id},m.email,CASE WHEN s.email IS NULL THEN 'pending' ELSE 'suppressed' END,${data.scheduledAt}::timestamptz
  FROM public.campaign_list_members m LEFT JOIN public.campaign_suppressions s ON s.sender_scope=${s.senderScope} AND s.email=m.email
  WHERE m.owner_scope=${s.ownerScope} AND m.list_id=${list.id} RETURNING id`);
- if(!inserted.length||inserted.length>campaignRecipientLimit)throw new Error("Recipient list is empty or exceeds the campaign limit.");
+ if(!inserted.length||inserted.length>campaignRecipientLimit)throw new DomainError("VALIDATION_FAILED","Recipient list is empty or exceeds the campaign limit.");
  if(s.record.ownerKind==="site"&&s.record.siteId&&s.record.organizationId)
    await emitReportableChange(tx,{eventType:EventTypes.SiteCampaignQueued,sourceId:campaign.id,sourceVersion:"queued",occurredAt:new Date(),actorPersonId:s.actor.actorPersonId,dimensions:{organizationId:s.record.organizationId,siteId:s.record.siteId},payload:{engagementId:data.engagementId,linkId:data.linkId,recipientCount:inserted.length,scheduledAt:scheduledAt.toISOString()}});
  return {id:campaign.id};
@@ -148,12 +149,12 @@ export const readCampaignListMembers = async (request:Request,data: z.output<typ
 export const updateCampaignListMember = async (request:Request,data: z.output<typeof updateCampaignListMemberInput>) =>{
  const s=await scope(request,data.engagementId);
  const parsed=parseCampaignRecipients(data.email);
- if(parsed.invalid.length||parsed.recipients.length!==1)throw new Error("Invalid member.");
+ if(parsed.invalid.length||parsed.recipients.length!==1)throw new DomainError("VALIDATION_FAILED","Invalid member.");
  const email=parsed.recipients[0];
  return db.transaction(async tx=>{
  const [list]=await campaignRows<{id:string}>(tx,sql`SELECT id FROM public.campaign_recipient_lists WHERE id=${data.listId}
  AND owner_scope=${s.ownerScope} AND sender_scope=${s.senderScope} FOR UPDATE`);
- if(!list)throw new Error("Recipient list unavailable.");
+ if(!list)throw new DomainError("UNAVAILABLE","Recipient list unavailable.");
  const [member]=await campaignRows<{email:string}>(tx,sql`SELECT email FROM public.campaign_list_members
  WHERE owner_scope=${s.ownerScope} AND list_id=${list.id} AND email=${email}`);
  if(!member)return {changed:false};
