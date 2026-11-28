@@ -29,6 +29,8 @@ const modules={
   familyApplications:"/src/modules/enrollment/guardian-family-applications.functions.ts",
   familyAttendance:"/src/modules/attendance/onsite-attendance-workflow.functions.ts",
   familyNative:"/src/modules/classes/native-class-guardian-enrollment.functions.ts",
+  guardianReview:"/src/modules/classes/guardian-minor-review.functions.ts",
+  classApproval:"/src/modules/classes/native-class-approvals.functions.ts",
 } as const;
 export async function pilotRpcPage(context:BrowserContext):Promise<Page>{
   const page=await context.newPage();
