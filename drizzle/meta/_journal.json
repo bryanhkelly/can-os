@@ -960,6 +960,13 @@
       "when": 1795462030000,
       "tag": "0136_shared_synthetic_founder_credentials",
       "breakpoints": true
+    },
+    {
+      "idx": 137,
+      "version": "7",
+      "when": 1795462031000,
+      "tag": "0137_restricted_staff_owner_delegation_parity",
+      "breakpoints": true
     }
   ]
 }
