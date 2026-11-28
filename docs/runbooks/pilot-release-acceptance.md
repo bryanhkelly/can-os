@@ -187,3 +187,23 @@ The canonical 22-assertion SQL regression also passes on the migrated branch wit
 **Data boundary:** this branch is a production-derived database clone, not a synthetic-only database. Keep it private, restrict access to authorized operators, use fresh branch-only credentials and secrets, and do not expose copied real accounts, data, sessions or media to QA testers. Do not deploy publicly or send real delivery traffic. A sanitized/schema-only QA environment or formal reviewed de-identification process is still required before broad tester access. No production row was changed during this work. New QA Personas must use independently verified controlled accounts and the standard identity-review flow; never reuse copied credentials or reviews.
 
 Runtime execution, actual R2 access, approved independent reviews and a full HTTP/browser journey remain outstanding.
+
+
+### Executive acceptance gate — November 27
+
+The provider HTTP test already asserts the authorized provider learning-outcome response against canonical database rows. It does not verify a national executive report, and the current report catalog marks `network-impact` as `not_available`; the network setup service returns `executionAvailable:false`. Do not mark national reporting accepted after the provider test.
+
+```sh
+npm run qa:pilot -- executive
+```
+
+The new count-only diagnostic independently attests migration parity, queries only branch-tagged rehearsal organizations/people, and reports enrollment and executive blockers separately. Its SQL was executed against the replacement branch: one tagged draft author Person, zero verified accounts/grants/adult reviews/verified identity documents/current sessions, zero published trainings/active Classes/open releases/registrations/course attempts/completion decisions, zero tagged denomination HQs, approved reporting memberships, current host grant records and accepted relationship records. Full Node execution remains unverified. The diagnostic intentionally exits blocked until a real governed executive report exists.
+
+Remaining work:
+1. Local private runtime with independent QA secrets, restricted auth connection, controlled test mailbox or approved email transport, isolated R2 and actual reviewed identity/media evidence. Existing access-mail outbox supports only .test recipients in APP_ENV=test/NODE_ENV=test; do not disable real authentication policies or expose outbox tokens, and do not use copied production accounts from the cloned database. The current pilot runner lacks an interactive provisioning command/outbox configuration; the HTTP test assumes pre-existing sessions.
+2. Provision the initial distinct learner, negative-control learner and provider plus independent authorized reviewers; publish the seven-lesson training, assessments, completion policy, campaign, Class and Go link via existing workflows. Verify provider results after the first HTTP journey, then use a distinct fresh fixture for browser acceptance and a dedicated multi-learner cohort acceptance scenario.
+3. Provision a branch-tagged synthetic HQ with separately authorized direct recipient/host actors and independently reviewed reporting agreements. Reuse governed reporting source contracts, canonical attribution and bottom-up relationship scope; no broad host grants substituted for narrower consent, no cross-tenant raw facts or copying provider dashboard totals. Existing pure relationship registration projection covers four count metrics; its source adapter, trusted disclosure policy and external endpoint are not complete. Add permitted learning outcome/feedback/engagement measures only through the versioned metric policy.
+4. Implement governed executive aggregate query and V6.1 reporting surface with explicit source reconciliation, distinct-person rollups, period/metric/permission definitions, denial, revocation, and disclosure tests. Five synthetic learners are appropriate for an internal private QA check, not public release: the current publication-safe helper defaults to ten distinct people and protects complementary cells too. Never lower the production threshold to make the demo pass. Synthetic data stays separate from real network totals; public-impact acceptance requires independently approved disclosure-safe fixtures.
+5. Verify actual browser rendering with an authorized HQ reader and denial for unrelated readers; verify suppression for small cells, duplicate-tag deduplication and metric totals against the same canonical facts. Distinguish zero from unavailable/suppressed. No claim of public report readiness until these tests pass.
+
+Cloudflare/R2 connector discovery returned no matching plugin; configuration and media operations remain unverified.
