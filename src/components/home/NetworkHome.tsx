@@ -1,4 +1,6 @@
 import {ReportDocumentView} from "@/components/workspace/report-document";
+import {reportDefinitionId} from "@/domain/report-catalog";
+import {summarizeNetworkOperations} from "@/domain/network-operations-overview";
 import {NetworkReportingReadinessPanel} from "@/components/reports/NetworkReportingReadinessPanel";
 import { UniversalEngagementPublisher } from "@/components/launch-studio/UniversalEngagementPublisher";
 import { SiteEngagementLibrary } from "@/components/launch-studio/SiteEngagementLibrary";
@@ -44,6 +46,7 @@ function isValidTimezone(value: string) {
 
 function NetworkSites({ data }: { data: NetworkData }) {
   const router = useRouter();
+  const overview=summarizeNetworkOperations(data.sites,data.affiliations);
   const engagementSurface:OwnerEngagementSurface={owner:{kind:"organization",organizationId:data.organization.id},sites:data.sites};
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
@@ -86,14 +89,14 @@ function NetworkSites({ data }: { data: NetworkData }) {
     actions={<><a href="#network-create">Add an HQ-operated location →</a><Link to="/profiles">My profile →</Link></>}>
     <WorkspacePanel id="network-executive" title="Network executive dashboard"
       description="Live operating measures from your authorized headquarters workspace.">
-      <ReportDocumentView report={{version:1,definitionId:"network-operations-overview-v1",
+      <ReportDocumentView report={{version:1,definitionId:reportDefinitionId("network-operations-overview"),
         title:"Network operations",scopeLabel:data.organization.name,
         basis:"Current authorized HQ locations and Site affiliation records. These are institutional counts, not learning outcomes.",
         blocks:[{id:"operations",kind:"metrics",items:[
-          {id:"hq-locations",label:"Directly operated locations",value:data.sites.length,hint:"Sites owned by headquarters"},
-          {id:"affiliated-sites",label:"Approved Site affiliations",value:data.affiliations.filter(entry=>entry.status==="approved").length,hint:"Approved affiliation records; not reporting consent"},
-          {id:"pending-affiliations",label:"Pending affiliation requests",value:data.affiliations.filter(entry=>entry.status==="pending").length,hint:"Requests awaiting decision"},
-          {id:"affiliate-organizations",label:"Affiliated organizations",value:new Set(data.affiliations.filter(entry=>entry.status==="approved").map(entry=>entry.siteOrganizationId)).size,hint:"Distinct organizations with approved Site affiliations"},
+          {id:"hq-locations",label:"Directly operated locations",value:overview.ownedSites,hint:"Distinct Site records owned by headquarters"},
+          {id:"affiliated-sites",label:"Approved Site affiliations",value:overview.approvedSites,hint:"Distinct Sites with approved affiliations; not reporting consent"},
+          {id:"pending-affiliations",label:"Pending affiliation requests",value:overview.pendingRequests,hint:"Distinct requests awaiting decision"},
+          {id:"affiliate-organizations",label:"Affiliated organizations",value:overview.affiliatedOrganizations,hint:"Distinct organizations with approved Site affiliations"},
         ]}]}}/>
     </WorkspacePanel>
     <NetworkReportingReadinessPanel/>
