@@ -19,7 +19,7 @@ import {
   siteEnvironmentV61Schema, siteHostingV61Schema, siteStoryV61Schema,
   type SiteEnvironmentV61, type SiteHostingV61, type SiteStoryV61,
 } from "@/domain/site-information-v61";
-import { saveSiteInformationV61 } from "@/modules/programs/site-information-v61.functions";
+import { saveSiteInformation } from "@/lib/api/browser-site-planning";
 import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
 import { LaunchGuidancePanels } from "./LaunchGuidancePanels";
 import { siteInformationGuideV61 } from "@/domain/launch-site-guide-v61";
@@ -203,17 +203,17 @@ export function EstablishSiteInformationV61({ siteId, responsibleOrganizationNam
   async function persist(section: "identity" | "hosting" | "environment" | "story",
     draft: SiteIdentityV61 | SiteHostingV61 | SiteEnvironmentV61 | SiteStoryV61) {
     const data = section === "identity"
-      ? { siteId, expectedRevision: revision.current, section, identity: draft as SiteIdentityV61 }
+      ? { expectedRevision: revision.current, section, identity: draft as SiteIdentityV61 }
       : section === "hosting"
-      ? { siteId, expectedRevision: revision.current, section, host: draft as SiteHostingV61 }
+      ? { expectedRevision: revision.current, section, host: draft as SiteHostingV61 }
       : section === "environment"
-        ? { siteId, expectedRevision: revision.current, section, environment: draft as SiteEnvironmentV61 }
-        : { siteId, expectedRevision: revision.current, section, story: draft as SiteStoryV61 };
+        ? { expectedRevision: revision.current, section, environment: draft as SiteEnvironmentV61 }
+        : { expectedRevision: revision.current, section, story: draft as SiteStoryV61 };
     // Discriminant is narrowed at the API boundary; the server revalidates all fields.
     // Even a rejected/failed response may hide a committed mutation. Reconcile first.
     saveAttempted.current = true;
-    const result = await saveSiteInformationV61({ data });
-    if (!result.revision) throw new Error("Save returned no Site revision. Reload before retrying.");
+    const result = await saveSiteInformation(siteId, data);
+    if (result.siteId !== siteId || !result.revision) throw new Error("Save returned no matching Site revision. Reload before retrying.");
     revision.current = result.revision;
   }
   async function saveIdentity(required: boolean) {
