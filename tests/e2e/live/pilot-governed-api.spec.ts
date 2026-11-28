@@ -31,6 +31,11 @@ const cohortSite=z.object({classId:uuid,siteId:uuid,ownerOrganizationId:uuid,cla
 const lessonInstruction=z.object({lessonId:uuid,assetVersionId:uuid,prompt:z.string().trim().min(5).max(1000),
   choices:z.array(z.string().trim().min(1).max(200)).min(2).max(8)}).strict();
 const scenario=z.discriminatedUnion("stage",[
+  z.object({stage:z.literal("prepare-class"),operator:actor,siteId:uuid,offeringVersionId:uuid,
+    courseVersionId:uuid,deploymentId:uuid,title:z.string().trim().min(3).max(200),
+    deliveryMode:z.enum(["self_paced","facilitated"]),capacity:z.number().int().min(2).max(100),
+    consentVersion:z.string().trim().min(3).max(80),consentText:z.string().trim().min(25).max(10000)}).strict(),
+  z.object({stage:z.literal("publish-courses"),publisher:actor,offering:manifest}).strict(),
   z.object({stage:z.literal("enroll-cohort"),sites:z.array(cohortSite).length(2)}).strict(),
   z.object({stage:z.literal("review-release"),reviewer:actor,author:actor,offering:manifest,
     decisions:z.array(reviewDecision).min(1).max(5)}).strict(),
@@ -137,7 +142,51 @@ test("governed pilot API stage",async({browser},info)=>{
   expect(identity).toEqual({project:"sweet-hall-62441909",branch});
   let evidence:Record<string,unknown>={stage:scenario.stage,revision:process.env.CAN_RELEASE_SOURCE_SHA};
   try{
-    if(scenario.stage==="review-release"){
+    if(scenario.stage==="prepare-class"){
+      const {operator,siteId,offeringVersionId,courseVersionId,deploymentId,title,deliveryMode,capacity,consentVersion,consentText}=scenario;
+      const page=await openActor(browser,operator,contexts);
+      // Discover the authorized adoption via the exact same API used by the
+      // Class authoring UI; no SQL-generated or inferred adoption is accepted.
+      const options=await rpc<{items:{deploymentId:string;adoptionId:string;offeringVersionId:string;courseVersionId:string;
+        operatingOrganizationId:string;siteOptions:{id:string;allowedDeliveryModes:string[]}[]}[];nextCursor:number|null}>(
+          page,"classes","getUnifiedClassCourseOptions",{search:"",cursor:0,siteId,offeringVersionId,courseVersionIds:[courseVersionId]});
+      const matches=options.items.filter(o=>o.deploymentId===deploymentId&&o.offeringVersionId===offeringVersionId&&
+        o.courseVersionId===courseVersionId&&o.operatingOrganizationId===operator.organizationId&&
+        o.siteOptions.some(s=>s.id===siteId&&s.allowedDeliveryModes.includes(deliveryMode)));
+      expect(matches).toHaveLength(1);
+      expect(options.nextCursor).toBeNull();
+      const definition={deploymentId,adoptionId:matches[0]!.adoptionId,offeringVersionId,courseVersionId,
+        operatingOrganizationId:operator.organizationId,siteId,title,deliveryMode,capacity};
+      const terms={visibility:"unlisted",enrollmentMethods:["self"],opensAt:null,closesAt:null,capacity,
+        allowedCreditModes:["not_applicable"],consentVersion,consentText};
+      const [existing]=await sql`SELECT count(*)::int AS count FROM public.classes WHERE operating_organization_id=${operator.organizationId}::uuid
+        AND site_id=${siteId}::uuid AND title=${title}`;
+      expect(existing?.count).toBe(0); // Fresh Class; ambiguous retries must be reconciled.
+      const created=await rpc<{classId:string;classOfferingVersionId:string;status:string}>(page,"classes","createUnifiedClassDraft",{definition,terms});
+      expect(created.status).toBe("draft");uuid.parse(created.classId);uuid.parse(created.classOfferingVersionId);
+      expect(await rpc(page,"classes","activateUnifiedClass",{classId:created.classId})).toMatchObject({classId:created.classId});
+      const target={classId:created.classId,classOfferingVersionId:created.classOfferingVersionId};
+      expect(await rpc(page,"classes","publishUnifiedClassOffering",target)).toMatchObject({...target,state:"published",alreadyPublished:false});
+      expect(await rpc(page,"classes","publishUnifiedClassOffering",target)).toMatchObject({...target,state:"published",alreadyPublished:true});
+      await classScope(created.classId,siteId,operator.organizationId);
+      const [persisted]=await sql`SELECT v.state,c.adoption_id::text AS adoption FROM public.class_offering_versions v
+        JOIN public.classes c ON c.id=v.class_id WHERE v.id=${created.classOfferingVersionId}::uuid AND c.id=${created.classId}::uuid`;
+      expect(persisted).toEqual({state:"published",adoption:definition.adoptionId});
+      evidence={...evidence,classId:created.classId,classOfferingVersionId:created.classOfferingVersionId,classesPublished:1};
+    }else if(scenario.stage==="publish-courses"){
+      const {publisher,offering}=scenario;
+      const [owned]=await sql`SELECT count(*)::int AS count FROM public.offering_versions v JOIN public.offerings o ON o.id=v.offering_id
+        WHERE v.id=${offering.offeringVersionId}::uuid AND o.publisher_organization_id=${publisher.organizationId}::uuid AND v.lifecycle='draft'`;
+      expect(owned?.count).toBe(1);
+      const page=await openActor(browser,publisher,contexts);
+      await rpc(page,"release","publishNativeOfferingCourses",offering);
+      const [published]=await sql`SELECT count(*)::int AS total,count(*) FILTER(WHERE cv.lifecycle='published')::int AS published
+        FROM public.offering_courses oc JOIN public.course_versions cv ON cv.id=oc.course_version_id WHERE oc.offering_version_id=${offering.offeringVersionId}::uuid`;
+      expect(published?.total).toBeGreaterThan(0);expect(published?.published).toBe(published?.total);
+      const [draft]=await sql`SELECT lifecycle FROM public.offering_versions WHERE id=${offering.offeringVersionId}::uuid`;
+      expect(draft?.lifecycle).toBe("draft");
+      evidence={...evidence,coursesPublished:published?.published,offeringPublished:false};
+    }else if(scenario.stage==="review-release"){
       const {reviewer,author,offering,decisions}=scenario;
       expect(reviewer.organizationId).toBe(author.organizationId);
       expect(reviewer.email).not.toBe(author.email);

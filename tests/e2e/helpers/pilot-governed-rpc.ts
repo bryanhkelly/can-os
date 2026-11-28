@@ -2,6 +2,8 @@ import {type BrowserContext,type Page} from "@playwright/test";
 const origin="http://localhost:5183";
 const modules={
   release:"/src/modules/learning/native-offering-release.functions.ts",
+  classes:"/src/modules/classes/unified-class.functions.ts",
+  adoption:"/src/modules/programs/native-offering-adoption-review.functions.ts",
   registration:"/src/modules/enrollment/noncredit-self-enrollment.functions.ts",
   enrollment:"/src/modules/classes/native-class-enrollment.functions.ts",
   onboarding:"/src/modules/classes/native-class-reviewed-onboarding.functions.ts",

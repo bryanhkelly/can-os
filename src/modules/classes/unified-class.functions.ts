@@ -240,7 +240,7 @@ export const publishUnifiedClassOffering = createServerFn({ method:"POST" })
         .where(and(eq(canonicalClassOfferingVersions.id,data.classOfferingVersionId),
           eq(canonicalClassOfferingVersions.classId,instance.id)))
         .for("update").limit(1);
-      if(!terms || terms.state!=="draft") throw new AuthorizationError("draft Class Offering version");
+      if(!terms || !["draft","published"].includes(terms.state)) throw new AuthorizationError("draft or currently published Class Offering version");
       // WS2/WS5 integration: only working and independently authorized enrollment
       // methods/credit modes may be published, even when the UI is bypassed.
       // This is a locked, authoritative server check before any publication write.
@@ -279,6 +279,13 @@ export const publishUnifiedClassOffering = createServerFn({ method:"POST" })
       }
       const now=new Date();
       await assertCurrentCanonicalStaffForMutation(tx,getRequest(),operator.actor);
+      // A network retry after a committed response loss must not emit another
+      // publication event, change timestamps or reopen a closed Offering.
+      // All current authority and operational-term checks above still apply.
+      if(terms.state==="published"){
+        if(instance.state!=="active")throw new AuthorizationError("current active published Class");
+        return {classId:instance.id,classOfferingVersionId:terms.id,state:"published" as const,alreadyPublished:true};
+      }
       await tx.update(canonicalClassOfferingVersions)
         .set({state:"published",publishedAt:now})
         .where(eq(canonicalClassOfferingVersions.id,terms.id));
@@ -296,7 +303,7 @@ export const publishUnifiedClassOffering = createServerFn({ method:"POST" })
         actorPersonId:operator.actor.actorPersonId!,
         payload:{classOfferingVersionId:terms.id,organizationId:operator.organizationId},
       });
-      return {classId:instance.id,classOfferingVersionId:terms.id,state:"published" as const};
+      return {classId:instance.id,classOfferingVersionId:terms.id,state:"published" as const,alreadyPublished:false};
     });
   });
 
