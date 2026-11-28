@@ -42,6 +42,7 @@ import {updateLaunchSiteAddressService,updateLaunchSiteContactService,updateLaun
 import {renameSitePublicIdentityService,reserveSitePublicationAddressService,setSitePublicationStatusService,setAcademicProgramMarketingStatusService} from "@/modules/sites/site-publication-commands.server";
 import {createSiteGoLinkService,listSiteGoLinksPageService,listAvailableGoDestinationsService,inspectSavedGoLinkService,setSiteGoLinkPausedService,revokeSiteGoLinkService} from "@/modules/engagement/site-go-link-management.server";
 import {getPartnerWebsitePreviewViewService,previewChurchWebsiteDraftService,saveSiteWebsiteAndBrandService,restoreChurchWebsiteContentService,prepareSchoolWebsiteService} from "@/modules/sites/site-website-commands.server";
+import {listSitePreviewSharesService,createSitePreviewShareService,setSitePreviewSharePausedService,revokeSitePreviewShareService} from "@/modules/sites/site-preview-sharing.server";
 export type WorkflowMode="planning"|"canonical"|"can"|"learner";
 /** Existing independent native reviewer credentials remain distinct from CAN.
  * No fallback, new role, token or grant is manufactured by this adapter. */
@@ -50,6 +51,10 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
  const context=await (mode==="planning"?getBlueprintPlanningContext(request):mode==="canonical"?getCanonicalCommandContext(request):mode==="learner"?getInstructionalLearnerContext(request):getIdentityContext(request));
  if(!context.actorPersonId)throw new AuthorizationError("verified Person");
  return {
+  listSitePreviewShares:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Site preview sharing context");return listSitePreviewSharesService(request,raw);},
+  createSitePreviewShare:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Site preview sharing context");return createSitePreviewShareService(request,raw);},
+  setSitePreviewSharePaused:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Site preview sharing context");return setSitePreviewSharePausedService(request,raw);},
+  revokeSitePreviewShare:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Site preview sharing context");return revokeSitePreviewShareService(request,raw);},
   getPartnerWebsitePreviewView:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Site website context");const preview=await getPartnerWebsitePreviewViewService(request,raw);return {siteId:preview.siteId,siteConfigurationRevision:preview.siteConfigurationRevision,currentRevision:preview.currentRevision,currentBrandVersionId:preview.currentBrandVersionId,previewHtml:preview.previewHtml,previewPages:preview.previewPages};},
   previewChurchWebsiteDraft:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Site website context");return previewChurchWebsiteDraftService(request,raw);},
   saveSiteWebsiteAndBrand:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Site website context");return saveSiteWebsiteAndBrandService(request,raw);},

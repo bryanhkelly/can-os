@@ -421,3 +421,19 @@ test('private Website and Brand workflow keeps publication distinct and requires
  assert.equal(bodies.restore.safeParse({expectedRevision:1,restoreRevision:1,publish:true}).success,false);
  assert.equal(bodies.save.safeParse({operation:'save',expectedRevision:1}).success,false);
 });
+
+test('frozen preview sharing has protected contracts and does not accept arbitrary snapshots',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const [method,path] of [["GET","/api/v1/sites/{siteId}/preview-shares"],["POST","/api/v1/sites/{siteId}/preview-shares"],["POST","/api/v1/sites/{siteId}/preview-shares/{shareId}/status"],["POST","/api/v1/sites/{siteId}/preview-shares/{shareId}/revocation"]]){
+   assert.ok(document.paths[path][method.toLowerCase()].security);
+   const response=await fetch(url+path.replace(/\{[^}]+\}/g,'00000000-0000-4000-8000-000000000001'),method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);
+  }
+ });
+ const {bodies,results}=require('../dist/preview-shares.contracts');
+ const requestId='00000000-0000-4000-8000-000000000001';
+ assert.equal(bodies.create.safeParse({requestId,expiresAfterDays:7}).success,true);
+ assert.equal(bodies.create.safeParse({requestId,expiresAfterDays:null,snapshotId:requestId}).success,false);
+ assert.equal(bodies.create.safeParse({requestId,expiresAfterDays:1}).success,false);
+ assert.equal(results.create.safeParse({shareId:requestId,relativeUrl:'https://foreign.example',expiresAt:null,sourceRevision:1}).success,false);
+});
