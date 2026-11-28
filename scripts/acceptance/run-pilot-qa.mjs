@@ -18,6 +18,7 @@ const modes = {
   governed: ["node_modules/@playwright/test/cli.js", "test", "--config", "playwright.pilot-governed.config.ts"],
   provision: ["node_modules/@playwright/test/cli.js", "test", "--config", "playwright.pilot-provision.config.ts"],
   parent: ["node_modules/@playwright/test/cli.js", "test", "--config", "playwright.parent-api.config.ts"],
+  "parent-readiness": ["scripts/acceptance/diagnose-parent-qa.mjs"],
   prepare: ["scripts/dev.mjs","--host","localhost","--port","5183","--strictPort"],
   readiness: ["scripts/acceptance/diagnose-noncredit-pilot-qa.mjs"],
   report: ["scripts/acceptance/report-pilot-network-qa.mjs"],
@@ -85,7 +86,7 @@ function localConfiguration() {
 }
 try {
   const mode=process.argv[2];
-  if(process.argv.length!==3) fail("Use exactly one QA action: init, prepare, provision, governed, parent, student, facilitator, readiness, executive, report, schema, regression, keys, fixture, api, browser, pilot1, pilot2, all.");
+  if(process.argv.length!==3) fail("Use exactly one QA action: init, prepare, provision, governed, parent, parent-readiness, student, facilitator, readiness, executive, report, schema, regression, keys, fixture, api, browser, pilot1, pilot2, all.");
   if(mode==="init") init();
   else {
     if(!Object.hasOwn(modes,mode)&&!["pilot1","pilot2","all"].includes(mode)) fail("Unknown QA action.");

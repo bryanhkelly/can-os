@@ -10,10 +10,12 @@ const actor=z.object({
  schoolChildren:z.array(uuid),nativeChildren:z.array(uuid),
 }).strict().refine(a=>a.schoolChildren.length+a.nativeChildren.length>0,
  "Each parent must have at least one independently reviewed child fixture");
-const fixture=z.object({parents:z.array(actor).length(2)}).strict()
+const fixture=z.object({parents:z.array(actor).length(2),coverage:z.enum(["school-only","school-and-community"])}).strict()
  .refine(f=>f.parents[0]!.email!==f.parents[1]!.email &&
   f.parents[0]!.grantId!==f.parents[1]!.grantId &&
   f.parents[0]!.schoolChildren.length>0 && f.parents[1]!.schoolChildren.length>0 &&
+  (f.coverage==="school-only"?f.parents.every(p=>p.nativeChildren.length===0):f.parents.every(p=>p.nativeChildren.length>0)) &&
+  f.parents.every(p=>p.nativeChildren.every(c=>!f.parents.some(q=>q!==p&&q.nativeChildren.includes(c)))) &&
   f.parents.every(p=>p.schoolChildren.every(c=>!f.parents.some(q=>q!==p&&q.schoolChildren.includes(c)))),
  "Use two distinct parents with disjoint nonempty school child fixtures")
  .parse(JSON.parse(process.env.CAN_PARENT_QA_JSON??"{}"));
@@ -23,7 +25,7 @@ const native=z.array(z.object({learnerPersonId:uuid}));
 const nativeEnrollments=z.array(z.object({learnerPersonId:uuid}));
 const attendance=z.object({absences:z.array(z.object({studentPersonId:uuid,canSubmitExcuse:z.boolean()}))});
 
-test("ordinary parent sessions isolate academic, family and community-class API reads",async({browser})=>{
+test("ordinary parent sessions isolate academic and family API reads ("+fixture.coverage+")",async({browser})=>{
  const contexts:BrowserContext[]=[];
  try{
   const anonymous=await browser.newContext();contexts.push(anonymous);
@@ -61,6 +63,8 @@ test("ordinary parent sessions isolate academic, family and community-class API 
    expect(await rpc(page,"familyApplications","getGuardianFamilyApplicationWorkspace")).toHaveProperty("applications");
    const learners=native.parse(await rpc(page,"familyNative","getMyNativeGuardianLearners"));
    expect(learners.map(c=>c.learnerPersonId).sort()).toEqual([...parent.nativeChildren].sort());
+   const approvals=native.parse(await rpc(page,"familyNative","getMyNativeGuardianClassApprovals"));
+   expect(approvals.every(c=>parent.nativeChildren.includes(c.learnerPersonId))).toBe(true);
    const history=nativeEnrollments.parse(await rpc(page,"familyNative","getMyNativeGuardianClassEnrollments"));
    expect(history.every(c=>parent.nativeChildren.includes(c.learnerPersonId))).toBe(true);
   }

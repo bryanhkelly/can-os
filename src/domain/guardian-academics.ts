@@ -1,3 +1,6 @@
+import { assessmentAvailability, isStudentAssessmentVisible } from "./assessment-availability";
+import { assessmentAttemptLimit } from "./assessment-attempt-policy";
+
 /** Guardian-facing grades are released only after teacher grading. */
 export function guardianFeedbackReleased(status: string | null): boolean {
  return status === "graded" || status === "returned";
@@ -59,4 +62,22 @@ export function releasedGuardianAttempts(rows: readonly {
    guardianFeedbackReleased(row.submissionStatus))
   .sort((a,b)=>(b.attemptNumber??0)-(a.attemptNumber??0))
   .map(row=>({submissionId:row.submissionId!,attemptNumber:row.attemptNumber??1}));
+}
+
+/** Separate actionable learner work from returned work needing teacher help.
+ * A due date is not a release date and exhausted revision attempts are not
+ * another deadline. Keep the released work in history. */
+export function guardianAssignmentAction(input:{
+ assessmentStatus:string; availableAt:Date|null; closesAt:Date|null;
+ submissionStatus:string|null; attemptNumber:number|null; metadata:Record<string,unknown>|null;
+},now:Date){
+ const assessment={status:input.assessmentStatus,availableAt:input.availableAt,closesAt:input.closesAt};
+ const visible=isStudentAssessmentVisible(assessment,now);
+ const availability=assessmentAvailability(assessment,now);
+ const status=input.submissionStatus??"assigned";
+ const maxAttempts=assessmentAttemptLimit(input.metadata);
+ const revisionLimitReached=status==="returned"&&maxAttempts!==null&&(input.attemptNumber??1)>=maxAttempts;
+ return {visible,availability,revisionLimitReached,
+  needsLearnerAction:visible&&availability.actionable&&guardianWorkNeedsAction(status)&&!revisionLimitReached,
+  needsTeacherReview:visible&&revisionLimitReached};
 }

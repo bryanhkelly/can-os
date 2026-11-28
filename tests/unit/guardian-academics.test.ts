@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { guardianFeedbackReleased, latestGuardianAttempts, guardianAssignmentSummary, priorReturnedGuardianFeedback, releasedGuardianAttempts } from "@/domain/guardian-academics";
+import { guardianAssignmentAction, guardianFeedbackReleased, latestGuardianAttempts, guardianAssignmentSummary, priorReturnedGuardianFeedback, releasedGuardianAttempts } from "@/domain/guardian-academics";
 
 describe("guardian assignment release policy", () => {
  it("never exposes grades for drafts or submitted work", () => {
@@ -85,5 +85,22 @@ describe("guardian follow-up history across revisions",()=>{
   expect(releasedGuardianAttempts([
    {assessmentId:"a",submissionId:null,attemptNumber:null,submissionStatus:null},
   ],"a")).toEqual([]);
+ });
+});
+
+describe("guardian work actionability",()=>{
+ const now=new Date("2026-11-28T00:00:00Z");
+ const base={assessmentStatus:"published",availableAt:null,closesAt:null,submissionStatus:"returned",attemptNumber:2,metadata:{maxAttempts:2}};
+ it("keeps exhausted revisions visible for teacher intervention without another learner deadline",()=>{
+  expect(guardianAssignmentAction(base,now)).toMatchObject({visible:true,revisionLimitReached:true,needsLearnerAction:false,needsTeacherReview:true});
+ });
+ it("allows an available revision with remaining attempts",()=>{
+  expect(guardianAssignmentAction({...base,attemptNumber:1},now)).toMatchObject({visible:true,needsLearnerAction:true,needsTeacherReview:false});
+ });
+ it("withholds future assignment content even for a guardian",()=>{
+  expect(guardianAssignmentAction({...base,availableAt:new Date("2026-12-01")},now)).toMatchObject({visible:false,needsLearnerAction:false,needsTeacherReview:false});
+ });
+ it("retains closed work without claiming it is actionable",()=>{
+  expect(guardianAssignmentAction({...base,assessmentStatus:"closed",submissionStatus:"draft"},now)).toMatchObject({visible:true,needsLearnerAction:false,needsTeacherReview:false});
  });
 });
