@@ -691,3 +691,29 @@ test('WS10 schemas reject forged authority and incomplete decisions',()=>{
  assert.equal(bodies.review.safeParse({decision:'reject',evidenceReference:'A sufficiently long evidence reference'}).success,true);
  assert.equal(results.saved.safeParse({saved:true,privateMetadata:{}}).success,false);
 });
+
+test('WS10 manual work contracts require current scope, request IDs and audited escalation',async()=>{
+ const id='00000000-0000-4000-8000-000000000001';
+ await withServer('0',async(url,document)=>{
+  for(const [method,route,operation] of [['GET','work/tasks','listOperationalTasks'],['POST','work/tasks','createOperationalTask'],['POST','work/tasks/:id/escalations','escalateOperationalTask'],['GET','work/inbox','getWorkInbox']]){
+   const path='/api/v1/'+route.replace(/:(\w+)/g,'{$1}');
+   const op=document.paths[path][method.toLowerCase()];
+   assert.equal(op.operationId,operation);assert.ok(op.security);
+   const actual='/api/v1/'+route.replace(/:\w+/g,id);
+   const response=await fetch(url+actual,method==='GET'?{headers:{'x-role':'site_admin'}}:{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'});
+   assert.equal(response.status,method==='GET'?401:503);
+  }
+ });
+ const {manualBodies,manualQueries,manualResults}=require('../dist/work-approvals.contracts');
+ const task={requestId:id,siteId:id,title:'Prepare operations materials',ownerPersonId:null};
+ assert.equal(manualBodies.create.safeParse(task).success,true);
+ assert.equal(manualBodies.create.safeParse({...task,organizationId:id}).success,false);
+ assert.equal(manualBodies.create.safeParse({...task,requestId:undefined}).success,false);
+ assert.equal(manualBodies.create.safeParse({...task,type:'credential_approval'}).success,false);
+ assert.equal(manualBodies.escalate.safeParse({requestId:id,expectedUpdatedAt:'2026-11-28T00:00:00Z',reason:'Immediate operational need'}).success,true);
+ assert.equal(manualBodies.escalate.safeParse({requestId:id,reason:'Immediate operational need'}).success,false);
+ assert.equal(manualBodies.escalate.safeParse({requestId:id,expectedUpdatedAt:'2026-11-28T00:00:00Z',reason:'x'}).success,false);
+ assert.equal(manualQueries.page.safeParse({afterId:'invalid'}).success,false);
+ assert.equal(manualQueries.inbox.safeParse({role:'can_credential_reviewer'}).success,false);
+ assert.equal(manualResults.inbox.safeParse({sources:[],privateEvidence:'secret'}).success,false);
+});
