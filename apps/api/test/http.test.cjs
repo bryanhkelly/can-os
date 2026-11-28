@@ -659,3 +659,159 @@ test('knowledge checks and completion require verified learner or provider autho
 test('noncredit enrollment publication protects provider scope and explicit Site selection',async()=>{await withServer('0',async(url,document)=>{for(const [route,method] of [["/api/v1/noncredit-enrollment-publisher","GET"],["/api/v1/noncredit-training-readiness","GET"],["/api/v1/noncredit-enrollment-releases","POST"],["/api/v1/noncredit-enrollment-closures","POST"],["/api/v1/noncredit-multisite-releases","POST"]]){assert.ok(document.paths[route][method.toLowerCase()].security);assert.equal((await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined)).status,method==='POST'?503:401);}assert.ok(document.paths['/api/v1/noncredit-enrollment-releases'].post.requestBody.content['application/json'].schema.required.includes('siteId'));});});
 
 test('completion administration requires canonical provider credentials and distinguishes decisions from corrections',async()=>{await withServer('0',async(url,document)=>{for(const [route,method] of [["/api/v1/noncredit-completion-decisions","POST"],["/api/v1/noncredit-completion-policy-catalog","GET"],["/api/v1/noncredit-completion-policies","POST"],["/api/v1/noncredit-completion-review","GET"],["/api/v1/noncredit-completion-queue","GET"],["/api/v1/noncredit-completion-corrections","POST"]]){assert.ok(document.paths[route][method.toLowerCase()].security);assert.equal((await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined)).status,method==='POST'?503:401);}});const c=require('../dist/completion-admin.contracts');assert.equal(c.queueQuery.safeParse({page:'101'}).success,false);assert.equal(c.queueQuery.parse({page:'2'}).page,2);});
+
+
+test('WS03 modular registration preserves singleton identity and protected geographic facts',async()=>{
+ const {CanonicalIdentityService}=require('../dist/identity.service');
+ const {OrganizationLaunchModule}=require('../dist/organization-launch.module');
+ const {CanonicalIdentityModule}=require('../dist/canonical-identity.module');
+ const {createApi,readConfig}=require('../dist/bootstrap');
+ const {app,document}=await createApi(readConfig({}));
+ try {
+  assert.equal(app.select(OrganizationLaunchModule).get(CanonicalIdentityService),app.select(CanonicalIdentityModule).get(CanonicalIdentityService,{strict:true}));
+  const p='/api/v1/sites/{siteId}/geography';
+  assert.equal(document.paths[p].get.operationId,'readSiteGeography');
+  assert.ok(document.paths[p].get.security);
+  await app.listen(0,'127.0.0.1');
+  const response=await fetch((await app.getUrl())+p.replace('{siteId}','00000000-0000-4000-8000-000000000001'),{headers:{'x-role':'platform_owner','x-person-id':'forged'}});
+  assert.equal(response.status,401);
+  assert.equal(response.headers.get('cache-control'),'no-store');
+ } finally {await app.close();}
+ const {geography,params,empty}=require('../dist/site-geography.contracts');
+ const siteId='00000000-0000-4000-8000-000000000001';
+ assert.equal(geography.safeParse({siteId,status:'unknown',market:null,areas:[],version:null}).success,true);
+ assert.equal(geography.safeParse({siteId,status:'unknown',market:null,areas:[],version:null,approval:true}).success,false);
+ assert.equal(params.safeParse({siteId,organizationId:siteId}).success,false);
+ assert.equal(empty.safeParse({asOf:'2025-01-01'}).success,false);
+});
+
+
+test('WS03 directory and denomination HQ Site operations are session-scoped',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const path of ['/api/v1/me/sites','/api/v1/me/network-sites']){
+   assert.ok(document.paths[path].get.security);
+   assert.equal((await fetch(url+path,{headers:{'x-role':'network_admin'}})).status,401);
+  }
+  assert.ok(document.paths['/api/v1/me/network-sites'].post.security);
+  const response=await fetch(url+'/api/v1/me/network-sites',{method:'POST',headers:{origin:url,'content-type':'application/json'},body:'{}'});
+  assert.equal(response.status,503);
+ });
+ const {create,empty}=require('../dist/organization-site-directory.contracts');
+ const valid={name:'HQ Site',slug:'hq-site',timezone:'America/Los_Angeles'};
+ assert.equal(create.safeParse(valid).success,true);
+ assert.equal(create.safeParse({...valid,organizationId:'00000000-0000-4000-8000-000000000001'}).success,false);
+ assert.equal(empty.safeParse({organizationId:'forged'}).success,false);
+});
+
+
+test('WS03 facilities preserve exact Site scope and distinct canonical Class authority',async()=>{
+ const id='00000000-0000-4000-8000-000000000001';
+ await withServer('0',async(url,document)=>{
+  for(const [method,path] of [["GET","/api/v1/sites/{siteId}/spaces"],["POST","/api/v1/sites/{siteId}/spaces"],["POST","/api/v1/sites/{siteId}/spaces/{spaceId}/revisions"],["GET","/api/v1/sites/{siteId}/class-facilities"],["POST","/api/v1/sites/{siteId}/classes/{classId}/physical-plan-revisions"]]){
+   assert.ok(document.paths[path][method.toLowerCase()].security);
+   const result=await fetch(url+path.replace(/\{\w+\}/g,id),method==='POST'?{method,headers:{origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(result.status,method==='POST'?503:401);
+  }
+ });
+ const {bodies,resourceInput}=require('../dist/launch-facilities.contracts');
+ assert.equal(resourceInput.parse({}).connectivity.internetAvailable,null);
+ assert.equal(resourceInput.safeParse({devices:[{category:'Laptop',quantity:1},{category:'laptop',quantity:2}]}).success,false);
+ assert.equal(bodies.create.safeParse({spaceId:id,name:'Room',maxOccupancy:30,resources:{},siteId:id}).success,false);
+ assert.equal(bodies.classPlan.safeParse({spaceId:null,facilitatorAssignmentId:id,expectedRevision:1}).success,false);
+ assert.equal(bodies.save.safeParse({name:'Room',maxOccupancy:30,resources:{},reason:'Changed room',expectedRevision:0}).success,false);
+});
+
+
+test('WS03 private content channels require explicit publication and exact revision',async()=>{
+ const siteId='00000000-0000-4000-8000-000000000001';
+ await withServer('0',async(url,document)=>{
+  for(const [method,path] of [["GET","/api/v1/sites/{siteId}/content-channels"],["POST","/api/v1/sites/{siteId}/content-channel-revisions"],["POST","/api/v1/sites/{siteId}/content-channel-publications"]]){
+   assert.ok(document.paths[path][method.toLowerCase()].security);
+   const result=await fetch(url+path.replace('{siteId}',siteId),method==='POST'?{method,headers:{origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(result.status,method==='POST'?503:401);
+  }
+ });
+ const {bodies,results}=require('../dist/site-content-channels.contracts');
+ const block={id:'site-setup',channel:'site.setup',placement:'community',layout:'list',enabled:true,eyebrow:'Site',title:'About',description:'Welcome'};
+ assert.equal(bodies.save.safeParse({expectedRevision:1,blocks:[block]}).success,true);
+ assert.equal(bodies.save.safeParse({expectedRevision:1,blocks:[block,block]}).success,false);
+ assert.equal(bodies.save.safeParse({expectedRevision:1,blocks:[{...block,title:'<b>HTML</b>'}]}).success,false);
+ assert.equal(bodies.save.safeParse({expectedRevision:1,blocks:[{...block,url:'https://example.com'}]}).success,false);
+ assert.equal(bodies.publish.safeParse({expectedRevision:1,openEnrollment:true}).success,false);
+ assert.equal(results.published.safeParse({siteId,publishedRevision:1,changed:true,approved:true}).success,false);
+});
+
+
+test('WS03 media separates private upload, finalization, rights review and revocation',async()=>{
+ const siteId='00000000-0000-4000-8000-000000000001';
+ await withServer('0',async(url,document)=>{
+  for(const [method,path] of [["POST","/api/v1/sites/{siteId}/media-upload-intents"],["POST","/api/v1/sites/{siteId}/media-upload-completions"],["GET","/api/v1/sites/{siteId}/media"],["POST","/api/v1/sites/{siteId}/media-reviews"],["POST","/api/v1/sites/{siteId}/media-revocations"]]){
+   assert.ok(document.paths[path][method.toLowerCase()].security);
+   const response=await fetch(url+path.replace('{siteId}',siteId),method==='POST'?{method,headers:{origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);
+  }
+ });
+ const {bodies,results}=require('../dist/site-media.contracts');
+ const upload={fileName:'photo.png',mimeType:'image/png',size:1000,width:320,height:240};
+ assert.equal(bodies.upload.safeParse(upload).success,true);
+ assert.equal(bodies.finish.safeParse({...upload,key:'school-site-media/'+siteId+'/'+siteId}).success,true);
+ assert.equal(bodies.finish.safeParse({...upload,key:'arbitrary/key'}).success,false);
+ assert.equal(bodies.upload.safeParse({...upload,siteId}).success,false);
+ assert.equal(bodies.review.safeParse({documentIds:[siteId],rightsConfirmed:true,confirmEachFileCovered:false,subjectRelease:'all_identifiable_people_cleared',reason:'Reviewed media'}).success,false);
+ assert.equal(results.list.safeParse([{documentId:siteId,fileName:'x.png',tags:[],reviewStatus:'pending',width:320,height:240,storageKey:'private'}]).success,false);
+});
+
+
+test('WS03 Site Intelligence requires exact preview digest and consent to external processing',async()=>{
+ const siteId='00000000-0000-4000-8000-000000000001';
+ await withServer('0',async(url,document)=>{
+  for(const [method,path] of [["GET","/api/v1/sites/{siteId}/intelligence-content"],["POST","/api/v1/sites/{siteId}/intelligence-previews"],["POST","/api/v1/sites/{siteId}/intelligence-generations"]]){
+   assert.ok(document.paths[path][method.toLowerCase()].security);
+   const response=await fetch(url+path.replace('{siteId}',siteId),method==='POST'?{method,headers:{origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);
+  }
+ });
+ const {bodies,results}=require('../dist/site-intelligence.contracts');
+ const request={consumer:'website',options:{},digest:'a'.repeat(64),externalProcessingConfirmed:true};
+ assert.equal(bodies.process.safeParse(request).success,true);
+ assert.equal(bodies.process.safeParse({...request,externalProcessingConfirmed:false}).success,false);
+ assert.equal(bodies.process.safeParse({...request,consumer:'outreach'}).success,false);
+ assert.equal(bodies.process.safeParse({...request,digest:'invalid'}).success,false);
+ assert.equal(bodies.process.safeParse({...request,input:{}}).success,false);
+ assert.equal(results.stored.safeParse({status:'consent-required',generation:null,package:null}).success,true);
+ assert.equal(results.process.safeParse({status:'ready',approved:true}).success,false);
+});
+
+
+test('WS03 affiliation workflows require independently scoped sessions',async()=>{
+ const id='00000000-0000-4000-8000-000000000001';
+ await withServer('0',async(url,document)=>{
+  for(const [method,path] of [["GET","/api/v1/affiliation-networks"],["GET","/api/v1/sites/{siteId}/affiliations"],["POST","/api/v1/sites/{siteId}/affiliations"],["GET","/api/v1/me/network-affiliations"],["POST","/api/v1/me/network-affiliations/{affiliationId}/decisions"],["POST","/api/v1/sites/{siteId}/affiliations/{affiliationId}/withdrawals"]]){
+   assert.ok(document.paths[path][method.toLowerCase()].security);
+   const response=await fetch(url+path.replace(/\{\w+\}/g,id),method==='POST'?{method,headers:{origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);
+  }
+ });
+ const {bodies,results}=require('../dist/network-affiliations.contracts');
+ assert.equal(bodies.request.safeParse({denominationOrganizationId:id,note:'Request affiliation'}).success,true);
+ assert.equal(bodies.review.safeParse({decision:'approve',reason:'Verified',organizationId:id}).success,false);
+ assert.equal(results.decision.safeParse({affiliationId:id,status:'approved',reportingAccess:true}).success,false);
+});
+
+
+test('WS03 network stewardship preserves independent evidence and invitation state',async()=>{
+ const id='00000000-0000-4000-8000-000000000001';
+ await withServer('0',async(url,document)=>{
+  for(const [method,path] of [["GET","/api/v1/network-steward/agreements"],["POST","/api/v1/network-steward/agreements"],["POST","/api/v1/network-steward/hq-officers"],["POST","/api/v1/network-steward/church-provisioning"],["GET","/api/v1/network-steward/church-applications"],["POST","/api/v1/network-steward/church-applications/{requestId}/verifications"],["POST","/api/v1/network-steward/church-applications/{requestId}/approvals"],["POST","/api/v1/network-steward/church-applications/{requestId}/declines"],["POST","/api/v1/network-steward/church-applications/{requestId}/evidence-requests"],["POST","/api/v1/network-steward/church-applications/{requestId}/cancellations"],["POST","/api/v1/network-steward/church-applications/{requestId}/evidence-notices"],["POST","/api/v1/network-steward/church-applications/{requestId}/invitation-resends"]]){
+   assert.ok(document.paths[path][method.toLowerCase()].security);
+   const response=await fetch(url+path.replace('{requestId}',id),method==='POST'?{method,headers:{origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);
+  }
+ });
+ const {bodies,results}=require('../dist/network-steward.contracts');
+ assert.equal(bodies.officer.safeParse({denominationOrganizationId:id,authorityDocumentId:id,email:'officer@example.com',firstName:'Test',lastName:'Officer'}).success,true);
+ assert.equal(bodies.officer.safeParse({denominationOrganizationId:id,email:'officer@example.com',firstName:'Test',lastName:'Officer'}).success,false);
+ assert.equal(bodies.churchVerify.safeParse({evidenceReference:'signed evidence',verificationMethod:'signed_authority',approved:true}).success,false);
+ assert.equal(results.notice.safeParse({providerAccepted:true,delivered:true}).success,false);
+ assert.equal(results.bootstrap.safeParse({churchId:id,siteId:id,grantId:id,invitationPending:true,created:true,emailSent:false,invitationDeliveryStatus:'failed'}).success,true);
+});

@@ -5,6 +5,7 @@ import {
   accountPersonGrants, documents, networkAgreements, organizations,
 } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
+import {DomainError} from "@/domain/errors";
 import { AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import {
@@ -48,7 +49,7 @@ export async function verifyAgreement(actor: AccessContext, input: {
 }) {
   await verifySteward(actor, "network.agreements.verify");
   if (input.validFrom >= input.validThrough)
-    throw new Error("Agreement expiration must be after its effective start");
+    throw new DomainError("VALIDATION_FAILED","Agreement expiration must be after its effective start");
   const [denomination] = await db.select({ id: organizations.id, type: organizations.type })
     .from(organizations).where(eq(organizations.id, input.denominationOrganizationId)).limit(1);
   if (denomination?.type !== "denomination") throw new AuthorizationError("denomination contract party");
@@ -82,7 +83,7 @@ export async function verifyAgreement(actor: AccessContext, input: {
           existing.evidenceDocumentId !== input.evidenceDocumentId ||
           existing.validFrom.getTime() !== input.validFrom.getTime() ||
           existing.validThrough.getTime() !== input.validThrough.getTime())
-        throw new Error("Existing contract reference has different or revoked details");
+        throw new DomainError("CONFLICT","Existing contract reference has different or revoked details");
       return { agreementId: existing.id, created: false as const };
     }
     await emitEvent(tx, {

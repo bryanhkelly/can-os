@@ -11,7 +11,7 @@ import { writeAudit } from "@/platform/mutation";
 import { AuthorizationError } from "@/domain/command-context";
 import { requirePartnerWebsiteEditor } from "./site-website-authorization.server";
 import { siteWebsiteDraftReadCapability, siteWebsiteLocalPublishCapability } from "@/domain/site-publication-policy";
-import { getRequest } from "@tanstack/react-start/server";
+import { DomainError } from "@/domain/errors";
 import { siteLaunchPreferencesSchema, snapshotSiteExperienceVision } from "@/domain/site-launch-preferences";
 
 /** School setup users and exact-Site Website Studio editors share one
@@ -36,8 +36,8 @@ async function authorizeContentChannelEditor(
     throw new AuthorizationError("exact Site website content editor");
 }
 
-export async function readAuthorizedSiteContentChannels(siteId: string) {
-  const actor = await getCommandContext(getRequest());
+export async function readAuthorizedSiteContentChannels(request: Request,siteId: string) {
+  const actor = await getCommandContext(request);
   const [site] = await db.select().from(sites).where(eq(sites.id, siteId)).limit(1);
   if (!site) throw new AuthorizationError("Site content channel scope");
   await authorizeContentChannelEditor(actor, site, db, "read");
@@ -47,10 +47,10 @@ export async function readAuthorizedSiteContentChannels(siteId: string) {
 /** Typed Site metadata document, not HTML injected into a page. A separate
  * update key coexists with Site intent and does not change Program records.
  * The row lock and expectedRevision prevent lost website editor updates. */
-export async function saveAuthorizedSiteContentChannels(input: {
+export async function saveAuthorizedSiteContentChannels(request: Request,input: {
   siteId: string; expectedRevision: number; blocks: SiteContentBlock[];
 }) {
-  const actor = await getCommandContext(getRequest());
+  const actor = await getCommandContext(request);
   if (!actor.actorPersonId) throw new AuthorizationError("Site content channel editor");
   return db.transaction(async tx => {
     const [site] = await tx.select().from(sites)
@@ -58,6 +58,8 @@ export async function saveAuthorizedSiteContentChannels(input: {
     if (!site) throw new AuthorizationError("Site content channel scope");
     await authorizeContentChannelEditor(actor, site, tx, "write");
     const current = readSiteContentChannelConfig(site.metadata.websiteContentChannels);
+    if (current.revision !== input.expectedRevision)
+      throw new DomainError("CONFLICT","Site content channels have changed. Reload before saving.");
     const {config: next, changed} = planSiteContentChannelSave(
       site.metadata.websiteContentChannels, input.expectedRevision, input.blocks);
     if (!changed) return next;
@@ -81,10 +83,10 @@ export async function saveAuthorizedSiteContentChannels(input: {
 /** Explicit public-presentation snapshot. Saving a block changes only the
  * private draft. The currently published website never reads draft metadata.
  * Public Program facts and enrollment rights still come from approved feeds. */
-export async function publishAuthorizedSiteContentChannels(input: {
+export async function publishAuthorizedSiteContentChannels(request: Request,input: {
   siteId: string; expectedRevision: number;
 }) {
-  const actor = await getCommandContext(getRequest());
+  const actor = await getCommandContext(request);
   if (!actor.actorPersonId) throw new AuthorizationError("Website content publisher");
   return db.transaction(async tx => {
     const editor = await requirePartnerWebsiteEditor(actor, tx, siteWebsiteLocalPublishCapability);
@@ -92,10 +94,12 @@ export async function publishAuthorizedSiteContentChannels(input: {
     const [site] = await tx.select().from(sites)
       .where(eq(sites.id, input.siteId)).for("update").limit(1);
     if (!site) throw new AuthorizationError("own Site website");
+    if (site.metadata.websiteContentChannels == null)
+      throw new DomainError("CONFLICT","Save the Site website layout before publishing it.");
     const draft = requireSavedSiteContentChannelDraft(
       site.metadata.websiteContentChannels);
     if (draft.revision !== input.expectedRevision)
-      throw new Error("Website channel revision has changed. Reload before publishing.");
+      throw new DomainError("CONFLICT","Website channel revision has changed. Reload before publishing.");
     const published = site.metadata.publishedWebsiteContentChannels == null ? null :
       safeReadSiteContentChannelConfig(site.metadata.publishedWebsiteContentChannels);
     const intent=siteLaunchPreferencesSchema.safeParse(site.metadata.launchPreferences);

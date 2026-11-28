@@ -14,21 +14,6 @@ function GovernedCommand(){
  return applyDecorators(CanonicalWriteOperation(),HttpCode(200),ApiHeader({name:'Origin',required:true}),
  ...[400,401,403,409,415,500,503].map(status=>ApiResponse({status,content:{'application/problem+json':{schema:problemOpenApiSchema}}})));
 }
-@ApiTags('Sites')
-@ApiCookieAuth('session')
-@Controller('sites')
-export class SitesController{
- constructor(private readonly identity:CanonicalIdentityService){}
- @Post()
- @GovernedCommand()
- @ApiOperation({operationId:'createSite',summary:'Create or replay a planning Site under an existing authorized Organization'})
- @ApiBody({schema:c.docs.site})
- @ApiOkResponse({schema:c.docs.siteResult})
- create(@Req() req:FastifyRequest,@Body() body:unknown){
-   const input=validated(c.siteBody,body);
-   return this.identity.run(verifiedIdentity(req),async actor=>c.siteResult.parse(await actor.createSite(input)));
- }
-}
 @ApiTags('Offering releases')
 @ApiCookieAuth('session')
 @Controller('offering-versions')

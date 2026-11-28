@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { setResponseHeader } from "@tanstack/react-start/server";
+import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { siteContentBlockSchema } from "@/domain/site-content-channels";
 
@@ -10,7 +10,7 @@ export const getSiteContentChannels = createServerFn({method: "GET"})
   .handler(async ({data}) => {
     setResponseHeader("Cache-Control", "private, no-store");
     const {readAuthorizedSiteContentChannels} = await import("./site-content-channels.server");
-    return readAuthorizedSiteContentChannels(data.siteId);
+    return readAuthorizedSiteContentChannels(getRequest(),data.siteId);
   });
 
 export const saveSiteContentChannels = createServerFn({method: "POST"})
@@ -22,7 +22,7 @@ export const saveSiteContentChannels = createServerFn({method: "POST"})
   .handler(async ({data}) => {
     setResponseHeader("Cache-Control", "private, no-store");
     const {saveAuthorizedSiteContentChannels} = await import("./site-content-channels.server");
-    return saveAuthorizedSiteContentChannels(data);
+    return saveAuthorizedSiteContentChannels(getRequest(),data);
   });
 
 
@@ -33,5 +33,5 @@ export const publishSiteContentChannels = createServerFn({method: "POST"})
   .handler(async ({data}) => {
     setResponseHeader("Cache-Control", "private, no-store");
     const {publishAuthorizedSiteContentChannels} = await import("./site-content-channels.server");
-    return publishAuthorizedSiteContentChannels(data);
+    return publishAuthorizedSiteContentChannels(getRequest(),data);
   });
