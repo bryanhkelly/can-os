@@ -309,6 +309,17 @@ integration("public demo school canonical setup", () => {
         const [completed]=await tx.select().from(schema.accessAccountSignups)
           .where(eq(schema.accessAccountSignups.accountId,account.id));
         expect(completed?.consumedAt).toBeInstanceOf(Date);
+        const challenges=await tx.select().from(schema.accessChallenges)
+          .where(eq(schema.accessChallenges.accountId,account.id));
+        const audit=await tx.select().from(schema.auditEvents)
+          .where(eq(schema.auditEvents.resourceType,"access_challenge"));
+        const ownAudit=audit.filter(row=>challenges.some(challenge=>challenge.id===row.resourceId));
+        expect(ownAudit.map(row=>row.action).sort()).toEqual([
+          "identity.access_email.attempted","identity.access_email.attempted",
+          "identity.access_email.failed","identity.access_email.submitted",
+        ]);
+        expect(JSON.stringify(ownAudit)).not.toContain(token);
+        expect(JSON.stringify(ownAudit)).not.toContain(email);
         checked=true;
         throw rollback;
       });
