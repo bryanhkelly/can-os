@@ -10,7 +10,7 @@ import { emitEvent, notify, writeAudit } from "@/platform/mutation";
 import { executeCommand } from "@/platform/execute-command";
 import { gradeResponseActionType } from "@/domain/grade-response-policy";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
-import { assertAcademicActionAuthority } from "./academic-action-policy.server";
+import { assertAcademicActionAuthority,isNativeAcademicAction } from "./academic-action-policy.server";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type ResolutionInput = { actionId: string; resolutionNote: string };
@@ -54,7 +54,8 @@ export async function resolveActionInTransaction(
 
   if (!current) throw new Error("Action not found");
   const gradeResponse = current.type === gradeResponseActionType;
-  if (current.type !== "academic_intervention" && !gradeResponse) {
+  const nativeMissingWork=isNativeAcademicAction(current)&&current.type==="missing_work_follow_up";
+  if (current.type !== "academic_intervention" && !gradeResponse && !nativeMissingWork) {
     throw new Error("Use the Action's owning domain lifecycle");
   }
   await assertAcademicActionAuthority(tx, context, current);
@@ -77,6 +78,8 @@ export async function resolveActionInTransaction(
     if (current.status === "resolved" && current.resolutionNote !== resolutionNote)
       throw new Error("The recorded school response cannot be overwritten");
   }
+  if(nativeMissingWork&&current.status==="resolved"&&current.resolutionNote!==resolutionNote)
+    throw new Error("The recorded follow-up resolution cannot be overwritten");
   if (current.status === "resolved") return;
   if (current.status === "cancelled") throw new Error("Cancelled Action cannot be resolved");
 
