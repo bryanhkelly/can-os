@@ -14,16 +14,16 @@ export function glooConfiguration(){
   return {keyConfigured:Boolean(key),modelConfigured:Boolean(model)};
 }
 export function assertGlooConfiguration(){
-  const config=glooConfiguration();
-  if(!config.keyConfigured||!config.modelConfigured)throw new GlooProviderError(!config.keyConfigured&&!config.modelConfigured?"gloo_missing_both":!config.keyConfigured?"gloo_missing_key":"gloo_missing_model","Gloo AI is not configured for this deployment.");
+  const key=process.env.GLOO_API_KEY?.trim(),model=process.env.GLOO_MODEL?.trim();
+  if(!key||!model)throw new GlooProviderError(!key&&!model?"gloo_missing_both":!key?"gloo_missing_key":"gloo_missing_model","Gloo AI is not configured for this deployment.");
+  return {key,model};
 }
 export function safeGlooFailure(error:unknown){
   return error instanceof GlooProviderError?{code:error.code,message:error.message}:{code:"processing_failed",message:"Site Intelligence could not complete or persist the result. Contact support."};
 }
 /** Fixed provider endpoint, server-only credentials, no automatic provider fallback. */
 async function requestGloo(input:unknown,instructions:string,maxTokens:number,send:typeof fetch){
-  const key=process.env.GLOO_API_KEY?.trim(),model=process.env.GLOO_MODEL?.trim();
-  assertGlooConfiguration();
+  const {key,model}=assertGlooConfiguration();
   const signal=AbortSignal.timeout(45000);
   let response:Response;
   try{response=await send(endpoint,{method:"POST",redirect:"error",signal,

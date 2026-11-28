@@ -421,7 +421,7 @@ function LocalWebsiteCopyEditor({
       acceptSavedBrand(outcome.value.brand);
       markSaved(submitted,outcome.value.website.revision);
       if(mode==="stay") return outcome.status==="saved";
-      if(mode!=="stay"&&outcome.status==="saved"){
+      if(outcome.status==="saved"){
         releaseNavigation();
         try {
           if (mode === "finish" && !allowPublication) {

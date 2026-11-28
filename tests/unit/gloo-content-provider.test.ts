@@ -42,6 +42,13 @@ describe("Gloo persistent package transport",()=>{
     expect(result.content.marketing["site-announcement"]).toEqual(packageContent.marketing["site-announcement"]);
     expect(result.providerResponseId).toBe("package-test");
   });
+  it("persists the configured model identifier when the provider omits its model metadata",async()=>{
+    configure();
+    const result=await generateSitePackageWithGloo(packageInput,async()=>new Response(JSON.stringify({
+      status:"completed",id:"package-test",output:[{type:"message",content:[{type:"output_text",text:JSON.stringify(packageContent)}]}],
+    })));
+    expect(result.model).toBe("synthetic-model");
+  });
   it("rejects incomplete, oversized and ungrounded packages",async()=>{
     configure();
     await expect(generateSitePackageWithGloo(packageInput,async()=>envelope(packageContent,"incomplete"))).rejects.toThrow(/incomplete/);
