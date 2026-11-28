@@ -50,7 +50,7 @@ beforeEach(() => {
   state.insert.mockReturnValue({
     values: () => ({ returning: async () => [{ id: "session" }] }),
   });
-  state.grants.mockResolvedValue({ grants: [grant], demoAccountSwitching: true });
+  state.grants.mockResolvedValue({ grants: [grant], demoAccountSwitching: false });
   state.bindings.mockResolvedValue([]);
   state.pending.mockResolvedValue([]);
   state.accept.mockResolvedValue([]);
@@ -85,7 +85,7 @@ describe("shared demo sign-in", () => {
     expect(JSON.stringify(state.audit.mock.calls)).not.toContain(code);
   });
   it("sends Valor's active school administrator to the school dashboard", async () => {
-    state.grants.mockResolvedValue({ grants: [grant], demoAccountSwitching: true,
+    state.grants.mockResolvedValue({ grants: [grant], demoAccountSwitching: false,
       launchSiteId: LOCAL_DEMO_ADMIN.siteId });
     state.activePrograms = [{ id: "active-valor-program" }];
     const result = await redeemDemoAccess(LOCAL_DEMO_ADMIN.email, "000000");
@@ -93,7 +93,7 @@ describe("shared demo sign-in", () => {
     expect(result).not.toHaveProperty("launchSiteId");
   });
   it("keeps Valor's administrator in Launch Studio when no academic program is active", async () => {
-    state.grants.mockResolvedValue({ grants: [grant], demoAccountSwitching: true,
+    state.grants.mockResolvedValue({ grants: [grant], demoAccountSwitching: false,
       launchSiteId: LOCAL_DEMO_ADMIN.siteId });
     const result = await redeemDemoAccess(LOCAL_DEMO_ADMIN.email, "000000");
     expect(result).toMatchObject({ launchSiteId: LOCAL_DEMO_ADMIN.siteId });
@@ -190,11 +190,10 @@ describe("shared demo sign-in", () => {
   });
   it.each([
     { grants: [] },
-    { grants: [{ ...grant, siteId: "another-site" }] },
+    // Scope, Person and protected-role checks are exercised against the actual
+    // grant resolver in demo-session-isolation.test.ts, not against a stub
+    // which bypasses that authorization boundary.
     { grants: [{ ...grant, accountId: "another-account" }] },
-    { grants: [{ ...grant, personId: "another-person" }] },
-    { grants: [{ ...grant, organizationId: "another-organization" }] },
-    { grants: [{ ...grant, role: "can_network_steward" }] },
   ])("rejects missing or foreign canonical grants", async ({ grants }) => {
     state.grants.mockResolvedValue({ grants });
     await expect(redeemDemoAccess(LOCAL_DEMO_ADMIN.email, "000000")).rejects.toThrow("Invalid demo credentials");
