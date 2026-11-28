@@ -543,4 +543,32 @@ export class ParticipationController{
   const input=validated(admission.guardianOffersQuery,query),workflow=verifiedWorkflow(req);
   return this.identity.runWorkflow(async()=>admission.guardianOffersResult.parse(await workflow.getGuardianAdmissionOffers(input)));
  }
+
+ @Get('me/transfer-destinations')
+ @GovernedWorkflowOperation('can','GET')
+ @ApiCookieAuth('session')
+ @Header('Cache-Control','private, no-store')
+ @Header('Referrer-Policy','no-referrer')
+ @ApiOperation({operationId:'listPublicTransferDestinations',summary:'Verified family discovers published authorized academic transfer destinations'})
+ @ApiOkResponse({schema:admission.transferDocs.destinations})
+ @ApiResponse({status:400,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:401,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:403,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:500,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:503,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ listPublicTransferDestinations(@Req() req:FastifyRequest,@Query() query:unknown){
+  const input=validated(admission.emptyCommand,query),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.transferDestinationsResult.parse(await workflow.listPublicTransferDestinations(input)));
+ }
+ @Post('transfer-destination-family-starts')
+ @Command('can')
+ @Header('Cache-Control','private, no-store')
+ @Header('Referrer-Policy','no-referrer')
+ @ApiOperation({operationId:'requestTransferDestinationFamilyStart',summary:'Request verified-email entry to a different authorized school for an existing verified transfer'})
+ @ApiBody({schema:admission.transferDocs.request})
+ @ApiOkResponse({schema:admission.transferDocs.receipt})
+ requestTransferDestinationFamilyStart(@Req() req:FastifyRequest,@Body() body:unknown){
+  const input=validated(admission.transferDestinationInput,body),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.transferDestinationReceipt.parse(await workflow.requestTransferDestinationFamilyStart(input)));
+ }
 }
