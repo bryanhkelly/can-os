@@ -65,3 +65,30 @@ Eight additional standard REST operations use the existing native Class services
 Approval and invitation do not create a seat reservation or Course Attempt. Assignment preserves the existing exact-Site staff check, verified affiliated adult requirement, no-credit/audit restriction, shared Class capacity and repeat-authorization transaction. Invitation and approval acceptance still use the existing class-enrollments endpoint with exact published terms and consent. Existing TanStack adapters delegate to the extracted services until the SDK migration.
 
 Source inspection: all 19 incremental operations are mapped through controller/OpenAPI, workflow type and bridge. New contract tests and SDK compile assertions are committed; execution is still pending. No schema or production changes.
+
+## Increment 3 — Admissions and family onboarding
+
+Fourteen additional governed REST operations under /api/v1:
+
+| Method | Resource |
+|---|---|
+| GET | admission-intake-programs |
+| GET | admission-existing-students |
+| GET | admission-stage-counts |
+| GET | admission-household-search |
+| GET | admission-applications |
+| POST | admission-inquiries |
+| POST | admission-stage-transitions |
+| POST | admission-guardian-verifications |
+| POST | admission-guardian-accounts |
+| POST | admission-guardian-invitations |
+| GET | me/family-application-workspace |
+| POST | family-applications |
+| POST | admission-guardian-access-revocations |
+| POST | admission-guardian-access-restorations |
+
+Existing admissions and family authorization remain authoritative: registrar scope, real verified-email guardian, independent relationship verification, approved operating services, application transaction lock, blockers, offer/seat and active enrollment guards. Grant revocation terminates sessions bound to the exact grant; restoration never resurrects revoked sessions. Existing individual-credential issuance rules remain unchanged. Sensitive results use private/no-store and no-referrer. Invitation receipt retains the existing send-request semantics; it does not prove delivery.
+
+Three shared Request-based service modules replace business logic in the old adapters. Added strict boundary contracts, OpenAPI schemas, HTTP/SDK assertions, and adjusted the source boundary test. Static inspection finds 33 incremental operation IDs wired through controller/workflow/bridge (37 in ParticipationController including original four), with no duplicate controller routes or operation IDs. No runtime/build/SDK/database tests executed.
+
+Remaining: public interest inbox/conversion and family-start request, guardian offer reads and enrollment requirements, noncredit catalog/history/operator queues, frontend SDK cutover, retirement of legacy RPC, authenticated lifecycle and both pilot tests. Existing business policy, migrations and production environments unchanged.
