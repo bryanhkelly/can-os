@@ -545,15 +545,23 @@ test("governed pilot API stage",async({browser},info)=>{
       const room=await rpc<{facilitatedSessionId:string;pairingCode:string|null}>(page,"session","openNativeClassSession",{classId,classSessionId});
       if(!room.pairingCode)throw Error("Fresh due Class Session is required");
       const scope={facilitatedSessionId:room.facilitatedSessionId};
+      let verifyActivityRecovery:(()=>Promise<void>)|undefined;
       try{
         const outside=await openActor(browser,foreign.actor,contexts,true);
         await deny(outside,"room","pairWithFacilitatedRoom",{courseAttemptId:foreign.courseAttemptId,pairingCode:room.pairingCode});
+        await deny(outside,"room","renewFacilitatedLearningPairing",scope);
+        const renewed=await rpc<{facilitatedSessionId:string;pairingCode:string;pairingExpiresAt:string}>(page,"room","renewFacilitatedLearningPairing",scope);
+        expect(renewed.facilitatedSessionId).toBe(scope.facilitatedSessionId);
+        expect(renewed.pairingCode).not.toBe(room.pairingCode);
+        expect(Date.parse(renewed.pairingExpiresAt)).toBeGreaterThan(Date.now());
+        await deny(outside,"room","pairWithFacilitatedRoom",{courseAttemptId:foreign.courseAttemptId,pairingCode:renewed.pairingCode});
         const pairedActors=new Map<string,Page>();
         for(const l of learners){
           if(l.paired){
             const participant=await openActor(browser,l.actor,contexts,true);
             pairedActors.set(l.courseAttemptId,participant);
-            expect(await rpc(participant,"room","pairWithFacilitatedRoom",{courseAttemptId:l.courseAttemptId,pairingCode:room.pairingCode})).toMatchObject({paired:true});
+            await deny(participant,"room","pairWithFacilitatedRoom",{courseAttemptId:l.courseAttemptId,pairingCode:room.pairingCode});
+            expect(await rpc(participant,"room","pairWithFacilitatedRoom",{courseAttemptId:l.courseAttemptId,pairingCode:renewed.pairingCode})).toMatchObject({paired:true});
           }
         }
         let activityResponses=0;
@@ -592,6 +600,13 @@ test("governed pilot API stage",async({browser},info)=>{
           expect(await rpc(page,"activity","closeClassroomActivity",{...scope,activityReleaseId:released.id})).toMatchObject({closed:true,duplicate:false});
           expect(await rpc(page,"activity","closeClassroomActivity",{...scope,activityReleaseId:released.id})).toMatchObject({closed:true,duplicate:true});
           await deny(outside,"attendance","getClassroomAttendanceRoster",scope);
+          verifyActivityRecovery=async()=>{
+            expect(await rpc(page,"activity","releaseClassroomActivity",input)).toMatchObject({id:released.id,duplicate:true});
+            expect(await rpc(page,"activity","closeClassroomActivity",{...scope,activityReleaseId:released.id})).toMatchObject({closed:true,duplicate:true});
+            await deny(page,"activity","releaseClassroomActivity",{...input,requestId:randomUUID()});
+            await deny(page,"room","renewFacilitatedLearningPairing",scope);
+            expect(await rpc(page,"projector","getClassroomProjectorCommand",scope)).toMatchObject({roomState:"ended",latest:null});
+          };
           const [persisted]=await sql`SELECT count(*)::int AS responses,count(DISTINCT course_attempt_id)::int AS attempts
             FROM public.facilitated_room_activity_responses WHERE activity_release_id=${released.id}::uuid
             AND facilitated_session_id=${scope.facilitatedSessionId}::uuid`;
@@ -619,6 +634,7 @@ test("governed pilot API stage",async({browser},info)=>{
         expect(await rpc(page,"room","endFacilitatedLearningRoom",scope)).toMatchObject({ended:true});
         expect(await rpc(page,"room","endFacilitatedLearningRoom",scope)).toMatchObject({ended:true,alreadyEnded:true});
       }
+      await verifyActivityRecovery?.();
     }else{
       const {owner,recipient,foreign,siteId,metrics}=scenario;
       if(!owner.privateAccessCode||!recipient.privateAccessCode||!foreign.privateAccessCode)
