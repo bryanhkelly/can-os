@@ -10,6 +10,8 @@
  * This is a required release precondition, not an optional feature flag.
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { neon } from "@neondatabase/serverless";
 
 const projectId = "sweet-hall-62441909";
@@ -74,11 +76,26 @@ const [reader] = await sql`
 SELECT
   coalesce(pg_get_functiondef(to_regprocedure('education_v30.v301_can_staff_session_context(text)')) LIKE '%private_access_code_hash%',false) AS private_credential_reader,
   coalesce(pg_get_functiondef(to_regprocedure('education_v30.v301_can_staff_session_context(text)')) LIKE '%authentication_method%',false) AS provenance_reader,
+  coalesce(pg_get_functiondef(to_regprocedure('education_v30.v301_can_staff_session_context(text)')) LIKE '%COALESCE(s.delegated_grant_id,s.active_grant_id)%',false) AS delegated_staff_reader,
+  coalesce(pg_get_functiondef(to_regprocedure('education_v30.v301_can_staff_session_context(text)')) LIKE '%synthetic_scope.approved%',false) AS synthetic_scope_reader,
+  coalesce(pg_get_functiondef(to_regprocedure('education_v30.v301_can_sensitive_capability(text,text)')) LIKE '%source_session.delegated_grant_id IS NULL%',false) AS independent_issuer_reader,
   (SELECT max(created_at) FROM drizzle.__drizzle_migrations) AS migration_tip
 `;
 assert.equal(reader?.private_credential_reader,true,"BLOCKED: restricted staff credential migration 0133 missing");
 assert.equal(reader?.provenance_reader,true,"BLOCKED: restricted staff session provenance missing");
-assert.ok(Number(reader?.migration_tip)>=1795462027000,"BLOCKED: release migration ledger incomplete");
+assert.equal(reader?.delegated_staff_reader,true,"BLOCKED: restricted staff delegation migration 0137 missing");
+assert.equal(reader?.synthetic_scope_reader,true,"BLOCKED: approved synthetic staff scope missing");
+assert.equal(reader?.independent_issuer_reader,true,"BLOCKED: independent issuer delegation exclusion missing");
+const journal=JSON.parse(readFileSync(new URL("../../drizzle/meta/_journal.json",import.meta.url),"utf8"));
+const required=journal.entries.filter(entry=>entry.idx>=133&&entry.idx<=137);
+assert.equal(required.length,5,"BLOCKED: identity release migration journal incomplete");
+assert.ok(Number(reader?.migration_tip)>=Number(required.at(-1).when),"BLOCKED: release migration ledger incomplete");
+for(const entry of required){
+  const hash=createHash("sha256").update(readFileSync(new URL("../../drizzle/"+entry.tag+".sql",import.meta.url))).digest("hex");
+  const records=await sql`SELECT hash FROM drizzle.__drizzle_migrations WHERE created_at=${entry.when}`;
+  assert.equal(records.length,1,"BLOCKED: missing or duplicate release migration "+entry.tag);
+  assert.equal(records[0].hash,hash,"BLOCKED: applied migration differs from source "+entry.tag);
+}
 
 // Do not even reference the new column until its existence is confirmed;
 // on an unmigrated deployment, the preceding checks fail with a clear reason.
