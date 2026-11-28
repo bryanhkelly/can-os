@@ -29,15 +29,19 @@ export async function preflightPilot2(plan,env,ledger){
    else{await preflightClassPreparation(sql,s);continue;}
   }
   const [state]=await sql`SELECT c.state,c.delivery_mode,ov.lifecycle AS offering_state,cv.lifecycle AS course_state,
-    v.state AS class_offering_state,
+    v.state AS class_offering_state,d.status AS deployment_state,op.status AS operation_state,a.approval_status AS adoption_state,
     (SELECT count(*)::int FROM public.class_enrollments WHERE class_id=c.id) AS enrollments,
     (SELECT count(*)::int FROM public.class_sessions WHERE class_id=c.id) AS sessions
     FROM public.classes c JOIN public.class_offering_versions v ON v.class_id=c.id
     JOIN public.offering_versions ov ON ov.id=c.offering_version_id
     JOIN public.course_versions cv ON cv.id=c.course_version_id
+    JOIN public.program_deployments d ON d.id=c.deployment_id
+    JOIN public.education_operations op ON op.id=d.operation_id
+    JOIN public.deployment_offering_adoptions a ON a.id=c.adoption_id AND a.deployment_id=d.id AND a.offering_version_id=ov.id
     WHERE c.id=${s.classId}::uuid AND c.site_id=${s.siteId}::uuid AND c.operating_organization_id=${s.host.organizationId}::uuid
       AND v.id=${s.classOfferingVersionId}::uuid`;
   if(!state||state.state!=="active"||!['facilitated','scheduled','hybrid'].includes(state.delivery_mode)||state.offering_state!=="published"||state.course_state!=="published"||state.class_offering_state!=="published")throw Error("Published authorized Class prerequisites missing");
+  if(state.deployment_state!=="active"||state.operation_state!=="active"||state.adoption_state!=="approved")throw Error("Class exists but Operation, Deployment or adoption is not operational");
   if(state.enrollments!==(ledger.passed("Pilot 2 enroll both Sites")?s.learners.length:0)||state.sessions!==(ledger.passed("Pilot 2 schedule both Sites")?4:0))throw Error("Canonical Class state changed since the last verified checkpoint");
   for(const m of s.meetings){
    const [asset]=await sql`SELECT count(*)::int AS count FROM public.classes c JOIN public.course_lessons l ON l.course_version_id=c.course_version_id
@@ -81,6 +85,7 @@ async function preflightClassPreparation(sql,s){
  JOIN public.offering_courses oc ON oc.offering_version_id=ov.id
  JOIN public.course_versions cv ON cv.id=oc.course_version_id
  JOIN public.program_deployments d ON d.id=a.deployment_id
+ JOIN public.education_operations op ON op.id=d.operation_id
  JOIN public.education_operation_organization_roles r ON r.operation_id=d.operation_id
  JOIN public.education_operation_sites os ON os.operation_id=d.operation_id
  JOIN public.deployment_sites ds ON ds.deployment_id=d.id AND ds.site_id=os.site_id
@@ -88,10 +93,11 @@ async function preflightClassPreparation(sql,s){
  AND cv.id=${p.courseVersionId}::uuid AND a.approval_status='approved'
  AND a.valid_from<=now() AND (a.valid_through IS NULL OR a.valid_through>now())
  AND ov.lifecycle='published' AND cv.lifecycle='published'
+ AND d.status='active' AND op.status='active'
  AND r.organization_id=${s.manager.organizationId}::uuid AND r.role_code='operator' AND r.status='approved'
  AND r.valid_from<=now() AND (r.valid_through IS NULL OR r.valid_through>now())
  AND os.site_id=${s.siteId}::uuid AND os.valid_from<=now() AND (os.valid_through IS NULL OR os.valid_through>now())`;
- if(scope?.count!==1)throw Error("Current approved published Offering and Site adoption required for Class preparation");
+ if(scope?.count!==1)throw Error("Active Operation and Deployment, current approved published Offering adoption and authorized Site placement required for Class preparation");
  for(const m of s.meetings){
   const [asset]=await sql`SELECT count(*)::int AS count FROM public.course_lessons l
    JOIN public.track_lesson_presentations t ON t.course_lesson_id=l.id

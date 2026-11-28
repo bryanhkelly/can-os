@@ -192,7 +192,7 @@ test("governed pilot API stage",async({browser},info)=>{
       expect(inspection.components.map(c=>c.componentId).sort()).toEqual(components.map(c=>c.componentId).sort());
       expect(await rpc(reviewPage,"blueprint","decideCanonicalBlueprintReview",decision)).toMatchObject({reviewId,configurationVersionId,decision:"approved",created:true});
       expect(await rpc(reviewPage,"blueprint","decideCanonicalBlueprintReview",decision)).toMatchObject({reviewId,created:false});
-      await deny(reviewPage,"blueprint","decideCanonicalBlueprintReview",{...decision,rationale:rationale+" Changed."},["CONFLICT"]);
+      await deny(reviewPage,"blueprint","decideCanonicalBlueprintReview",{...decision,rationale:rationale==="Different review rationale"?"Another review rationale":"Different review rationale"},["CONFLICT"]);
       const [proof]=await sql`SELECT count(*)::int AS count FROM public.configuration_reviews r JOIN public.access_accounts a ON a.person_id=r.reviewer_person_id
         WHERE r.id=${reviewId}::uuid AND r.configuration_version_id=${configurationVersionId}::uuid
         AND r.decision='approved' AND r.evidence_version_id=${evidenceVersionId}::uuid AND a.email_normalized=${reviewer.email}`;
