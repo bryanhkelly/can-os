@@ -41,6 +41,9 @@ function ActionDetailPage() {
       {action.description && <p className="mt-5 whitespace-pre-wrap text-sm">{action.description}</p>}
       {action.resolutionNote && <div className="mt-5 border-t pt-5"><h3 className="font-semibold">Resolution</h3><p className="mt-2 whitespace-pre-wrap text-sm">{action.resolutionNote}</p></div>}
       {action.resolvedAt && <p className="mt-3 text-sm text-muted-foreground">Resolved {new Date(action.resolvedAt).toLocaleDateString()}</p>}
+      {"classId" in action && action.canReviewClass && action.classId && <nav aria-label="Related native Class work" className="mt-5 flex flex-wrap gap-4 text-sm font-semibold">
+        <Link to="/class/$classId" params={{classId:action.classId}} search={{view:"teach",tab:"assignments"}} className="underline">Review Class assignments</Link>
+      </nav>}
       {action.canReviewClass && action.sectionId && <nav aria-label="Related academic work" className="mt-5 flex flex-wrap gap-4 text-sm font-semibold">
         <Link to="/class"  className="underline">Open class</Link>
         <Link to="/teacher/gradebook" search={{ section: action.sectionId }} className="underline">Review academic work</Link>
