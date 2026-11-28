@@ -1,10 +1,11 @@
 import {defineConfig} from "@playwright/test";
 import provision from "./playwright.pilot-provision.config";
 const env=process.env;
-if(!env.CAN_STUDENT_QA_JSON)throw Error("Reviewed two-student QA fixture required");
+const reporting=env.CAN_NEST_QA_SUITE==="reporting";
+if(reporting?!env.CAN_NEST_REPORT_QA_JSON:!env.CAN_STUDENT_QA_JSON)throw Error("Reviewed isolated QA fixture required");
 if(!provision.webServer||Array.isArray(provision.webServer))throw Error("Existing isolated QA server configuration required");
 export default defineConfig({
-  ...provision,use:{...provision.use,baseURL:"http://localhost:3001"},testMatch:["nest-student-http.spec.ts","nest-access-provisioning-http.spec.ts"],projects:[{name:"http-only"}],
+  ...provision,use:{...provision.use,baseURL:"http://localhost:3001"},testMatch:reporting?["nest-pilot-report-readback.spec.ts"]:["nest-student-http.spec.ts","nest-access-provisioning-http.spec.ts"],projects:[{name:"http-only"}],
   webServer:[{
     command:"npm --prefix apps/api start",
     url:"http://127.0.0.1:3001/api/v1/health/live",reuseExistingServer:false,timeout:30000,
