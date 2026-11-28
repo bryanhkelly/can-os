@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Field } from "@/components/ui/field";
 import { EmptyState, QueryState, StatusBadge, WorkspaceNotice } from "@/components/workspace";
-import { getNativeClassHomework, getNativeClassHomeworkHistory, getNativeClassHistoricalWork, submitNativeClassHomework } from
+import { getNativeClassHomework, getNativeClassHomeworkHistory, getNativeClassHistoricalWork } from
   "@/modules/classes/native-class-homework.functions";
+import { submitLearnerAssignment } from "@/lib/api/browser-learning";
 import { normalizeClientError } from "@/lib/client-error";
 
 /** Homework lives on the Course Attempt, not on a duplicate Class/Section store. */
@@ -28,9 +29,7 @@ export function NativeClassHomeworkPanel({classEnrollmentId}:{classEnrollmentId:
     if(submitting)return;
     setSubmitting(assignmentId);setNotice("");setError("");
     try {
-      const receipt=await submitNativeClassHomework({
-        data:{classEnrollmentId,assignmentId,responseText},
-      });
+      const receipt=await submitLearnerAssignment(classEnrollmentId,assignmentId,responseText);
       setNotice(receipt.alreadySubmitted
         ?"This response was already submitted. No duplicate was created."
         :"Homework submitted. Your work is saved for teacher review.");
