@@ -177,4 +177,95 @@ export class ParticipationController{
   const input=validated(admission.classCancelInput,body),workflow=verifiedWorkflow(req);
   return this.identity.runWorkflow(async()=>admission.classExitReceipt.parse(await workflow.cancelNativeClassEnrollment(input)));
  }
+
+ @Post('class-approval-requests')
+ @Command('canonical')
+ @ApiOperation({operationId:'requestNativeClassApproval',summary:'Request independent Class approval without enrollment or seat rights'})
+ @ApiBody({schema:admission.classParticipationDocs.request})
+ @ApiOkResponse({schema:admission.classParticipationDocs.approvalReceipt})
+ requestNativeClassApproval(@Req() req:FastifyRequest,@Body() body:unknown){
+  const input=validated(admission.requestClassApprovalInput,body),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.classApprovalReceipt.parse(await workflow.requestNativeClassApproval(input)));
+ }
+ @Post('class-approval-decisions')
+ @Command('canonical')
+ @ApiOperation({operationId:'decideNativeClassApproval',summary:'Exact-Site independent reviewer decides eligibility without enrolling learner'})
+ @ApiBody({schema:admission.classParticipationDocs.decide})
+ @ApiOkResponse({schema:admission.classParticipationDocs.approvalReceipt})
+ decideNativeClassApproval(@Req() req:FastifyRequest,@Body() body:unknown){
+  const input=validated(admission.decideClassApprovalInput,body),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.classApprovalReceipt.parse(await workflow.decideNativeClassApproval(input)));
+ }
+ @Post('class-invitations')
+ @Command('canonical')
+ @ApiOperation({operationId:'issueNativeClassInvitation',summary:'Exact-Site manager issues a verified adult invitation without reserving a seat'})
+ @ApiBody({schema:admission.classParticipationDocs.issue})
+ @ApiOkResponse({schema:admission.classParticipationDocs.invitationReceipt})
+ issueNativeClassInvitation(@Req() req:FastifyRequest,@Body() body:unknown){
+  const input=validated(admission.issueClassInvitationInput,body),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.classInvitationReceipt.parse(await workflow.issueNativeClassInvitation(input)));
+ }
+ @Post('class-invitation-declines')
+ @Command('canonical')
+ @ApiOperation({operationId:'declineNativeClassInvitation',summary:'Decline own invitation without withdrawing an enrollment'})
+ @ApiBody({schema:admission.classParticipationDocs.decline})
+ @ApiOkResponse({schema:admission.classParticipationDocs.declineReceipt})
+ declineNativeClassInvitation(@Req() req:FastifyRequest,@Body() body:unknown){
+  const input=validated(admission.declineClassInvitationInput,body),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.declineInvitationReceipt.parse(await workflow.declineNativeClassInvitation(input)));
+ }
+ @Post('class-enrollment-assignments')
+ @Command('canonical')
+ @ApiOperation({operationId:'assignAdultToNativeClass',summary:'Assign verified affiliated adult using shared Class capacity and repeat policy'})
+ @ApiBody({schema:admission.classParticipationDocs.assign})
+ @ApiOkResponse({schema:docs.enrollmentResult})
+ assignAdultToNativeClass(@Req() req:FastifyRequest,@Body() body:unknown){
+  const input=validated(admission.assignAdultInput,body),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.enrollmentResult.parse(await workflow.assignAdultToNativeClass(input)));
+ }
+ @Get('me/class-approvals')
+ @GovernedWorkflowOperation('canonical','GET')
+ @ApiCookieAuth('session')
+ @ApiCookieAuth('nativeSession')
+ @ApiOperation({operationId:'getMyNativeClassApprovals',summary:"Current learner's own Class approval requests"})
+ 
+ @ApiOkResponse({schema:admission.classParticipationDocs.myApprovals})
+ @ApiResponse({status:400,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:401,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:403,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:503,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ getMyNativeClassApprovals(@Req() req:FastifyRequest,@Query() query:unknown){
+  const input=validated(admission.emptyCommand,query),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.myClassApprovalsResult.parse(JSON.parse(JSON.stringify(await workflow.getMyNativeClassApprovals(input)))));
+ }
+ @Get('class-approval-queue')
+ @GovernedWorkflowOperation('canonical','GET')
+ @ApiCookieAuth('session')
+ @ApiCookieAuth('nativeSession')
+ @ApiOperation({operationId:'getNativeClassApprovalQueue',summary:"Pending approvals for an authorized exact-Site Class"})
+ @ApiQuery({name:'classId',required:true,type:String,format:'uuid'})
+ @ApiOkResponse({schema:admission.classParticipationDocs.queue})
+ @ApiResponse({status:400,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:401,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:403,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:503,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ getNativeClassApprovalQueue(@Req() req:FastifyRequest,@Query() query:unknown){
+  const input=validated(admission.classApprovalQueueInput,query),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.classApprovalQueueResult.parse(JSON.parse(JSON.stringify(await workflow.getNativeClassApprovalQueue(input)))));
+ }
+ @Get('me/class-invitations')
+ @GovernedWorkflowOperation('canonical','GET')
+ @ApiCookieAuth('session')
+ @ApiCookieAuth('nativeSession')
+ @ApiOperation({operationId:'getMyNativeClassInvitations',summary:"Current learner's own Class invitations"})
+ 
+ @ApiOkResponse({schema:admission.classParticipationDocs.myInvitations})
+ @ApiResponse({status:400,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:401,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:403,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:503,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ getMyNativeClassInvitations(@Req() req:FastifyRequest,@Query() query:unknown){
+  const input=validated(admission.emptyCommand,query),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.myClassInvitationsResult.parse(JSON.parse(JSON.stringify(await workflow.getMyNativeClassInvitations(input)))));
+ }
 }
