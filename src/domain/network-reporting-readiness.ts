@@ -23,7 +23,7 @@ export function assessNetworkReportingReadiness(counts:NetworkReadinessCounts){
   if(!counts.activeUnits)blockers.push("No current network reporting units are configured.");
   if(!counts.currentMemberships)blockers.push("No current approved organizational reporting memberships are recorded.");
   if(!counts.currentGrants)blockers.push("No current host reporting grant records are present.");
-  // A nonempty inventory is not proof of evidence scope, grant review or disclosure approval.
-  blockers.push("Independent host-grant evidence validation, network reporting principal and scoped disclosure acceptance are required before cross-provider report execution.");
-  return {counts,blockers,executionAvailable:false as const,classification:"private_setup_inventory" as const};
+  // Readiness describes the scope of data, never whether the dashboard can open.
+  // A nonempty inventory is not proof of outcome access or disclosure authority.
+  return {counts,blockers,classification:"private_setup_inventory" as const};
 }
