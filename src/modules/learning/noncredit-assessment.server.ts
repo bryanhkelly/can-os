@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, lte, or, gt, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lte, or, gt, isNull, sql } from "drizzle-orm";
 import { randomInt } from "node:crypto";
 import { db } from "@/db/client";
 import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
