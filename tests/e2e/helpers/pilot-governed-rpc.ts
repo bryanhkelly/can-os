@@ -1,6 +1,10 @@
 import {type BrowserContext,type Page} from "@playwright/test";
 const origin="http://localhost:5183";
 const modules={
+  studentToday:"/src/modules/student-experience/student-today.functions.ts",
+  studentClasses:"/src/modules/classes/native-class-student-home.functions.ts",
+  studentLearning:"/src/modules/classes/native-class-learning.functions.ts",
+  studentHomework:"/src/modules/classes/native-class-homework.functions.ts",
   release:"/src/modules/learning/native-offering-release.functions.ts",
   classes:"/src/modules/classes/unified-class.functions.ts",
   adoption:"/src/modules/programs/native-offering-adoption-review.functions.ts",
