@@ -1,5 +1,6 @@
 import {test,expect} from "@playwright/test";
 import {randomUUID} from "node:crypto";
+import {neon} from "@neondatabase/serverless";
 import {z} from "zod";
 import {NestQaClient,actorSchema,uuid,query} from "../helpers/nest-qa-client";
 const hash=z.string().regex(/^[a-f0-9]{64}$/);
@@ -47,14 +48,19 @@ test("independent pilot learning on two Sites using only ordinary Nest APIs",asy
     await provider.login(s.provider);await learner.login(s.learner);
     return {s,provider,learner};
   }));
+  const sql=neon(process.env.TEST_DATABASE_URL!);
+  const [dbIdentity]=await sql`SELECT current_setting('neon.project_id',true) AS project,current_setting('neon.branch_id',true) AS branch`;
+  expect(dbIdentity).toEqual({project:"sweet-hall-62441909",branch:"br-solitary-art-arun91gj"});
+  // Both learner identities must be established before foreign-scope assertions.
+  for(const {learner} of sessions){
+   expect(await learner.post("/me/learning-session/activate",{})).toEqual({ready:true});
+   expect(await learner.post("/me/learning-session/resume",{})).toEqual({ready:true});
+  }
   for(const [i,{s,provider,learner}] of sessions.entries()){
    const outside=sessions[1-i]!.learner;
    const input={releaseId:s.releaseId,consentVersion:s.consentVersion,consentSha256:s.consentSha256,acceptedConsent:true,adultConfirmed:true};
    await anonymous.deny("POST","/noncredit-registrations",input,[401]);
    await learner.deny("POST","/noncredit-registrations",{...input,consentSha256:"0".repeat(64)},[400,403,409]);
-   // Existing independent review is consumed through the governed learner path.
-   expect(await learner.post("/me/learning-session/activate",{})).toEqual({ready:true});
-   expect(await learner.post("/me/learning-session/resume",{})).toEqual({ready:true});
    const first=receipt.parse(await learner.post("/noncredit-registrations",input));
    expect(first.alreadyEnrolled).toBe(false);expect(first.registrationId).not.toBe(first.classEnrollmentId);
    expect(await learner.post("/noncredit-registrations",input)).toEqual({...first,alreadyEnrolled:true});
@@ -96,6 +102,26 @@ test("independent pilot learning on two Sites using only ordinary Nest APIs",asy
    const rows=report.byTraining.filter(r=>r.trainingVersionId===s.trainingVersionId);expect(rows).toHaveLength(1);
    expect(rows[0]!.summary).toMatchObject({registrations:1,lessonsMarkedComplete:s.lessonTitles.length,knowledgeCheckSubmissions:1,knowledgeCheckPasses:1,surveyRespondents:1,confirmedNoncreditCompletions:1,pairedKnowledgeChecks:1,verifiedParticipationMinutes:0});
    expect(rows[0]!.summary.averageImprovementPercentagePoints).toBeCloseTo((after-before)*100);
+   // Independent read-only reconciliation: no database-created journey state.
+   const [placement]=await sql`
+    SELECT n.id::text AS registration,e.id::text AS enrollment,e.class_id::text AS class_id,
+      a.id::text AS attempt,e.status AS enrollment_status
+    FROM public.noncredit_registrations n
+    JOIN public.learner_course_attempts a ON a.noncredit_registration_id=n.id
+    JOIN public.class_enrollments e ON e.id=a.class_enrollment_id AND e.course_attempt_id=a.id
+      AND e.learner_person_id=n.participant_person_id
+    WHERE n.id=${first.registrationId}::uuid AND a.id=${id}::uuid
+   `;
+   expect(placement).toEqual({registration:first.registrationId,enrollment:first.classEnrollmentId,class_id:first.classId,attempt:id,enrollment_status:"active"});
+   const [persisted]=await sql`
+    SELECT
+      (SELECT count(*)::int FROM public.noncredit_self_enrollment_claims c WHERE c.release_id=${s.releaseId}::uuid AND c.registration_id=${first.registrationId}::uuid) AS claims,
+      (SELECT count(*)::int FROM public.noncredit_self_enrollment_claims c WHERE c.release_id=${s.releaseId}::uuid) AS total_claims,
+      (SELECT count(*)::int FROM public.learner_lesson_progress p WHERE p.course_attempt_id=${id}::uuid AND p.status='completed') AS lessons,
+      (SELECT count(*)::int FROM public.noncredit_completion_decisions d WHERE d.registration_id=${first.registrationId}::uuid AND d.outcome='completed') AS completions,
+      (SELECT count(*)::int FROM public.survey_answers a WHERE a.response_id=${feedback.responseId}::uuid) AS answers
+   `;
+   expect(persisted).toEqual({claims:1,total_claims:1,lessons:s.lessonTitles.length,completions:1,answers:5});
   }
   for(const {provider,learner} of sessions){await provider.logout();await learner.logout();}
  }finally{await Promise.all(clients.map(c=>c.close()));}
