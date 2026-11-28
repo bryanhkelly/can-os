@@ -81,8 +81,12 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
  if(mode==="operator-reporting"&&request.method!=="GET")throw new AuthorizationError("read-only reporting context");
  const context=await (mode==="operator-reporting"?(readCookie(request,accessSessionCookie)!==undefined?getIdentityContext(request):getCanonicalCommandContext(request)):mode==="planning"?getBlueprintPlanningContext(request):mode==="canonical"?getCanonicalCommandContext(request):mode==="learner"?getInstructionalLearnerContext(request):getIdentityContext(request));
  if(!context.actorPersonId)throw new AuthorizationError("verified Person");
+ const participation=participationWorkflow(request,mode);
  return {
-  ...participationWorkflow(request,mode),
+  joinNoncreditWaitlist:participation.joinNoncreditWaitlist,
+  cancelMyNoncreditWaitlist:participation.cancelMyNoncreditWaitlist,
+  getMyNoncreditWaitlistPage:participation.getMyNoncreditWaitlistPage,
+  withdrawMyNoncreditRegistration:participation.withdrawMyNoncreditRegistration,
   decideNoncreditCompletion:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Completion administration context");return completionAdmin0.decideNoncreditCompletionService(request,raw);},
   getNoncreditCompletionPolicyCatalog:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Completion administration context");return completionAdmin1.getNoncreditCompletionPolicyCatalogService(request);},
   publishNoncreditCompletionPolicy:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Completion administration context");return completionAdmin1.publishNoncreditCompletionPolicyService(request,raw);},
