@@ -2,7 +2,7 @@ import { createRequire } from 'node:module';
 import { Injectable, ServiceUnavailableException, UnauthorizedException, ForbiddenException, BadRequestException, ConflictException } from '@nestjs/common';
 import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
-export type Identity = {me:unknown;readStudentClasses:()=>Promise<unknown>};
+export type Identity = {me:unknown;readStudentClasses:()=>Promise<unknown>;readLearningResume:(id:string)=>Promise<unknown>;readHomeworkSummary:(id:string)=>Promise<unknown>};
 type Bridge = {resolveHttpIdentity:(request:Request)=>Promise<Identity>;classifyHttpDomainError:(error:unknown)=>string};
 
 /** Only explicit verified local runtime configuration can enable this adapter. */

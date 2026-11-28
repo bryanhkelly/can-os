@@ -12,3 +12,7 @@ GET /api/v1/me and GET /api/v1/me/student/classes use the existing canonical ide
 
 After installing the locked root dependencies, run npm run build:canonical from apps/api. This bundles the existing server services and rejects TanStack/React imports. If the boundary check fails, extract the implicated shared dependency; do not relax the boundary. Build the Nest app separately. Only against an isolated reviewed QA database, local development can opt in with API_CANONICAL_READS=1 and the existing session configuration. No real user cookies in fixtures. A disabled or missing bridge fails closed. This is not yet a production auth adapter, ingress, login or canonical learner-session migration. Swagger shows the current cookie name and is local-only. Runtime output schema parity and successful authenticated/foreign-scope tests are release blockers.
 
+
+## Learner read slice
+
+GET /api/v1/me/class-enrollments/:classEnrollmentId/resume and /assignments share the existing instructional learner context, exact enrollment authorization, and read services with RPC. The ordinary CAN session remains required; a historical native cookie is evaluated by the existing policy, never used alone. Only the same Person can be resolved. The summaries exclude submission bodies and are read-only. Local runtime and authenticated acceptance remain unverified.

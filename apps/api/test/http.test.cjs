@@ -68,3 +68,26 @@ test('canonical reads cannot be enabled outside local development', () => {
   assert.throws(() => readConfig({ API_CANONICAL_READS:'1', NODE_ENV:'production' }));
   assert.throws(() => readConfig({ API_CANONICAL_READS:'1', API_HOST:'0.0.0.0' }));
 });
+
+test('learner resource routes require the standard session and publish explicit UUID parameters', async ()=>{
+  await withServer('0',async (url,document)=>{
+    for(const resource of ['resume','assignments']){
+      const path='/api/v1/me/class-enrollments/00000000-0000-4000-8000-000000000001/'+resource;
+      const response=await fetch(url+path,{headers:{'x-role':'student','x-person-id':'forged'}});
+      assert.equal(response.status,401);
+      assert.equal((await response.json()).code,'AUTHENTICATION_REQUIRED');
+      const operation=document.paths['/api/v1/me/class-enrollments/{classEnrollmentId}/'+resource].get;
+      assert.ok(operation.security);
+      assert.ok(operation.parameters.some(p=>p.name==='classEnrollmentId'&&p.in==='path'&&p.required));
+      assert.ok(operation.responses['403']);
+      assert.equal((await fetch(url+path,{headers:{cookie:'unrelated=value'}})).status,503);
+    }
+  });
+});
+test('learner contract rejects invalid parameters and unintended response fields',()=>{
+  const {enrollmentId,resumeSchema,homeworkSchema}=require('../dist/learning.contracts');
+  assert.throws(()=>enrollmentId({classEnrollmentId:'bad'}));
+  assert.throws(()=>enrollmentId({classEnrollmentId:'00000000-0000-4000-8000-000000000001',actor:'forged'}));
+  assert.equal(resumeSchema.safeParse({classId:'00000000-0000-4000-8000-000000000001',title:'Class',lesson:null,completed:1,total:1}).success,true);
+  assert.equal(homeworkSchema.safeParse({assignments:[{id:'00000000-0000-4000-8000-000000000001',title:'Assignment',dueAt:null,status:'assigned',submittedAt:null,responseText:'private'}]}).success,false);
+});

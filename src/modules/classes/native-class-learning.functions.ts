@@ -4,56 +4,17 @@ import { and, asc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
-  courseLessons, courseUnits, learnerLessonProgress,
+  courseLessons,
   canonicalClassOutcomes, canonicalClassAwards,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { authorizeNativeLearnerClass } from "./native-learner-class-access.server";
 import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
 import { writeCanonicalAudit } from "@/platform/canonical-mutation.server";
-import { canonicalLessonVideoResources } from "@/domain/canonical-lesson-video-resources";
-import { deriveNativeClassResume } from "@/domain/native-class-resume";
 
 const input=z.object({classEnrollmentId:z.string().uuid()}).strict();
 
-type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
-
-/** Canonical ordered lesson projection, shared by full workspace and resume. */
-async function readLearnerLessons(tx:Tx,courseVersionId:string,courseAttemptId:string){
-      const lessons=await tx.select({
-        unitId:courseUnits.id,unitTitle:courseUnits.title,
-        unitOrder:courseUnits.sequenceNo,
-        lessonId:courseLessons.id,lessonTitle:courseLessons.title,
-        lessonOrder:courseLessons.lessonOrder,
-        content:courseLessons.content,
-        progressStatus:learnerLessonProgress.status,
-        observedAt:learnerLessonProgress.observedAt,
-      }).from(courseLessons)
-        .innerJoin(courseUnits,and(
-          eq(courseUnits.id,courseLessons.courseUnitId),
-          eq(courseUnits.courseVersionId,courseVersionId),
-        ))
-        .leftJoin(learnerLessonProgress,and(
-          eq(learnerLessonProgress.courseAttemptId,courseAttemptId),
-          eq(learnerLessonProgress.lessonId,courseLessons.id),
-        ))
-        .where(eq(courseLessons.courseVersionId,courseVersionId))
-        .orderBy(asc(courseUnits.sequenceNo),asc(courseLessons.lessonOrder),asc(courseLessons.id))
-        .limit(500);
-      return lessons.map(lesson=>{
-        const content=lesson.content&&typeof lesson.content==="object" &&
-          !Array.isArray(lesson.content)
-          ?lesson.content as Record<string,unknown>:{};
-        const videoResources=canonicalLessonVideoResources(content,{includeSupplementalCandidates:false});
-        return {
-          unitId:lesson.unitId,unitTitle:lesson.unitTitle,unitOrder:lesson.unitOrder,
-          lessonId:lesson.lessonId,lessonTitle:lesson.lessonTitle,lessonOrder:lesson.lessonOrder,
-          progressStatus:lesson.progressStatus,observedAt:lesson.observedAt,
-          lessonBody:typeof content.body==="string"?content.body:"",
-          videoResources,
-        };
-      });
-}
+import { readLearnerLessons, readNativeClassResume } from "./native-class-learning-read.server";
 
 /** Resume needs only the next eligible lesson and aggregate counts. */
 export const getNativeClassLearningResume=createServerFn({method:"GET"})
@@ -62,11 +23,7 @@ export const getNativeClassLearningResume=createServerFn({method:"GET"})
     setResponseHeader("Cache-Control","private, no-store");
     setResponseHeader("Referrer-Policy","no-referrer");
     const actor=await getInstructionalLearnerContext(getRequest());
-    return db.transaction(async tx=>{
-      const {cls,access}=await authorizeNativeLearnerClass(tx,actor,data.classEnrollmentId,"active_read");
-      const lessons=await readLearnerLessons(tx,access.courseVersionId,access.courseAttemptId);
-      return deriveNativeClassResume(cls.id,cls.title,lessons);
-    });
+    return readNativeClassResume(actor,data.classEnrollmentId);
   });
 
 /** Native read path. Does not fall back to Section, old registrations or
