@@ -8,6 +8,9 @@ import {assertCurrentCANGrantForMutation} from "@/modules/identity/current-can-g
 import {getIdentityContext} from "@/modules/identity/command-context.server";
 import {AuthorizationError} from "@/domain/command-context";
 import {relationshipProposalMetrics} from "@/domain/relationship-metric-policy";
+import {readRelationshipRegistrationFacts} from "./relationship-registration-sources.server";
+import {projectRelationshipRegistrationMetric} from "@/domain/relationship-registration-projection";
+import {readAuthorizedOwnerDomains} from "@/modules/insights/reporting-population.server";
 import {buildCurrentReportingMetricRegistry} from "@/domain/reporting-metric-registry";
 import {
   assertRelationshipActor,relationshipProposalSchema,transitionRelationship,validateRelationshipProposal,
@@ -358,4 +361,65 @@ export async function readRelationshipPortfolio(request:Request){
       taggedPrograms:new Set(accepted.filter(row=>row.scopeKind==="program"&&row.ownerId===organizationId).map(row=>row.scopeId)).size,
       excludedUnclassifiedOrChanged:rows.length-current.length,byKind};
   });
+}
+
+const internalReportInput=z.object({
+  metric:z.object({metricKey:z.enum(["class.registrations","class.uniquePeople","noncredit.registrations","noncredit.distinctLearners"]),definitionVersion:z.string().min(1).max(64)}).strict(),
+  from:z.string().datetime({offset:true}),to:z.string().datetime({offset:true}),
+}).strict();
+/** Internal projection only. Do not export a server function until approved
+ * disclosure artifacts, source completeness reconciliation and independent
+ * review of overlapping cuts are available. Never return source facts. */
+export async function readInternalRelationshipRegistrationProjection(request:Request,input:unknown){
+  const actor=await getIdentityContext(request);
+  const {metric,from,to}=internalReportInput.parse(input);
+  if(!actor.capabilities.has("relationships.report"))throw new AuthorizationError("relationships.report");
+  return db.transaction(async tx=>{
+    const recipient=await requireRelationshipAuthority(tx,request,actor);
+    const now=new Date(),start=Date.parse(from),end=Date.parse(to);
+    if(!(start<end&&end<=now.getTime()&&end-start<=366*86400000))
+      throw Error("Choose a valid closed reporting window of up to 366 days.");
+    const population=relationshipPopulation(await ownerDomain(tx,recipient));
+    if(!population)throw new AuthorizationError("classified report recipient");
+    if(!relationshipProposalMetrics("organization").some(m=>m.metricKey===metric.metricKey&&m.definitionVersion===metric.definitionVersion))
+      throw Error("Current metric definition is unavailable");
+    const result=await tx.execute(sql`
+      SELECT ${columns} FROM public.reporting_relationship_agreements
+      WHERE recipient_organization_id=${recipient}::uuid AND status='accepted'
+        AND accepted_at<=CURRENT_TIMESTAMP AND (valid_through IS NULL OR valid_through>CURRENT_TIMESTAMP)
+        AND data_population=${population} AND metrics @> ${JSON.stringify([metric])}::jsonb
+      ORDER BY id LIMIT 10001`);
+    const agreements=z.array(rowSchema).parse(result.rows);
+    if(agreements.length>10000)throw Error("Too many relationships for this report window");
+    const candidateOwners=[...new Set(agreements.map(a=>a.ownerOrganizationId))];
+    const ownerDomains=await readAuthorizedOwnerDomains(tx,candidateOwners);
+    const live:ReportingRelationship[]=[];
+    for(const a of agreements){
+      if(relationshipPopulation(ownerDomains.get(a.ownerOrganizationId)??null)!==population)continue;
+      const owner=await tx.execute(sql`SELECT id FROM public.organizations WHERE id=${a.ownerOrganizationId}::uuid AND lifecycle_status='active' FOR SHARE`);
+      if(!owner.rows.length)continue;
+      try{
+        const scope=await resolveScope(tx,a.scopeKind,a.scopeId,a.ownerOrganizationId);
+        if(scope.ownerOrganizationId!==a.ownerOrganizationId)continue;
+      }catch(error){if(error instanceof AuthorizationError)continue;throw error;}
+      // No canonical Class/registration -> local Program mapping is established
+      // by these adapters. Never treat Program consent as a Site-wide grant.
+      if(a.scopeKind==="program")continue;
+      live.push(a);
+    }
+    const owners=[...new Set(live.map(a=>a.ownerOrganizationId))];
+    const facts=await readRelationshipRegistrationFacts(tx,{
+      source:metric.metricKey.startsWith("class.")?"native_class_enrollment":"noncredit_registration",
+      ownerIds:owners,from,to,
+    });
+    const projection=projectRelationshipRegistrationMetric(actor,recipient,metric,live,facts,{
+      recipientOrganizationId:recipient,currentAgreementIds:new Set(live.map(a=>a.id)),
+      sourceProof:{verifiedOrganizationIds:new Set(owners),verifiedSiteIds:new Set(facts.map(f=>f.deliverySiteId))},
+      population:{classification:population,ownerDomains},
+    },{from,to,asOf:now.toISOString()},now);
+    return {projection,disclosureApproved:false as const,coverage:{
+      siteBackedOnly:true,noncreditSelfEnrollmentClaimsOnly:true,programMappingAvailable:false,
+      sourceCompletenessVerified:false,
+    }};
+  },{isolationLevel:"repeatable read"});
 }
