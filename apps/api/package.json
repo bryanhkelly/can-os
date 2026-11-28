@@ -14,7 +14,8 @@
     "sdk:generate": "npm run build && npm run sdk:export && openapi-typescript sdk/generated/browser-openapi.json -o sdk/generated/schema.ts",
     "sdk:check": "tsc -p sdk/tsconfig.json",
     "sdk:test": "node --test sdk/transport.test.mjs scripts/browser-sdk-document.test.cjs",
-    "verify:platform": "npm run build:canonical && npm test && npm run sdk:generate && npm run sdk:check && npm run sdk:test"
+    "verify:platform": "npm run build:canonical && npm test && npm run sdk:generate && npm run sdk:check && npm run sdk:test && npm run sdk:verify",
+    "sdk:verify": "node scripts/verify-generated.cjs"
   },
   "dependencies": {
     "@nestjs/common": "11.2.12",
