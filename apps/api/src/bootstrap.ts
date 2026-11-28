@@ -23,11 +23,23 @@ const configSchema = z.object({
   }
 });
 
+/** A development flag alone must not turn on business writes against arbitrary data. */
+export function assertIsolatedWriteEnvironment(env:NodeJS.ProcessEnv){
+  if(env.APP_ENV!=='test'||env.NODE_ENV!=='test'||env.CAN_TEST_DB_WRITES_ENABLED!=='true'||
+    env.CAN_PILOT_QA_BRANCH_ID!=='br-solitary-art-arun91gj'||!env.TEST_DATABASE_URL||
+    env.DATABASE_URL!==env.TEST_DATABASE_URL||!env.CAN_CANONICAL_AUTH_DATABASE_URL||
+    env.CAN_CANONICAL_AUTH_DATABASE_URL===env.DATABASE_URL||!env.CAN_ACCESS_MAIL_OUTBOX_DIR||
+    env.CAN_ACCESS_PUBLIC_ORIGIN!=='https://app.can-os.test'||env.CAN_DEMO_FIXED_ACCESS_ENABLED!=='false'||
+    env.RESEND_API_KEY||env.GLOO_API_KEY)
+      throw new Error('Canonical writes require the reviewed isolated QA environment');
+}
 export function readConfig(env: NodeJS.ProcessEnv = process.env) {
+  if(env.API_CANONICAL_WRITES==='1')assertIsolatedWriteEnvironment(env);
   return configSchema.parse({ host: env.API_HOST, port: env.API_PORT, docs: env.API_DOCS, canonicalReads: env.API_CANONICAL_READS, canonicalWrites:env.API_CANONICAL_WRITES, environment: env.NODE_ENV });
 }
 export async function createApi(config: ReturnType<typeof readConfig>) {
   configSchema.parse(config);
+  if(config.canonicalWrites==='1')assertIsolatedWriteEnvironment(process.env);
   const adapter = new FastifyAdapter({
     bodyLimit: 1024 * 1024, requestTimeout: 30000, trustProxy: false,
     requestIdHeader: false, genReqId: () => randomUUID(),

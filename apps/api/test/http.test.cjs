@@ -112,3 +112,8 @@ test('write guard rejects wrong origin and content type before loading database 
   await assert.rejects(()=>service.authenticate({...req,headers:{...req.headers,origin:'http://localhost:3001','content-type':'text/plain'}},'write'),/Unsupported Media Type/);
   await assert.rejects(()=>service.authenticate({...req,headers:{origin:'http://localhost:3001','content-type':'application/json'}},'write'),/Unauthorized/);
 });
+
+test('local write configuration rejects mismatched or missing QA database configuration',()=>{
+  const {assertIsolatedWriteEnvironment}=require('../dist/bootstrap');
+  assert.throws(()=>assertIsolatedWriteEnvironment({NODE_ENV:'test',DATABASE_URL:'not-a-qa-database'}));
+});
