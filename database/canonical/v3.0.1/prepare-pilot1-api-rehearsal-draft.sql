@@ -16,19 +16,19 @@ DECLARE
 BEGIN
  IF current_setting('neon.project_id',true) IS DISTINCT FROM 'sweet-hall-62441909'
  OR branch_id IS DISTINCT FROM current_setting('can.qa_expected_branch',true)
- OR coalesce(branch_id,'') IN ('','br-restless-sea-ar9ooo55','br-bitter-feather-ar0u63x7')
+ OR branch_id IS DISTINCT FROM 'br-solitary-art-arun91gj'
  THEN RAISE EXCEPTION 'Dedicated nonproduction QA branch required'; END IF;
  PERFORM pg_advisory_xact_lock(hashtext('qa-draft:'||fixture_key));
  IF EXISTS(SELECT 1 FROM public.organizations o WHERE o.metadata->>'qa_fixture_key'=fixture_key AND o.metadata->>'intended_branch'=branch_id) THEN
   RAISE NOTICE 'QA draft already exists; no mutation';
   RETURN;
  END IF;
- INSERT INTO public.organizations(id,type,name,slug,metadata,lifecycle_status)
- VALUES(org,'other_partner','TEST ONLY - Pilot API rehearsal','pilot-api-qa-'||org,jsonb_build_object('qa_only',true,'intended_branch',branch_id,'qa_fixture_key',fixture_key),'active');
+ INSERT INTO public.organizations(id,type,name,slug,metadata,lifecycle_status,domain)
+ VALUES(org,'other_partner','TEST ONLY - Pilot API rehearsal','pilot-api-qa-'||org,jsonb_build_object('qa_only',true,'synthetic',true,'intended_branch',branch_id,'qa_fixture_key',fixture_key),'active','pilot-acceptance.can.demo');
  INSERT INTO public.people(id,legal_first_name,legal_last_name,metadata)
- VALUES(author,'TEST','ONLY rehearsal author',jsonb_build_object('qa_only',true,'intended_branch',branch_id,'qa_fixture_key',fixture_key));
- INSERT INTO public.sites(id,organization_id,name,slug,site_kind,lifecycle_status)
- VALUES(site,org,'TEST ONLY rehearsal Site','pilot-api-qa-'||site,'virtual','planning');
+ VALUES(author,'TEST','ONLY rehearsal author',jsonb_build_object('qa_only',true,'synthetic',true,'intended_branch',branch_id,'qa_fixture_key',fixture_key));
+ INSERT INTO public.sites(id,organization_id,name,slug,site_kind,lifecycle_status,metadata)
+ VALUES(site,org,'TEST ONLY rehearsal Site','pilot-api-qa-'||site,'virtual','planning',jsonb_build_object('qa_only',true,'synthetic',true,'intended_branch',branch_id,'qa_fixture_key',fixture_key));
  INSERT INTO public.education_operations(id,code,name,kind_code,status) VALUES(operation,'QA-'||operation,'TEST ONLY rehearsal operation','learning_center','planning');
  INSERT INTO public.offerings(id,publisher_organization_id,code,title,status) VALUES(offering,org,'QA-'||offering,title,'active');
  INSERT INTO public.offering_versions(id,offering_id,version_no,lifecycle) VALUES(ov,offering,1,'draft');
