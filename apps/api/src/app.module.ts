@@ -3,9 +3,10 @@ import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { healthOpenApiSchema, healthSchema, type Health } from './contracts';
 import { DefaultDenyGuard, PublicOperation } from './security';
-import {SitesController,OfferingReleaseController} from './platform-commands.controller';
+import {SitesController} from './platform-commands.controller';
+import {ProgramsOfferingsModule} from './programs-offerings.module';
+import {CanonicalIdentityModule} from './canonical-identity.module';
 import {CompletionAdminController} from './completion-admin.controller';
-import {NoncreditPublicationController} from './noncredit-publication.controller';
 import {KnowledgeCheckController} from './knowledge-check.controller';
 import {OutcomesController} from './outcomes.controller';
 import {SurveysController} from './surveys.controller';
@@ -16,7 +17,6 @@ import {SenderAdminController} from './sender-admin.controller';
 import {CampaignController} from './campaign.controller';
 import {AccessController} from './access.controller';
 import {LaunchWorkspaceController} from './launch-workspace.controller';
-import {CatalogController} from './catalog.controller';
 import {PreviewSharesController} from './preview-shares.controller';
 import {WebsiteController} from './website.controller';
 import {GoLinksController} from './go-links.controller';
@@ -31,10 +31,8 @@ import {ClassAdminController} from './class-admin.controller';
 import {RoomController} from './room.controller';
 import {ClassroomController} from './classroom.controller';
 import {ParticipationController} from './participation.controller';
-import {WorkflowController} from './workflow.controller';
 import { LearningController } from './learning.controller';
 import { IdentityController } from './identity';
-import { CanonicalIdentityService } from './identity.service';
 import { ProblemFilter } from './problem.filter';
 
 @ApiTags('Platform')
@@ -48,9 +46,9 @@ export class HealthController {
 }
 
 @Module({
-  controllers: [CompletionAdminController, NoncreditPublicationController, KnowledgeCheckController, OutcomesController, SurveysController, MarketingArtifactsController, MarketingPackagesController, EngagementController, SenderAdminController, CampaignController, LaunchWorkspaceController, CatalogController, PreviewSharesController, WebsiteController, GoLinksController, SitePublishingController, SiteProfileController, BrandController, SitePlanningController, LaunchController, RoleWorkspacesController, ReportingController, ClassAdminController, RoomController, ClassroomController, ParticipationController, WorkflowController, AccessController, HealthController, IdentityController, LearningController, SitesController, OfferingReleaseController],
+  imports: [CanonicalIdentityModule, ProgramsOfferingsModule],
+  controllers: [CompletionAdminController, KnowledgeCheckController, OutcomesController, SurveysController, MarketingArtifactsController, MarketingPackagesController, EngagementController, SenderAdminController, CampaignController, LaunchWorkspaceController, PreviewSharesController, WebsiteController, GoLinksController, SitePublishingController, SiteProfileController, BrandController, SitePlanningController, LaunchController, RoleWorkspacesController, ReportingController, ClassAdminController, RoomController, ClassroomController, ParticipationController, AccessController, HealthController, IdentityController, LearningController, SitesController],
   providers: [
-    CanonicalIdentityService,
     { provide: APP_GUARD, useClass: DefaultDenyGuard },
     { provide: APP_FILTER, useClass: ProblemFilter },
   ],
