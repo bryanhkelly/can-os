@@ -5,6 +5,7 @@ import { accessAccounts, accountPersonGrants, organizations } from "@/db/schema"
 import { canonicalSensitiveCapabilityApprovals as approvals } from "@/db/canonical-v301";
 import { assertCANCredentialIssuerReviewer } from "@/domain/credential-issuer-review";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
+import {DomainError} from "@/domain/errors";
 import { AuthorizationError } from "@/domain/command-context";
 import { writeAudit } from "@/platform/mutation";
 import type { AccessContext } from "@/domain/access-context";
@@ -65,11 +66,12 @@ async function requireIndependentInstitutionalReviewer(reviewer:AccessContext) {
   }).from(organizations).where(eq(organizations.id,organizationId)).limit(1):[];
   assertCANCredentialIssuerReviewer(reviewer,organization);
   const [account]=await db.select({
+    personId:accessAccounts.personId,
     email:accessAccounts.emailNormalized,
     verified:accessAccounts.emailVerifiedAt,
     disabled:accessAccounts.disabled,
   }).from(accessAccounts).where(eq(accessAccounts.id,reviewer.accountId)).limit(1);
-  if(!account||!account.verified||account.disabled||
+  if(!account||account.personId!==reviewer.actorPersonId||!account.verified||account.disabled||
      isDemoAccountEmail(account.email))
     throw new AuthorizationError("verified non-demo institutional reviewer");
   return reviewer;
@@ -91,7 +93,7 @@ async function assertCurrentReviewerInTransaction(
   await assertCurrentCANGrantForMutation(tx,request,reviewer,{
     roles:["can_credential_reviewer"],
     organizationId,siteId:null,organizationType:"can_network",
-}
+  });
 }
 
 /**
@@ -141,11 +143,13 @@ export async function requestCanonicalCredentialIssuerApprovalService(context:Ac
       if(eligible.rows.length!==1)throw new AuthorizationError("verified non-demo issuer requester");
       await assertIssuerOperatingSite(tx,scope.org,scope.site);
       const grantId=scope.grantId;
+      // Serialize duplicate requests before checking the unique open-approval invariant.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"credential-issuer:"+grantId}))`);
       const existing=await tx.select({id:approvals.id}).from(approvals)
         .where(and(eq(approvals.accountPersonGrantId,grantId),
           eq(approvals.capabilityCode,"credential.issue"),
           sql`${approvals.status} IN ('pending','approved')`)).limit(1);
-      if(existing.length)throw new AuthorizationError("issuer approval already requested or approved");
+      if(existing.length)throw new DomainError("CONFLICT","Issuer approval already requested or approved");
       const [created]=await withSensitiveApprovalWriter(
         tx,"request",can.accountId,()=>tx.insert(approvals).values({
           accountPersonGrantId:grantId,capabilityCode:"credential.issue",
