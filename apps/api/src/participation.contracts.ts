@@ -142,3 +142,23 @@ export const intakeDocs={
  households:{type:'array' as const,maxItems:40,items:obj({id,studentFirst:str,studentLast:str,programId:id})},
  intake:obj({items:listDoc(intakeRowDoc),hasMore:bool,nextPage:pageDoc}),
 };
+
+export const familyApplicationInput=z.object({requestId:uuid,programId:uuid,householdId:uuid.optional(),schoolYearId:uuid.optional(),studentProfileId:uuid.optional(),originTransferActionId:uuid.optional(),confirmedTransferDestination:z.literal(true).optional(),destinationRecordsReleaseAuthorized:z.literal(true).optional(),familyStartRequestId:uuid.optional(),studentFirstName:name,studentLastName:name,gradeLevel:z.string().trim().min(1).max(10)}).strict();
+export const guardianAccessChangeInput=z.object({grantId:uuid,reason:z.string().trim().min(10).max(500)}).strict();
+export const guardianRevokeReceipt=z.object({revoked:z.boolean()}).strict();
+export const guardianRestoreReceipt=z.object({restored:z.boolean()}).strict();
+const familyYear=z.object({id:uuid,name:z.string()}).strict();
+const familyProgram=z.object({id:uuid,name:z.string(),siteId:nilId,schoolYears:z.array(familyYear)}).strict();
+const familyApplication=z.object({applicationId:uuid,programId:uuid,programName:z.string(),submissionRequestId:nullableString,studentPersonId:uuid,studentFirstName:z.string(),studentLastName:z.string(),stage:z.string(),siteId:nilId,source:nullableString,schoolYearId:nullableString,schoolYearName:nullableString,guardianVerified:z.boolean(),originTransferActionId:nullableString,updatedAt:date}).strict();
+const familyStudent=z.object({studentProfileId:uuid,studentPersonId:uuid,studentFirstName:z.string(),studentLastName:z.string(),gradeLevel:z.string(),householdId:uuid}).strict();
+const familyTransfer=z.object({id:uuid,studentProfileId:uuid,originProgramId:nilId,originSchoolName:z.string(),destinationSchoolName:z.string(),destinationFamilyStartRequestId:nullableString,destinationFamilyStartProgramId:nullableString,originExited:z.boolean()}).strict();
+export const familyWorkspaceResult=z.object({programs:z.array(familyProgram),applications:z.array(familyApplication).max(100),households:z.array(familyYear).max(100),students:z.array(familyStudent),transferRequests:z.array(familyTransfer).max(100)}).strict();
+const anyList=(items:Record<string,any>)=>({type:'array' as const,items});
+const familyYearDoc=obj({id,name:str});
+const familyApplicationDoc=obj({applicationId:id,programId:id,programName:str,submissionRequestId:nullableText,studentPersonId:id,studentFirstName:str,studentLastName:str,stage:str,siteId:nullableId,source:nullableText,schoolYearId:nullableText,schoolYearName:nullableText,guardianVerified:bool,originTransferActionId:nullableText,updatedAt:dateDoc});
+export const familyDocs={
+ application:obj({requestId:id,programId:id,householdId:id,schoolYearId:id,studentProfileId:id,originTransferActionId:id,confirmedTransferDestination:yes,destinationRecordsReleaseAuthorized:yes,familyStartRequestId:id,studentFirstName:nameDoc,studentLastName:nameDoc,gradeLevel:{...str,minLength:1,maxLength:10}},['requestId','programId','studentFirstName','studentLastName','gradeLevel']),
+ access:obj({grantId:id,reason:{...str,minLength:10,maxLength:500}}),
+ revoked:obj({revoked:bool}),restored:obj({restored:bool}),
+ workspace:obj({programs:anyList(obj({id,name:str,siteId:nullableId,schoolYears:anyList(familyYearDoc)})),applications:listDoc(familyApplicationDoc),households:listDoc(familyYearDoc),students:anyList(obj({studentProfileId:id,studentPersonId:id,studentFirstName:str,studentLastName:str,gradeLevel:str,householdId:id})),transferRequests:listDoc(obj({id,studentProfileId:id,originProgramId:nullableId,originSchoolName:str,destinationSchoolName:str,destinationFamilyStartRequestId:nullableText,destinationFamilyStartProgramId:nullableText,originExited:bool}))}),
+};
