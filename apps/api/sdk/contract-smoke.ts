@@ -50,3 +50,6 @@ export async function checkEngagementContract(client:BecomunaBrowserApi,id:strin
  // @ts-expect-error marketing updates require expected revision
  await api.deleteSiteMarketingPackageV61({data:{siteId:id,packageId:id}});
 }
+
+import {createNestEngagementWorkspaces} from './engagement-workspaces';
+export function checkEngagementWorkspaceComposition(client:BecomunaBrowserApi){return createNestEngagementWorkspaces(client);}
