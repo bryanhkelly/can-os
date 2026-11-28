@@ -6,9 +6,7 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { effectiveAttendanceEvents } from "@/domain/effective-attendance";
-import { guardianWorkNeedsAction, latestGuardianAttempts, guardianAssignmentSummary } from "@/domain/guardian-academics";
-import { assessmentAvailability } from "@/domain/assessment-availability";
-import { assessmentAttemptLimit } from "@/domain/assessment-attempt-policy";
+import { guardianAssignmentAction, latestGuardianAttempts, guardianAssignmentSummary } from "@/domain/guardian-academics";
 
 /**
  * Family Home is a read model over canonical domain state.
@@ -138,7 +136,7 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
      inArray(s.assessments.sectionId, sectionIds),
      inArray(s.assessments.status, ["published", "closed"]),
     ));
-   const current = latestGuardianAttempts(published);
+   const current = latestGuardianAttempts(published).filter(row=>guardianAssignmentAction(row,now).visible);
    // Family Home and Guardian Academics must share the same unfinished/overdue
    // definition over the latest attempt in every actively enrolled section.
    missingCount = guardianAssignmentSummary(current.map(row=>({
@@ -149,20 +147,8 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
    })),now).overdue;
    for (const row of current) {
     const status = row.submissionStatus ?? "assigned";
-    // Parents must not be told to complete work the student cannot open.
-    // Use the same availability policy as the authenticated student workspace.
-    const actionable = assessmentAvailability({
-     status: row.assessmentStatus,
-     availableAt: row.availableAt,
-     closesAt: row.closesAt,
-    }, now).actionable;
-    const incomplete = !row.submissionId || guardianWorkNeedsAction(status);
-    // Student submission uses attempt N+1 when a teacher returns attempt N.
-    // Do not imply another revision can be submitted after its allowed limit.
-    const maxAttempts = assessmentAttemptLimit(row.metadata);
-    const revisionLimitReached = status === "returned" &&
-     maxAttempts !== null && (row.attemptNumber ?? 1) >= maxAttempts;
-    if (actionable && guardianWorkNeedsAction(status)) {
+    const {needsLearnerAction,needsTeacherReview,revisionLimitReached}=guardianAssignmentAction(row,now);
+    if (needsLearnerAction || needsTeacherReview) {
      workToReview.push({
       assessmentId: row.assessmentId,
       sectionId: row.sectionId,
@@ -175,8 +161,8 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
     }
     // The guardian summary above already includes overdue open and closed
     // assignments. Do not count these cases a second time here.
-    if (!actionable || !row.dueAt) continue;
-    if (row.dueAt.getTime() >= now.getTime() && incomplete) {
+    if (!needsLearnerAction || !row.dueAt) continue;
+    if (row.dueAt.getTime() >= now.getTime()) {
      if (!nextDueAt || row.dueAt.toISOString() < nextDueAt) {
       nextDueAt = row.dueAt.toISOString();
       nextDueTimezone = row.timezone;

@@ -571,6 +571,8 @@ test("governed pilot API stage",async({browser},info)=>{
       const scope={facilitatedSessionId:room.facilitatedSessionId};
       let verifyActivityRecovery:(()=>Promise<void>)|undefined;
       try{
+        expect(await rpc(page,"session","openNativeClassSession",{classId,classSessionId}))
+          .toMatchObject({...scope,alreadyStarted:true,pairingCode:null});
         const outside=await openActor(browser,foreign.actor,contexts,true);
         await deny(outside,"room","pairWithFacilitatedRoom",{courseAttemptId:foreign.courseAttemptId,pairingCode:room.pairingCode});
         await deny(outside,"room","renewFacilitatedLearningPairing",scope);
@@ -588,6 +590,36 @@ test("governed pilot API stage",async({browser},info)=>{
             expect(await rpc(participant,"room","pairWithFacilitatedRoom",{courseAttemptId:l.courseAttemptId,pairingCode:renewed.pairingCode})).toMatchObject({paired:true});
           }
         }
+        // Exercise actual production presence and reconnect commands, not simulated
+        // attendance. Concurrent delivery of the same event must persist once.
+        const firstPair=[...pairedActors.entries()][0]!;
+        const [presenceAttempt,presenceActor]=firstPair;
+        const presenceScope={...scope,courseAttemptId:presenceAttempt};
+        const heartbeat={...presenceScope,clientInstanceId:randomUUID(),clientEventId:randomUUID(),eventKind:"heartbeat"};
+        const retries=await Promise.all([
+          rpc<{recorded:boolean;duplicate:boolean;throttled:boolean}>(presenceActor,"activity","recordClassroomPresence",heartbeat),
+          rpc<{recorded:boolean;duplicate:boolean;throttled:boolean}>(presenceActor,"activity","recordClassroomPresence",heartbeat),
+        ]);
+        expect(retries.every(r=>r.recorded&&!r.throttled)).toBe(true);
+        expect(retries.filter(r=>r.duplicate)).toHaveLength(1);
+        expect(await rpc(presenceActor,"activity","recordClassroomPresence",{...heartbeat,clientEventId:randomUUID()}))
+          .toMatchObject({recorded:false,throttled:true});
+        const secondDevice={...heartbeat,clientInstanceId:randomUUID(),clientEventId:randomUUID()};
+        expect(await rpc(presenceActor,"activity","recordClassroomPresence",secondDevice))
+          .toMatchObject({recorded:true,duplicate:false});
+        await deny(outside,"activity","recordClassroomPresence",{...heartbeat,clientEventId:randomUUID()});
+        const [presenceProof]=await sql`SELECT count(*)::int AS events,count(DISTINCT client_instance_id)::int AS devices
+          FROM public.facilitated_room_presence_events WHERE facilitated_session_id=${scope.facilitatedSessionId}::uuid
+          AND course_attempt_id=${presenceAttempt}::uuid AND event_kind='heartbeat'`;
+        expect(presenceProof).toEqual({events:2,devices:2});
+        expect(await rpc(presenceActor,"room","leaveFacilitatedRoom",presenceScope)).toMatchObject({left:true});
+        expect(await rpc(presenceActor,"room","leaveFacilitatedRoom",presenceScope)).toMatchObject({left:false});
+        await deny(presenceActor,"activity","recordClassroomPresence",{...heartbeat,clientEventId:randomUUID()});
+        const left=await rpc<{rooms:{facilitatedSessionId:string}[]}>(presenceActor,"room","getLearnerFacilitatedRoom",{courseAttemptId:presenceAttempt});
+        expect(left.rooms.some(r=>r.facilitatedSessionId===scope.facilitatedSessionId)).toBe(false);
+        expect(await rpc(presenceActor,"room","pairWithFacilitatedRoom",{courseAttemptId:presenceAttempt,pairingCode:renewed.pairingCode})).toMatchObject({paired:true});
+        const rejoined=await rpc<typeof left>(presenceActor,"room","getLearnerFacilitatedRoom",{courseAttemptId:presenceAttempt});
+        expect(rejoined.rooms.some(r=>r.facilitatedSessionId===scope.facilitatedSessionId)).toBe(true);
         let activityResponses=0;
         if(instruction){
           const {lessonId,assetVersionId,prompt,choices}=instruction;
@@ -658,6 +690,7 @@ test("governed pilot API stage",async({browser},info)=>{
         expect(await rpc(page,"room","endFacilitatedLearningRoom",scope)).toMatchObject({ended:true});
         expect(await rpc(page,"room","endFacilitatedLearningRoom",scope)).toMatchObject({ended:true,alreadyEnded:true});
       }
+      await deny(page,"session","openNativeClassSession",{classId,classSessionId});
       await verifyActivityRecovery?.();
     }else{
       const {owner,recipient,foreign,siteId,metrics}=scenario;

@@ -66,8 +66,13 @@ describe("Classroom Connect Phase 2 learner activities", () => {
   it("requires an active registered learner in the precise room and Site", () => {
     const api = source("src/modules/learning/classroom-evidence.functions.ts");
     expect(api).toContain("authorizeCanonicalCourseAttempt(tx, actor, courseAttemptId)");
-    expect(api).toContain("roomHostIsCurrent(tx, room, now)");
-    expect(api).toContain("schoolAttemptIsPlacedAtSite(");
+    expect(api).toContain("currentRoomParticipantPermitted(tx,room,access,actor.actorPersonId,now)");
+    const shared=source("src/modules/learning/facilitated-learning-operations.server.ts");
+    const guard=shared.slice(shared.indexOf("export async function currentRoomParticipantPermitted"));
+    expect(guard).toContain("roomHostIsCurrent(tx,room,now)");
+    expect(guard).toContain("schoolAttemptIsPlacedAtSite(");
+    expect(guard).toContain("selfEnrolledNoncreditRoomSitePermitted(tx,access,room.siteId)");
+    expect(guard).toContain("attemptInAssignedClassroomRelease(tx,room,access.courseAttemptId,personId)");
     expect(api).toContain("eq(facilitatedLearningParticipants.participantPersonId, actor.actorPersonId)");
     expect(api).toContain("isNull(facilitatedLearningParticipants.leftAt)");
     expect(api).toContain("facilitatedRoomOperationalState(room, now)");

@@ -7,6 +7,7 @@ import { db } from "@/db/client";
 import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import { catalogSites, canonicalAccounts, canonicalAccountGrants, contentAssetVersions, courseLessons, courseVersions, enrollments, learnerProfiles, canonicalClassEnrollments, noncreditRegistrations, noncreditTrainingVersions, deploymentOfferingAdoptions, offeringVersions, classroomOfferingCourses, educationOperationOrganizationRoles, educationOperationSites, facilitatedLearningParticipants, facilitatedLearningSessions, learnerCourseAttempts, programDeployments, classroomDeploymentSites, classroomEnrollmentSitePlacements, siteOrganizationRoles, trackLessonPresentations, noncreditSelfEnrollmentClaims } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
+import type { CanonicalParticipationAccess } from "@/domain/canonical-course-participation";
 import { facilitatedCodeAlphabet, facilitatedCodeLength, facilitatedPairingWindowMs, facilitatedRoomOperationalState, roomMediaAudienceEligible } from "@/domain/facilitated-learning";
 import { attemptInAssignedClassroomRelease } from "./classroom-release-boundary.server";
 import { assertNativeClassRoomStaff, nativeClassRoomParticipant } from "@/modules/classes/native-class-room-boundary.server";
@@ -519,3 +520,21 @@ export async function selfEnrolledNoncreditRoomSitePermitted(
   }
 }
 
+/** Revalidate the current, already-authorized Course Attempt against this exact
+ * room. Live callers must additionally check the room lifecycle; historical
+ * survey callers retain their separate response-window rules. */
+export async function currentRoomParticipantPermitted(
+  tx:Tx, room:typeof facilitatedLearningSessions.$inferSelect,
+  access:CanonicalParticipationAccess, personId:string, now:Date,
+):Promise<boolean>{
+  if(access.participantPersonId!==personId ||
+     access.deploymentId!==room.deploymentId ||
+     access.courseVersionId!==room.courseVersionId)return false;
+  if(!await roomHostIsCurrent(tx,room,now))return false;
+  if(access.source==="school" && !await schoolAttemptIsPlacedAtSite(
+    tx,access.courseAttemptId,room.deploymentId,room.siteId,now,
+  ))return false;
+  if(access.source!=="class" &&
+     !await selfEnrolledNoncreditRoomSitePermitted(tx,access,room.siteId))return false;
+  return attemptInAssignedClassroomRelease(tx,room,access.courseAttemptId,personId);
+}

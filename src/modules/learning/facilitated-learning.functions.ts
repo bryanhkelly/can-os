@@ -1,8 +1,7 @@
 import { requireFacilitatedLearningEnabled } from "@/modules/learning/canonical-learning-release.server";
-import { attemptInAssignedClassroomRelease } from "./classroom-release-boundary.server";
 import { assertNativeClassRoomStaff } from "@/modules/classes/native-class-room-boundary.server";
 import { createServerFn } from "@tanstack/react-start";
-import { digestCode, generatePairingCode, derivePairingRenewalCode, displayCode, recordRoomAuditAndEvent, roomHostIsCurrent, schoolAttemptIsPlacedAtSite, ownedRoom, assertRoomLive, currentRoomMediaAudience, assertRoomMediaRightsForAudience, assertAuthorizedFacilitatedRoomMedia, createFacilitatedRoomForHost, selfEnrolledNoncreditRoomSitePermitted } from "./facilitated-learning-operations.server";
+import { digestCode, generatePairingCode, derivePairingRenewalCode, displayCode, recordRoomAuditAndEvent, currentRoomParticipantPermitted, ownedRoom, assertRoomLive, currentRoomMediaAudience, assertRoomMediaRightsForAudience, assertAuthorizedFacilitatedRoomMedia, createFacilitatedRoomForHost } from "./facilitated-learning-operations.server";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, asc, countDistinct, desc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -394,15 +393,7 @@ export const pairWithFacilitatedRoom = createServerFn({method:"POST"})
         attemptDeploymentId:attempt.deploymentId,attemptCourseVersionId:attempt.courseVersionId,
       }))return null;
       // Denials return null so the per-person rate limiter still commits.
-      if (!await roomHostIsCurrent(tx,room,now)) return null;
-      if (attempt.source==="school" && !await schoolAttemptIsPlacedAtSite(
-        tx,attempt.courseAttemptId,room.deploymentId,room.siteId,now,
-      )) return null;
-      if(attempt.source!=="class" &&
-        !await selfEnrolledNoncreditRoomSitePermitted(tx,attempt,room.siteId))return null;
-      if(!await attemptInAssignedClassroomRelease(
-        tx,room,attempt.courseAttemptId,personId,
-      )) return null;
+      if(!await currentRoomParticipantPermitted(tx,room,attempt,personId,now))return null;
       await tx.insert(facilitatedLearningParticipants).values({
         facilitatedSessionId:room.id,courseAttemptId:data.courseAttemptId,
         participantPersonId:personId,joinedAt:now,lastPairedAt:now,
@@ -490,14 +481,8 @@ export const getLearnerFacilitatedRoom = createServerFn({method:"GET"})
         // to subsequent shared-room status, not merely new pairing attempts.
         const [room]=await tx.select().from(facilitatedLearningSessions)
           .where(eq(facilitatedLearningSessions.id,row.roomId)).limit(1);
-        if(!room || !await roomHostIsCurrent(tx,room,now))continue;
-        if(access.source==="school" && !await schoolAttemptIsPlacedAtSite(
-          tx,access.courseAttemptId,row.deploymentId,row.siteId,now,
-        ))continue;
-        if(access.source!=="class" &&
-          !await selfEnrolledNoncreditRoomSitePermitted(tx,access,row.siteId))continue;
-        if(!await attemptInAssignedClassroomRelease(
-          tx,room,access.courseAttemptId,actor.actorPersonId!,
+        if(!room || !await currentRoomParticipantPermitted(
+          tx,room,access,actor.actorPersonId!,now,
         ))continue;
         recent.push(row);
       }

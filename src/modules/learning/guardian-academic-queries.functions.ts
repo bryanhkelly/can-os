@@ -5,9 +5,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
-import { guardianFeedbackReleased, latestGuardianAttempts, priorReturnedGuardianFeedback, releasedGuardianAttempts } from "@/domain/guardian-academics";
-import { assessmentAvailability } from "@/domain/assessment-availability";
-import { assessmentAttemptLimit } from "@/domain/assessment-attempt-policy";
+import { guardianAssignmentAction, guardianFeedbackReleased, latestGuardianAttempts, priorReturnedGuardianFeedback, releasedGuardianAttempts } from "@/domain/guardian-academics";
 import { z } from "zod";
 import { readRubric } from "./rubric";
 
@@ -97,15 +95,11 @@ export const getGuardianAssignments = createServerFn({ method: "GET" })
     inArray(s.assessments.sectionId, sectionIds),
     inArray(s.assessments.status, ["published", "closed"]),
    )).orderBy(desc(s.assessments.dueAt));
-  return { assignments: latestGuardianAttempts(rows).map(row => {
+  const now=new Date();
+  return { assignments: latestGuardianAttempts(rows).filter(row=>guardianAssignmentAction(row,now).visible).map(row => {
    const released = guardianFeedbackReleased(row.submissionStatus);
    const previous=priorReturnedGuardianFeedback(rows,row);
-   const availability=assessmentAvailability({
-    status:row.assessmentStatus,availableAt:row.availableAt,closesAt:row.closesAt,
-   });
-   const maxAttempts = assessmentAttemptLimit(row.metadata);
-   const revisionLimitReached = row.submissionStatus === "returned" &&
-    maxAttempts !== null && (row.attemptNumber ?? 1) >= maxAttempts;
+   const {availability,revisionLimitReached,needsLearnerAction,needsTeacherReview}=guardianAssignmentAction(row,now);
    return {
     assessmentId: row.assessmentId,
     sectionId: row.sectionId,
@@ -120,6 +114,8 @@ export const getGuardianAssignments = createServerFn({ method: "GET" })
     status: row.submissionStatus ?? "assigned",
     workAvailabilityReason: availability.reason,
     revisionLimitReached,
+    needsLearnerAction,
+    needsTeacherReview,
     submittedAt: row.submittedAt?.toISOString() ?? null,
     gradedAt: released ? row.gradedAt?.toISOString() ?? null : null,
     score: released ? row.score : null,
