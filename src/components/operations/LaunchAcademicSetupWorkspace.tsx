@@ -1,3 +1,4 @@
+import {ContextualReportingRelationships} from "@/components/reporting/ContextualReportingRelationships";
 import { useSchoolConfigurationNavigation } from "@/components/launch-studio/SchoolConfigurationContext";
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { LaunchTeacherQualificationPolicy } from "@/components/operations/LaunchTeacherQualificationPolicy";
@@ -109,6 +110,7 @@ export function LaunchAcademicSetupWorkspace({data,hubMode=false}:{data:Snapshot
   </section>
   {data.program.siteId&&<SchoolJurisdictionReviewPanel programId={data.program.id}/>}
   <ProgramSiteAuthorizationPanel key={data.program.id} programId={data.program.id}/>
+  <ContextualReportingRelationships scopeKind="program" scopeId={data.program.id}/>
   {(!data.academicAuthority.teacherAssignment||!data.academicAuthority.creditConfiguration)&&
    <p role="status" className="mt-4  border border-warning/40 p-4 text-sm">
     Current academic authority is incomplete. Existing assignments, credits and official records remain visible,
