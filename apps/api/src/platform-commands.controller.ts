@@ -34,6 +34,18 @@ export class SitesController{
 @Controller('offering-versions')
 export class OfferingReleaseController{
  constructor(private readonly identity:CanonicalIdentityService){}
+ @Get(':offeringVersionId/review-content')
+ @GovernedRead()
+ @ApiParam({name:'offeringVersionId',required:true,type:String,format:'uuid'})
+ @ApiQuery({name:'manifestId',required:true,type:String})
+ @ApiQuery({name:'expectedHash',required:true,type:String})
+ @ApiOperation({operationId:'getExactOfferingReviewContent',summary:'Independent appointed reviewer reads exact current submitted manuscript and evidence; stale hash fails closed'})
+ @ApiOkResponse({schema:c.exactReviewDoc})
+ @ApiResponse({status:409,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ exactReview(@Req() req:FastifyRequest,@Param() params:unknown,@Query() query:unknown){
+   const input={...validated(c.versionParams,params),...validated(c.exactReviewQuery,query)};
+   return this.identity.run(verifiedIdentity(req),async actor=>c.exactReviewResult.parse(JSON.parse(JSON.stringify(await actor.readReleaseContent(input)))));
+ }
  @Get('release-review-queue')
  @GovernedRead()
  @ApiOperation({operationId:'listReleaseReviewQueue',summary:'Page through current independently appointed Offering reviews'})

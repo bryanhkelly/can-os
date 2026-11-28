@@ -5,7 +5,7 @@ import { AuthorizationError } from "@/domain/command-context";
 import { readNativeClassResume } from "@/modules/classes/native-class-learning-read.server";
 import { readNativeClassHomeworkSummary } from "@/modules/classes/native-class-homework-read.server";
 import {createLaunchSiteService} from "@/modules/programs/launch-site-create.server";
-import {submitNativeOfferingReleaseService,saveNativeOfferingReleasePolicyService,decideNativeOfferingReleaseService,publishNativeOfferingCoursesService,approveNativeOfferingAssetManifestService,publishNativeOfferingVersionService,getNativeOfferingReleaseOverviewService,getNativeOfferingReleasePolicyReviewService,getNativeOfferingReleaseReviewQueueService} from "@/modules/learning/native-offering-release.server";
+import {submitNativeOfferingReleaseService,saveNativeOfferingReleasePolicyService,decideNativeOfferingReleaseService,publishNativeOfferingCoursesService,approveNativeOfferingAssetManifestService,publishNativeOfferingVersionService,getNativeOfferingReviewContentService,getNativeOfferingReleaseOverviewService,getNativeOfferingReleasePolicyReviewService,getNativeOfferingReleaseReviewQueueService} from "@/modules/learning/native-offering-release.server";
 import {readWorkspaceSession} from "./workspace-session.server";
 import { getIdentityContext } from "./command-context.server";
 import { normalizeClientError } from "@/lib/client-error";
@@ -33,6 +33,7 @@ export async function resolveHttpIdentity(request: Request) {
       siteIds: actor.scope.siteIds ?? [],
       programIds: actor.scope.programIds ?? [],
     },
+    readReleaseContent:(input:unknown)=>{if(request.method!=="GET")throw new AuthorizationError("review read context");return getNativeOfferingReviewContentService(actor,input);},
     readReleaseOverview:(input:unknown)=>getNativeOfferingReleaseOverviewService(actor,input),
     readReleasePolicy:(input:unknown)=>getNativeOfferingReleasePolicyReviewService(actor,input),
     readReleaseQueue:(input:unknown)=>getNativeOfferingReleaseReviewQueueService(actor,input),

@@ -1,10 +1,9 @@
-import {readCanonicalBlueprintConfigurationService,readCanonicalBlueprintReviewService,readCanonicalBlueprintReviewHistoryService,createCanonicalBlueprintConfigurationService,saveCanonicalBlueprintConfigurationService,submitCanonicalBlueprintConfigurationService,decideCanonicalBlueprintReviewService,executeCanonicalBlueprintConfigurationService} from "./blueprint-commands.server";
+import {readCanonicalBlueprintHomeService,readCanonicalBlueprintConfigurationService,readCanonicalBlueprintReviewService,readCanonicalBlueprintReviewHistoryService,createCanonicalBlueprintConfigurationService,saveCanonicalBlueprintConfigurationService,submitCanonicalBlueprintConfigurationService,decideCanonicalBlueprintReviewService,executeCanonicalBlueprintConfigurationService} from "./blueprint-commands.server";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { getBlueprintPlanningContext } from "./verified-site-planning.server";
-import { assertCapability } from "@/domain/command-context";
 import {
   createBlueprintConfigurationInputSchema,
   saveBlueprintConfigurationInputSchema,
@@ -28,18 +27,7 @@ function noStore() {
   setResponseHeader("Cache-Control", "private, no-store");
 }
 
-export const readCanonicalBlueprintHome = createServerFn({ method: "GET" })
-  .handler(async () => {
-    noStore();
-    const context = await getBlueprintPlanningContext(getRequest());
-    assertCapability(context, "blueprint.read");
-    return {
-      role: context.role,
-      siteIds: context.scope.siteIds ?? [],
-      organizationId: context.scope.organizationIds?.[0] ?? null,
-      referencesEnabled: true,
-    };
-  });
+export const readCanonicalBlueprintHome=createServerFn({method:"GET"}).handler(async()=>{noStore();return readCanonicalBlueprintHomeService(getRequest());});
 
 export const exploreCanonicalBlueprintReferences = createServerFn({ method: "GET" })
   .validator((value: unknown) => blueprintReferenceCatalogInputSchema.parse(value))

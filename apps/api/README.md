@@ -53,3 +53,5 @@ Media inventory, short-lived audience-authorized media access, joined-room state
 
 ## Class administration
 Eight protected HTTP operations now support Class draft creation, independent activation, Class Offering publication/closure/new version, private scoped Class discovery, operator Sites and bounded Course options. All existing operator authorization, published Offering/adoption and publisher-local variation checks remain in the single shared service. Class activation is distinct from enrollment publication; a closed publication does not erase participants or history. The draft input now rejects unknown top-level fields rather than ignoring them. No runtime acceptance yet.
+
+Independent reviewers can read the exact submitted Offering manuscript (manifest identifier and hash required), current proposed adoption queue, and verified Blueprint planning context. No hash-only approval shortcuts. Manuscript payloads retain existing bounded domain JSON specifications; exact response/Swagger compatibility remains to be runtime verified. The adoption queue's readiness is a diagnostic projection, not authorization to approve.

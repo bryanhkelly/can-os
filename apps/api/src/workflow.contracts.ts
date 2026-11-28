@@ -63,3 +63,9 @@ export const readDocs={
  review:obj({configurationVersionId:id,lifecycle:str,latestReview:{...obj(decided),nullable:true},components:arr(obj({componentId:id,decision:str}))}),
  history:obj({configurationVersionId:id,page:{type:'integer',minimum:0,maximum:100},hasMore:bool,items:arr(obj({...decided,evidenceVersionId:nullableId,rationale:{...str,nullable:true}}),20)})
 };
+
+export const planningHomeResult=z.object({role:z.string(),siteIds:z.array(uuid),organizationId:uuid.nullable(),referencesEnabled:z.literal(true)}).strict();
+export const adoptionQueueResult=z.object({items:z.array(z.object({adoptionId:uuid,deploymentId:uuid,offeringVersionId:uuid,title:z.string(),versionNo:z.number().int().positive(),lifecycle:z.string(),publishedAt:z.string().datetime({offset:true}).nullable(),offeringStatus:z.string(),deploymentName:z.string(),deploymentState:z.string(),operationState:z.string(),approvalStatus:z.literal('proposed'),blueprintExecutionRecorded:z.boolean(),readiness:z.array(z.object({kind:z.string(),recordedReady:z.boolean()}).strict()),evidencePreviewLimited:z.boolean()}).strict()).max(60),limited:z.boolean()}).strict();
+export const planningHomeDoc=obj({role:str,siteIds:arr(id),organizationId:nullableId,referencesEnabled:{...bool,enum:[true]}});
+export const adoptionQueueDoc=obj({items:arr(obj({adoptionId:id,deploymentId:id,offeringVersionId:id,title:str,versionNo:integer,lifecycle:str,publishedAt:{...str,format:'date-time',nullable:true},offeringStatus:str,deploymentName:str,deploymentState:str,operationState:str,approvalStatus:en(['proposed']),blueprintExecutionRecorded:bool,readiness:arr(obj({kind:str,recordedReady:bool})),evidencePreviewLimited:bool}),60),limited:bool});
+export const noQuery=z.object({}).strict();

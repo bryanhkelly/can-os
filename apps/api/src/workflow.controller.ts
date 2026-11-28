@@ -5,7 +5,7 @@ import {GovernedWorkflowOperation,verifiedWorkflow} from './security';
 import {CanonicalIdentityService,type WorkflowMode} from './identity.service';
 import {problemOpenApiSchema} from './contracts';
 import {validated} from './learning.contracts';
-import {inputs,results,outputDocs,readResults,readDocs,configParams,versionParams,historyQuery} from './workflow.contracts';
+import {inputs,results,outputDocs,readResults,readDocs,configParams,versionParams,historyQuery,planningHomeResult,adoptionQueueResult,planningHomeDoc,adoptionQueueDoc,noQuery} from './workflow.contracts';
 function Governed(mode:WorkflowMode){
  return applyDecorators(GovernedWorkflowOperation(mode),HttpCode(200),ApiHeader({name:'Origin',required:true}),ApiCookieAuth('session'),
  ...(mode==='can'?[]:[ApiCookieAuth('nativeSession')]),
@@ -118,5 +118,24 @@ export class WorkflowController{
  history(@Req() req:FastifyRequest,@Param() params:unknown,@Query() query:unknown){
   const input=validated(versionParams,params),q=validated(historyQuery,query),workflow=verifiedWorkflow(req);
   return this.identity.runWorkflow(async()=>readResults.history.parse(await workflow.readCanonicalBlueprintReviewHistory({...input,page:q.page??0})));
+ }
+ @Get('blueprint-planning-context')
+ @GovernedRead()
+ @ApiOperation({operationId:'getBlueprintPlanningContext',summary:'Current verified Blueprint planning scope'})
+ @ApiOkResponse({schema:planningHomeDoc})
+ home(@Req() req:FastifyRequest,@Query() query:unknown){
+  validated(noQuery,query);const workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>planningHomeResult.parse(await workflow.readCanonicalBlueprintHome(undefined)));
+ }
+ @Get('offering-adoption-review-queue')
+ @GovernedWorkflowOperation('canonical','GET')
+ @ApiCookieAuth('session')
+ @ApiOperation({operationId:'listOfferingAdoptionReviewQueue',summary:'Current proposed adoptions within independent reviewer scope; bounded diagnostic readiness preview'})
+ @ApiOkResponse({schema:adoptionQueueDoc})
+ @ApiResponse({status:401,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:403,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ adoptionQueue(@Req() req:FastifyRequest,@Query() query:unknown){
+  validated(noQuery,query);const workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>adoptionQueueResult.parse(JSON.parse(JSON.stringify(await workflow.getNativeOfferingAdoptionReviewQueue(undefined)))));
  }
 }

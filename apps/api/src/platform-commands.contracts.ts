@@ -68,3 +68,16 @@ export const releaseReadDocs={
  queue:obj({items:arr(obj({id,offeringVersionId:id,offeringTitle:string,manifestHash:digest,status:string,current:bool,assetCount:countDoc,releasePoliciesComplete:bool,courseCount:countDoc,allCoursesPublished:bool,offeringPublished:bool,reviews:arr(obj({kind:choice(reviewKind.options),decision:choice(reviewStatus.options)}))}),60),
  nextCursor:{...obj({createdAt:{type:'string',format:'date-time'},id}),nullable:true}}),
 };
+
+/** Reviewer-only exact manuscript JSON, including existing extensible content
+ * specs. Nested official assignment/policy data is normalized to JSON; the
+ * outer response and manuscript unit/lesson identity remain explicit. */
+const jsonValue:z.ZodType<unknown>=z.lazy(()=>z.union([z.null(),z.boolean(),z.string(),z.number().finite(),z.array(jsonValue),z.record(jsonValue)]));
+const jsonObject=z.record(jsonValue);
+const unit=z.object({id:uuid,title:z.string(),sequenceNo:count,content:jsonValue,lessons:z.array(z.object({id:uuid,lessonKey:z.string(),title:z.string(),lessonOrder:count,content:jsonValue}).strict()).max(2000)}).strict();
+const manuscriptCourse=z.object({courseVersionId:uuid,courseTitle:z.string(),courseCode:z.string(),isRequired:z.boolean(),syllabus:jsonValue,assignments:z.array(jsonObject).max(2000),deliveryAssignments:z.array(jsonObject).max(2000),gradingPolicies:z.array(jsonObject).max(500),units:z.array(unit).max(1000)}).strict();
+export const exactReviewQuery=z.object({manifestId:uuid,expectedHash:hash}).strict();
+export const exactReviewResult=z.object({offeringTitle:z.string(),offeringVersionId:uuid,reviewedManifestHash:hash,manuscriptHash:hash,policyRevision:hash,policies:z.array(policyRead).max(51),assetItems:z.array(z.object({assetVersionId:uuid,usageKind:use,contentHash:hash,rightsEvidenceVersionId:uuid.nullable()}).strict()).max(50),productDefinition:jsonValue,courseCount:count,lessonCount:count,courses:z.array(manuscriptCourse).max(50)}).strict();
+const jsonDoc={type:'object' as const,additionalProperties:true};
+const unitDoc=obj({id,title:string,sequenceNo:countDoc,content:jsonDoc,lessons:arr(obj({id,lessonKey:string,title:string,lessonOrder:countDoc,content:jsonDoc}),2000)});
+export const exactReviewDoc=obj({offeringTitle:string,offeringVersionId:id,reviewedManifestHash:digest,manuscriptHash:digest,policyRevision:digest,policies:arr(policyReadDoc,51),assetItems:arr(obj({assetVersionId:id,usageKind:choice(use.options),contentHash:digest,rightsEvidenceVersionId:{...id,nullable:true}}),50),productDefinition:jsonDoc,courseCount:countDoc,lessonCount:countDoc,courses:arr(obj({courseVersionId:id,courseTitle:string,courseCode:string,isRequired:bool,syllabus:jsonDoc,assignments:arr(jsonDoc,2000),deliveryAssignments:arr(jsonDoc,2000),gradingPolicies:arr(jsonDoc,500),units:arr(unitDoc,1000)}),50)});

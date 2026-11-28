@@ -264,3 +264,15 @@ test('Class management has distinct activation, publication and closure operatio
  assert.equal(optionsQuery.safeParse({siteId:'not-a-uuid'}).success,false);
  assert.equal(optionsQuery.safeParse({organizationId:'forged'}).success,false);
 });
+
+test('independent reviewer discovery and exact manuscript reads have protected HTTP contracts',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const route of ['/api/v1/blueprint-planning-context','/api/v1/offering-adoption-review-queue','/api/v1/offering-versions/{offeringVersionId}/review-content']){
+   assert.ok(document.paths[route].get.security);assert.ok(document.paths[route].get.responses['403']);
+   assert.equal((await fetch(url+route.replace('{offeringVersionId}','00000000-0000-4000-8000-000000000001'))).status,401);
+  }
+ });
+ const {exactReviewQuery}=require('../dist/platform-commands.contracts');
+ assert.equal(exactReviewQuery.safeParse({manifestId:'00000000-0000-4000-8000-000000000001',expectedHash:'a'.repeat(64)}).success,true);
+ assert.equal(exactReviewQuery.safeParse({manifestId:'00000000-0000-4000-8000-000000000001',expectedHash:'a'.repeat(64),reviewerPersonId:'forged'}).success,false);
+});

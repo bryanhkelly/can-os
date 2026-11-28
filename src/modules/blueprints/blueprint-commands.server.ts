@@ -1,3 +1,4 @@
+import {assertCapability} from "@/domain/command-context";
 import {z} from "zod";
 import {getCanonicalCommandContext} from "@/modules/identity/canonical-command-context.server";
 import {getBlueprintPlanningContext} from "./verified-site-planning.server";
@@ -57,4 +58,11 @@ export async function readCanonicalBlueprintReviewService(request:Request,raw:un
 }
 export async function readCanonicalBlueprintReviewHistoryService(request:Request,raw:unknown){
  return getBlueprintReviewHistory(await getBlueprintPlanningContext(request),raw);
+}
+
+/** Same planning scope used for discovery and authoring. */
+export async function readCanonicalBlueprintHomeService(request:Request){
+ const context=await getBlueprintPlanningContext(request);
+ assertCapability(context,"blueprint.read");
+ return {role:context.role,siteIds:context.scope.siteIds??[],organizationId:context.scope.organizationIds?.[0]??null,referencesEnabled:true};
 }
