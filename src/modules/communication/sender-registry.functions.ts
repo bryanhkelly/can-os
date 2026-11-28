@@ -1,6 +1,6 @@
 import {createServerFn} from "@tanstack/react-start";
 import {setResponseHeader} from "@tanstack/react-start/server";
-import {scopeInput,changeInput,revokeInput} from "./sender-registry.inputs";
+import {scopeInput,changeInput,revokeInput,pageInput} from "./sender-registry.inputs";
 export const readSenderAdministration=createServerFn({method:"GET"}).validator((input:unknown)=>scopeInput.parse(input)).handler(async({data})=>{
  setResponseHeader("Cache-Control","private, no-store");
  return (await import("./sender-registry.server")).readSenderAdministration(data.organizationId);
@@ -18,4 +18,9 @@ export const revokeSenderAdministration=createServerFn({method:"POST"}).validato
 export const listSenderOrganizations=createServerFn({method:"GET"}).handler(async()=>{
  setResponseHeader("Cache-Control","private, no-store");
  return (await import("./sender-registry.server")).listSenderOrganizations();
+});
+
+export const listSenderOrganizationsPage=createServerFn({method:"GET"}).validator((input:unknown)=>pageInput.parse(input)).handler(async({data})=>{
+ setResponseHeader("Cache-Control","private, no-store");
+ return (await import("./sender-registry.server")).listSenderOrganizationsPage(data);
 });
