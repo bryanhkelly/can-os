@@ -14,7 +14,7 @@ const suite=suites[selected as keyof typeof suites];
 if(!env[suite.fixture])throw Error("Reviewed isolated QA fixture required");
 if(!provision.webServer||Array.isArray(provision.webServer))throw Error("Existing isolated QA server configuration required");
 export default defineConfig({
-  ...provision,use:{...provision.use,baseURL:"http://localhost:3001"},testMatch:[...suite.files],timeout:600000,projects:[{name:"http-only"}],
+  ...provision,...(selected==="pilot2"?{reporter:[["list"],["./tests/e2e/helpers/nest-pilot2-receipt-reporter.ts"]] as import("@playwright/test").ReporterDescription[]}:{}),use:{...provision.use,baseURL:"http://localhost:3001"},testMatch:[...suite.files],timeout:600000,projects:[{name:"http-only"}],
   webServer:[{
     command:"npm --prefix apps/api start",
     url:"http://127.0.0.1:3001/api/v1/health/live",reuseExistingServer:false,timeout:30000,
