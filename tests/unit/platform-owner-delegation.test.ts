@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolveAccessContext, roleCapabilities } from "@/domain/access-context";
-import { platformOwnerMayActAs, platformOwnerDelegationIsCurrent,
+import { platformOwnerMayActAs, platformOwnerMayActAsTarget, platformOwnerDelegationIsCurrent,
   ownerDelegationLifetimeMs } from "@/domain/platform-owner-delegation";
 import { getWorkspaceHome, getWorkspaceLinks } from "@/components/shell/workspace-navigation.registry";
 
@@ -51,6 +51,34 @@ describe("Platform Owner signed delegation foundation",()=>{
     expect(platformOwnerMayActAs("site_admin")).toBe(true);
   });
 
+  it("permits synthetic family rehearsal without widening independent identity roles",()=>{
+    for(const role of ["student","guardian"]){
+      expect(platformOwnerMayActAsTarget(role,true)).toBe(true);
+      expect(platformOwnerMayActAsTarget(role,false)).toBe(false);
+    }
+    for(const role of ["account_holder","platform_owner","app_admin","academic_content_reviewer",
+      "can_network_steward","can_credential_reviewer","reporting_relationship_manager","safeguarding_lead","unknown_role"]){
+      expect(platformOwnerMayActAsTarget(role,true),role).toBe(false);
+      expect(platformOwnerMayActAsTarget(role,false),role).toBe(false);
+    }
+    expect(platformOwnerMayActAsTarget("teacher",true)).toBe(true);
+    expect(platformOwnerMayActAsTarget("teacher",false)).toBe(true);
+  });
+
+  it("reuses existing delegation UI and retains independent database issuer protection",()=>{
+    const switcher=source("src/components/shell/WorkspaceContextSwitcher.tsx");
+    const panel=source("src/components/platform/PlatformOwnerDelegationPanel.tsx");
+    const sql=source("drizzle/0137_restricted_staff_owner_delegation_parity.sql");
+    expect(switcher).toContain("<PlatformOwnerDelegationPanel compact />");
+    expect(switcher).toContain('current?.role==="platform_owner" && !session.ownerDelegation');
+    expect(panel).toContain("disabled={!target.canAct}");
+    expect(sql).toContain("s.delegated_mode='act'");
+    expect(sql).toContain("synthetic_scope.approved AND target_person.domain=org.domain");
+    expect(sql).toContain("owner_grant.role='platform_owner'");
+    expect(sql).toContain("source_session.delegated_grant_id IS NULL");
+    expect(sql).not.toContain("admin.demo@valorschool.demo");
+  });
+
   it("resolves delegated identity exclusively from original signed owner session and a live target grant",()=>{
     const auth=source("src/modules/identity/command-context.server.ts");
     const service=source("src/modules/identity/platform-owner-delegation.server.ts");
@@ -63,7 +91,9 @@ describe("Platform Owner signed delegation foundation",()=>{
     expect(service).toContain("assertPlatformOwnerUndelegated(owner)");
     expect(auth).toContain('request.method!=="GET"');
     expect(auth).toContain("context.impersonatedByAccountId=session.accountId");
-    expect(auth).toContain("platformOwnerMayActAs(exact.role)");
+    expect(auth).toContain("mayActAsDelegationTarget(exact)");
+    expect(service).toContain("mayActAsDelegationTarget(target,tx)");
+    expect(service).toContain("matchesDemoCredentialScope(target.email,target.organizationId,target.siteId,reader)");
     expect(service).toContain('eq(accountPersonGrants.role, "platform_owner")');
     expect(service).toContain("eq(accessSessions.activeGrantId, owner.grantId)");
     expect(service).toContain('action: "platform.owner.delegation.started"');
