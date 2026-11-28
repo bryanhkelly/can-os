@@ -2,8 +2,7 @@ import {InvalidAccessCredentialError,logAuthenticationUnavailable} from "@/domai
 import {accessLandingPath,accessReturnCookieHeader,safeAccessReturnTo} from "@/domain/access-navigation";
 import {AuthorizationError} from "@/domain/command-context";
 import {readTrustedSessionDevice} from "./trusted-session-device.server";
-import {getCommandContext} from "./command-context.server";
-import {revokeAccessSession} from "./passwordless-access.server";
+import {revokePresentedAccessSession} from "./passwordless-access.server";
 
 /** Shared Web Request handlers: original admission, challenge redemption, device
  * classification and session revocation. No additional identity mechanism. */
@@ -143,8 +142,10 @@ export async function handleAccessLogout(request:Request):Promise<Response>{
    if(new URL(request.url).origin!==request.headers.get("origin"))
     return Response.json({error:"Invalid request origin"},{status:403});
    try {
-    const {sessionId,accountId,sessionAccountId,impersonatedByAccountId}=await getCommandContext(request);
-    const cookie=await revokeAccessSession(sessionId,impersonatedByAccountId??sessionAccountId??accountId);
+    const cookie=await revokePresentedAccessSession(request);
     return new Response(null,{status:204,headers:{"Set-Cookie":cookie,"Cache-Control":"no-store"}});
-   }catch{return Response.json({error:"Unauthorized"},{status:401});}
+   }catch(error){
+    if(error instanceof AuthorizationError)return Response.json({error:"Unauthorized"},{status:401,headers:{"Cache-Control":"no-store"}});
+    return Response.json({error:"Authentication temporarily unavailable."},{status:503,headers:{"Cache-Control":"no-store","Retry-After":"30"}});
+   }
 }
