@@ -684,3 +684,21 @@ test('WS03 modular registration preserves singleton identity and protected geogr
  assert.equal(params.safeParse({siteId,organizationId:siteId}).success,false);
  assert.equal(empty.safeParse({asOf:'2025-01-01'}).success,false);
 });
+
+
+test('WS03 directory and denomination HQ Site operations are session-scoped',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const path of ['/api/v1/me/sites','/api/v1/me/network-sites']){
+   assert.ok(document.paths[path].get.security);
+   assert.equal((await fetch(url+path,{headers:{'x-role':'network_admin'}})).status,401);
+  }
+  assert.ok(document.paths['/api/v1/me/network-sites'].post.security);
+  const response=await fetch(url+'/api/v1/me/network-sites',{method:'POST',headers:{origin:url,'content-type':'application/json'},body:'{}'});
+  assert.equal(response.status,503);
+ });
+ const {create,empty}=require('../dist/organization-site-directory.contracts');
+ const valid={name:'HQ Site',slug:'hq-site',timezone:'America/Los_Angeles'};
+ assert.equal(create.safeParse(valid).success,true);
+ assert.equal(create.safeParse({...valid,organizationId:'00000000-0000-4000-8000-000000000001'}).success,false);
+ assert.equal(empty.safeParse({organizationId:'forged'}).success,false);
+});

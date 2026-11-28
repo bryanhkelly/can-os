@@ -39,5 +39,8 @@ export type OrganizationLaunchOperation =
   | 'reviewLaunchEvidence'
   | 'activateLaunch'
   | 'scheduleLaunchOrientation'
-  | 'readSiteGeography';
+  | 'readSiteGeography'
+  | 'listMySites'
+  | 'getNetworkSites'
+  | 'createNetworkSite';
 export type OrganizationLaunchWorkflow=Record<OrganizationLaunchOperation,(input:unknown)=>Promise<unknown>>;

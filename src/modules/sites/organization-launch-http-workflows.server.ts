@@ -17,9 +17,14 @@ import {listSitePreviewSharesService,createSitePreviewShareService,setSitePrevie
 import {getStaffLaunchWorkspaceService,getLaunchStudioDraftService,saveLaunchStudioDraftService} from "@/modules/programs/launch-drafts.server";
 import {listLaunchOptionsService,getLaunchEntryService} from "@/modules/programs/launch-discovery.server";
 
+import {listMySitesService} from "@/modules/operations/site-directory.server";
+import {getNetworkSitesService,createNetworkSiteService,createSiteInput} from "@/modules/networks/network-sites.server";
 const geographyInput=z.object({siteId:z.string().uuid()}).strict();
 export function organizationLaunchWorkflows(request:Request,mode:string){
  return {
+  listMySites:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Site directory context");parseCommandInput(z.object({}).strict(),raw);return listMySitesService(request);},
+  getNetworkSites:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Network Site context");parseCommandInput(z.object({}).strict(),raw);return getNetworkSitesService(request);},
+  createNetworkSite:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Network Site context");return createNetworkSiteService(request,parseCommandInput(createSiteInput,raw));},
   getStaffLaunchWorkspace:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Launch workspace context");return getStaffLaunchWorkspaceService(request);},
   getLaunchStudioDraft:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Launch workspace context");return getLaunchStudioDraftService(request,raw);},
   saveLaunchStudioDraft:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Launch workspace context");return saveLaunchStudioDraftService(request,raw);},

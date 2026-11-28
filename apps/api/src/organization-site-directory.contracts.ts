@@ -1,0 +1,14 @@
+import {z} from 'zod';
+const id=z.string().uuid(),s=z.string();
+const site=z.object({id,name:s,slug:s,timezone:s}).strict();
+const directorySite=site.extend({organizationSlug:s,organizationName:s});
+export const empty=z.object({}).strict();
+export const directory=z.array(directorySite);
+export const network=z.object({organization:z.object({id,name:s}).strict(),sites:z.array(site)}).strict();
+export const create=z.object({name:s.trim().min(2).max(160),slug:s.trim().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),timezone:s.trim().min(3).max(80)}).strict();
+export const receipt=z.object({siteId:id,created:z.boolean()}).strict();
+const text={type:'string' as const},uuid={...text,format:'uuid'};
+const obj=(properties:Record<string,any>)=>({type:'object' as const,properties,required:Object.keys(properties),additionalProperties:false});
+const arr=(items:Record<string,any>)=>({type:'array' as const,items});
+const siteDoc=obj({id:uuid,name:text,slug:text,timezone:text});
+export const docs={directory:arr(obj({...siteDoc.properties,organizationSlug:text,organizationName:text})),network:obj({organization:obj({id:uuid,name:text}),sites:arr(siteDoc)}),create:obj({name:{...text,minLength:2,maxLength:160},slug:{...text,pattern:'^[a-z0-9]+(?:-[a-z0-9]+)*$'},timezone:{...text,minLength:3,maxLength:80}}),receipt:obj({siteId:uuid,created:{type:'boolean'}})};
