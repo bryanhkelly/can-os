@@ -16,3 +16,15 @@ export async function checkStudentContract(client:BecomunaBrowserApi, enrollment
  // @ts-expect-error the exact enrollment path parameter is required
  await client.GET('/api/v1/me/class-enrollments/{classEnrollmentId}/resume',{params:{path:{}}});
 }
+
+export async function checkOwnerControlContract(client:BecomunaBrowserApi,grantId:string){
+ const status=await client.GET('/api/v1/owner/delegation');
+ if(status.data){const active:boolean=status.data.active;void active;}
+ await client.GET('/api/v1/owner/delegation-targets',{params:{query:{search:'example'}}});
+ await client.POST('/api/v1/owner/delegation',{body:{grantId,mode:'view',reason:'Reviewed support request'}});
+ await client.POST('/api/v1/owner/delegation/return',{body:{confirm:true}});
+ // @ts-expect-error cannot select an effective account or arbitrary role
+ await client.POST('/api/v1/owner/delegation',{body:{grantId,mode:'view',reason:'Reviewed support request',role:'platform_owner'}});
+ // @ts-expect-error explicit confirmation required
+ await client.POST('/api/v1/owner/delegation/return',{body:{}});
+}
