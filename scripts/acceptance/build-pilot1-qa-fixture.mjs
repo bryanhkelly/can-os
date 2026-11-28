@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import {neon} from "@neondatabase/serverless";
 import {verifyAdmissionsNeonBranch} from "../verify-admissions-neon-branch.mjs";
 const env=process.env;
-const branch="br-spring-frog-arnmih9w";
+const branch="br-solitary-art-arun91gj";
 const correct={
   "qa-item-1":"Define the decision",
   "qa-item-2":"Participants’ availability",
