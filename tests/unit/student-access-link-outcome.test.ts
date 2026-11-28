@@ -115,10 +115,18 @@ describe("student approval and sign-in request outcomes",()=>{
   state.insert.mockImplementation(()=>({values:()=>({returning:async()=>[{id:"new-account",personId:"student",disabled:false,privateCredential:true}]})}));
   const result=await provisionStudentLearningAccess({data:input});
   expect(result).toEqual({status:"approved",signInRequest:"private_code",privateAccessCode:"a".repeat(43)});
-  expect(state.scope).not.toHaveBeenCalled();
+  expect(state.scope).toHaveBeenCalledWith("child@example.demo","church","site",expect.anything());
   expect(state.sender).not.toHaveBeenCalled();
   expect(state.emit).toHaveBeenCalledTimes(1);
   expect(JSON.stringify(state.audit.mock.calls)).not.toContain("a".repeat(43));
+ });
+ it("keeps the standard demo code even if the operator may issue individual credentials",async()=>{
+  rows("pending_review",undefined,"child@example.demo");
+  state.issuer.mockResolvedValue(true);
+  state.scope.mockResolvedValue(true);
+  expect(await provisionStudentLearningAccess({data:input})).toEqual({status:"approved",signInRequest:"demo_code"});
+  expect(state.sender).not.toHaveBeenCalled();
+  expect(state.emit).toHaveBeenCalledTimes(1);
  });
  it("reuses an existing private student credential without sending or revealing it",async()=>{
   rows("approved",undefined,"child@example.demo");
