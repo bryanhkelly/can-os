@@ -14,6 +14,7 @@ import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canoni
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { assertNativeClassSessionSeries, canChangeUnopenedClassSession } from "@/domain/native-class-sessions";
 import { requireNativeClassSessionHost } from "./native-class-session-host.server";
+import { currentClassAuthority } from "./native-class-authority.server";
 import { assertCurrentNativeClassFacilitatorSession } from "./native-class-facilitator-session.server";
 import { requireCanonicalFacilitator } from "@/modules/learning/canonical-facilitator-access.server";
 import { requireFacilitatedLearningEnabled } from "@/modules/learning/canonical-learning-release.server";
@@ -149,15 +150,30 @@ export const changeNativeClassSessionSchedule=createServerFn({method:"POST"})
     const host=await requireCanonicalFacilitator();
     return db.transaction(async tx=>{
       const now=new Date();
-      // Lock the parent Class to serialize against both schedule/create
-      // operations and other Session change commands.
-      const cls=await requireNativeClassSessionHost(tx,host,data.classId,now,true);
-      await assertCurrentNativeClassFacilitatorSession(tx,host.actor);
+      // An exact-Site manager can cancel an unavailable facilitator’s future
+      // Session, but cannot schedule or open a replacement on their behalf.
+      // The new facilitator must use their own current grant and Class assignment.
+      const managerCancellation=data.replacement===null &&
+        ["site_admin","registrar"].includes(host.actor.role??"") &&
+        host.actor.capabilities.has("class.manage");
+      const cls=managerCancellation
+        ? (await tx.select().from(canonicalClasses)
+          .where(eq(canonicalClasses.id,data.classId)).for("update").limit(1))[0]
+        : await requireNativeClassSessionHost(tx,host,data.classId,now,true);
+      if(!cls || cls.state!=="active" || !cls.siteId ||
+         cls.operatingOrganizationId!==host.organizationId ||
+         !host.siteIds.includes(cls.siteId) ||
+         !["scheduled","hybrid","facilitated"].includes(cls.deliveryMode))
+        throw new AuthorizationError("active exact-Site Class scheduling authority");
+      if(managerCancellation){
+        await currentClassAuthority(tx,cls.id,now);
+        await assertCurrentCanonicalStaffForMutation(tx,getRequest(),host.actor);
+      }else await assertCurrentNativeClassFacilitatorSession(tx,host.actor);
       const [original]=await tx.select().from(canonicalClassSessions)
         .where(and(eq(canonicalClassSessions.id,data.classSessionId),
           eq(canonicalClassSessions.classId,cls.id))).limit(1);
-      if(!original||original.facilitatorPersonId!==host.actor.actorPersonId)
-        throw new AuthorizationError("own currently authorized native Class Session");
+      if(!original||(!managerCancellation && original.facilitatorPersonId!==host.actor.actorPersonId))
+        throw new AuthorizationError("own Session or exact-Site manager cancellation");
       const [plan]=await tx.select().from(facilitatedClassroomPlans).where(and(
         eq(facilitatedClassroomPlans.id,original.classroomPlanId),
         eq(facilitatedClassroomPlans.deliverySessionId,original.deliverySessionId),
@@ -165,7 +181,7 @@ export const changeNativeClassSessionSchedule=createServerFn({method:"POST"})
         eq(facilitatedClassroomPlans.courseVersionId,cls.courseVersionId),
         eq(facilitatedClassroomPlans.hostOrganizationId,cls.operatingOrganizationId),
         eq(facilitatedClassroomPlans.siteId,cls.siteId!),
-        eq(facilitatedClassroomPlans.facilitatorPersonId,host.actor.actorPersonId!),
+        eq(facilitatedClassroomPlans.facilitatorPersonId,original.facilitatorPersonId),
       )).for("update").limit(1);
       const [delivery]=await tx.select().from(canonicalDeliverySessions).where(and(
         eq(canonicalDeliverySessions.id,original.deliverySessionId),
@@ -245,6 +261,8 @@ export const changeNativeClassSessionSchedule=createServerFn({method:"POST"})
         classId:cls.id,requestId:data.requestId,
         cancelledSessionId:original.id,
         replacementSessionId,
+        originalFacilitatorPersonId:original.facilitatorPersonId,
+        actorAuthority:managerCancellation?"site_manager_cancellation":"assigned_facilitator",
         reason:data.reason,
         replacementStartsAt:data.replacement?.startsAt??null,
         replacementEndsAt:data.replacement?.endsAt??null,
