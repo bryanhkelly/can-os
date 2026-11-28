@@ -39,3 +39,26 @@ export const participationDocs={
  withdrawResult:obj({withdrawn:yes,alreadyWithdrawn:bool}),
  page:obj({items:{type:'array' as const,maxItems:50,items:obj({releaseId:id,title:str,emailDeliveryStatus:{...str,nullable:true},status:{...str,enum:['waiting','invited','expired']},invitationActive:bool,inviteExpiresAt:nullableDate,joinedAt:dateDoc})},nextCursor:{...obj({joinedAt:dateDoc,waitlistId:id}),nullable:true}}),
 };
+
+export const admissionOptionsInput=z.object({applicationId:uuid.optional(),siteId:uuid.optional(),programId:uuid.optional()}).strict();
+export const issueOfferInput=z.object({applicationId:uuid,schoolYearId:uuid}).strict();
+export const respondOfferInput=z.object({offerId:uuid,decision:z.enum(['accept','decline'])}).strict();
+export const activateOfferInput=z.object({offerId:uuid,sectionId:uuid.optional()}).strict();
+export const withdrawOfferInput=z.object({offerId:uuid,reason:z.string().trim().min(10).max(2000),confirmed:z.literal(true)}).strict();
+export const classWithdrawInput=z.object({classEnrollmentId:uuid}).strict();
+export const classCancelInput=z.object({classEnrollmentId:uuid,reason:z.enum(['not_eligible','operator_decision'])}).strict();
+export const offerReceipt=z.object({offerId:uuid}).strict();
+export const activationReceipt=z.object({enrollmentId:uuid}).strict();
+export const admissionOptionsResult=z.array(z.object({applicationId:uuid,years:z.array(z.object({id:uuid,name:z.string(),capacity:z.number().int().nonnegative()}).strict())}).strict()).max(1);
+export const classExitReceipt=z.object({classEnrollmentId:uuid,status:z.enum(['withdrawn','cancelled']),releasedSeat:z.boolean(),alreadyClosed:z.boolean()}).strict();
+export const admissionDocs={
+ issue:obj({applicationId:id,schoolYearId:id}),
+ respond:obj({offerId:id,decision:{...str,enum:['accept','decline']}}),
+ activate:obj({offerId:id,sectionId:id},['offerId']),
+ withdraw:obj({offerId:id,reason:{...str,minLength:10,maxLength:2000},confirmed:yes}),
+ offerReceipt:obj({offerId:id}),activationReceipt:obj({enrollmentId:id}),
+ options:{type:'array' as const,maxItems:1,items:obj({applicationId:id,years:{type:'array' as const,items:obj({id,name:str,capacity:{type:'integer',minimum:0}})}})},
+ classWithdraw:obj({classEnrollmentId:id}),
+ classCancel:obj({classEnrollmentId:id,reason:{...str,enum:['not_eligible','operator_decision']}}),
+ classExitReceipt:obj({classEnrollmentId:id,status:{...str,enum:['withdrawn','cancelled']},releasedSeat:bool,alreadyClosed:bool}),
+};
