@@ -23,3 +23,9 @@ Explicit strict request and response contracts; current cookie-based identity, d
 - Remaining WS10: inventory all Action creation paths and other domain review/approval queues; design federated authorized inbox and explicit escalation policies without inventing authority; implement remaining resource-specific APIs, pagination, stale-write handling and acceptance journeys.
 
 Do not promote or merge for release solely on these source changes.
+
+## Second slice — manual operational work and federated inbox
+
+Four additional protected operations: GET/POST /api/v1/work/tasks, POST /api/v1/work/tasks/{id}/escalations, GET /api/v1/work/inbox. Manual tasks are Site-scoped, optionally bound to an existing Program at that Site, and represented by canonical Actions with a fixed operational_task type. Creation uses a request-scoped deterministic ID, payload fingerprint and transaction lock. Assignment is restricted to currently verified Site operators; no caller-defined approval kind. Escalation requires a reason and current revision, raises priority to urgent, and writes audit, event and notification in one transaction. Generic status/assignment/deadline paths recheck current manual-task authority, and generic assignment cannot bypass the escalation command. Listing uses UUID keyset pages of 50.
+
+Inbox projects existing authorized operational queues and credential requests/reviews; no copied workflow records, no caller-selected role, and explicit source bounds. Other roles and domain approvals remain outside this first projection. No automated escalation scheduler, organization-only or Offering-level manual tasks, frontend integration, or authenticated runtime acceptance yet. Added HTTP/schema and SDK contract checks; these must be executed before promotion.
