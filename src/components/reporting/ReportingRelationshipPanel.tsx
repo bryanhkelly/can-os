@@ -22,6 +22,7 @@ const actionLabels={
 export type RelationshipPanelEntry={
   agreement:Omit<ReportingRelationship,"proposedByPersonId"|"acceptedByPersonId">;
   scopeName?:string;
+  inherited?:boolean;
   organizationName:string;
   metricLabels:readonly string[];
   allowedActions:readonly RelationshipAction[];
@@ -59,7 +60,7 @@ function RelationshipPanelContent({scope,entries,recipients,metrics,canPropose,b
   const today=new Date().toISOString().slice(0,10);
   const coverageValid=selected.length===0||coverageMode!=="from_date"||!!coverageDate&&coverageDate<=today;
   const expiryValid=!expiryDate||expiryDate>today;
-  const canSubmit=canPropose&&!busy&&currentRecipient&&coverageValid&&expiryValid;
+  const canSubmit=canPropose&&!busy&&currentRecipient&&coverageValid&&expiryValid&&availableMetrics.length===selected.length;
   function amend(entry:RelationshipPanelEntry){
     const a=entry.agreement;
     setSupersedesId(a.id);setRecipient(a.recipientOrganizationId);setKind(a.relationshipKind);
@@ -74,13 +75,14 @@ function RelationshipPanelContent({scope,entries,recipients,metrics,canPropose,b
     </div>
     {error&&<WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
     {entries.length===0?<EmptyState title="No relationships for this scope yet."/>:
-      <ul className="space-y-3">{entries.map(entry=>{const {agreement,organizationName,scopeName,metricLabels,allowedActions}=entry;return <li key={agreement.id} className="space-y-2 border border-border p-3">
+      <ul className="space-y-3">{entries.map(entry=>{const {agreement,organizationName,scopeName,metricLabels,allowedActions,inherited}=entry;return <li key={agreement.id} className="space-y-2 border border-border p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-sm font-semibold">{organizationName}</span>
             <StatusBadge tone={agreement.status==="accepted"?"success":agreement.status==="pending"?"attention":"neutral"}>{agreement.status}</StatusBadge>
           </div>
           <p className="text-sm">{relationshipLabels[agreement.relationshipKind]}</p>
           <p className="text-sm text-muted-foreground">Scope: {agreement.scopeKind}{scopeName?": "+scopeName:""}. Selected metrics: {metricLabels.join(", ")||"None — relationship only"}.</p>
+          {inherited&&<p className="text-sm text-muted-foreground">Inherited from {agreement.scopeKind}; manage at the source.</p>}
           {agreement.metrics.length>0&&<p className="text-sm text-muted-foreground">Reporting coverage: {agreement.coverageMode==="all_history"?"All eligible history":agreement.coverageMode==="from_date"?"From "+agreement.coverageFrom?.slice(0,10)+" (UTC)":"From acceptance"}.</p>}
           {agreement.supersedesId&&<p className="text-sm text-muted-foreground">Amendment to prior terms.</p>}
           {agreement.validThrough&&<p className="text-sm text-muted-foreground">Ends {agreement.validThrough.slice(0,10)} (UTC).</p>}
@@ -119,7 +121,7 @@ function RelationshipPanelContent({scope,entries,recipients,metrics,canPropose,b
       </Field>
       <fieldset disabled={busy} className="space-y-2">
         <legend className="mb-2 text-sm font-semibold">Aggregate reporting metrics</legend>
-        {metrics.length===0?<p className="text-sm text-muted-foreground">No metrics are approved for sharing at this scope.</p>:metrics.map(m=>{
+        {metrics.length===0?<p className="text-sm text-muted-foreground">No reporting permissions can be selected from this workspace.</p>:metrics.map(m=>{
           const key=m.metricKey+":"+m.definitionVersion;
           return <Label key={key} className="flex items-center gap-3">
             <Checkbox checked={selected.includes(key)} onChange={e=>setSelected(old=>e.target.checked?[...old,key]:old.filter(v=>v!==key))}/>
