@@ -58,3 +58,10 @@ export const docs={
  pending:a(o({id:i,requestedByAccountId:i,evidenceReference:t,requestedAt:date,grantId:i,...scope,role:t}),101),
  decision:o({status:choice('approved','rejected')}),revoked:o({revoked:yes})
 };
+
+const jurisdictionEvidence=obj({title:s.min(1),url:s.url().refine(v=>v.startsWith('https://')),authority:s.min(1),checkedAt:s.datetime()});
+export const jurisdictionBodies={review:obj({title:s.trim().min(3).max(250),summary:s.trim().min(10).max(4000),profile:z.record(z.unknown()),evidence:z.array(jurisdictionEvidence)}),verify:obj({note:s.trim().min(25).max(2000)}),publish:obj({})};
+const jurisdictionReview=obj({id,jurisdictionId:id,code:s,name:s,revision:s,status:s,verificationStatus:s,title:s,summary:s,profile:s,evidence:s,lastEditedByPersonId:id.nullable(),verifiedByPersonId:id.nullable(),verificationEvidence:s,reviewedAt:dt.nullable(),nextReviewAt:dt.nullable(),publishedAt:dt.nullable(),canEdit:b,canVerify:b,canPublish:b});
+export const jurisdictionResults={reviews:z.array(jurisdictionReview),guidance:z.record(id,obj({summary:s,publishedAt:dt.nullable()})),saved:obj({id})};
+export const jurisdictionBodyDocs={review:o({title:{...t,minLength:3,maxLength:250},summary:{...t,minLength:10,maxLength:4000},profile:{type:'object',additionalProperties:true},evidence:a(o({title:{...t,minLength:1},url:{...t,format:'uri',pattern:'^https://'},authority:{...t,minLength:1},checkedAt:date}))}),verify:o({note:{...t,minLength:25,maxLength:2000}}),publish:o({})};
+export const jurisdictionDocs={reviews:a(o({id:i,jurisdictionId:i,code:t,name:t,revision:t,status:t,verificationStatus:t,title:t,summary:t,profile:t,evidence:t,lastEditedByPersonId:ni,verifiedByPersonId:ni,verificationEvidence:t,reviewedAt:nd,nextReviewAt:nd,publishedAt:nd,canEdit:bool,canVerify:bool,canPublish:bool})),guidance:{type:'object' as const,additionalProperties:o({summary:t,publishedAt:nd})},saved:o({id:i})};
