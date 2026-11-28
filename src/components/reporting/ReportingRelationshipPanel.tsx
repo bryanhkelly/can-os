@@ -74,8 +74,7 @@ function RelationshipPanelContent({scope,entries,recipients,metrics,canPropose,b
     </div>
     {error&&<WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
     {entries.length===0?<EmptyState title="No relationships for this scope yet."/>:
-      <ul className="space-y-3">{entries.map(entry=>{const {agreement,organizationName,scopeName,metricLabels,allowedActions}=entry;return
-        <li key={agreement.id} className="space-y-2 border border-border p-3">
+      <ul className="space-y-3">{entries.map(entry=>{const {agreement,organizationName,scopeName,metricLabels,allowedActions}=entry;return <li key={agreement.id} className="space-y-2 border border-border p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-sm font-semibold">{organizationName}</span>
             <StatusBadge tone={agreement.status==="accepted"?"success":agreement.status==="pending"?"attention":"neutral"}>{agreement.status}</StatusBadge>
