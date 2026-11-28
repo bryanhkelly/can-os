@@ -82,9 +82,9 @@ export async function listPeopleService(context:Actor,raw:unknown) {
     const { people, accountPersonGrants, accessAccounts } = await import("@/db/schema");
     const nameFilter = data.query
       ? or(
-          ilike(people.legalFirstName, `%${data.query}%`),
-          ilike(people.legalLastName, `%${data.query}%`),
-          ilike(people.preferredName, `%${data.query}%`),
+          ilike(people.legalFirstName, `%${data.query.replace(/[\\%_]/g, char => "\\" + char)}%`),
+          ilike(people.legalLastName, `%${data.query.replace(/[\\%_]/g, char => "\\" + char)}%`),
+          ilike(people.preferredName, `%${data.query.replace(/[\\%_]/g, char => "\\" + char)}%`),
         )
       : undefined;
     const personRows = await db.selectDistinct({ personId: accountPersonGrants.personId })
@@ -109,7 +109,7 @@ export async function listPeopleService(context:Actor,raw:unknown) {
       grantActive: accountPersonGrants.active,
     }).from(accountPersonGrants)
       .innerJoin(people, eq(people.id, accountPersonGrants.personId))
-      .innerJoin(accessAccounts, eq(accessAccounts.id, accountPersonGrants.accountId))
+      .innerJoin(accessAccounts, and(eq(accessAccounts.id, accountPersonGrants.accountId),eq(accessAccounts.personId,accountPersonGrants.personId)))
       .where(and(
         inArray(accountPersonGrants.personId, personIds),
         inArray(accountPersonGrants.organizationId, actor.organizationIds),
@@ -153,7 +153,7 @@ export async function listAccessAccountsService(context:Actor) {
     siteId: accountPersonGrants.siteId,
     grantActive: accountPersonGrants.active,
   }).from(accountPersonGrants)
-    .innerJoin(accessAccounts, eq(accessAccounts.id, accountPersonGrants.accountId))
+    .innerJoin(accessAccounts, and(eq(accessAccounts.id, accountPersonGrants.accountId),eq(accessAccounts.personId,accountPersonGrants.personId)))
     .innerJoin(people, eq(people.id, accountPersonGrants.personId))
     .where(and(inArray(accountPersonGrants.organizationId, actor.organizationIds),actor.grantSiteId?eq(accountPersonGrants.siteId,actor.grantSiteId):undefined));
   const grantIds = rows.map(row => row.grantId);
@@ -208,6 +208,7 @@ export async function listAccessAccountsService(context:Actor) {
  * account/person/grant and the access challenge's normal delivery cooldown.
  */
 export async function inviteStaffMemberService(context:Actor,request:Request,raw:unknown) {
+    if(request.method!=="POST")throw new AuthorizationError("staff administration mutation");
     const data=localStaffInviteInput.parse(raw);
     assertSafeguardingStaffInviteSite(data.role, data.siteId);
     const actor = await requireRegistrar(context);
@@ -368,8 +369,9 @@ export async function inviteStaffMemberService(context:Actor,request:Request,raw
 /** Toggle a grant's active flag, with before/after audit and a self-lockout guard. */
 export const staffGrantStateInput=z.object({grantId:z.string().uuid(),active:z.boolean()}).strict();
 export async function setGrantActiveService(context:Actor,request:Request,raw:unknown) {
+    if(request.method!=="POST")throw new AuthorizationError("staff administration mutation");
     const data=staffGrantStateInput.parse(raw);
-    const actor = await requireRegistrar();
+    const actor = await requireRegistrar(context);
     if (!data.active && data.grantId === actor.grantId) {
       throw new AuthorizationError("cannot deactivate your own active grant");
     }
