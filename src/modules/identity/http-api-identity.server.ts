@@ -1,3 +1,5 @@
+import {z} from "zod";
+import {listCANAcademicProgramStaff,delegateCANAcademicProgramStaff,revokeCANAcademicProgramStaff} from "@/modules/programs/can-academic-staff-delegation.server";
 import {getMyCredentialIssuerApprovalService,listPendingCredentialIssuerApprovalsService,listActiveCredentialIssuerApprovalsService,requestCanonicalCredentialIssuerApprovalService,reviewCanonicalCredentialIssuerApprovalService,revokeCanonicalCredentialIssuerApprovalService} from "./canonical-sensitive-approvals.server";
 import {listScopedSitesService,listPeopleService,listAccessAccountsService,inviteStaffMemberService,setGrantActiveService} from "./staff-admin.server";
 import {completeNativeClassLesson,submitNativeClassHomeworkCommand} from "@/modules/classes/native-class-learner-write.server";
@@ -65,6 +67,9 @@ export async function resolveHttpIdentity(request: Request) {
     requestCanonicalCredentialIssuerApproval:(input:unknown)=>{requireWrite();return requestCanonicalCredentialIssuerApprovalService(actor,request,input);},
     reviewCanonicalCredentialIssuerApproval:(input:unknown)=>{requireWrite();return reviewCanonicalCredentialIssuerApprovalService(actor,request,input);},
     revokeCanonicalCredentialIssuerApproval:(input:unknown)=>{requireWrite();return revokeCanonicalCredentialIssuerApprovalService(actor,request,input);},
+    listCANAcademicProgramStaff:(programId:string)=>listCANAcademicProgramStaff(actor,z.string().uuid().parse(programId)),
+    delegateCANAcademicProgramStaff:(input:unknown)=>{requireWrite();return delegateCANAcademicProgramStaff(actor,request,z.object({programId:z.string().uuid(),personId:z.string().uuid(),role:z.enum(["teacher","registrar"]),reason:z.string().trim().min(10).max(500)}).strict().parse(input));},
+    revokeCANAcademicProgramStaff:(input:unknown)=>{requireWrite();return revokeCANAcademicProgramStaff(actor,request,z.object({roleAssignmentId:z.string().uuid(),reason:z.string().trim().min(10).max(500)}).strict().parse(input));},
     listStaffSites:()=>listScopedSitesService(staffActor),
     listStaffPeople:(input:unknown)=>listPeopleService(staffActor,input),
     listStaffAccounts:()=>listAccessAccountsService(staffActor),
