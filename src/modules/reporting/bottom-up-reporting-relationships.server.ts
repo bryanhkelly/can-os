@@ -34,10 +34,12 @@ const columns=sql`id,owner_organization_id AS "ownerOrganizationId",
 /** Only a direct, independently provisioned organization-wide membership can
  * authorize initial relationship management. No automatic administrator grants.
  * Recheck and lock the live identity rows inside every command transaction. */
-async function requireDirectRelationshipManager(tx:Tx,actor:AccessContext):Promise<string>{
+async function requireRelationshipAuthority(tx:Tx,actor:AccessContext,allowInitiation=false):Promise<string>{
+  const manager=actor.role==="reporting_relationship_manager"&&actor.grantSiteId===null;
+  const initiator=allowInitiation&&actor.capabilities.has("relationships.initiate")&&actor.grantSiteId!==null;
   const organizationId=actor.scope.organizationIds?.[0];
   if(!organizationId||actor.scope.organizationIds?.length!==1||
-    actor.role!=="reporting_relationship_manager"||actor.grantSiteId!==null||
+    (!manager&&!initiator)||
     actor.sessionAccountId||actor.impersonatedByAccountId||actor.delegatedByPlatformOwner||!actor.actorPersonId)
     throw new AuthorizationError("direct organization reporting relationship manager");
   const result=await tx.execute(sql`
@@ -49,7 +51,7 @@ async function requireDirectRelationshipManager(tx:Tx,actor:AccessContext):Promi
     JOIN public.access_sessions s ON s.active_grant_id=g.id AND s.account_id=a.id
     WHERE g.id=${actor.grantId}::uuid AND g.account_id=${actor.accountId}::uuid
       AND g.person_id=${actor.actorPersonId}::uuid AND g.organization_id=${organizationId}::uuid
-      AND g.site_id IS NULL AND g.active AND g.role='reporting_relationship_manager'
+      AND g.site_id IS NOT DISTINCT FROM ${actor.grantSiteId}::uuid AND g.active AND g.role=${actor.role}
       AND NOT a.disabled AND p.active AND o.lifecycle_status='active'
       AND s.id=${actor.sessionId}::uuid AND s.revoked_at IS NULL
       AND s.expires_at>CURRENT_TIMESTAMP AND s.delegated_grant_id IS NULL
@@ -122,14 +124,18 @@ async function resolveScope(tx:Tx,scopeKind:RelationshipProposal["scopeKind"],sc
 /** Proposal terms use a server-owned allowlist; accepting terms does not release numbers. */
 export async function proposeReportingRelationship(request:Request,input:unknown):Promise<ReportingRelationship>{
   const actor=await getIdentityContext(request);
-  if(!actor.capabilities.has("relationships.propose")||actor.scope.organizationIds?.length!==1)
-    throw new AuthorizationError("relationships.propose");
+  const canAuthorize=actor.capabilities.has("relationships.propose");
+  if((!canAuthorize&&!actor.capabilities.has("relationships.initiate"))||actor.scope.organizationIds?.length!==1)
+    throw new AuthorizationError("relationship initiation");
   const candidate=relationshipProposalSchema.parse(input);
   return db.transaction(async tx=>{
-    const ownerId=await requireDirectRelationshipManager(tx,actor);
+    const ownerId=await requireRelationshipAuthority(tx,actor,true);
     const scope=await resolveScope(tx,candidate.scopeKind,candidate.scopeId,ownerId);
+    if(!canAuthorize&&(candidate.metrics.length>0||candidate.supersedesId||candidate.coverageFrom||
+      (candidate.coverageMode&&candidate.coverageMode!=="prospective")||!scope.siteId))
+      throw new AuthorizationError("Site initiation can propose a tag only; reporting requires independent owner authorization");
     await requireEligibleRecipient(tx,ownerId,candidate.recipientOrganizationId);
-    const person=assertRelationshipActor(actor,scope.ownerOrganizationId,"relationships.propose",scope.siteId);
+    const person=assertRelationshipActor(actor,scope.ownerOrganizationId,canAuthorize?"relationships.propose":"relationships.initiate",scope.siteId);
     const proposal=validateRelationshipProposal(candidate,scope,buildCurrentReportingMetricRegistry(),relationshipProposalMetrics(candidate.scopeKind),new Date());
     const result=await tx.execute(sql`
       INSERT INTO public.reporting_relationship_agreements
@@ -159,7 +165,7 @@ export async function decideReportingRelationship(request:Request,input:unknown)
     throw new AuthorizationError(capability);
   const organizationId=actor.scope.organizationIds[0]!;
   return db.transaction(async tx=>{
-    await requireDirectRelationshipManager(tx,actor);
+    await requireRelationshipAuthority(tx,actor);
     const result=await tx.execute(sql`
       SELECT ${columns} FROM public.reporting_relationship_agreements
       WHERE id=${agreementId}::uuid
@@ -207,7 +213,7 @@ export async function searchRelationshipRecipients(request:Request,input:unknown
   const actor=await getIdentityContext(request);
   const {query,after}=lookupInput.parse(input);
   return db.transaction(async tx=>{
-    const ownerId=await requireDirectRelationshipManager(tx,actor);
+    const ownerId=await requireRelationshipAuthority(tx,actor,true);
     const domain=await ownerDomain(tx,ownerId);
     // Page the candidate organizations, not their memberships. The cursor is
     // based on the scanned page even if every candidate fails eligibility.
@@ -230,14 +236,25 @@ export async function searchRelationshipRecipients(request:Request,input:unknown
     return {items,next:rows.length>25?rows[24]!.id:null};
   });
 }
-const listInput=z.object({direction:z.enum(["incoming","outgoing"]),after:uuid.optional()}).strict();
+const listInput=z.object({direction:z.enum(["incoming","outgoing"]),after:uuid.optional(),
+  scope:relationshipProposalSchema.pick({scopeKind:true,scopeId:true}).optional()}).strict();
 /** Agreement metadata only; no outcome counts, underlying facts, actor IDs or
  * access to the other party's private workspace. */
 export async function listReportingRelationships(request:Request,input:unknown){
   const actor=await getIdentityContext(request);
-  const {direction,after}=listInput.parse(input);
+  const {direction,after,scope:selection}=listInput.parse(input);
   return db.transaction(async tx=>{
-    const organizationId=await requireDirectRelationshipManager(tx,actor);
+    const manager=actor.capabilities.has("relationships.propose");
+    if(!manager&&(!selection||direction!=="outgoing"))throw new AuthorizationError("exact Site relationship scope");
+    const organizationId=await requireRelationshipAuthority(tx,actor,!!selection&&direction==="outgoing");
+    const scope=selection?await resolveScope(tx,selection.scopeKind,selection.scopeId,organizationId):null;
+    if(scope){
+      if(direction!=="outgoing")throw new AuthorizationError("outgoing relationship resource");
+      assertRelationshipActor(actor,scope.ownerOrganizationId,manager?"relationships.propose":"relationships.initiate",scope.siteId);
+    }
+    const scopeFilter=scope?sql`AND ((scope_kind=${scope.scopeKind} AND scope_id=${scope.scopeId}::uuid)
+      OR (status='accepted' AND scope_kind='organization' AND scope_id=${organizationId}::uuid)
+      OR (status='accepted' AND scope_kind='site' AND scope_id=${scope.siteId}::uuid))`:sql``;
     const party=direction==="incoming"?sql`recipient_organization_id`:sql`owner_organization_id`;
     const result=await tx.execute(sql`
       SELECT r.*,
@@ -251,7 +268,7 @@ export async function listReportingRelationships(request:Request,input:unknown){
           WHEN 'class' THEN (SELECT title FROM public.classes WHERE id=r."scopeId")
         END AS "scopeName"
       FROM (SELECT ${columns} FROM public.reporting_relationship_agreements
-        WHERE ${party}=${organizationId}::uuid
+        WHERE ${party}=${organizationId}::uuid ${scopeFilter}
         AND (${after??null}::uuid IS NULL OR id>${after??null}::uuid)
         ORDER BY id LIMIT 26) r ORDER BY r.id`);
     const rows=z.array(rowSchema.extend({organizationName:z.string(),scopeName:z.string()})).parse(result.rows);
@@ -259,7 +276,8 @@ export async function listReportingRelationships(request:Request,input:unknown){
     const items=rows.slice(0,25).map(({proposedByPersonId,acceptedByPersonId,organizationName,scopeName,...agreement})=>{
       const selfProposed=proposedByPersonId===actor.actorPersonId;
       const expired=agreement.validThrough!==null&&Date.parse(agreement.validThrough)<=Date.now();
-      const allowedActions:RelationshipAction[]=agreement.status==="pending"?
+      const inherited=!!scope&&(agreement.scopeKind!==scope.scopeKind||agreement.scopeId!==scope.scopeId);
+      const allowedActions:RelationshipAction[]=!manager||inherited?[]:agreement.status==="pending"?
         direction==="outgoing"?["withdraw"]:selfProposed||expired?[]:["accept","decline"]:
         agreement.status==="accepted"?["revoke"]:[];
       void acceptedByPersonId;
@@ -267,9 +285,9 @@ export async function listReportingRelationships(request:Request,input:unknown){
         const definition=registry.find(d=>d.metricKey===m.metricKey&&d.definitionVersion===m.definitionVersion);
         return (definition?.label??m.metricKey)+" ("+m.metricKey+", v"+m.definitionVersion+")";
       });
-      return {agreement,allowedActions,organizationName,scopeName,metricLabels};
+      return {agreement,allowedActions,organizationName,scopeName,metricLabels,inherited};
     });
-    return {items,next:rows.length>25?rows[24]!.id:null};
+    return {items,next:rows.length>25?rows[24]!.id:null,canAuthorize:manager};
   });
 }
 
@@ -279,7 +297,7 @@ export async function listRelationshipScopes(request:Request,input:unknown){
   const actor=await getIdentityContext(request);
   const {kind,after}=scopeInput.parse(input);
   return db.transaction(async tx=>{
-    const owner=await requireDirectRelationshipManager(tx,actor);
+    const owner=await requireRelationshipAuthority(tx,actor);
     const source=kind==="organization"?sql`SELECT id,name FROM public.organizations WHERE id=${owner}::uuid`:
       kind==="site"?sql`SELECT id,name FROM public.sites WHERE organization_id=${owner}::uuid`:
       kind==="program"?sql`SELECT id,name FROM public.programs WHERE organization_id=${owner}::uuid`:
