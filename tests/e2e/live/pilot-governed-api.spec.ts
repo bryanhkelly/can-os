@@ -91,8 +91,8 @@ async function classScope(classId:string,siteId:string,ownerId:string){
   expect(row?.count).toBe(1);
 }
 type EnrollmentTarget=Omit<z.infer<typeof cohortSite>,"learners">&{learner:Actor};
-async function enrollOne(browser:Browser,contexts:BrowserContext[],target:EnrollmentTarget){
-  const {learner,classId,siteId,ownerOrganizationId,classOfferingVersionId,creditMode}=target;
+async function enrollOne(browser:Browser,contexts:BrowserContext[],selection:EnrollmentTarget){
+  const {learner,classId,siteId,ownerOrganizationId,classOfferingVersionId,creditMode}=selection;
   await classScope(classId,siteId,ownerOrganizationId);
   const [target]=await sql`SELECT count(*)::int AS count FROM public.class_offering_versions
     WHERE id=${classOfferingVersionId}::uuid AND class_id=${classId}::uuid AND state='published'`;
@@ -186,7 +186,7 @@ test("governed pilot API stage",async({browser},info)=>{
           WHERE cs.class_id=${site.classId}::uuid AND p.site_id=${site.siteId}::uuid
             AND r.site_id=${site.siteId}::uuid AND r.host_organization_id=${site.manager.organizationId}::uuid
             AND r.state='ended' AND r.ended_at IS NOT NULL
-            AND cs.id=ANY(${site.sessionIds}::uuid[]) AND d.starts_at>=${from}::date AND d.starts_at<${to}::date
+            AND cs.id=ANY(${site.sessionIds}::uuid[]) AND d.starts_at>=(${from}::date::timestamp AT TIME ZONE 'UTC') AND d.starts_at<(${to}::date::timestamp AT TIME ZONE 'UTC')
             AND d.starts_at<=now()
         ), latest AS (
           SELECT DISTINCT ON (a.facilitated_session_id,a.course_attempt_id)
@@ -201,7 +201,7 @@ test("governed pilot API stage",async({browser},info)=>{
           (SELECT count(*)::int FROM latest WHERE status='present') AS attendance,
           (SELECT count(DISTINCT learner_person_id)::int FROM latest WHERE status='present') AS attendees,
           (SELECT count(DISTINCT learner_person_id)::int FROM public.class_enrollments
-             WHERE class_id=${site.classId}::uuid AND enrolled_at>=${from}::date AND enrolled_at<${to}::date
+             WHERE class_id=${site.classId}::uuid AND enrolled_at>=(${from}::date::timestamp AT TIME ZONE 'UTC') AND enrolled_at<(${to}::date::timestamp AT TIME ZONE 'UTC')
              AND enrolled_at<=now()) AS people`;
         expect(persisted).toMatchObject({sessions:4,attendance:site.expectedPresentOccurrences,people:site.expectedDistinctPeople});
         const report=await rpc<{visibility:string;publicationApproved:boolean;metrics:Record<string,number|null>}>(
