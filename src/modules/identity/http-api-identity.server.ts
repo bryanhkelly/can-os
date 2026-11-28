@@ -73,3 +73,5 @@ export {handleAccessRequest,handleAccessVerification,handlePersonalRegistration,
 export {handleSiteSignupRequest} from "./site-signup-http.server";
 
 export {resolveGovernedWorkflow} from "./http-governed-workflows.server";
+
+export {resolveHttpOwnerControl} from "./http-owner-control.server";
