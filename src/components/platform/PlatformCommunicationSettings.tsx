@@ -6,12 +6,20 @@ import {Textarea} from "@/components/ui/textarea";
 import {Checkbox} from "@/components/ui/choice";
 import {Field} from "@/components/ui/field";
 import {WorkspacePanel,WorkspaceNotice,ActionFooter} from "@/components/workspace";
-import {readSenderAdministration,changeSenderAdministration,revokeSenderAdministration,listSenderOrganizations} from "@/modules/communication/sender-registry.functions";
+import {legacySenderTransport,type SenderWorkspaceTransport} from "@/modules/communication/sender-workspace-transport";
 
-export function PlatformCommunicationSettings(){
+export function PlatformCommunicationSettings({transport=legacySenderTransport}:{transport?:SenderWorkspaceTransport}={}){
+ return <CommunicationSettingsSession key={transport.kind} transport={transport}/>;
+}
+function CommunicationSettingsSession({transport}:{transport:SenderWorkspaceTransport}){
+ const {readSenderAdministration,changeSenderAdministration,revokeSenderAdministration,listSenderOrganizationsPage}=transport.api;
  const [organizationId,setOrganizationId]=useState("");
  const [organizations,setOrganizations]=useState<{id:string;name:string}[]>([]);
- useEffect(()=>{let active=true;listSenderOrganizations().then(value=>{if(active)setOrganizations(value);}).catch(()=>{if(active)setError("Organization directory unavailable.");});return()=>{active=false;};},[]);
+ const [cursor,setCursor]=useState<{afterName:string;afterId:string}|null>(null);
+ const [directoryBusy,setDirectoryBusy]=useState(false),[directoryError,setDirectoryError]=useState(""),[directoryRevision,setDirectoryRevision]=useState(0);
+ useEffect(()=>{let active=true;setOrganizations([]);setCursor(null);setDirectoryBusy(true);setDirectoryError("");
+  listSenderOrganizationsPage({data:{limit:100}}).then(page=>{if(active){setOrganizations(page.items);setCursor(page.nextCursor);}}).catch(()=>{if(active)setDirectoryError("Organization directory unavailable.");}).finally(()=>{if(active)setDirectoryBusy(false);});return()=>{active=false;};},[listSenderOrganizationsPage,directoryRevision]);
+ async function moreOrganizations(){if(!cursor||directoryBusy)return;setDirectoryBusy(true);setDirectoryError("");try{const page=await listSenderOrganizationsPage({data:{limit:100,...cursor}});setOrganizations(previous=>{const known=new Set(previous.map(item=>item.id));return [...previous,...page.items.filter(item=>!known.has(item.id))];});setCursor(page.nextCursor);}catch{setDirectoryError("More organizations could not be loaded. Refresh the directory.");}finally{setDirectoryBusy(false);}}
  const [id,setId]=useState<string|null>(null);
  const [from,setFrom]=useState(""),[address,setAddress]=useState(""),[reference,setReference]=useState("");
  const [ready,setReady]=useState(false),[busy,setBusy]=useState(false),[confirmed,setConfirmed]=useState(false);
@@ -21,7 +29,7 @@ export function PlatformCommunicationSettings(){
   let active=true;setReady(false);setConfirmed(false);setRevokeConfirmed(false);setError("");
   readSenderAdministration({data:{organizationId:organizationId||null}}).then(value=>{if(active){setId(value?.id??null);setFrom(value?.sender_from??"");setAddress(value?.postal_address??"");setReference(value?.verification_reference??"");setReady(true);}}).catch(()=>{if(active)setError("Sender registry unavailable. Confirm migration and platform owner access.");});
   return()=>{active=false;};
- },[revision,organizationId]);
+ },[revision,organizationId,readSenderAdministration]);
  async function save(){
   if(!ready||busy||!confirmed)return;
   setBusy(true);setNotice("");setError("");
@@ -40,6 +48,8 @@ export function PlatformCommunicationSettings(){
   <div className="space-y-4">
    <p className="text-sm text-muted-foreground">Approve a Resend-verified campaign sender. Provider credentials remain in deployment secrets. Changing an approved sender may prevent older queued campaigns from sending.</p>
    <Field label="Sender scope"><Select value={organizationId} disabled={busy} onChange={e=>{setReady(false);setId(null);setConfirmed(false);setRevokeConfirmed(false);setNotice("");setOrganizationId(e.target.value);}}><option value="">Platform default</option>{organizations.map(org=><option key={org.id} value={org.id}>{org.name}</option>)}</Select></Field>
+   {cursor&&<Button type="button" variant="outline" size="sm" disabled={busy||directoryBusy} onClick={()=>void moreOrganizations()}>Load more organizations</Button>}
+   {directoryError&&<WorkspaceNotice tone="attention">{directoryError} <Button type="button" variant="outline" size="sm" disabled={busy||directoryBusy} onClick={()=>{setReady(false);setOrganizationId("");setRevision(v=>v+1);setDirectoryRevision(v=>v+1);}}>Refresh directory</Button></WorkspaceNotice>}
    <Field label="Sender email"><Input type="email" value={from} disabled={!ready||busy} onChange={e=>{setFrom(e.target.value);setConfirmed(false);}}/></Field>
    <Field label="Postal address"><Textarea value={address} maxLength={500} disabled={!ready||busy} onChange={e=>{setAddress(e.target.value);setConfirmed(false);}}/></Field>
    <Field label="Verification evidence reference"><Input value={reference} maxLength={500} disabled={!ready||busy} onChange={e=>{setReference(e.target.value);setConfirmed(false);}}/></Field>
