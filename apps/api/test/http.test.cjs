@@ -393,3 +393,18 @@ test('publication decisions remain independently authorized and reject enrollmen
  const {bodies}=require('../dist/site-publishing.contracts');
  assert.equal(bodies.publish.safeParse({action:'publish',expectedRevision:'2026-11-28T00:00:00Z',reason:'Reviewed website copy',contentReviewed:true,openEnrollment:true}).success,false);
 });
+
+test('Go Link management is Site scoped and rejects arbitrary redirect destinations',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const [method,path] of [["POST","/api/v1/sites/{siteId}/go-links"],["GET","/api/v1/sites/{siteId}/go-links"],["GET","/api/v1/sites/{siteId}/go-link-destinations"],["GET","/api/v1/sites/{siteId}/go-links/{linkId}/inspection"],["POST","/api/v1/sites/{siteId}/go-links/{linkId}/status"],["POST","/api/v1/sites/{siteId}/go-links/{linkId}/revocation"]]){
+   assert.ok(document.paths[path][method.toLowerCase()].security);
+   const response=await fetch(url+path.replace(/\{[^}]+\}/g,'00000000-0000-4000-8000-000000000001'),method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);
+  }
+ });
+ const {bodies,queries}=require('../dist/go-links.contracts');
+ const requestId='00000000-0000-4000-8000-000000000001';
+ assert.equal(bodies.create.safeParse({requestId,destination:{kind:'url',href:'https://foreign.example'}}).success,false);
+ assert.equal(bodies.create.safeParse({destination:{kind:'site-page',page:'home'}}).success,false);
+ assert.equal(queries.page.safeParse({limit:'51'}).success,false);
+});
