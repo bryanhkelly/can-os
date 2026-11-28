@@ -21,7 +21,7 @@ vi.mock("@tanstack/react-start/server",()=>({
 }));
 vi.mock("@/modules/identity/command-context.server",()=>({getCommandContext:async()=>state.actor}));
 vi.mock("@/modules/actions/academic-action-policy.server",()=>({assertAcademicActionAuthority:state.authority}));
-vi.mock("@/modules/learning/class-access.server",()=>({authorizeClass:state.authorizeClass}));
+vi.mock("@/modules/learning/class-access-core.server",()=>({authorizeClass:state.authorizeClass}));
 vi.mock("@/db/client",()=>({db:{transaction:state.transaction}}));
 
 const actionId="00000000-0000-4000-8000-000000000001";
