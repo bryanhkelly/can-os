@@ -691,3 +691,20 @@ test('WS10 schemas reject forged authority and incomplete decisions',()=>{
  assert.equal(bodies.review.safeParse({decision:'reject',evidenceReference:'A sufficiently long evidence reference'}).success,true);
  assert.equal(results.saved.safeParse({saved:true,privateMetadata:{}}).success,false);
 });
+
+test('WS10 existing jurisdiction review lifecycle has explicit protected REST contracts',async()=>{
+ const id='00000000-0000-4000-8000-000000000001';
+ await withServer('0',async(url,document)=>{
+  for(const [method,route,operation] of [['GET','jurisdiction-profiles/reviews','listJurisdictionProfileReviews'],['GET','jurisdiction-profiles/guidance','listPublishedJurisdictionGuidance'],['POST','jurisdiction-profiles/:id/review','saveJurisdictionProfileReview'],['POST','jurisdiction-profiles/:id/verification','verifyJurisdictionProfileReview'],['POST','jurisdiction-profiles/:id/publication','publishJurisdictionProfile']]){
+   const op=document.paths['/api/v1/'+route.replace(':id','{id}')][method.toLowerCase()];
+   assert.equal(op.operationId,operation);assert.ok(op.security);
+   const response=await fetch(url+'/api/v1/'+route.replace(':id',id),method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);
+  }
+ });
+ const c=require('../dist/work-approvals.contracts');
+ assert.equal(c.jurisdictionBodies.verify.safeParse({note:'Independent evidence reviewed in full'}).success,true);
+ assert.equal(c.jurisdictionBodies.verify.safeParse({note:'Independent evidence reviewed in full',reviewerPersonId:id}).success,false);
+ assert.equal(c.jurisdictionBodies.publish.safeParse({verified:true}).success,false);
+ assert.equal(c.jurisdictionBodies.review.safeParse({title:'Test',summary:'Existing review summary',profile:{},evidence:[{title:'Source',url:'http://example.com',authority:'State',checkedAt:'2026-11-28T00:00:00Z'}]}).success,false);
+});
