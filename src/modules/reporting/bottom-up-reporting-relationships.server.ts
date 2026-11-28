@@ -2,7 +2,8 @@ import {sql} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
 import type {AccessContext} from "@/domain/access-context";
-import {LOCAL_DEMO_ADMIN} from "@/domain/local-demo-access";
+import {isDemoAccountEmail,isEligiblePrivilegedMailbox} from "@/domain/domain-classification";
+import {canConnectRelationshipPopulations,relationshipIdentityEligible,relationshipPopulation} from "@/domain/reporting-relationship-population";
 import {getIdentityContext} from "@/modules/identity/command-context.server";
 import {AuthorizationError} from "@/domain/command-context";
 import {relationshipProposalMetrics} from "@/domain/relationship-metric-policy";
@@ -36,11 +37,11 @@ async function requireDirectRelationshipManager(tx:Tx,actor:AccessContext):Promi
   const organizationId=actor.scope.organizationIds?.[0];
   if(!organizationId||actor.scope.organizationIds?.length!==1||
     actor.role!=="reporting_relationship_manager"||actor.grantSiteId!==null||
-    actor.impersonatedByAccountId||actor.delegatedByPlatformOwner||!actor.actorPersonId||
-    organizationId===LOCAL_DEMO_ADMIN.organizationId)
+    actor.sessionAccountId||actor.impersonatedByAccountId||actor.delegatedByPlatformOwner||!actor.actorPersonId)
     throw new AuthorizationError("direct organization reporting relationship manager");
   const result=await tx.execute(sql`
-    SELECT g.id FROM public.account_person_grants g
+    SELECT g.id,o.domain,a.email_normalized AS email,(a.email_verified_at IS NOT NULL) AS "mailboxVerified",
+      s.authentication_method AS "authenticationMethod" FROM public.account_person_grants g
     JOIN public.access_accounts a ON a.id=g.account_id AND a.person_id=g.person_id
     JOIN public.people p ON p.id=g.person_id
     JOIN public.organizations o ON o.id=g.organization_id
@@ -48,29 +49,44 @@ async function requireDirectRelationshipManager(tx:Tx,actor:AccessContext):Promi
     WHERE g.id=${actor.grantId}::uuid AND g.account_id=${actor.accountId}::uuid
       AND g.person_id=${actor.actorPersonId}::uuid AND g.organization_id=${organizationId}::uuid
       AND g.site_id IS NULL AND g.active AND g.role='reporting_relationship_manager'
-      AND a.email_verified_at IS NOT NULL AND NOT a.disabled
-      AND lower(a.email_normalized) NOT LIKE '%.demo' AND p.active AND o.lifecycle_status='active'
+      AND NOT a.disabled AND p.active AND o.lifecycle_status='active'
       AND s.id=${actor.sessionId}::uuid AND s.revoked_at IS NULL
       AND s.expires_at>CURRENT_TIMESTAMP AND s.delegated_grant_id IS NULL
-      AND NOT EXISTS(SELECT 1 FROM public.demo_school_tenants d WHERE d.organization_id=o.id)
     FOR SHARE OF g,a,p,o,s`);
-  if(result.rows.length!==1)throw new AuthorizationError("current verified reporting relationship membership");
+  const membership=z.object({domain:z.string().nullable(),email:z.string(),mailboxVerified:z.boolean(),
+    authenticationMethod:z.enum(["email_link","local_demo_code","private_access_code"]).nullable()}).safeParse(result.rows[0]);
+  if(result.rows.length!==1||!membership.success||
+    !relationshipIdentityEligible({...membership.data,organizationDomain:membership.data.domain}))
+    throw new AuthorizationError("current verified reporting relationship membership");
   return organizationId;
 }
 const recipientEligible=sql`g.role='reporting_relationship_manager' AND g.active
-  AND g.site_id IS NULL AND a.person_id=g.person_id AND a.email_verified_at IS NOT NULL
-  AND NOT a.disabled AND p.active AND lower(a.email_normalized) NOT LIKE '%.demo'
-  AND o.lifecycle_status='active' AND o.id<>${LOCAL_DEMO_ADMIN.organizationId}::uuid
-  AND NOT EXISTS(SELECT 1 FROM public.demo_school_tenants d WHERE d.organization_id=o.id)`;
-async function requireEligibleRecipient(tx:Tx,id:string){
+  AND g.site_id IS NULL AND a.person_id=g.person_id AND NOT a.disabled AND p.active
+  AND o.lifecycle_status='active'`;
+const recipientIdentity=z.object({id:uuid,domain:z.string().nullable(),email:z.string(),mailboxVerified:z.boolean()});
+function eligibleRecipientIdentity(row:z.infer<typeof recipientIdentity>):boolean{
+  const population=relationshipPopulation(row.domain);
+  return population==="real"?row.mailboxVerified&&isEligiblePrivilegedMailbox(row.email):
+    population==="synthetic"&&isDemoAccountEmail(row.email);
+}
+async function ownerDomain(tx:Tx,id:string):Promise<string|null>{
+  const result=await tx.execute(sql`SELECT domain FROM public.organizations WHERE id=${id}::uuid FOR SHARE`);
+  if(!result.rows.length)throw new AuthorizationError("current relationship organization");
+  return z.object({domain:z.string().nullable()}).parse(result.rows[0]).domain;
+}
+async function requireEligibleRecipient(tx:Tx,ownerId:string,id:string){
+  const domain=await ownerDomain(tx,ownerId);
   const result=await tx.execute(sql`
-    SELECT g.id FROM public.organizations o
+    SELECT o.id,o.domain,a.email_normalized AS email,(a.email_verified_at IS NOT NULL) AS "mailboxVerified"
+    FROM public.organizations o
     JOIN public.account_person_grants g ON g.organization_id=o.id
     JOIN public.access_accounts a ON a.id=g.account_id
     JOIN public.people p ON p.id=g.person_id
     WHERE o.id=${id}::uuid AND ${recipientEligible}
-    ORDER BY g.id LIMIT 1 FOR SHARE OF g,a,p,o`);
-  if(!result.rows.length)throw new AuthorizationError("registered eligible relationship recipient");
+    ORDER BY g.id LIMIT 101 FOR SHARE OF g,a,p,o`);
+  const rows=z.array(recipientIdentity).parse(result.rows);
+  if(!rows.some(row=>canConnectRelationshipPopulations(domain,row.domain)&&eligibleRecipientIdentity(row)))
+    throw new AuthorizationError("registered eligible same-population relationship recipient");
 }
 
 const scopeRow=z.object({ownerOrganizationId:uuid,siteId:uuid.nullable()}).strict();
@@ -111,7 +127,7 @@ export async function proposeReportingRelationship(request:Request,input:unknown
   return db.transaction(async tx=>{
     const ownerId=await requireDirectRelationshipManager(tx,actor);
     const scope=await resolveScope(tx,candidate.scopeKind,candidate.scopeId,ownerId);
-    await requireEligibleRecipient(tx,candidate.recipientOrganizationId);
+    await requireEligibleRecipient(tx,ownerId,candidate.recipientOrganizationId);
     const person=assertRelationshipActor(actor,scope.ownerOrganizationId,"relationships.propose",scope.siteId);
     const proposal=validateRelationshipProposal(candidate,scope,buildCurrentReportingMetricRegistry(),relationshipProposalMetrics(candidate.scopeKind),new Date());
     const result=await tx.execute(sql`
@@ -129,30 +145,6 @@ export async function proposeReportingRelationship(request:Request,input:unknown
     return rowSchema.parse(result.rows[0]);
   });
 }
-/** Exact outgoing scope reader. The same ownership resolution used for
- * proposals protects this view; a recipient or sibling Site cannot enumerate
- * the owner's other agreements. Fetch one extra row for a stable next cursor. */
-export async function listOutgoingReportingRelationships(request:Request,input:unknown){
-  const actor=await getIdentityContext(request);
-  const organizationId=actor.scope.organizationIds?.length===1?actor.scope.organizationIds[0]:undefined;
-  if(!organizationId)throw new AuthorizationError("relationship owner scope");
-  const {scopeKind,scopeId,after}=relationshipProposalSchema.pick({scopeKind:true,scopeId:true})
-    .extend({after:uuid.optional()}).strict().parse(input);
-  return db.transaction(async tx=>{
-    const scope=await resolveScope(tx,scopeKind,scopeId,organizationId);
-    assertRelationshipActor(actor,scope.ownerOrganizationId,"relationships.propose",scope.siteId);
-    const result=await tx.execute(sql`
-      SELECT ${columns} FROM public.reporting_relationship_agreements
-      WHERE owner_organization_id=${scope.ownerOrganizationId}::uuid
-        AND scope_kind=${scopeKind} AND scope_id=${scopeId}::uuid
-        AND (${after??null}::uuid IS NULL OR id>${after??null}::uuid)
-      ORDER BY id LIMIT 51`);
-    const rows=result.rows.map(row=>rowSchema.parse(row));
-    const entries=rows.slice(0,50);
-    return {entries,nextCursor:rows.length>50?entries[49]!.id:null};
-  });
-}
-
 const actionInput=z.object({agreementId:uuid,action:z.enum(["accept","decline","withdraw","revoke"])}).strict();
 
 /** Serialize decisions on the immutable proposal. The DB trigger records the
@@ -186,6 +178,8 @@ export async function decideReportingRelationship(request:Request,input:unknown)
         scopeId:current.scopeId,siteId:null};
     }
     if(action==="accept"){
+      await requireEligibleRecipient(tx,current.ownerOrganizationId,current.recipientOrganizationId);
+      await requireEligibleRecipient(tx,current.recipientOrganizationId,current.ownerOrganizationId);
       const {recipientOrganizationId,scopeKind,scopeId,relationshipKind,metrics,validThrough}=current;
       validateRelationshipProposal({recipientOrganizationId,scopeKind,scopeId,relationshipKind,metrics,validThrough},
         scope,buildCurrentReportingMetricRegistry(),relationshipProposalMetrics(scopeKind),new Date());
@@ -204,25 +198,6 @@ export async function decideReportingRelationship(request:Request,input:unknown)
   });
 }
 
-/** Direct organization inbox: no inherited or delegated visibility. Bounded
- * keyset pagination; site-scoped grants must use a future exact-resource reader.
- * Internal only until independently ratified capability mapping is enabled. */
-export async function listIncomingReportingRelationships(request:Request,input:unknown):Promise<{entries:ReportingRelationship[];nextCursor:string|null}>{
-  const actor=await getIdentityContext(request);
-  const organizationId=actor.scope.organizationIds?.length===1?actor.scope.organizationIds[0]:undefined;
-  if(!organizationId)throw new AuthorizationError("relationship recipient scope");
-  assertRelationshipActor(actor,organizationId,"relationships.decide");
-  const {after}=z.object({after:uuid.optional()}).strict().parse(input);
-  const result=await db.execute(sql`
-    SELECT ${columns} FROM public.reporting_relationship_agreements
-    WHERE recipient_organization_id=${organizationId}::uuid
-      AND (${after??null}::uuid IS NULL OR id>${after??null}::uuid)
-    ORDER BY id LIMIT 51`);
-  const rows=result.rows.map(row=>rowSchema.parse(row));
-  const entries=rows.slice(0,50);
-  return {entries,nextCursor:rows.length>50?entries[49]!.id:null};
-}
-
 const lookupInput=z.object({query:z.string().trim().min(2).max(80),after:z.string().uuid().optional()}).strict();
 /** Bounded opt-in discovery. Only organizations with a current independent
  * management appointment are requestable; never expose contacts or accounts. */
@@ -231,17 +206,26 @@ export async function searchRelationshipRecipients(request:Request,input:unknown
   const {query,after}=lookupInput.parse(input);
   return db.transaction(async tx=>{
     const ownerId=await requireDirectRelationshipManager(tx,actor);
+    const domain=await ownerDomain(tx,ownerId);
+    // Page the candidate organizations, not their memberships. The cursor is
+    // based on the scanned page even if every candidate fails eligibility.
     const result=await tx.execute(sql`
-      SELECT DISTINCT o.id,o.name FROM public.organizations o
-      JOIN public.account_person_grants g ON g.organization_id=o.id
-      JOIN public.access_accounts a ON a.id=g.account_id
-      JOIN public.people p ON p.id=g.person_id
-      WHERE o.id<>${ownerId}::uuid AND ${recipientEligible}
+      SELECT o.id,o.name,o.domain FROM public.organizations o
+      WHERE o.id<>${ownerId}::uuid AND o.lifecycle_status='active'
         AND strpos(lower(o.name),lower(${query}))>0
         AND (${after??null}::uuid IS NULL OR o.id>${after??null}::uuid)
+        AND EXISTS(SELECT 1 FROM public.account_person_grants g
+          WHERE g.organization_id=o.id AND g.role='reporting_relationship_manager' AND g.active AND g.site_id IS NULL)
       ORDER BY o.id LIMIT 26`);
-    const rows=z.array(z.object({id:uuid,name:z.string()})).parse(result.rows);
-    return {items:rows.slice(0,25),next:rows.length>25?rows[24]!.id:null};
+    const rows=z.array(z.object({id:uuid,name:z.string(),domain:z.string().nullable()})).parse(result.rows);
+    const items:{id:string;name:string}[]=[];
+    for(const row of rows.slice(0,25)){
+      if(!canConnectRelationshipPopulations(domain,row.domain))continue;
+      try{await requireEligibleRecipient(tx,ownerId,row.id);}
+      catch(error){if(error instanceof AuthorizationError)continue;throw error;}
+      items.push({id:row.id,name:row.name});
+    }
+    return {items,next:rows.length>25?rows[24]!.id:null};
   });
 }
 const listInput=z.object({direction:z.enum(["incoming","outgoing"]),after:uuid.optional()}).strict();
