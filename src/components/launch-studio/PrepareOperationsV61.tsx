@@ -13,9 +13,7 @@ import {
   cleanSiteEnvironmentV61, siteEnvironmentV61Schema,
   type SiteEnvironmentV61,
 } from "@/domain/site-information-v61";
-import {
-  readSiteInformationV61, saveSiteInformationV61,
-} from "@/modules/programs/site-information-v61.functions";
+import { readSiteInformation, saveSiteInformation } from "@/lib/api/browser-site-planning";
 import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
 
 /** Mount the existing authorized services only in the requested Prepare module.
@@ -57,10 +55,11 @@ export function PrepareFacilitiesV61({ siteId }: { siteId: string }) {
 
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
     setLoading(true);
     setError("");
     setNotice("");
-    void readSiteInformationV61({ data: { siteId } }).then(result => {
+    void readSiteInformation(siteId, controller.signal).then(result => {
       if (!active) return;
       if (result.siteId !== siteId) throw new Error("The response did not match your Site.");
       setEnvironment(result.environment);
@@ -73,7 +72,7 @@ export function PrepareFacilitiesV61({ siteId }: { siteId: string }) {
         setError("Learning environment could not be verified. Reload the saved Site Information before editing.");
       }
     }).finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
+    return () => { active = false; controller.abort(); };
   }, [siteId, reload]);
 
   async function saveEnvironment() {
@@ -92,8 +91,8 @@ export function PrepareFacilitiesV61({ siteId }: { siteId: string }) {
     try {
       // The existing Site Information service enforces exact Site scope, updates
       // Program delivery preferences consistently, and audits the revision.
-      const result = await saveSiteInformationV61({
-        data: { siteId, expectedRevision, section: "environment", environment: clean },
+      const result = await saveSiteInformation(siteId, {
+        expectedRevision, section: "environment", environment: clean,
       });
       if (result.siteId !== siteId || !result.revision) {
         throw new Error("The saved Site revision could not be verified.");
