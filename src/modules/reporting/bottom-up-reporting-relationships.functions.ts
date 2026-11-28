@@ -28,7 +28,7 @@ export const findRelationshipRecipients=createServerFn({method:"GET"})
     return service.searchRelationshipRecipients(getRequest(),data);
   });
 export const getRelationshipRequests=createServerFn({method:"GET"})
-  .validator((value:unknown)=>z.object({direction:z.enum(["incoming","outgoing"]),after:uuid.optional()}).strict().parse(value))
+  .validator((value:unknown)=>z.object({direction:z.enum(["incoming","outgoing"]),after:uuid.optional(),scope:relationshipProposalSchema.pick({scopeKind:true,scopeId:true}).optional()}).strict().parse(value))
   .handler(async({data})=>{
     noStore();
     const service=await import("./bottom-up-reporting-relationships.server");
