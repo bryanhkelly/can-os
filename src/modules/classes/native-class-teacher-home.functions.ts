@@ -28,11 +28,10 @@ async function currentTeacher(){
 }
 
 async function readTeachingClasses(tx:Tx,actor:NonNullable<Awaited<ReturnType<typeof currentTeacher>>>){
-    const siteId=actor.grantSiteId;
-    const organizationId=actor.scope.organizationIds[0]!;
-    {
-      const now=new Date();
-      const rows=await tx.select({
+    const siteId=actor.grantSiteId!;
+    const organizationId=actor.scope.organizationIds![0]!;
+    const now=new Date();
+      const rows=await tx.selectDistinct({
         id:canonicalClasses.id,
         title:canonicalClasses.title,
         deliveryMode:canonicalClasses.deliveryMode,
@@ -63,7 +62,6 @@ async function readTeachingClasses(tx:Tx,actor:NonNullable<Awaited<ReturnType<ty
         classes.push({classId:row.id,title:row.title,deliveryMode:row.deliveryMode});
       }
       return classes;
-    }
 }
 
 /** One scoped directory for Class navigation and Teacher Today. */
@@ -99,6 +97,8 @@ export const getNativeTeacherToday=createServerFn({method:"GET"})
           JOIN public.learner_course_attempts ca
             ON ca.class_enrollment_id=ce.id AND ca.id=ce.course_attempt_id
            AND ca.course_version_id=c.course_version_id
+           AND ca.deployment_id=c.deployment_id AND ca.adoption_id=c.adoption_id
+           AND ca.offering_version_id=c.offering_version_id
           WHERE ce.class_id IN (${ids}) AND ce.status='active'
             AND ca.status='active' AND ca.section_id IS NULL
         ), rosters AS (
@@ -110,7 +110,7 @@ export const getNativeTeacherToday=createServerFn({method:"GET"})
           SELECT aa.class_id,
             count(*) FILTER (WHERE s.status='submitted')::int AS review_count,
             count(*) FILTER (WHERE a.due_at<now()
-              AND (s.id IS NULL OR s.status='assigned' OR s.status='returned'))::int AS overdue_count
+              AND (s.id IS NULL OR s.status::text='assigned' OR s.status='returned'))::int AS overdue_count
           FROM active_attempts aa
           JOIN public.graded_assignments a ON a.course_version_id=aa.course_version_id
             AND a.section_id IS NULL
