@@ -31,6 +31,19 @@ const cohortSite=z.object({classId:uuid,siteId:uuid,ownerOrganizationId:uuid,cla
 const lessonInstruction=z.object({lessonId:uuid,assetVersionId:uuid,prompt:z.string().trim().min(5).max(1000),
   choices:z.array(z.string().trim().min(1).max(200)).min(2).max(8)}).strict();
 const scenario=z.discriminatedUnion("stage",[
+  z.object({stage:z.literal("prepare-blueprint"),author:actor,siteId:uuid,
+    configurationId:uuid,initialVersionId:uuid,blueprintId:uuid,blueprintVersionId:uuid,
+    name:z.string().min(2).max(120),version:z.record(z.unknown())}).strict(),
+  z.object({stage:z.literal("review-blueprint"),reviewer:actor,author:actor,
+    configurationVersionId:uuid,reviewId:uuid,evidenceVersionId:uuid,
+    rationale:z.string().trim().min(10).max(4000),
+    components:z.array(z.object({componentId:uuid,decision:z.literal("approved"),evidenceVersionId:uuid,
+      conditions:z.string().max(2000).nullable()}).strict()).max(200)}).strict(),
+  z.object({stage:z.literal("execute-blueprint"),executor:actor,siteId:uuid,
+    configurationVersionId:uuid,reviewId:uuid,operationId:uuid,
+    idempotencyKey:z.string().min(8).max(200),expectedOfferingVersionIds:z.array(uuid).min(1).max(50)}).strict(),
+  z.object({stage:z.literal("approve-adoption"),reviewer:actor,deploymentId:uuid,offeringVersionId:uuid,
+    evidenceVersionId:uuid,rationale:z.string().trim().min(10).max(2000)}).strict(),
   z.object({stage:z.literal("prepare-class"),operator:actor,siteId:uuid,offeringVersionId:uuid,
     courseVersionId:uuid,deploymentId:uuid,title:z.string().trim().min(3).max(200),
     deliveryMode:z.enum(["self_paced","facilitated"]),capacity:z.number().int().min(2).max(100),
@@ -142,7 +155,94 @@ test("governed pilot API stage",async({browser},info)=>{
   expect(identity).toEqual({project:"sweet-hall-62441909",branch});
   let evidence:Record<string,unknown>={stage:scenario.stage,revision:process.env.CAN_RELEASE_SOURCE_SHA};
   try{
-    if(scenario.stage==="prepare-class"){
+    if(scenario.stage==="prepare-blueprint"){
+      const {author,siteId,configurationId,initialVersionId,blueprintId,blueprintVersionId,name,version}=scenario;
+      const [site]=await sql`SELECT count(*)::int AS count FROM public.sites WHERE id=${siteId}::uuid AND organization_id=${author.organizationId}::uuid`;
+      expect(site?.count).toBe(1);
+      expect(version.config).toMatchObject({siteId});
+      const page=await openActor(browser,author,contexts);
+      const home=await rpc<{organizationId:string;siteIds:string[]}>(page,"blueprint","readCanonicalBlueprintHome");
+      expect(home.organizationId).toBe(author.organizationId);expect(home.siteIds).toContain(siteId);
+      const input={configurationId,initialVersionId,blueprintId,blueprintVersionId,owningOrganizationId:author.organizationId,name,version};
+      const target={configurationId,versionId:initialVersionId,revision:1};
+      expect(await rpc(page,"blueprint","createCanonicalBlueprintConfiguration",input)).toMatchObject({...target,lifecycle:"draft"});
+      expect(await rpc(page,"blueprint","createCanonicalBlueprintConfiguration",input)).toMatchObject({...target,lifecycle:"draft"});
+      const submit={configurationId,expectedRevision:1};
+      expect(await rpc(page,"blueprint","submitCanonicalBlueprintConfiguration",submit)).toMatchObject({...target,lifecycle:"frozen"});
+      expect(await rpc(page,"blueprint","submitCanonicalBlueprintConfiguration",submit)).toMatchObject({...target,lifecycle:"frozen"});
+      const current=await rpc(page,"blueprint","readCanonicalBlueprintConfiguration",{configurationId});
+      expect(current).toMatchObject({...target,lifecycle:"frozen",blueprintVersionId,config:{siteId}});
+      const [stored]=await sql`SELECT v.lifecycle,v.revision,c.owning_organization_id::text AS organization
+        FROM public.blueprint_configuration_versions v JOIN public.blueprint_configurations c ON c.id=v.configuration_id
+        WHERE v.id=${initialVersionId}::uuid AND c.id=${configurationId}::uuid`;
+      expect(stored).toEqual({lifecycle:"frozen",revision:1,organization:author.organizationId});
+      evidence={...evidence,configurationId,configurationVersionId:initialVersionId,submitted:true,approved:false};
+    }else if(scenario.stage==="review-blueprint"){
+      const {reviewer,author,configurationVersionId,reviewId,evidenceVersionId,rationale,components}=scenario;
+      expect(author.organizationId).toBe(reviewer.organizationId);expect(author.email).not.toBe(reviewer.email);
+      const [owned]=await sql`SELECT count(*)::int AS count FROM public.blueprint_configuration_versions v
+        JOIN public.blueprint_configurations c ON c.id=v.configuration_id WHERE v.id=${configurationVersionId}::uuid
+        AND v.lifecycle='frozen' AND c.owning_organization_id=${reviewer.organizationId}::uuid`;
+      expect(owned?.count).toBe(1);
+      const authorPage=await openActor(browser,author,contexts),reviewPage=await openActor(browser,reviewer,contexts);
+      const decision={configurationVersionId,reviewId,evidenceVersionId,rationale,components,decision:"approved"};
+      await deny(authorPage,"blueprint","decideCanonicalBlueprintReview",decision);
+      const inspection=await rpc<{configurationVersionId:string;lifecycle:string;components:{componentId:string}[]}>(reviewPage,"blueprint","readCanonicalBlueprintReview",{configurationVersionId});
+      expect(inspection.lifecycle).toBe("frozen");
+      expect(inspection.components.map(c=>c.componentId).sort()).toEqual(components.map(c=>c.componentId).sort());
+      expect(await rpc(reviewPage,"blueprint","decideCanonicalBlueprintReview",decision)).toMatchObject({reviewId,configurationVersionId,decision:"approved",created:true});
+      expect(await rpc(reviewPage,"blueprint","decideCanonicalBlueprintReview",decision)).toMatchObject({reviewId,created:false});
+      await deny(reviewPage,"blueprint","decideCanonicalBlueprintReview",{...decision,rationale:rationale+" Changed."},["CONFLICT"]);
+      const [proof]=await sql`SELECT count(*)::int AS count FROM public.configuration_reviews r JOIN public.access_accounts a ON a.person_id=r.reviewer_person_id
+        WHERE r.id=${reviewId}::uuid AND r.configuration_version_id=${configurationVersionId}::uuid
+        AND r.decision='approved' AND r.evidence_version_id=${evidenceVersionId}::uuid AND a.email_normalized=${reviewer.email}`;
+      expect(proof?.count).toBe(1);
+      evidence={...evidence,configurationVersionId,reviewId,approved:true,componentsReviewed:components.length};
+    }else if(scenario.stage==="execute-blueprint"){
+      const {executor,siteId,configurationVersionId,reviewId,operationId,idempotencyKey,expectedOfferingVersionIds}=scenario;
+      const [owned]=await sql`SELECT count(*)::int AS count FROM public.blueprint_configuration_versions v JOIN public.blueprint_configurations c ON c.id=v.configuration_id
+        JOIN public.sites s ON s.id=${siteId}::uuid AND s.organization_id=c.owning_organization_id
+        WHERE v.id=${configurationVersionId}::uuid AND v.config->>'siteId'=${siteId} AND v.lifecycle='frozen'
+        AND c.owning_organization_id=${executor.organizationId}::uuid`;
+      expect(owned?.count).toBe(1);
+      const intents=await sql`SELECT offering_version_id::text AS id FROM public.blueprint_configuration_offering_intents WHERE configuration_version_id=${configurationVersionId}::uuid`;
+      expect(intents.map(i=>i.id).sort()).toEqual([...expectedOfferingVersionIds].sort());
+      const page=await openActor(browser,executor,contexts);
+      const input={configurationVersionId,reviewId,operationId,idempotencyKey};
+      const result=await rpc<{executionBatchId:string;deploymentIds:string[];created:boolean}>(page,"blueprint","executeCanonicalBlueprintConfiguration",input);
+      uuid.parse(result.executionBatchId);expect(result.deploymentIds).toHaveLength(expectedOfferingVersionIds.length);
+      const retry=await rpc<typeof result>(page,"blueprint","executeCanonicalBlueprintConfiguration",input);
+      expect(retry).toMatchObject({executionBatchId:result.executionBatchId,created:false});
+      expect([...retry.deploymentIds].sort()).toEqual([...result.deploymentIds].sort());
+      const persisted=await sql`SELECT d.id::text AS deployment_id,d.status,a.id::text AS adoption_id,a.offering_version_id::text AS offering_version_id,a.approval_status
+        FROM public.blueprint_outputs o JOIN public.blueprint_execution_batches b ON b.id=o.execution_batch_id
+        JOIN public.program_deployments d ON d.id=o.deployment_id JOIN public.deployment_offering_adoptions a ON a.deployment_id=d.id
+        WHERE b.id=${result.executionBatchId}::uuid AND b.configuration_version_id=${configurationVersionId}::uuid
+        AND b.review_id=${reviewId}::uuid AND b.executing_organization_id=${executor.organizationId}::uuid
+        AND b.execution_status='executed' AND d.operation_id=${operationId}::uuid`;
+      expect(persisted.map(r=>r.deployment_id).sort()).toEqual([...result.deploymentIds].sort());
+      expect(persisted.map(r=>r.offering_version_id).sort()).toEqual([...expectedOfferingVersionIds].sort());
+      if(result.created)expect(persisted.every(r=>r.status==="planning"&&r.approval_status==="proposed")).toBe(true);
+      evidence={...evidence,executionBatchId:result.executionBatchId,deployments:persisted,operationActivated:false};
+    }else if(scenario.stage==="approve-adoption"){
+      const {reviewer,deploymentId,offeringVersionId,evidenceVersionId,rationale}=scenario;
+      const page=await openActor(browser,reviewer,contexts);
+      const queue=await rpc<{limited:boolean;items:{adoptionId:string;deploymentId:string;offeringVersionId:string;blueprintExecutionRecorded:boolean;readiness:{recordedReady:boolean}[]}[]}>(page,"adoption","getNativeOfferingAdoptionReviewQueue");
+      expect(queue.limited).toBe(false);
+      const matches=queue.items.filter(r=>r.deploymentId===deploymentId&&r.offeringVersionId===offeringVersionId);
+      expect(matches).toHaveLength(1);const target=matches[0]!;
+      expect(target.blueprintExecutionRecorded).toBe(true);
+      expect(target.readiness.length).toBeGreaterThan(0);
+      expect(target.readiness.every(r=>r.recordedReady)).toBe(true);
+      const result=await rpc(page,"adoption","approveNativeOfferingAdoption",{adoptionId:target.adoptionId,evidenceVersionId,rationale});
+      expect(result).toMatchObject({adoptionId:target.adoptionId,approvalStatus:"approved"});
+      const [stored]=await sql`SELECT a.approval_status,d.status FROM public.deployment_offering_adoptions a
+        JOIN public.program_deployments d ON d.id=a.deployment_id JOIN public.access_accounts ac ON ac.person_id=a.approved_by_person_id
+        WHERE a.id=${target.adoptionId}::uuid AND a.offering_version_id=${offeringVersionId}::uuid
+        AND d.id=${deploymentId}::uuid AND ac.email_normalized=${reviewer.email}`;
+      expect(stored?.approval_status).toBe("approved");
+      evidence={...evidence,adoptionId:target.adoptionId,deploymentId,adoptionApproved:true,deploymentStatus:stored?.status};
+    }else if(scenario.stage==="prepare-class"){
       const {operator,siteId,offeringVersionId,courseVersionId,deploymentId,title,deliveryMode,capacity,consentVersion,consentText}=scenario;
       const page=await openActor(browser,operator,contexts);
       // Discover the authorized adoption via the exact same API used by the

@@ -57,3 +57,20 @@ export const blueprintReviewHistoryInputSchema = z.object({
   configurationVersionId: uuid,
   page: z.number().int().min(0).max(100).default(0),
 }).strict();
+
+/** Exact request receipt, stored with the existing immutable review. Sort only
+ * component IDs: their order is presentation, not part of the decision. */
+export function blueprintReviewReceipt(input:DecideBlueprintReviewInput){
+  return {rationale:input.rationale,componentDecisions:[...input.components]
+    .sort((a,b)=>a.componentId.localeCompare(b.componentId))
+    .map(c=>({componentId:c.componentId,decision:c.decision,evidenceVersionId:c.evidenceVersionId,conditions:c.conditions}))};
+}
+export function matchesBlueprintReviewReceipt(stored:unknown,input:DecideBlueprintReviewInput):boolean{
+  if(!stored||typeof stored!=="object"||Array.isArray(stored))return false;
+  const receipt=stored as Record<string,unknown>;
+  if(receipt.rationale!==input.rationale||!Array.isArray(receipt.componentDecisions))return false;
+  const parsed=z.array(blueprintComponentReviewSchema).safeParse(receipt.componentDecisions);
+  if(!parsed.success)return false;
+  const original=blueprintReviewReceipt({...input,components:parsed.data});
+  return JSON.stringify(original)===JSON.stringify(blueprintReviewReceipt(input));
+}

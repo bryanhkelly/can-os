@@ -4,6 +4,7 @@ const modules={
   release:"/src/modules/learning/native-offering-release.functions.ts",
   classes:"/src/modules/classes/unified-class.functions.ts",
   adoption:"/src/modules/programs/native-offering-adoption-review.functions.ts",
+  blueprint:"/src/modules/blueprints/blueprint-studio.functions.ts",
   registration:"/src/modules/enrollment/noncredit-self-enrollment.functions.ts",
   enrollment:"/src/modules/classes/native-class-enrollment.functions.ts",
   onboarding:"/src/modules/classes/native-class-reviewed-onboarding.functions.ts",

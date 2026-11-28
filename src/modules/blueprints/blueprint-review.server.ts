@@ -17,6 +17,7 @@ import {
   decideBlueprintReviewInputSchema,
   blueprintReviewReadInputSchema,
   blueprintReviewHistoryInputSchema,
+  blueprintReviewReceipt, matchesBlueprintReviewReceipt,
 } from "@/domain/blueprint-review";
 import { assertCapability, AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
@@ -226,7 +227,8 @@ export async function decideBlueprintReview(
       if (existing.configurationVersionId !== version.id
         || existing.reviewerPersonId !== actorPersonId
         || existing.decision !== input.decision
-        || existing.evidenceVersionId !== input.evidenceVersionId) {
+        || existing.evidenceVersionId !== input.evidenceVersionId
+        || !matchesBlueprintReviewReceipt(existing.conditions,input)) {
         throw new DomainError("CONFLICT", "The Blueprint review identifier is already in use.");
       }
       return {
@@ -309,7 +311,7 @@ export async function decideBlueprintReview(
       reviewerPersonId: actorPersonId,
       decision: input.decision,
       evidenceVersionId: input.evidenceVersionId,
-      conditions: { rationale: input.rationale } satisfies JsonObject,
+      conditions: blueprintReviewReceipt(input) satisfies JsonObject,
     });
     const payload: JsonObject = {
       owningOrganizationId: version.owningOrganizationId,

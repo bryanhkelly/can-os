@@ -519,7 +519,7 @@ export async function createBlueprintConfiguration(
           eq(blueprintConfigurationVersions.configurationId, input.configurationId),
         ))
         .limit(1);
-      if (version && await loadAndCompareVersion(tx, version, input.version)) {
+      if (version && version.blueprintVersionId === input.blueprintVersionId && await loadAndCompareVersion(tx, version, input.version)) {
         return asResult(existing.id, version);
       }
       return conflict("The configuration creation command was already used with different content.");
@@ -553,7 +553,7 @@ export async function createBlueprintConfiguration(
             eq(blueprintConfigurationVersions.configurationId, input.configurationId),
           ))
           .limit(1);
-        if (racedVersion && await loadAndCompareVersion(tx, racedVersion, input.version)) {
+        if (racedVersion && racedVersion.blueprintVersionId === input.blueprintVersionId && await loadAndCompareVersion(tx, racedVersion, input.version)) {
           return asResult(racedConfiguration.id, racedVersion);
         }
       }
