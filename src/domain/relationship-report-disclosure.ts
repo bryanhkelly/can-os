@@ -12,7 +12,8 @@ type Scope={
 /** Trusted server constructs this digest from the exact authorized scope and
  * reconciled source manifest; the client cannot supply either proof. */
 export async function relationshipDisclosureDigest(scope:Scope):Promise<string>{
-  if(!scope.recipientOrganizationId||!scope.agreementIds.length||!scope.manifestDigest)
+  const from=Date.parse(scope.from),to=Date.parse(scope.to),asOf=Date.parse(scope.asOf);
+  if(!scope.recipientOrganizationId||!scope.agreementIds.length||scope.agreementIds.some(id=>!id)||new Set(scope.agreementIds).size!==scope.agreementIds.length||!/^[a-f0-9]{64}$/.test(scope.manifestDigest)||!scope.metric.metricKey||!scope.metric.definitionVersion||!["real","synthetic"].includes(scope.population)||![from,to,asOf].every(Number.isFinite)||from>=to||to>asOf||to-from>366*86400000)
     throw Error("Exact relationship report scope and source manifest required");
   const payload=canonicalJson({...scope,agreementIds:[...new Set(scope.agreementIds)].sort()});
   const hash=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(payload));
@@ -28,7 +29,7 @@ export async function discloseRelationshipMetric(input:{
   scope:Scope;sourceCompletenessVerified:boolean;approval:PublicationDisclosureApproval|null;
   value:number;distinctContributors:number;currentAgreementIds:ReadonlySet<string>;
 },now=new Date()){
-  if(!input.sourceCompletenessVerified||
+  if(!Number.isFinite(now.getTime())||Date.parse(input.scope.asOf)>now.getTime()||!input.sourceCompletenessVerified||
     input.scope.agreementIds.some(id=>!input.currentAgreementIds.has(id))||
     !Number.isSafeInteger(input.value)||input.value<0||
     !Number.isSafeInteger(input.distinctContributors)||input.distinctContributors<0||

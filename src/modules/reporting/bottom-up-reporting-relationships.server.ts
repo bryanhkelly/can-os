@@ -9,8 +9,9 @@ import {assertCurrentCANGrantForMutation} from "@/modules/identity/current-can-g
 import {getIdentityContext} from "@/modules/identity/command-context.server";
 import {AuthorizationError} from "@/domain/command-context";
 import {relationshipProposalMetrics} from "@/domain/relationship-metric-policy";
-import {readRelationshipRegistrationFacts} from "./relationship-registration-sources.server";
+import {readRelationshipRegistrationFacts,countRelationshipRegistrationCandidates} from "./relationship-registration-sources.server";
 import {projectRelationshipRegistrationMetric} from "@/domain/relationship-registration-projection";
+import {reconcileRegistrationSource} from "@/domain/relationship-source-reconciliation";
 import {readAuthorizedOwnerDomains} from "@/modules/insights/reporting-population.server";
 import {buildCurrentReportingMetricRegistry} from "@/domain/reporting-metric-registry";
 import {
@@ -409,10 +410,10 @@ export async function readInternalRelationshipRegistrationProjection(request:Req
       live.push(a);
     }
     const owners=[...new Set(live.map(a=>a.ownerOrganizationId))];
-    const facts=await readRelationshipRegistrationFacts(tx,{
-      source:metric.metricKey.startsWith("class.")?"native_class_enrollment":"noncredit_registration",
-      ownerIds:owners,from,to,
-    });
+    const selection={source:metric.metricKey.startsWith("class.")?"native_class_enrollment" as const:"noncredit_registration" as const,ownerIds:owners,from,to};
+    const candidates=await countRelationshipRegistrationCandidates(tx,selection);
+    const facts=await readRelationshipRegistrationFacts(tx,selection);
+    const sourceJoin=reconcileRegistrationSource(candidates,facts.length);
     const projection=projectRelationshipRegistrationMetric(actor,recipient,metric,live,facts,{
       recipientOrganizationId:recipient,currentAgreementIds:new Set(live.map(a=>a.id)),
       sourceProof:{verifiedOrganizationIds:new Set(owners),verifiedSiteIds:new Set(facts.map(f=>f.deliverySiteId))},
@@ -420,7 +421,7 @@ export async function readInternalRelationshipRegistrationProjection(request:Req
     },{from,to,asOf:now.toISOString()},now);
     return {projection,disclosureApproved:false as const,coverage:{
       siteBackedOnly:true,noncreditSelfEnrollmentClaimsOnly:true,programMappingAvailable:false,
-      sourceCompletenessVerified:false,
+      sourceJoin,sourceCompletenessVerified:false,
     }};
   },{isolationLevel:"repeatable read"});
 }

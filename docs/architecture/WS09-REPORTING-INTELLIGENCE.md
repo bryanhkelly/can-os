@@ -15,3 +15,7 @@ Run API build, HTTP tests, SDK generation/typecheck, reporting foundation tests 
 ## Evidence API increment
 
 Five additional protected reads expose the existing metric definitions, projection health, Site source coverage, Site campaign delivery and revalidated source snapshot receipts. The snapshot reader has been extracted from the TanStack handler into a shared transport-neutral service; the legacy handler delegates to it. No event identifiers, source payloads, recipient addresses or claimed disclosure approval are added. Existing snapshot creation and replay mutations remain on their current guarded transport until idempotency/concurrency and write acceptance are established. Build, runtime tests and frontend SDK cutover are still pending.
+
+## Cross-owner source reconciliation increment
+
+The internal registration projection now compares the complete owner-period base cohort to its strict canonical join under the same transaction. Missing joins, Site-less records and non-self-enrollment registrations remain visible as a coverage diagnostic, not a recipient report. Even a reconciled join does not certify lifecycle completeness or authorize publication. The existing exact-scope disclosure gate now rejects malformed manifests, duplicate agreements, invalid windows and future evidence; behavioral tests cover small-cell suppression, revocation, expiration, changed scope and unreviewed cuts. No national aggregate is exposed. Program attribution, approved persisted disclosure artifacts and independently verified source completeness remain prerequisites.

@@ -63,3 +63,24 @@ export async function readRelationshipRegistrationFacts(tx:Tx,options:{
   if(new Set(rows.map(r=>r.sourceId)).size!==rows.length)throw Error("Registration source requires identity reconciliation");
   return rows.map(row=>({...row,source:options.source,programId:null,creditedOrganizationId:null}));
 }
+
+/** Compare the authoritative owner-period base cohort to the strict source
+ * join. Only inside the same repeatable-read transaction as the fact reader.
+ * Counts include excluded non-Site and non-self-enrollment records: this is
+ * conservative internal diagnostic evidence, NOT a permitted recipient cut. */
+export async function countRelationshipRegistrationCandidates(tx:Tx,options:{
+ source:"native_class_enrollment"|"noncredit_registration";ownerIds:readonly string[];from:string;to:string;
+}):Promise<number>{
+ const owners=z.array(uuid).max(1000).parse([...new Set(options.ownerIds)]);
+ if(!owners.length)return 0;
+ const from=new Date(options.from),to=new Date(options.to);
+ if(!Number.isFinite(from.getTime())||!Number.isFinite(to.getTime())||from>=to||to.getTime()-from.getTime()>366*86400000)throw Error("Bounded closed registration window required");
+ const ids=sql.join(owners.map(id=>sql`${id}::uuid`),sql`, `);
+ const query=options.source==="native_class_enrollment"?sql`
+ SELECT count(*)::text AS count FROM public.class_enrollments e JOIN public.classes c ON c.id=e.class_id
+ WHERE c.operating_organization_id IN (${ids}) AND e.enrolled_at>=${from.toISOString()}::timestamptz AND e.enrolled_at<${to.toISOString()}::timestamptz`:sql`
+ SELECT count(*)::text AS count FROM public.noncredit_registrations n
+ WHERE n.registering_organization_id IN (${ids}) AND n.registered_at>=${from.toISOString()}::timestamptz AND n.registered_at<${to.toISOString()}::timestamptz`;
+ const result=await tx.execute(query);
+ return z.coerce.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).parse(result.rows[0]?.count);
+}
