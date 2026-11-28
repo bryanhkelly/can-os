@@ -8,14 +8,12 @@ import type {Actor} from "@/modules/identity/actors.server";
 import {emitEvent} from "@/platform/mutation";
 import {recordAudit} from "@/modules/identity/actor-audit.server";
 import {DomainError} from "@/domain/errors";
-import {annualAdoptionEligible} from "@/domain/curriculum-year-policy";
+import {annualAdoptionEligible,curriculumAdoptionRollout} from "@/domain/curriculum-year-policy";
 import {EventTypes} from "@/domain/event-types";
 
 // Central service gate: neither HTTP, RPC nor internal callers can bypass staged licensing.
 function requireAnnualAdoptionEnabled(){
- if(process.env.CAN_ANNUAL_ADOPTIONS_ENABLED!=="true" ||
-    process.env.CAN_ANNUAL_ADOPTIONS_SCHEMA_READY!=="true" ||
-    process.env.CAN_ANNUAL_ADOPTIONS_CONNECTED_ACCEPTANCE!=="true")
+ if(!curriculumAdoptionRollout(process.env).annualEnabled)
   throw new AuthorizationError("Annual curriculum adoption awaits schema and connected release acceptance");
 }
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];

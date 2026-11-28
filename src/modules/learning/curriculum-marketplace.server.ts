@@ -8,6 +8,7 @@ import {
 } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
+import { curriculumAdoptionRollout } from "@/domain/curriculum-year-policy";
 import { readClassContent } from "@/domain/class-content";
 import { recommendCourseOption } from "@/domain/first-classroom";
 import { schoolCourseOutline } from "@/domain/school-course-outline";
@@ -157,8 +158,7 @@ export async function installPack(actor: Actor, input:{programId:string;packId:s
 export async function adoptPack(actor: Actor,input:{programId:string;packId:string;versionId:string}) {
  // Enforce the same compatibility policy at the domain entry point, not just
  // the HTTP handler: internal callers must never bypass the annual rollout.
- if(process.env.CAN_ANNUAL_ADOPTIONS_ENABLED==="true" ||
-    process.env.CAN_DISABLE_LEGACY_CURRICULUM_ADOPTIONS==="true")
+ if(!curriculumAdoptionRollout(process.env).legacyWriteEnabled)
   throw new AuthorizationError("New curriculum adoption requires verified school-year licensing");
  return db.transaction(async tx=>{
   const program=await authorizedProgram(actor,input.programId,tx);
@@ -200,8 +200,7 @@ export async function addCurriculumSupplement(actor:Actor,input:{
  // A historical program-wide adoption must never grant new supplement rights
  // after annual licensing is enabled. A year-scoped Section/entitlement
  // resolver must be integrated before reopening this command.
- if(process.env.CAN_ANNUAL_ADOPTIONS_ENABLED==="true" ||
-    process.env.CAN_DISABLE_LEGACY_CURRICULUM_ADOPTIONS==="true")
+ if(!curriculumAdoptionRollout(process.env).legacyWriteEnabled)
   throw new AuthorizationError("Curriculum supplements require verified annual adoption and Section licensing");
  return db.transaction(async tx=>{
   const program=await authorizedProgram(actor,input.programId,tx);
