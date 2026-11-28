@@ -58,8 +58,9 @@ export async function requestPersonalCanAccount(input: unknown,
       // Don't let repeated unverified requests rewrite another signup's name.
       // A consumed prior signup is historical evidence, not an eternal ban
       // on creating an account-only membership after roles were revoked.
-      // Never replace a still-pending verified-email signup.
-      if (!existing.consumedAt && existing.expiresAt > new Date()) {
+      // Preserve all unfinished registrations, even after the old link expires.
+      // The common issuer renews the window atomically with a new challenge.
+      if (!existing.consumedAt) {
         return;
       }
       await tx.update(accessAccountSignups).set({
