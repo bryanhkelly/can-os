@@ -6,6 +6,7 @@ import { canonicalSensitiveCapabilityApprovals as approvals } from "@/db/canonic
 import { assertCANCredentialIssuerReviewer } from "@/domain/credential-issuer-review";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { AuthorizationError } from "@/domain/command-context";
+import { DomainError } from "@/domain/errors";
 import { writeAudit } from "@/platform/mutation";
 import { getIdentityContext } from "./command-context.server";
 import type { AccessContext } from "@/domain/access-context";
@@ -120,11 +121,16 @@ export async function requestCanonicalCredentialIssuerApprovalService(request:Re
       });
       await assertIssuerOperatingSite(tx,scope.org,scope.site);
       const grantId=scope.grantId;
-      const existing=await tx.select({id:approvals.id}).from(approvals)
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"credential-issuer-request:"+grantId}))`);
+      const existing=await tx.select({id:approvals.id,accountId:approvals.requestedByCanAccountId,evidence:approvals.requestEvidenceReference}).from(approvals)
         .where(and(eq(approvals.accountPersonGrantId,grantId),
           eq(approvals.capabilityCode,"credential.issue"),
           sql`${approvals.status} IN ('pending','approved')`)).limit(1);
-      if(existing.length)throw new AuthorizationError("issuer approval already requested or approved");
+      if(existing.length){
+        const prior=existing[0]!;
+        if(prior.accountId===can.accountId&&prior.evidence===data.evidenceReference)return {requested:true as const,approvalId:prior.id};
+        throw new DomainError("CONFLICT","Issuer approval already requested or approved with different evidence");
+      }
       const [created]=await withSensitiveApprovalWriter(
         tx,"request",can.accountId,()=>tx.insert(approvals).values({
           accountPersonGrantId:grantId,capabilityCode:"credential.issue",
