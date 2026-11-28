@@ -578,3 +578,20 @@ test('engagement registry protects publication, owned discovery and invitation p
  assert.equal(c.linkQuery.safeParse({engagementId:id,linkId:id,actorPersonId:id}).success,false);
  assert.equal(c.results.draft.safeParse({subject:'Invitation',body:'Public copy',url:'https://app.example.test/go/abcdefgh1234',recipientEmail:'private@example.test'}).success,false);
 });
+
+test('marketing package routes preserve revision and Site boundaries',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const [route,method] of [["/api/v1/site-marketing-suggestions","GET"],["/api/v1/site-marketing-packages","GET"],["/api/v1/site-marketing-packages","POST"],["/api/v1/site-marketing-package-revisions","POST"],["/api/v1/site-marketing-package-copies","POST"],["/api/v1/site-marketing-package-status","POST"],["/api/v1/site-marketing-package-brand","POST"],["/api/v1/site-marketing-package-deletions","POST"]]){
+   const op=document.paths[route][method.toLowerCase()];
+   assert.ok(op.security);assert.ok(op.responses['403']);assert.ok(op.responses['409']);
+   const response=await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);
+  }
+  assert.ok(document.paths['/api/v1/site-marketing-package-revisions'].post.requestBody.content['application/json'].schema.required.includes('expectedRevision'));
+ });
+ const c=require('../dist/marketing-packages.contracts');
+ const id='00000000-0000-4000-8000-000000000001';
+ assert.equal(c.pageQuery.safeParse({siteId:id,limit:'101'}).success,false);
+ assert.equal(c.pageQuery.safeParse({siteId:id,ownerPersonId:id}).success,false);
+ assert.equal(c.pageQuery.parse({siteId:id,limit:'20'}).limit,20);
+});

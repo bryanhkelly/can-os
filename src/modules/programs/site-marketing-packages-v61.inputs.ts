@@ -1,0 +1,11 @@
+import {z} from "zod";
+import {marketingPackageContentSchema,marketingPurposeIds} from "@/domain/marketing-package-v61";
+const uuid=z.string().uuid();
+export const siteInput=z.object({siteId:uuid}).strict();
+export const recordInput=siteInput.extend({packageId:uuid}).strict();
+export const revisionInput=recordInput.extend({expectedRevision:z.number().int().positive()}).strict();
+export const createInput=siteInput.extend({title:z.string().trim().min(2).max(120),purpose:z.enum(marketingPurposeIds)}).strict();
+export const saveInput=revisionInput.extend({title:z.string().trim().min(2).max(120),content:marketingPackageContentSchema}).strict();
+export const archiveInput=revisionInput.extend({archived:z.boolean()}).strict();
+export const brandInput=revisionInput.extend({brandVersionId:uuid}).strict();
+export const pageInput=siteInput.extend({cursor:uuid.optional(),limit:z.number().int().min(1).max(100).default(50)}).strict();

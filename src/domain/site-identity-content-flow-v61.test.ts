@@ -29,7 +29,7 @@ describe("Site identity flows from Establish through Website and Introduce",()=>
   it("uses the same Site Brief for Website and Introduce without adding another CMS",()=>{
     const brief=source("src/domain/site-content-brief-v61.ts");
     const website=source("src/modules/sites/site-website-preview.server.ts");
-    const marketing=source("src/modules/programs/site-marketing-packages-v61.functions.ts");
+    const marketing=source("src/modules/programs/site-marketing-packages-v61.server.ts");
     expect(brief).toContain("identity:siteIdentityV61Schema.nullable()");
     expect(website).toContain("siteIdentity:siteBrief.identity");
     expect(marketing).toContain("identity:reuseAllowed?brief.identity:null");

@@ -1,3 +1,4 @@
+import * as marketing from "@/modules/programs/site-marketing-packages-v61.server";
 import * as engagement from "@/modules/engagement/engagement-registry-service.server";
 import * as engagementInput from "@/modules/engagement/engagement-registry.inputs";
 import * as sender from "@/modules/communication/sender-registry-service.server";
@@ -61,6 +62,14 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
  const context=await (mode==="planning"?getBlueprintPlanningContext(request):mode==="canonical"?getCanonicalCommandContext(request):mode==="learner"?getInstructionalLearnerContext(request):getIdentityContext(request));
  if(!context.actorPersonId)throw new AuthorizationError("verified Person");
  return {
+  readSiteMarketingSuggestionsV61:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Marketing package context");return marketing.readSiteMarketingSuggestionsV61(request,raw);},
+  listSiteMarketingPackagesPageV61:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Marketing package context");return marketing.listSiteMarketingPackagesPageV61(request,raw);},
+  createSiteMarketingPackageV61:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Marketing package context");return marketing.createSiteMarketingPackageV61(request,raw);},
+  saveSiteMarketingPackageV61:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Marketing package context");return marketing.saveSiteMarketingPackageV61(request,raw);},
+  duplicateSiteMarketingPackageV61:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Marketing package context");return marketing.duplicateSiteMarketingPackageV61(request,raw);},
+  archiveSiteMarketingPackageV61:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Marketing package context");return marketing.archiveSiteMarketingPackageV61(request,raw);},
+  selectSiteMarketingPackageBrandV61:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Marketing package context");return marketing.selectSiteMarketingPackageBrandV61(request,raw);},
+  deleteSiteMarketingPackageV61:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Marketing package context");return marketing.deleteSiteMarketingPackageV61(request,raw);},
   createEngagementDefinition:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Engagement context");return engagement.createEngagementDefinition(request,parseCommandInput(engagementInput.createEngagementDefinitionInput,raw));},
   createEngagementGoLink:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Engagement context");return engagement.createEngagementGoLink(request,parseCommandInput(engagementInput.createEngagementGoLinkInput,raw));},
   listEngagementGoLinks:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Engagement context");return engagement.listEngagementGoLinks(request,parseCommandInput(engagementInput.listEngagementGoLinksInput,raw));},

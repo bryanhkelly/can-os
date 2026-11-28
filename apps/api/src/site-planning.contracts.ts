@@ -60,3 +60,5 @@ export const docs={
  existing:obj({siteId:id,programs:arr(obj({id,name:s,type:s,status:s,gradeRange:rangeDoc,deliveryModel:obj({onsite:b,asynchronous:b,liveOnline:b,onsiteDaysPerWeek:{type:'integer',minimum:1,maximum:7}},[])})),visibility:en(['whole_site','assigned'])}),
  saved:obj({siteId:id,revision:dt,updated:b})
 };
+
+export {audiences as sitePlanningAudienceWireIds,identity as siteIdentityWireSchema,identityDoc as siteIdentityOpenApiSchema};
