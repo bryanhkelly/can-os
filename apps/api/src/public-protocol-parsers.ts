@@ -4,6 +4,10 @@ import type {FastifyInstance} from 'fastify';
  * provider events are the sole JSON route that receives original bytes.
  * Do not parse, stringify or normalize a signed payload before verification. */
 export function registerPublicProtocolParsers(server:FastifyInstance){
+ server.addHook('onRoute',route=>{
+  if(route.url==='/api/v1/webhooks/resend')route.bodyLimit=64*1024;
+  if(route.url==='/api/v1/campaigns/unsubscribe'&&route.method==='POST')route.bodyLimit=4096;
+ });
  const parseJson=server.getDefaultJsonParser('error','error');
  server.removeContentTypeParser('application/json');
  server.addContentTypeParser('application/json',{parseAs:'buffer'},(request,body,done)=>{
