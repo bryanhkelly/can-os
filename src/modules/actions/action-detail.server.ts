@@ -5,7 +5,7 @@ import {parseCommandInput} from "@/domain/command-input";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertAcademicActionAuthority } from "./academic-action-policy.server";
-import { authorizeClass } from "@/modules/learning/class-access.server";
+import { authorizeClass } from "@/modules/learning/class-access-core.server";
 import type { Actor } from "@/modules/identity/actors.server";
 
 export async function getActionDetailService(request:Request,raw:unknown){
