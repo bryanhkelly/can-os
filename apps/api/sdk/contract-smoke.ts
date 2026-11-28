@@ -40,3 +40,19 @@ export async function checkStaffAdministrationContract(client:BecomunaBrowserApi
  // @ts-expect-error no caller-selected actor
  await client.POST('/api/v1/staff/grant-state',{body:{grantId,active:false,actorId:grantId}});
 }
+
+export async function checkInstitutionalIdentityContract(client:BecomunaBrowserApi,id:string){
+ await client.GET('/api/v1/identity/credential-issuer/mine');
+ await client.GET('/api/v1/identity/credential-issuer/pending');
+ await client.GET('/api/v1/identity/credential-issuer/approved');
+ await client.POST('/api/v1/identity/credential-issuer/requests',{body:{evidenceReference:'Reviewed secure evidence reference'}});
+ await client.POST('/api/v1/identity/credential-issuer/decisions',{body:{approvalId:id,decision:'approve',evidenceReference:'Reviewed secure evidence reference',expiresAt:'2027-01-01T00:00:00Z'}});
+ await client.POST('/api/v1/identity/credential-issuer/revocations',{body:{approvalId:id,reason:'Independent verified revocation reason'}});
+ await client.GET('/api/v1/identity/academic-staff/delegations',{params:{query:{programId:id}}});
+ await client.POST('/api/v1/identity/academic-staff/delegations',{body:{programId:id,personId:id,role:'registrar',reason:'Exact Program responsibility'}});
+ await client.POST('/api/v1/identity/academic-staff/revocations',{body:{roleAssignmentId:id,reason:'Assignment ended'}});
+ // @ts-expect-error no caller-selected staff grant on issuer request
+ await client.POST('/api/v1/identity/credential-issuer/requests',{body:{grantId:id,evidenceReference:'Reviewed secure evidence reference'}});
+ // @ts-expect-error no institution-wide privileged role via program delegation
+ await client.POST('/api/v1/identity/academic-staff/delegations',{body:{programId:id,personId:id,role:'can_network_steward',reason:'Exact Program responsibility'}});
+}
