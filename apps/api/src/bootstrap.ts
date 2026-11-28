@@ -6,6 +6,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { z } from 'zod';
 import { AppModule } from './app.module';
 import { CanonicalIdentityService } from './identity.service';
+import { registerPublicProtocolParsers } from './public-protocol-parsers';
 
 const configSchema = z.object({
   host: z.enum(['127.0.0.1', '0.0.0.0']).default('127.0.0.1'),
@@ -44,7 +45,8 @@ export async function createApi(config: ReturnType<typeof readConfig>) {
     bodyLimit: 1024 * 1024, requestTimeout: 30000, trustProxy: false,
     requestIdHeader: false, genReqId: () => randomUUID(),
   });
-  const app = await NestFactory.create<NestFastifyApplication>(AppModule, adapter, { logger: ['error', 'warn'] });
+  registerPublicProtocolParsers(adapter.getInstance());
+  const app = await NestFactory.create<NestFastifyApplication>(AppModule, adapter, { bodyParser:false, logger: ['error', 'warn'] });
   app.get(CanonicalIdentityService).configure(config.canonicalReads === '1', config.canonicalWrites==='1'?'http://localhost:'+config.port:null);
   adapter.getInstance().addHook('onRequest', async (request, reply) => {
     reply.header('X-Request-Id', request.id);
