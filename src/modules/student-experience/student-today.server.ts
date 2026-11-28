@@ -206,3 +206,20 @@ export async function getStudentToday(studentProfileId: string, at = new Date(),
     ),
   };
 }
+
+/** Minimal Person-owned workspace shell. No academic record access is granted.
+ * Only call after verifying the exact student Site grant on the server. */
+export async function getCanonicalStudentTodayShell(personId:string,siteId:string,at:Date):Promise<
+  Omit<StudentTodayData,"student"> & {student:Omit<StudentTodayData["student"],"studentProfileId"|"gradeLevel"> & {studentProfileId:null;gradeLevel:null}}
+> {
+  const [person] = await db.select({personId:people.id,firstName:people.legalFirstName,preferredName:people.preferredName})
+    .from(people).where(eq(people.id,personId)).limit(1);
+  const [site] = await db.select({timezone:sites.timezone}).from(sites).where(eq(sites.id,siteId)).limit(1);
+  if (!person || !site) throw new Error("Verified student workspace unavailable");
+  const {start,end}=localDayBoundsInTimezone(at,site.timezone);
+  return {
+    student:{...person,studentProfileId:null,gradeLevel:null},
+    generatedAt:at,dayStartUtc:start,dayEndUtc:end,
+    sections:[],events:[],coursework:[],openActions:[],recoveryCandidates:[],
+  };
+}

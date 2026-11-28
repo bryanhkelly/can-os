@@ -7,6 +7,7 @@ import { getSchoolExperiences } from "@/modules/student-experience/school-experi
 import { getClassWorkspace } from "@/modules/learning/class-workspace.functions";
 import { getNativeClassLearningResume } from "@/modules/classes/native-class-learning.functions";
 import { getMyStudentClasses } from "@/modules/classes/native-class-student-home.functions";
+import { loadNativeStudentHomework } from "@/modules/classes/native-student-homework-index";
 import { isLearnerFacingInstruction } from "@/domain/first-class-lesson";
 import { DataUnavailableError, safeLoader } from "@/lib/safe-loader";
 import { orderedBatches } from "@/lib/ordered-batches";
@@ -30,7 +31,7 @@ export async function loadStudentToday() {
   // The native Class index is independent of the older Section lesson resume
   // projection. Begin it early instead of waiting for all Section probes.
   const classesPromise = safeLoader(() => getMyStudentClasses())();
-  const [assignmentResult, supportResult, grades, community] = await Promise.all([
+  const [assignmentResult, supportResult, grades, community, nativeHomework] = await Promise.all([
     safeLoader(async () => {
       const view = await getAssignments();
       if (!view.connected) throw new DataUnavailableError();
@@ -57,6 +58,7 @@ export async function loadStudentToday() {
       if (!view.connected) throw new DataUnavailableError();
       return { connected: view.connected, events: view.events, notices: view.notices };
     })(),
+    safeLoader(loadNativeStudentHomework)(),
   ]);
   let success: StudentSuccessPriorities | null = null;
   if (assignmentResult.ok) success = deriveStudentSuccessPriorities(assignmentResult.data, new Date(today.generatedAt));
@@ -68,8 +70,8 @@ export async function loadStudentToday() {
     Number(b.sectionId === preferredSectionId) - Number(a.sectionId === preferredSectionId));
   const classes = await classesPromise;
   const learning = await safeLoader(async (): Promise<LearningResume | null> => {
-    if (!classes.ok) throw new DataUnavailableError();
-    const native = classes.data.classes.filter(item => item.status === "active" && item.enrollmentId && item.courseAttemptId);
+    if (!classes.ok && !candidates.length) throw new DataUnavailableError();
+    const native = (classes.ok ? classes.data.classes : []).filter(item => item.status === "active" && item.enrollmentId && item.courseAttemptId);
     if (native.length) {
       let fallback: LearningResume | null = null;
       // Reuse the authorized native lesson service. Never infer a Class from a Section title.
@@ -126,7 +128,7 @@ export async function loadStudentToday() {
     if (!completedFallback && candidates.length) throw new DataUnavailableError();
     return completedFallback;
   })();
-  const dashboard: StudentDashboardData = { assignments: assignmentResult, learning, grades, community, classes };
+  const dashboard: StudentDashboardData = { assignments: assignmentResult, learning, grades, community, classes, nativeHomework };
   return { today, success, support, dashboard };
 }
 

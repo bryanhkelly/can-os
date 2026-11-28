@@ -18,5 +18,6 @@ export type StudentDashboardData = {
   grades: LoadOutcome<Pick<Awaited<ReturnType<typeof getStudentReportCard>>["grades"][number],
     "sectionGradeId" | "sectionTitle" | "schoolYearName" | "gradingPeriodName" | "letterGrade" | "percentage">[]>;
   classes?: LoadOutcome<{ kind: "student" | "other"; classes: { classId: string; title: string; status: string; courseAttemptId: string | null }[] }>;
+  nativeHomework?: LoadOutcome<Awaited<ReturnType<typeof import("@/modules/classes/native-student-homework-index").loadNativeStudentHomework>>>;
   community: LoadOutcome<Pick<Awaited<ReturnType<typeof getSchoolExperiences>>, "connected" | "events" | "notices">>;
 };

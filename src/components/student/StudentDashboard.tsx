@@ -13,6 +13,8 @@ import { StudentSchoolLifePanel } from "./StudentSchoolLifePanel";
 import { StudentTodayAtGlance } from "./StudentTodayAtGlance";
 import type { DashboardAssignment, StudentDashboardData } from "./student-dashboard-data";
 import { StudentAssignmentLink } from "./StudentAssignmentLink";
+import { NativeStudentHomeworkIndex } from "./NativeStudentHomeworkIndex";
+import { WorkspaceNotice } from "@/components/workspace";
 import { DashboardHero, homeGreeting } from "@/components/workspace/dashboard-home";
 
 type Today = Awaited<ReturnType<typeof getMyStudentToday>>;
@@ -32,6 +34,8 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
     }));
   const assignmentsError = data && !data.assignments.ok ? data.assignments.message : null;
   const plan = deriveStudentSuccessPriorities(assignments, at, 25);
+  const nativeHomework = data?.nativeHomework;
+  const hasNativeHomework = nativeHomework?.ok && nativeHomework.data.kind==="student" && nativeHomework.data.classes.length>0;
   const nextWork = plan.steps.find(item => item.canEdit && ["revision","overdue","due_soon","to_do"].includes(item.kind));
   const learning = data?.learning.ok ? data.learning.data : null;
   const studentClasses = data?.classes?.ok && data.classes.data.kind === "student"
@@ -58,7 +62,7 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
           ? resumeClassId ? <Link to="/class/$classId" params={{classId:resumeClassId}} search={{view:"learn",tab:"lessons",lesson:learning.lesson.id}} /> : <Link to="/class" />
           : nextWork ? <StudentAssignmentLink assessmentId={nextWork.assessmentId} sectionId={nextWork.sectionId} />
           : <Link to="/class" />}</DashboardShortcut>
-      <DashboardShortcut title="View Assignments" description={assignmentsError ? "Assignments unavailable" : `${plan.requiresAction} ready for your attention`}
+      <DashboardShortcut title="View Assignments" description={hasNativeHomework ? "View current Class and school assignments" : assignmentsError ? "Assignments unavailable" : `${plan.requiresAction} ready for your attention`}
         icon={<FileText className="size-5" />}><Link to="/student/assignments" /></DashboardShortcut>
       <DashboardShortcut title="Today's Schedule" description={`${classesToday.length} class events scheduled`}
         icon={<CalendarDays className="size-5" />}><Link to="/calendar" search={{date:localDate}} /></DashboardShortcut>
@@ -81,6 +85,8 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
           sections={liveData.sections} />
         <StudentReleasedGradesPanel state={data?.grades} />
       </div>
+      {nativeHomework?.ok ? <NativeStudentHomeworkIndex data={nativeHomework.data} compact/> :
+        nativeHomework && <WorkspaceNotice tone="attention">Class assignments could not be verified. Open My Classes to retry.</WorkspaceNotice>}
       <StudentSchoolLifePanel events={upcomingEvents}
         unavailable={Boolean(data && !data.community.ok)} />
     </>}
