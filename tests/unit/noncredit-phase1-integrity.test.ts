@@ -15,7 +15,7 @@ const assessment=readFileSync("src/components/learning/CourseAssessmentPanel.tsx
 const pilotReport=readFileSync("src/modules/learning/noncredit-pilot-outcomes.server.ts","utf8");
 const surveyDisplay=readFileSync("src/components/learning/NoncreditCourseSurveys.tsx","utf8");
 const providerEnrollment=readFileSync("src/routes/programs.noncredit.enrollment.tsx","utf8");
-const publisher=readFileSync("src/modules/enrollment/noncredit-enrollment-publication.functions.ts","utf8");
+const publisher=readFileSync("src/modules/enrollment/noncredit-enrollment-publication.server.ts","utf8");
 const preflight=readFileSync("src/modules/enrollment/noncredit-training-readiness.server.ts","utf8");
 const preflightView=readFileSync("src/components/enrollment/NoncreditTrainingReadiness.tsx","utf8");
 
@@ -134,8 +134,8 @@ describe("noncredit pilot correctness boundaries",()=>{
   });
 
   it("checks one authorized training before release without bypassing publication",()=>{
-    expect(publisher).toContain('getNoncreditTrainingReadiness=createServerFn({method:"GET"})');
-    expect(publisher).toContain('requireCanonicalLabProvider("noncredit.enrollment.read")');
+    expect(publisher).toContain('getNoncreditTrainingReadinessService(request:Request');
+    expect(publisher).toContain('resolveCanonicalProvider(request,"noncredit.enrollment.read")');
     expect(publisher).toContain('if(!selected)throw new AuthorizationError("authorized published training selection")');
     expect(publisher).toContain('readNoncreditTrainingReadiness(selected,provider.organizationId)');
     expect(preflight).toContain("courseLessons.courseVersionId");

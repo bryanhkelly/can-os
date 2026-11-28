@@ -1,3 +1,4 @@
+import * as noncreditPublication from "@/modules/enrollment/noncredit-enrollment-publication.server";
 import * as knowledgeCheck from "@/modules/learning/noncredit-assessment-http.server";
 import {getNoncreditCompletionReadinessService} from "@/modules/learning/noncredit-completion.server";
 import {accessSessionCookie} from "@/domain/access-tokens";
@@ -76,6 +77,11 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
  const context=await (mode==="operator-reporting"?(readCookie(request,accessSessionCookie)!==undefined?getIdentityContext(request):getCanonicalCommandContext(request)):mode==="planning"?getBlueprintPlanningContext(request):mode==="canonical"?getCanonicalCommandContext(request):mode==="learner"?getInstructionalLearnerContext(request):getIdentityContext(request));
  if(!context.actorPersonId)throw new AuthorizationError("verified Person");
  return {
+  getNoncreditEnrollmentPublisher:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Enrollment publication context");return (async()=>{const result=await noncreditPublication.getNoncreditEnrollmentPublisherService(request);return {...result,published:result.published.map(row=>({...row,opensAt:row.opensAt.toISOString(),closesAt:row.closesAt.toISOString()}))};})();},
+  getNoncreditTrainingReadiness:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Enrollment publication context");return noncreditPublication.getNoncreditTrainingReadinessService(request,raw);},
+  publishNoncreditSelfEnrollment:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Enrollment publication context");return noncreditPublication.publishNoncreditSelfEnrollmentService(request,raw);},
+  closeNoncreditSelfEnrollment:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Enrollment publication context");return noncreditPublication.closeNoncreditSelfEnrollmentService(request,raw);},
+  publishNoncreditAcrossAuthorizedSites:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Enrollment publication context");return noncreditPublication.publishNoncreditAcrossAuthorizedSitesService(request,raw);},
   getNoncreditKnowledgeCheck:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="learner")throw new AuthorizationError("Knowledge check context");return knowledgeCheck.getNoncreditKnowledgeCheckService(request,raw);},
   beginNoncreditKnowledgeCheckAttempt:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="learner")throw new AuthorizationError("Knowledge check context");return knowledgeCheck.beginNoncreditKnowledgeCheckAttemptService(request,raw);},
   saveNoncreditKnowledgeCheckAnswer:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="learner")throw new AuthorizationError("Knowledge check context");return knowledgeCheck.saveNoncreditKnowledgeCheckAnswerService(request,raw);},

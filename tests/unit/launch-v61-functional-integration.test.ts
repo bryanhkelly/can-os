@@ -42,14 +42,14 @@ describe("Launch Studio current persisted workflows", () => {
   });
   it("reads publisher-authorized noncredit Offering releases only in Open", () => {
     const view = read("src/components/launch-studio/LaunchReadinessPanelV61.tsx");
-    const publisher = read("src/modules/enrollment/noncredit-enrollment-publication.functions.ts");
+    const publisher = read("src/modules/enrollment/noncredit-enrollment-publication.server.ts");
     expect(view).toContain('context === "open" ? getNoncreditEnrollmentPublisher()');
     expect(view).toContain("releases=noncredit.value.published.filter(item=>item.siteId===siteId)");
     expect(view).toContain("...item.siteOptions,...item.digitalSiteOptions");
     expect(view).toContain('context==="open" && <section');
     expect(view).toContain('publicSiteId:siteId');
     expect(view).toContain('noncredit.state==="unavailable"');
-    expect(publisher).toContain('requireCanonicalLabProvider("noncredit.enrollment.read")');
+    expect(publisher).toContain('resolveCanonicalProvider(request,"noncredit.enrollment.read")');
     expect(view).not.toContain("publishNoncreditSelfEnrollment(");
     expect(view).not.toContain("publishNoncreditAcrossAuthorizedSites(");
   });

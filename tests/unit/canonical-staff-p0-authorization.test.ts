@@ -96,9 +96,9 @@ describe("canonical single-login P0 authorization boundaries", () => {
 
   it("makes permission enforcement explicit on enrollment publication and cohorts", () => {
     const publication = source(
-      "src/modules/enrollment/noncredit-enrollment-publication.functions.ts");
-    expect(publication).toContain('requireCanonicalLabProvider("noncredit.enrollment.read")');
-    expect((publication.match(/requireCanonicalLabProvider\("noncredit.enrollment.manage"\)/g)??[]).length)
+      "src/modules/enrollment/noncredit-enrollment-publication.server.ts");
+    expect(publication).toContain('resolveCanonicalProvider(request,"noncredit.enrollment.read")');
+    expect((publication.match(/resolveCanonicalProvider\(request,"noncredit.enrollment.manage"\)/g)??[]).length)
       .toBe(3);
     expect((publication.match(/assertCurrentCanonicalStaffForMutation/g)??[]).length)
       .toBe(6); // three server-handler imports + three protected mutations

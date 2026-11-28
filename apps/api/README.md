@@ -130,3 +130,6 @@ Three read-only APIs expose the existing pilot outcomes, organization operator r
 
 ## Knowledge checks and completion readiness
 Seven APIs reuse existing canonical grants, objective scoring, provider finalization, draft answer revisions and completion readiness. Provider grant provisioning now honors the requested baseline/final phase; default remains final. Completion readiness rejects ambiguous decision histories using the shared canonical projection. No answer key appears in response schemas. Authenticated execution and dependency build remain unverified.
+
+## Noncredit release publication
+Five APIs expose provider discovery, training readiness, single-Site publication, multi-Site facilitated publication and terminal closure. Both transports share the original provider capability checks, exact Site and Deployment authority, transaction-local staff revalidation, publication lock, consent terms and idempotent release matching. Existing 100/200 discovery bounds remain. Authenticated execution is pending.

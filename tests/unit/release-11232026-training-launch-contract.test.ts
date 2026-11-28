@@ -33,12 +33,12 @@ describe("release-11232026 national training pilot launch", () => {
   it("keeps Site in noncredit handoff while retaining publisher-only authorization", () => {
     const prepare = source("src/components/launch-studio/LaunchPrepareV61.tsx");
     const ready = source("src/components/launch-studio/ProgramOfferingJourneyReadinessV61.tsx");
-    const publisher = source("src/modules/enrollment/noncredit-enrollment-publication.functions.ts");
+    const publisher = source("src/modules/enrollment/noncredit-enrollment-publication.server.ts");
     expect(prepare).toContain('"/programs/noncredit/enrollment?publicSiteId=" + scoped(id)');
     expect(prepare).toContain("Only an independently authorized provider");
     expect(ready).toContain('noncredit.state==="ready" && (journey.publisherCandidateCount??0)>0');
     expect(ready).toContain("offeringCode:journey.solution.offeringCode");
-    expect(publisher).toContain('requireCanonicalLabProvider("noncredit.enrollment.manage")');
+    expect(publisher).toContain('resolveCanonicalProvider(request,"noncredit.enrollment.manage")');
   });
 
   it("never labels a published Solution as an approved Course or Offering", () => {
