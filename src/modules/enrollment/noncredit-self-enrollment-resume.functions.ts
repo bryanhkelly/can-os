@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { appendResponseHeader, setResponseHeader } from "@tanstack/react-start/server";
+import { getRequest, appendResponseHeader, setResponseHeader } from "@tanstack/react-start/server";
 import { and, eq, gt, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
@@ -24,11 +24,13 @@ export const openMyNoncreditCourse = createServerFn({method:"POST"})
   }).strict().parse(value))
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
-    const { requireVerifiedAdultAccount, issueNativeLearnerSession } = await import("./noncredit-self-enrollment-identity.server");
-    const owner=await requireVerifiedAdultAccount();
+    const { resolveVerifiedAdultAccount, issueNativeLearnerSession,assertVerifiedAdultSessionForMutation } = await import("./noncredit-participant-identity.server");
+    const request=getRequest();
+    const owner=await resolveVerifiedAdultAccount(request);
     if(!await probeCanonicalAuthReader())
       throw new Error("Secure learning access is temporarily unavailable");
     const result=await db.transaction(async tx=>{
+      await assertVerifiedAdultSessionForMutation(tx,request,owner);
       await assertUnambiguousAdultAccount(owner.accountId,owner.personId,tx);
       const [bridge]=await tx.select().from(accessAccountNoncreditPrincipals)
         .where(eq(accessAccountNoncreditPrincipals.accessAccountId,owner.accountId)).limit(1);
@@ -103,7 +105,7 @@ export const openMyNoncreditCourse = createServerFn({method:"POST"})
       if(!record||record.accountId!==bridge.canonicalAccountId||
          record.personId!==bridge.canonicalPersonId)
         throw new AuthorizationError("current active course participation");
-      const cookie=await issueNativeLearnerSession(tx,record.accountId,record.grantId,now);
+      const cookie=await issueNativeLearnerSession(tx,request,owner,record.accountId,record.grantId,now);
       await writeCanonicalAudit(tx,{
         actorPersonId:record.personId,
         owningOrganizationId:record.organizationId,
