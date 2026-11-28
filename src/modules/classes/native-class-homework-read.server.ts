@@ -130,4 +130,5 @@ export async function readNativeHistoricalWork(actor:CommandContext,data:{classE
   return db.transaction(async tx=>{
    const {cls,enrollment}=await authorizeNativeLearnerClass(tx,actor,data.classEnrollmentId,"active_read");
    return readHistoricalClassWork(tx,{classId:cls.id,classEnrollmentId:enrollment.id,beforeId:data.beforeId});
+  });
 }
