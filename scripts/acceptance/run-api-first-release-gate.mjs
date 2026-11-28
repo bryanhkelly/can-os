@@ -60,10 +60,12 @@ if(release){
     run("Attested database migration parity",process.execPath,["scripts/acceptance/run-pilot-qa.mjs","schema"]);
     run("Restricted database login and forced-RLS preflight",process.execPath,["scripts/acceptance/run-pilot-qa.mjs","nest-db"]);
     run("Attested Nest signup, student isolation and replay",process.execPath,["scripts/acceptance/run-pilot-qa.mjs","nest-http"]);
+    run("Attested Platform Owner, staff and independent reviewer acceptance",process.execPath,["scripts/acceptance/run-pilot-qa.mjs","nest-identity"]);
+    run("Attested reporting relationship acceptance and revocation",process.execPath,["scripts/acceptance/run-pilot-qa.mjs","nest-relationships"]);
     run("Attested teacher and guardian workspaces",process.execPath,["scripts/acceptance/run-pilot-qa.mjs","nest-roles"]);
     run("Attested independent pilot learner journey",process.execPath,["scripts/acceptance/run-pilot-qa.mjs","nest-pilot1"]);
     run("Attested both-pilot report readback and cross-tenant denial",process.execPath,["scripts/acceptance/run-pilot-qa.mjs","nest-reporting"]);
-  }else for(const name of ["Attested database migration parity","Restricted database login and forced-RLS preflight","Attested Nest signup, student isolation and replay","Attested teacher and guardian workspaces","Attested independent pilot learner journey","Attested both-pilot report readback and cross-tenant denial"])block(name,"Source, dependency or runtime preconditions failed");
+  }else for(const name of ["Attested database migration parity","Restricted database login and forced-RLS preflight","Attested Nest signup, student isolation and replay","Attested Platform Owner, staff and independent reviewer acceptance","Attested reporting relationship acceptance and revocation","Attested teacher and guardian workspaces","Attested independent pilot learner journey","Attested both-pilot report readback and cross-tenant denial"])block(name,"Source, dependency or runtime preconditions failed");
   run("Eight-session classroom control receipt reconciliation",process.execPath,["scripts/acceptance/nest-pilot2-receipts.mjs",join(root,"acceptance-artifacts","nest-pilot2",sha)]);
   // Deliberately fail closed until the following independent suites exist.
   // The older TanStack pilot runner is not equivalent evidence.
@@ -71,8 +73,8 @@ if(release){
     ["Pilot 1 full standard Nest API journey","Prepared-release learner journey authored; standard publication/discovery, fresh provisioning, full cohort execution and persisted evidence still required"],
     ["Pilot 2 full standard Nest API journey","Schedule and due-session API suites authored; eight exact-SHA delivery receipts plus media, assessments, staged surveys, completion and reconciled outcomes still required"],
     ["Database privileges, RLS and reconciled counts","Restricted login preflight authored; effective business-connection tenant policies and transactional isolation still require runtime evidence"],
-    ["Teacher, guardian, facilitator, owner and reviewer acceptance","Teacher and guardian tests authored; facilitator, owner and independent reviewer coverage and authenticated execution still required"],
-    ["National relationship disclosure and revocation","Exact metric/organization consent and before/after evidence required"],
+    ["Teacher, guardian, facilitator, owner and reviewer acceptance","Teacher, guardian and classroom tests authored; WS02 owner/staff/reviewer suites required after integration; authenticated execution remains mandatory"],
+    ["National relationship disclosure and revocation","Exact metric consent, portfolio acceptance and revocation tests authored; approved recipient disclosure API and independently reconciled outcome evidence are not available"],
     ["Deployment, rollback and production ingress","Exact deployed SHA, production auth, readiness and safe rollout evidence required"]
   ])block(name,reason);
 }
