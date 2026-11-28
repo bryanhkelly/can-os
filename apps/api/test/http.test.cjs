@@ -117,3 +117,23 @@ test('local write configuration rejects mismatched or missing QA database config
   const {assertIsolatedWriteEnvironment}=require('../dist/bootstrap');
   assert.throws(()=>assertIsolatedWriteEnvironment({NODE_ENV:'test',DATABASE_URL:'not-a-qa-database'}));
 });
+
+test('Site and Offering operations have explicit protected contracts and disabled writes by default',async()=>{
+ await withServer('0',async(url,document)=>{
+  const version='00000000-0000-4000-8000-000000000001';
+  for(const path of ['/api/v1/sites',...['release-submissions','release-policy','release-decisions','course-publication','asset-manifest-approval','publication'].map(x=>'/api/v1/offering-versions/{offeringVersionId}/'+x)]){
+   const operation=document.paths[path].post;
+   assert.ok(operation.security);assert.ok(operation.requestBody);assert.ok(operation.responses['403']);
+   const response=await fetch(url+path.replace('{offeringVersionId}',version),{method:'POST',headers:{Origin:url,'content-type':'application/json'},body:'{}'});
+   assert.equal(response.status,503);
+  }
+ });
+});
+test('release contracts reject caller identities, stale-hash format and disabled review protections',()=>{
+ const c=require('../dist/platform-commands.contracts');
+ const id='00000000-0000-4000-8000-000000000001',hash='a'.repeat(64);
+ assert.equal(c.publishBody.safeParse({manifestId:id,expectedHash:hash}).success,true);
+ assert.equal(c.publishBody.safeParse({manifestId:id,expectedHash:hash,actorPersonId:id}).success,false);
+ assert.equal(c.publishBody.safeParse({manifestId:id,expectedHash:'bad'}).success,false);
+ assert.equal(c.policyBody.safeParse({expectedManuscriptHash:hash,expectedPolicyRevision:hash,reviewEvidenceVersionId:id,rationale:'Evidence reviewed',requirements:[{courseVersionId:id,minimumApprovedPrimaryTracks:0,completeLessonCoverageRequired:false,independentAcademicReviewRequired:false,rightsClearanceRequired:true,accessibilityReviewRequired:true}]}).success,false);
+});

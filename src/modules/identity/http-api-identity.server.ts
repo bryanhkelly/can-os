@@ -4,6 +4,8 @@ import { getInstructionalLearnerContext } from "./learning-command-context.serve
 import { AuthorizationError } from "@/domain/command-context";
 import { readNativeClassResume } from "@/modules/classes/native-class-learning-read.server";
 import { readNativeClassHomeworkSummary } from "@/modules/classes/native-class-homework-read.server";
+import {createLaunchSiteService} from "@/modules/programs/launch-site-create.server";
+import {submitNativeOfferingReleaseService,saveNativeOfferingReleasePolicyService,decideNativeOfferingReleaseService,publishNativeOfferingCoursesService,approveNativeOfferingAssetManifestService,publishNativeOfferingVersionService} from "@/modules/learning/native-offering-release.server";
 import { getIdentityContext } from "./command-context.server";
 import { normalizeClientError } from "@/lib/client-error";
 import { readStudentClasses } from "@/modules/classes/native-class-student-home.server";
@@ -30,6 +32,13 @@ export async function resolveHttpIdentity(request: Request) {
       siteIds: actor.scope.siteIds ?? [],
       programIds: actor.scope.programIds ?? [],
     },
+    createSite:async (input:unknown)=>{requireWrite();return createLaunchSiteService(actor,input);},
+    submitRelease:async (input:unknown)=>{requireWrite();return submitNativeOfferingReleaseService(actor,input);},
+    saveReleasePolicy:async (input:unknown)=>{requireWrite();return saveNativeOfferingReleasePolicyService(actor,input);},
+    decideRelease:async (input:unknown)=>{requireWrite();return decideNativeOfferingReleaseService(actor,input);},
+    publishCourses:async (input:unknown)=>{requireWrite();return publishNativeOfferingCoursesService(actor,input);},
+    approveAssetManifest:async (input:unknown)=>{requireWrite();return approveNativeOfferingAssetManifestService(actor,input);},
+    publishOffering:async (input:unknown)=>{requireWrite();return publishNativeOfferingVersionService(actor,input);},
     selectMembership:async (grantId:string)=>{requireWrite();await selectCurrentSessionMembership(actor,grantId);},
     recordActivity:async ()=>{requireWrite();await recordCurrentSessionActivity(actor);},
     completeLesson:async (classEnrollmentId:string,lessonId:string)=>{requireWrite();return completeNativeClassLesson(await learner(),{classEnrollmentId,lessonId});},
