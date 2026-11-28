@@ -94,3 +94,51 @@ export const classParticipationDocs={
  queue:listDoc(obj({approvalRequestId:id,learnerPersonId:id,applicantPersonId:id,state:{...str,enum:['pending']},requestedAt:dateDoc,expiresAt:dateDoc})),
  myInvitations:listDoc(obj({invitationId:id,classId:id,classOfferingVersionId:id,title:str,creditMode:creditDoc,consentText:nullableText,consentVersion:nullableText,state:str,expiresAt:dateDoc,acceptedEnrollmentId:nullableId})),
 };
+
+const intakePage=z.object({siteId:uuid.optional(),programId:uuid.optional(),applicationId:uuid.optional(),search:z.string().trim().max(100).optional(),pageSize:z.coerce.number().int().min(1).max(100).default(40),page:z.coerce.number().int().min(1).max(10000).default(1)}).strict();
+export const admissionsIntakeQuery=intakePage;
+export const admissionsCountsQuery=intakePage.pick({siteId:true,programId:true,search:true});
+export const admissionsHouseholdsQuery=z.object({programId:uuid,search:z.string().trim().min(2).max(100)}).strict();
+const inquiryCommon=z.object({requestId:uuid,programId:uuid,source:z.string().trim().max(80).default('school_direct'),notes:z.string().trim().max(3000).optional()});
+const existingStudent=z.object({studentProfileId:uuid,guardianPersonId:uuid,householdId:uuid.optional(),createHousehold:z.literal(true).optional()}).strict().refine(v=>Boolean(v.householdId)!==Boolean(v.createHousehold));
+const name=z.string().trim().min(1).max(100);
+export const admissionsInquiryInput=z.union([
+ inquiryCommon.extend({existingStudent}).strict(),
+ inquiryCommon.extend({existingApplicationId:uuid.optional(),publicInterestId:uuid.optional(),contactReviewed:z.literal(true).optional(),studentFirstName:name,studentLastName:name,gradeLevel:z.string().trim().max(10).optional(),guardianFirstName:name,guardianLastName:name,guardianEmail:z.string().trim().email()}).strict(),
+]);
+const decisions=['application','eligibility','accept','decline','withdraw','waitlist','restore'] as const;
+const verificationMethods=['in_person_id','verified_school_record','live_video_verification'] as const;
+export const admissionsTransitionInput=z.object({applicationId:uuid,decision:z.enum(decisions),note:z.string().trim().max(2000).optional()}).strict();
+export const admissionsApplicationInput=z.object({applicationId:uuid}).strict();
+export const guardianVerificationInput=z.object({applicationId:uuid,method:z.enum(verificationMethods),evidenceNote:z.string().trim().min(12).max(2000)}).strict();
+export const inquiryReceipt=z.object({applicationId:uuid}).strict();
+export const stageReceipt=z.object({stage:z.string()}).strict();
+export const guardianVerificationReceipt=z.object({verified:z.literal(true)}).strict();
+export const guardianProvisionReceipt=z.object({created:z.boolean(),email:z.string().email(),accountId:uuid,privateCredential:z.boolean(),privateAccessCode:z.string().optional()}).strict();
+export const guardianInvitationReceipt=z.object({sent:z.boolean(),signInMethod:z.enum(['private_code','demo_code','email_link'])}).strict();
+const nullableString=z.string().nullable(),nilId=uuid.nullable(),pageNumber=z.number().int().positive().nullable();
+export const intakeProgramsResult=z.array(z.object({id:uuid,name:z.string(),siteId:nilId}).strict());
+const existingStudentRow=z.object({programId:uuid,siteId:nilId,studentProfileId:uuid,studentFirstName:z.string(),studentLastName:z.string(),guardianPersonId:uuid,guardianFirstName:z.string(),guardianLastName:z.string(),householdId:nilId}).strict();
+export const existingStudentsResult=z.object({items:z.array(existingStudentRow).max(100),nextPage:pageNumber}).strict();
+export const admissionsCountsResult=z.array(z.object({stage:z.string(),count:z.number().int().nonnegative()}).strict());
+export const admissionsHouseholdsResult=z.array(z.object({id:uuid,studentFirst:z.string(),studentLast:z.string(),programId:uuid}).strict()).max(40);
+const intakeRow=z.object({id:uuid,stage:z.string(),createdAt:date,updatedAt:date,programId:uuid,submittedByPersonId:uuid,studentProfileId:uuid,organizationId:uuid,siteId:nilId,studentPersonId:uuid,programName:z.string(),studentFirst:z.string(),studentLast:z.string(),guardianVerified:z.boolean(),guardianLoginProvisioned:z.boolean(),transferOriginStatus:z.enum(['requires_review','completed','pending']).nullable(),transferNamedDestination:nullableString,destinationTranscriptConsentRecorded:z.boolean(),transferRecordsStatus:z.enum(['requires_review','available_in_can','released_externally','pending_release','not_started']).nullable(),disposition:z.enum(['waitlisted','ready_for_offer']).nullable()}).strict();
+export const admissionsIntakeResult=z.object({items:z.array(intakeRow).max(100),hasMore:z.boolean(),nextPage:pageNumber}).strict();
+const nameDoc={...str,minLength:1,maxLength:100},emailDoc={...str,format:'email'},pageDoc={type:'integer' as const,minimum:1,nullable:true};
+const inquiryFields={requestId:id,programId:id,source:{...str,maxLength:80,default:'school_direct'},notes:{...str,maxLength:3000}};
+const existingStudentDoc={oneOf:[obj({studentProfileId:id,guardianPersonId:id,householdId:id}),obj({studentProfileId:id,guardianPersonId:id,createHousehold:yes})]};
+const intakeRowDoc=obj({id,stage:str,createdAt:dateDoc,updatedAt:dateDoc,programId:id,submittedByPersonId:id,studentProfileId:id,organizationId:id,siteId:nullableId,studentPersonId:id,programName:str,studentFirst:str,studentLast:str,guardianVerified:bool,guardianLoginProvisioned:bool,transferOriginStatus:{...str,enum:['requires_review','completed','pending'],nullable:true},transferNamedDestination:nullableText,destinationTranscriptConsentRecorded:bool,transferRecordsStatus:{...str,enum:['requires_review','available_in_can','released_externally','pending_release','not_started'],nullable:true},disposition:{...str,enum:['waitlisted','ready_for_offer'],nullable:true}});
+export const intakeDocs={
+ inquiry:{oneOf:[obj({...inquiryFields,existingStudent:existingStudentDoc},['requestId','programId','existingStudent']),obj({...inquiryFields,existingApplicationId:id,publicInterestId:id,contactReviewed:yes,studentFirstName:nameDoc,studentLastName:nameDoc,gradeLevel:{...str,maxLength:10},guardianFirstName:nameDoc,guardianLastName:nameDoc,guardianEmail:emailDoc},['requestId','programId','studentFirstName','studentLastName','guardianFirstName','guardianLastName','guardianEmail'])]},
+ transition:obj({applicationId:id,decision:{...str,enum:[...decisions]},note:{...str,maxLength:2000}},['applicationId','decision']),
+ application:obj({applicationId:id}),
+ verification:obj({applicationId:id,method:{...str,enum:[...verificationMethods]},evidenceNote:{...str,minLength:12,maxLength:2000}}),
+ inquiryReceipt:obj({applicationId:id}),stageReceipt:obj({stage:str}),verificationReceipt:obj({verified:yes}),
+ provisionReceipt:obj({created:bool,email:emailDoc,accountId:id,privateCredential:bool,privateAccessCode:str},['created','email','accountId','privateCredential']),
+ invitationReceipt:obj({sent:bool,signInMethod:{...str,enum:['private_code','demo_code','email_link']}}),
+ programs:{type:'array' as const,items:obj({id,name:str,siteId:nullableId})},
+ students:obj({items:listDoc(obj({programId:id,siteId:nullableId,studentProfileId:id,studentFirstName:str,studentLastName:str,guardianPersonId:id,guardianFirstName:str,guardianLastName:str,householdId:nullableId})),nextPage:pageDoc}),
+ counts:{type:'array' as const,items:obj({stage:str,count:{type:'integer',minimum:0}})},
+ households:{type:'array' as const,maxItems:40,items:obj({id,studentFirst:str,studentLast:str,programId:id})},
+ intake:obj({items:listDoc(intakeRowDoc),hasMore:bool,nextPage:pageDoc}),
+};
