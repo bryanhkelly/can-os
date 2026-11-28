@@ -1,5 +1,5 @@
 import type { DailyAttentionItem } from "@/domain/daily-operations";
-import { EmptyState, StatusBadge } from "@/components/workspace";
+import { WorkQueue } from "@/components/workspace";
 
 const categoryLabels = {
   opening: "Opening handoff",
@@ -11,43 +11,21 @@ const categoryLabels = {
   operations: "Operations",
 } as const;
 
-/** Shared, read-only presentation. Every destination still enforces its own server authorization. */
+/** Source-owned work projection, rendered by the common queue. */
 export function AttentionQueue({ items = [], empty = "Nothing needs your attention in the current authorized view." }: {
-  items: readonly DailyAttentionItem[];
-  empty?: string;
+  items: readonly DailyAttentionItem[]; empty?: string;
 }) {
-  return <section aria-label="What needs my attention" className="mt-8">
-    <div className="flex flex-wrap items-baseline justify-between gap-3">
-      <div>
-        <h2 className="font-serif text-2xl">What needs my attention</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Canonical work and source-derived follow-ups for your current role and scope.</p>
-      </div>
-      {items.length > 0 && <StatusBadge tone="neutral">{items.length} open</StatusBadge>}
-    </div>
-    {!items.length && <EmptyState className="mt-4" title={empty}/>}
-    <div className="mt-4 space-y-3">
-      {items.map(item => <article key={item.id} className="border bg-card p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{categoryLabels[item.category]}</p>
-            <h3 className="mt-1 font-semibold">{item.title}</h3>
-          </div>
-          {item.priority !== "normal" && <StatusBadge tone={item.priority === "critical" ? "danger" : "attention"}>{item.priority}</StatusBadge>}
-        </div>
-        {item.detail && <p className="mt-2 text-sm text-muted-foreground">{item.detail}</p>}
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-          <p>
-            {item.ownerName ? `Owner: ${item.ownerName}` : "Owner: unassigned or determined by the owning workflow"}
-            {" · "}{item.dueAt ? `Due ${new Intl.DateTimeFormat("en-US",{
-              dateStyle:"medium",...(item.timezone?{timeZone:item.timezone}:{}),
-            }).format(new Date(item.dueAt))}` : "No deadline recorded"}
-          </p>
-          <div className="flex flex-wrap gap-3 font-semibold text-foreground">
-            {item.secondaryHref && <a href={item.secondaryHref} className="underline">{item.secondaryLabel ?? "Open workspace"} →</a>}
-            <a href={item.href} className="underline">{item.nextStep} →</a>
-          </div>
-        </div>
-      </article>)}
-    </div>
-  </section>;
+  return <WorkQueue empty={empty}
+    description="Canonical work and source-derived follow-ups for your current role and scope."
+    items={items.map(item=>({
+      id:item.id,category:categoryLabels[item.category],title:item.title,detail:item.detail,priority:item.priority,
+      responsibility:<p>
+        {item.ownerName ? `Owner: ${item.ownerName}` : "Owner: unassigned or determined by the owning workflow"}
+        {" · "}{item.dueAt ? `Due ${new Intl.DateTimeFormat("en-US",{
+          dateStyle:"medium",...(item.timezone?{timeZone:item.timezone}:{}),
+        }).format(new Date(item.dueAt))}` : "No deadline recorded"}
+      </p>,
+      actions:<>{item.secondaryHref && <a href={item.secondaryHref} className="underline">{item.secondaryLabel ?? "Open workspace"} →</a>}
+        <a href={item.href} className="underline">{item.nextStep} →</a></>,
+    }))}/>;
 }

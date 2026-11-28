@@ -4,7 +4,8 @@ import {Field} from "@/components/ui/field";
 import {Button} from "@/components/ui/button";
 import {Select} from "@/components/ui/select";
 import {Textarea} from "@/components/ui/textarea";
-import {WorkspaceNotice} from "@/components/workspace";
+import {WorkspaceNotice,AsyncOperationStatus} from "@/components/workspace";
+import {SiteGenerationStatus,type GenerationFeedback} from "./SiteGenerationStatus";
 import {readSiteIntelligenceContent,previewSiteIntelligence} from "@/modules/sites/site-content-generation.functions";
 import {runSiteGeneration} from "./useSiteGeneration";
 import type {SiteContentPackage} from "@/domain/site-content-package";
@@ -30,6 +31,7 @@ function SiteIntelligenceSession({siteId,target,purpose="site-announcement",disa
  const [pending,setPending]=useState(false);
  const [error,setError]=useState("");
  const [notice,setNotice]=useState("");
+ const [feedback,setFeedback]=useState<GenerationFeedback|null>(null);
  const [selected,setSelected]=useState<string[]>([]);
  const [refresh,setRefresh]=useState(0);
  const generation=useRef(0);
@@ -46,23 +48,23 @@ function SiteIntelligenceSession({siteId,target,purpose="site-announcement",disa
  useEffect(()=>{setSelected([]);},[purpose]);
  const canUse=!disabled&&!pending;
  const request={siteId,consumer:target,options};
- function change(patch:Partial<SiteGenerationOptions>){setOptions(old=>({...old,...patch}));setPreview(null);setApproved(false);setError("");}
+ function change(patch:Partial<SiteGenerationOptions>){setOptions(old=>({...old,...patch}));setPreview(null);setApproved(false);setError("");setFeedback(null);}
  async function prepare(){
    if(target!=="website"||!canUse)return;
-   setPending(true);setPreview(null);setApproved(false);setError("");setNotice("");
+   setPending(true);setPreview(null);setApproved(false);setError("");setNotice("");setFeedback(null);
    try{setPreview(await previewSiteIntelligence({data:request}));}
    catch{setError("Could not prepare saved Site information. Verify editing permissions and save content reuse permission first.");}
    finally{setPending(false);}
  }
  async function process(){
    if(target!=="website"||!preview?.eligibility.allowed||!approved||!canUse)return;
-   setPending(true);setError("");setNotice("");
+   setPending(true);setError("");setNotice("");setFeedback(null);
    try{
      const result=await runSiteGeneration(request,preview);
      if(result.success)setNotice("Site Intelligence package is available in both Website and Marketing.");
-     else setError(result.message);
+     else setFeedback({kind:result.kind==="ready"?"refresh-required":result.kind,message:result.message});
      setPreview(null);setApproved(false);setRefresh(n=>n+1);
-   }catch{setError("Processing did not finish. Your previously stored content is unchanged. Review the input and retry if permitted.");}
+   }catch{setError("Processing could not be confirmed. Reload stored content before retrying if permitted.");}
    finally{setPending(false);}
  }
  const item=stored?.package;
@@ -108,10 +110,11 @@ function SiteIntelligenceSession({siteId,target,purpose="site-announcement",disa
        <WorkspaceNotice tone="attention">Review the exact data to be sent to Gloo. Only approve information you are authorized to share. Public references are not automatically fetched.</WorkspaceNotice>
        <details className="border p-3"><summary className="cursor-pointer text-sm font-medium">Exact JSON input sent to Gloo</summary><pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-words text-xs">{JSON.stringify(preview.input,null,2)}</pre></details>
        <label className="flex items-start gap-2 text-sm"><Checkbox checked={approved} disabled={!canUse} onChange={e=>setApproved(e.target.checked)}/>I have permission to send this exact input to Gloo AI Studio for editorial processing.</label>
-       {!preview.eligibility.allowed&&<WorkspaceNotice tone="attention">{preview.eligibility.message}</WorkspaceNotice>}
+       <SiteGenerationStatus eligibility={preview.eligibility} pending={pending} disabled={disabled} onReload={()=>void prepare()}/>
        <Button type="button" disabled={!canUse||!approved||!preview.eligibility.allowed} loading={pending} loadingLabel="Processing…" onClick={()=>void process()}>Process and store content package</Button>
      </div>}
    </details>}
+   {feedback&&<AsyncOperationStatus title="Last processing request" state={feedback.kind==="refresh-required"?{kind:"partial",detail:feedback.message}:feedback.kind==="processing"?{kind:"running"}:feedback.kind==="ready"?{kind:"succeeded"}:feedback.kind==="blocked"?{kind:"unavailable",detail:feedback.message}:{kind:"failed",detail:feedback.message}} recovery={<Button type="button" variant="outline" disabled={pending} onClick={()=>{setError("");setRefresh(n=>n+1);}}>Reload stored content</Button>}/>}
    {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}
    {notice&&<p role="status" className="text-sm">{notice}</p>}
  </section>;

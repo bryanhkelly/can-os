@@ -112,15 +112,15 @@ describe("workspace design primitives", () => {
   it("retains the approved semantic foundation without decorative role hues", () => {
     const css = readFileSync(new URL("../../src/styles.css", import.meta.url), "utf8");
     for (const declaration of [
-      "--primary: #1769ef",
+      "--primary: #135fdb",
       "--foreground: #101d39",
       "--muted-foreground: #52627c",
       "--background: #f6f8fb",
       "--border: #e2e8f0",
-      "--success: #16845b",
-      "--warning: #b86b00",
+      "--success: #10724d",
+      "--warning: #985700",
       "--danger: #c93232",
-      "--info: #1769ef",
+      "--info: #135fdb",
     ]) expect(css).toContain(declaration);
     expect(css).not.toContain("[data-workspace-category=");
   });

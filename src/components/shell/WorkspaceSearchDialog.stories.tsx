@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { WorkspaceSearchDialog } from "./WorkspaceSearchDialog";
 
 const meta = {
-  title: "Shell/Workspace search dialog",
+  id: "shell-workspace-search-dialog", title: "03 Components/Shell/Workspace search dialog",
   parameters: { chromatic: { modes: { light: { theme: "light" }, dark: { theme: "dark" } } } },
 } satisfies Meta;
 export default meta;

@@ -6,7 +6,7 @@ const defaultContent: DailyCanvasContent = {
   id: "evergreen", audience: "student", priority: "default",
   headline: "Make today count.", supportingCopy: "Your classes and next steps are ready.", campaignLabel: "Your learning day",
 };
-const meta = { title: "Student/Daily canvas", component: DailyCanvas, parameters: { layout: "fullscreen" } } satisfies Meta<typeof DailyCanvas>;
+const meta = { id: "student-daily-canvas", title: "07 Persona experiences/Student daily canvas", component: DailyCanvas, parameters: { layout: "fullscreen" } } satisfies Meta<typeof DailyCanvas>;
 export default meta;
 type Story = StoryObj<typeof meta>;
 const render: Story["render"] = args => <div className="bg-background p-4 sm:p-8"><DailyCanvas {...args} /></div>;
@@ -37,3 +37,17 @@ export const EditorialActions: Story = {
 };
 export const DarkEditorialActions: Story = { ...EditorialActions, globals: { theme: "dark" } };
 export const SiteEditorialActions: Story = { ...EditorialActions, globals: { theme: "site" } };
+
+export const DarkEmergency: Story = {
+  ...Emergency,
+  globals: { theme: "dark" },
+  play: async ({ canvas }) => {
+    const region = canvas.getByRole("region", { name: "Urgent school notice" });
+    const copy = canvas.getByText("Please follow official school instructions for next steps.");
+    const summary = canvas.getByText("School-day updates take priority over campaigns.");
+    const ink = getComputedStyle(region).color;
+    await expect(copy).toHaveStyle({ color: ink });
+    await expect(summary).toHaveStyle({ color: ink });
+    await expect(region).toHaveStyle({ color: "rgb(16, 29, 57)", backgroundColor: "rgb(255, 133, 133)" });
+  },
+};

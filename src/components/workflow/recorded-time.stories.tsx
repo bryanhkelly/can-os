@@ -3,7 +3,7 @@ import { expect, within } from "storybook/test";
 import { RecordedTime } from "./recorded-time";
 
 const meta={
-  title:"Foundations/Recorded time",
+  id: "foundations-recorded-time", title: "03 Components/Recorded time",
   component:RecordedTime,
   args:{value:"2026-11-17T19:00:00.000Z"},
 } satisfies Meta<typeof RecordedTime>;

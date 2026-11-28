@@ -9,7 +9,7 @@ import { StatCard } from "./stat-card";
 import { StatusBadge, WorkspacePanel } from "./workspace-panel";
 import { WorkspaceActionLink } from "./workspace-action-link";
 
-const meta = { title: "Foundations/Workspace primitives" } satisfies Meta;
+const meta = { id: "foundations-workspace-primitives", title: "03 Components/Workspace primitives" } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
 
@@ -35,6 +35,13 @@ export const Metrics: Story = {
 };
 
 export const InteractiveMetric: Story = {
+  play: async ({canvasElement}) => {
+    const link=within(canvasElement).getByRole("link",{name:"3 Needs your attention Open the related items"});
+    await expect(link).toBeVisible();
+    await expect(link).toHaveAttribute("href","#details");
+    link.focus();
+    await expect(link).toHaveFocus();
+  },
   render: () => <div className="bg-background p-6">
     <StatCard asChild className="max-w-sm" label="Needs your attention" value="3" hint="Open the related items">
       <a href="#details" />

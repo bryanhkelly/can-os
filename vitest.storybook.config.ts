@@ -3,24 +3,47 @@ import { playwright } from "@vitest/browser-playwright";
 import { storybookTest } from "@storybook/addon-vitest/vitest-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath, URL } from "node:url";
+import { engineeringInventoryPlugin } from "./.storybook/engineering-inventory.mjs";
+import { fixtureIsolationPlugin } from "./.storybook/fixture-isolation-plugin";
+import { storybookFixtureAliases } from "./.storybook/fixture-aliases";
+import { storybookServerDependencyExclusions } from "./.storybook/fixture-dependencies";
 
 export default defineConfig({
+  envDir: false,
+  envPrefix: "STORYBOOK_FIXTURE_",
+  publicDir: false,
   plugins: [
+    fixtureIsolationPlugin(),
+    engineeringInventoryPlugin(),
     tailwindcss(),
     storybookTest({
       configDir: fileURLToPath(new URL("./.storybook", import.meta.url)),
     }),
   ],
   resolve: {
-    alias: {
-      "@/modules/programs/launch-drafts.functions": fileURLToPath(new URL("./src/modules/programs/__mocks__/launch-drafts.functions.ts", import.meta.url)),
-      "@/modules/profiles/student-self-profile.functions": fileURLToPath(new URL("./src/modules/profiles/__mocks__/student-self-profile.functions.ts", import.meta.url)),
-      "@/modules/profiles/qualifications.functions": fileURLToPath(new URL("./src/modules/profiles/__mocks__/qualifications.functions.ts", import.meta.url)),
-      "@": fileURLToPath(new URL("./src", import.meta.url)),
-    },
+    alias: storybookFixtureAliases,
+  },
+  // Vitest may pre-bundle exports of installed application dependencies even
+  // when no story imports them. TanStack Start server exports require the app
+  // plugin and must not enter the browser optimizer.
+  optimizeDeps: {
+    exclude: storybookServerDependencyExclusions,
   },
   test: {
+    deps: {
+      optimizer: {
+        client: {
+          exclude: storybookServerDependencyExclusions,
+        },
+      },
+    },
     name: "storybook",
+    // Limit competing browser contexts and cold transforms on local runners.
+    // Every test still runs; do not mask nondeterminism with retries.
+    maxWorkers: 2,
+    // Preserve complete structured failure evidence, not only the console tail.
+    reporters: ["default", "json"],
+    outputFile: { json: "acceptance-artifacts/storybook-interaction-results.json" },
     browser: {
       enabled: true,
       headless: true,

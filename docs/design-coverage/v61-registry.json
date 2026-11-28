@@ -1,0 +1,2590 @@
+{
+  "version": 1,
+  "designSystem": "V6.1",
+  "note": "Initial proposed route classification; not evidence of adoption. Null layout denotes a proposed non-page boundary. Review every entry against actual rendering and authorization. Never mark verified without linked evidence.",
+  "layouts": {
+    "dashboard": "Dashboard and command center",
+    "directory": "Directory and collection",
+    "record": "Entity and record details",
+    "guided": "Guided setup and workflow",
+    "builder": "Builder and editor studio",
+    "review": "Review and decision workspace",
+    "learning": "Focused learning",
+    "report": "Reporting and analytics",
+    "public": "Public and branded experience",
+    "calendar": "Calendar and scheduling",
+    "communication": "Communication and engagement",
+    "settings": "Settings and administration"
+  },
+  "routes": [
+    {
+      "path": "src/routes/__root.tsx",
+      "layout": null,
+      "persona": "non-page candidate; review boundary",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/access.index.tsx",
+      "layout": "public",
+      "persona": "public visitor",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/access.register.tsx",
+      "layout": "public",
+      "persona": "public visitor",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/access.verify.tsx",
+      "layout": "public",
+      "persona": "public visitor",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/account.index.tsx",
+      "layout": "dashboard",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/account.sessions.tsx",
+      "layout": "settings",
+      "persona": "authorized administrator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/actions.$actionId.tsx",
+      "layout": "review",
+      "persona": "authorized reviewer",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/admin.tsx",
+      "layout": "settings",
+      "persona": "authorized administrator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/admin_.invite.tsx",
+      "layout": "guided",
+      "persona": "authorized applicant or operator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/admin_.people.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/admissions.capacity.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/admissions.credential-delivery.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/admissions.families.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [
+        "OutcomeMilestoneList"
+      ],
+      "stories": [
+        "src/components/admissions/FamilyJourneyProgress.stories.tsx#PendingRequirements",
+        "src/components/admissions/FamilyReadinessOverviewCard.stories.tsx#AcceptedAwaitingActivation",
+        "src/components/admissions/FamilyReadinessOverviewCard.stories.tsx#ActiveEnrollment"
+      ],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/admissions.graduation.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/admissions.index.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [
+        "AdmissionsDecisionActions",
+        "ActionFooter"
+      ],
+      "stories": [
+        "src/components/admissions/AdmissionsDecisionActions.stories.tsx#Eligibility",
+        "src/components/admissions/AdmissionsDecisionActions.stories.tsx#Waitlisted",
+        "src/components/admissions/PublicInterestTimeline.stories.tsx#VerifiedEmailIsNotEnrollment",
+        "src/components/admissions/PublicInterestTimeline.stories.tsx#AuthorizationUnavailable"
+      ],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/admissions.intake.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [
+        "AdmissionsDecisionActions",
+        "ActionFooter"
+      ],
+      "stories": [
+        "src/components/admissions/AdmissionsDecisionActions.stories.tsx#Eligibility",
+        "src/components/admissions/AdmissionsDecisionActions.stories.tsx#Waitlisted",
+        "src/components/admissions/PublicInterestTimeline.stories.tsx#VerifiedEmailIsNotEnrollment",
+        "src/components/admissions/PublicInterestTimeline.stories.tsx#AuthorizationUnavailable"
+      ],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/admissions.intake_.new.tsx",
+      "layout": "guided",
+      "persona": "authorized applicant or operator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/admissions.invite-families.tsx",
+      "layout": "guided",
+      "persona": "authorized applicant or operator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/admissions.my-credentials.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/admissions.transcripts.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/admissions.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/api.family-alert-delivery.tsx",
+      "layout": null,
+      "persona": "non-page candidate; review boundary",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/ask.tsx",
+      "layout": "communication",
+      "persona": "authorized communicator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/calendar-export.tsx",
+      "layout": null,
+      "persona": "non-page candidate; review boundary",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/calendar.tsx",
+      "layout": "calendar",
+      "persona": "authorized participant or operator",
+      "review": "unreviewed",
+      "patterns": [
+        "EntitySelectionResults",
+        "CalendarInviteesPicker",
+        "CalendarEventComposer",
+        "Modal"
+      ],
+      "stories": [
+        "src/components/calendar/CalendarInviteesPicker.stories.tsx#DeduplicatedGuests",
+        "src/components/calendar/CalendarEventComposer.stories.tsx#CreateAndValidate",
+        "src/components/calendar/CalendarEventComposer.stories.tsx#InviteeLimit"
+      ],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/canonical.assessment-publications.tsx",
+      "layout": "builder",
+      "persona": "publisher or site operator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/canonical.assessment-reviews.tsx",
+      "layout": "review",
+      "persona": "authorized reviewer",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/canonical.blueprint-reviews.tsx",
+      "layout": "review",
+      "persona": "authorized reviewer",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/canonical.blueprints.tsx",
+      "layout": "builder",
+      "persona": "publisher or site operator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/canonical.capability-lab.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/canonical.completion-evidence-reviews.tsx",
+      "layout": "review",
+      "persona": "authorized reviewer",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/canonical.index.tsx",
+      "layout": "dashboard",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/canonical.issuer-access.tsx",
+      "layout": "settings",
+      "persona": "authorized administrator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/canonical.lab.credentials.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/canonical.lab.deployments.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/canonical.lab.devices.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/canonical.lab.enrollment.tsx",
+      "layout": "guided",
+      "persona": "authorized applicant or operator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/canonical.lab.facilitated.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/canonical.lab.impact.tsx",
+      "layout": "report",
+      "persona": "authorized report viewer",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/canonical.lab.noncredit.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/canonical.lab.readiness.tsx",
+      "layout": "review",
+      "persona": "authorized reviewer",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/canonical.lab.site-qualification.tsx",
+      "layout": "guided",
+      "persona": "authorized applicant or operator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/canonical.lab.survey-drafts.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/canonical.lab.survey-publications.tsx",
+      "layout": "builder",
+      "persona": "publisher or site operator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/canonical.lab.survey-reviews.tsx",
+      "layout": "review",
+      "persona": "authorized reviewer",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/canonical.lab.surveys.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/canonical.my-credentials.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/canonical.noncredit.completion.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/canonical.program-operations.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/canonical_.noncredit-review-queue.tsx",
+      "layout": "review",
+      "persona": "authorized reviewer",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/centers.demo.tsx",
+      "layout": "public",
+      "persona": "public visitor",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/church.apply.tsx",
+      "layout": "public",
+      "persona": "public visitor",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/class.tsx",
+      "layout": "learning",
+      "persona": "learner or educator",
+      "review": "unreviewed",
+      "patterns": [
+        "ClassroomWorkspace"
+      ],
+      "stories": [
+        "src/components/learning/ClassroomWorkspace.stories.tsx#Lesson",
+        "src/components/learning/ClassroomWorkspace.stories.tsx#UnavailableCurriculum"
+      ],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/class_.$classId.tsx",
+      "layout": "learning",
+      "persona": "learner or educator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/classroom.$sessionId.presentation.tsx",
+      "layout": "learning",
+      "persona": "learner or educator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/classroom.companion.tsx",
+      "layout": "learning",
+      "persona": "learner or educator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/enrichment-review.tsx",
+      "layout": "review",
+      "persona": "authorized reviewer",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/enrichment.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/enrichment_.$seasonId.tsx",
+      "layout": "record",
+      "persona": "authorized record viewer",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/explore.index.tsx",
+      "layout": "public",
+      "persona": "public visitor",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/family.join.tsx",
+      "layout": "public",
+      "persona": "public visitor",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/groups.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [
+        "ActionStateIndicator"
+      ],
+      "stories": [
+        "src/components/groups/GroupReviewRows.stories.tsx#PermissionRequired",
+        "src/components/groups/GroupReviewRows.stories.tsx#Moderation"
+      ],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/groups_.$groupId.tsx",
+      "layout": "record",
+      "persona": "authorized record viewer",
+      "review": "unreviewed",
+      "patterns": [
+        "ActionStateIndicator"
+      ],
+      "stories": [
+        "src/components/groups/GroupReviewRows.stories.tsx#PermissionRequired",
+        "src/components/groups/GroupReviewRows.stories.tsx#Moderation"
+      ],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/groups_.new.tsx",
+      "layout": "guided",
+      "persona": "authorized applicant or operator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/guardian.admission-offers.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/guardian.attendance.tsx",
+      "layout": "record",
+      "persona": "authorized record viewer",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/guardian.course-approvals.tsx",
+      "layout": "review",
+      "persona": "authorized reviewer",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/guardian.enrichment.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/guardian.enrollment-changes.tsx",
+      "layout": "guided",
+      "persona": "authorized applicant or operator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/guardian.experiences.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/guardian.field-trips.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/guardian.group-permissions.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/guardian.health.tsx",
+      "layout": "record",
+      "persona": "authorized record viewer",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/guardian.native-classes.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/guardian.report-cards.tsx",
+      "layout": "report",
+      "persona": "authorized report viewer",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/guardian.students.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/guardian.study-group-consent.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/guardian.watching.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/home.tsx",
+      "layout": "dashboard",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [
+        "WorkQueue"
+      ],
+      "stories": [
+        "src/components/workspace/work-queue.stories.tsx#Assigned",
+        "src/components/workspace/work-queue.stories.tsx#LimitedInventory"
+      ],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/index.tsx",
+      "layout": "public",
+      "persona": "public visitor",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/join.tsx",
+      "layout": "public",
+      "persona": "public visitor",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/landing.$journeyId.tsx",
+      "layout": "public",
+      "persona": "public visitor",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/landing.index.tsx",
+      "layout": "public",
+      "persona": "public visitor",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/landing.tsx",
+      "layout": "public",
+      "persona": "public visitor",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/launch.family.tsx",
+      "layout": "guided",
+      "persona": "authorized applicant or operator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/launch.index.tsx",
+      "layout": "dashboard",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/launch.school_.$programId.tsx",
+      "layout": "guided",
+      "persona": "authorized applicant or operator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/launch.site.tsx",
+      "layout": "guided",
+      "persona": "authorized applicant or operator",
+      "review": "unreviewed",
+      "patterns": [
+        "OutcomeMilestones",
+        "StudioLayout"
+      ],
+      "stories": [
+        "src/components/launch-studio/LaunchStudio.stories.tsx#Entry",
+        "src/components/workspace/studio-layout.stories.tsx#Editable",
+        "src/components/workspace/launch-pilot-journey.stories.tsx#CompleteJourney",
+        "src/components/launch-studio/LaunchStudio.stories.tsx#ReturningWithSavedShape",
+        "src/components/launch-studio/LaunchStudio.stories.tsx#CompletionUnavailable"
+      ],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/launch.staff.tsx",
+      "layout": "guided",
+      "persona": "authorized applicant or operator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/launch.student.tsx",
+      "layout": "guided",
+      "persona": "authorized applicant or operator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/launch.tsx",
+      "layout": "guided",
+      "persona": "authorized applicant or operator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/launch.website.tsx",
+      "layout": "builder",
+      "persona": "publisher or site operator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/learn.activity.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/learn.course.$courseAttemptId.tsx",
+      "layout": "learning",
+      "persona": "learner or educator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/learn.enroll.tsx",
+      "layout": "guided",
+      "persona": "authorized applicant or operator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/learn.my-activity.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/learn.my-courses.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/learn.my-programs.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/messages.tsx",
+      "layout": "communication",
+      "persona": "authorized communicator",
+      "review": "unreviewed",
+      "patterns": [
+        "MessagesWorkspace",
+        "QueryState",
+        "EntityPicker"
+      ],
+      "stories": [
+        "src/components/communication/MessagesWorkspace.stories.tsx#Conversation",
+        "src/components/communication/MessagesWorkspace.stories.tsx#Unavailable",
+        "src/components/communication/ContactLookup.stories.tsx#SearchAndSelect"
+      ],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/next.$journeyId.tsx",
+      "layout": "public",
+      "persona": "public visitor",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/notifications.tsx",
+      "layout": "communication",
+      "persona": "authorized communicator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/o.$organizationSlug.$siteSlug.go-links.tsx",
+      "layout": "communication",
+      "persona": "authorized communicator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/o.$organizationSlug.$siteSlug.index.tsx",
+      "layout": "dashboard",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/o.$organizationSlug.$siteSlug.launch.tsx",
+      "layout": "guided",
+      "persona": "authorized applicant or operator",
+      "review": "unreviewed",
+      "patterns": [
+        "OutcomeMilestones",
+        "StudioLayout",
+        "ActionStateIndicator",
+        "DistributionDialog"
+      ],
+      "stories": [
+        "src/components/launch-studio/LaunchStudio.stories.tsx#Entry",
+        "src/components/workspace/outcome-milestones.stories.tsx#Mixed",
+        "src/components/workspace/studio-layout.stories.tsx#Editable",
+        "src/components/workspace/distribution-dialog.stories.tsx#ShareAndReturn",
+        "src/components/workspace/launch-pilot-journey.stories.tsx#CompleteJourney",
+        "src/components/launch-studio/LaunchStudio.stories.tsx#ReturningWithSavedShape",
+        "src/components/launch-studio/LaunchStudio.stories.tsx#CompletionUnavailable"
+      ],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/o.$organizationSlug.$siteSlug.profile.tsx",
+      "layout": "record",
+      "persona": "authorized record viewer",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/o.$organizationSlug.$siteSlug.tsx",
+      "layout": "record",
+      "persona": "authorized record viewer",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/o.$organizationSlug.$siteSlug.website.tsx",
+      "layout": "builder",
+      "persona": "publisher or site operator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/operations.course-policies.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/operations.course-requests.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/operations.curriculum-marketplace.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/operations.curriculum-marketplace_.imports.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/operations.curriculum-marketplace_.resources.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/operations.curriculum-marketplace_.roster.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/operations.curriculum.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/operations.curriculum_.$courseId.tsx",
+      "layout": "builder",
+      "persona": "publisher or site operator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/operations.curriculum_.new.tsx",
+      "layout": "builder",
+      "persona": "publisher or site operator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/operations.curriculum_.publishing.tsx",
+      "layout": "builder",
+      "persona": "publisher or site operator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/operations.family-alerts.tsx",
+      "layout": "communication",
+      "persona": "authorized communicator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/operations.family-alerts_.compose.tsx",
+      "layout": "communication",
+      "persona": "authorized communicator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/operations.field-trips.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/operations.field-trips_.$tripId.tsx",
+      "layout": "record",
+      "persona": "authorized record viewer",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/operations.field-trips_.new.tsx",
+      "layout": "guided",
+      "persona": "authorized applicant or operator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/operations.health-review.tsx",
+      "layout": "review",
+      "persona": "authorized reviewer",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/operations.insights.tsx",
+      "layout": "report",
+      "persona": "authorized report viewer",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/operations.interest-events.tsx",
+      "layout": "calendar",
+      "persona": "authorized participant or operator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/operations.interest-events_.$eventId.tsx",
+      "layout": "calendar",
+      "persona": "authorized participant or operator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/operations.interest-events_.new.tsx",
+      "layout": "guided",
+      "persona": "authorized applicant or operator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/operations.jurisdiction-profiles.tsx",
+      "layout": "record",
+      "persona": "authorized record viewer",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/operations.school-years.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/operations.school-years_.$yearId.tsx",
+      "layout": "record",
+      "persona": "authorized record viewer",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/operations.school-years_.new.tsx",
+      "layout": "guided",
+      "persona": "authorized applicant or operator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/operations.teacher-marketplace.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/operations.transfer-records.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/operations.tsx",
+      "layout": "dashboard",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/operations.workflows.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/platform.tsx",
+      "layout": "dashboard",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [
+        "WorkQueue"
+      ],
+      "stories": [
+        "src/components/workspace/work-queue.stories.tsx#Assigned",
+        "src/components/workspace/work-queue.stories.tsx#LimitedInventory",
+        "src/components/platform/PlatformReleaseCenter.stories.tsx#LimitedInventory"
+      ],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/profiles.tsx",
+      "layout": "record",
+      "persona": "authorized record viewer",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/programs.noncredit.enrollment.tsx",
+      "layout": "guided",
+      "persona": "authorized applicant or operator",
+      "review": "unreviewed",
+      "patterns": [
+        "DirectoryTable",
+        "ActionStateIndicator"
+      ],
+      "stories": [
+        "src/components/enrollment/NoncreditParticipantRoster.stories.tsx#SeatRelease"
+      ],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/readiness.tsx",
+      "layout": "review",
+      "persona": "authorized reviewer",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/reports.index.tsx",
+      "layout": "report",
+      "persona": "authorized report viewer",
+      "review": "unreviewed",
+      "patterns": [
+        "ReportDocumentView",
+        "ReportChart"
+      ],
+      "stories": [
+        "src/components/workspace/report-document.stories.tsx#Dashboard",
+        "src/components/workspace/report-document.stories.tsx#PrintReview",
+        "src/components/workspace/report-document.stories.tsx#NarrowMetrics"
+      ],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/safeguarding.tsx",
+      "layout": "review",
+      "persona": "authorized reviewer",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/settings.tsx",
+      "layout": "settings",
+      "persona": "authorized administrator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/settings_.school.$module.tsx",
+      "layout": "settings",
+      "persona": "authorized administrator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/site-identity.tsx",
+      "layout": "settings",
+      "persona": "authorized administrator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/site-website.tsx",
+      "layout": "builder",
+      "persona": "publisher or site operator",
+      "review": "unreviewed",
+      "patterns": [
+        "SiteGenerationStatus",
+        "AsyncOperationStatus"
+      ],
+      "stories": [
+        "src/components/launch-studio/SiteGenerationStatus.stories.tsx#ProviderUnavailable",
+        "src/components/launch-studio/SiteGenerationStatus.stories.tsx#ConfirmedButReadUnavailable"
+      ],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/site.new.tsx",
+      "layout": "guided",
+      "persona": "authorized applicant or operator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/sites.$siteId.go-links.tsx",
+      "layout": "communication",
+      "persona": "authorized communicator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/sites.$siteId.index.tsx",
+      "layout": "record",
+      "persona": "authorized record viewer",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/sites.$siteId.parent-information.tsx",
+      "layout": "record",
+      "persona": "authorized record viewer",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/sites.$siteId.profile.tsx",
+      "layout": "record",
+      "persona": "authorized record viewer",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/sites.$siteId.publish.tsx",
+      "layout": "guided",
+      "persona": "authorized applicant or operator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/sites.$siteId.tsx",
+      "layout": "record",
+      "persona": "authorized record viewer",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/sites.index.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/staff.attendance.tsx",
+      "layout": "record",
+      "persona": "authorized record viewer",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/staff.students.$personId.tsx",
+      "layout": "record",
+      "persona": "authorized record viewer",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/staff.students.index.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/staff.students.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/staff.teachers.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/student.assignments.tsx",
+      "layout": "learning",
+      "persona": "learner or educator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/student.assignments_.$assessmentId.tsx",
+      "layout": "learning",
+      "persona": "learner or educator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/student.courses.tsx",
+      "layout": "learning",
+      "persona": "learner or educator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/student.discussions.tsx",
+      "layout": "communication",
+      "persona": "authorized communicator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/student.experiences.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/student.field-trips.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/student.my-school.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/student.notifications.tsx",
+      "layout": "communication",
+      "persona": "authorized communicator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/student.report-card.tsx",
+      "layout": "report",
+      "persona": "authorized report viewer",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/student.settings.tsx",
+      "layout": "settings",
+      "persona": "authorized administrator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/student.support.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/student.tsx",
+      "layout": "dashboard",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/support.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/teacher.discussions.tsx",
+      "layout": "communication",
+      "persona": "authorized communicator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/teacher.gradebook.tsx",
+      "layout": "review",
+      "persona": "authorized reviewer",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/teacher.missing-work.tsx",
+      "layout": "directory",
+      "persona": "authorized workspace",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    },
+    {
+      "path": "src/routes/teacher.notices.tsx",
+      "layout": "communication",
+      "persona": "authorized communicator",
+      "review": "unreviewed",
+      "patterns": [],
+      "stories": [],
+      "evidence": {
+        "responsive": null,
+        "accessibility": null,
+        "visual": null,
+        "browserJourney": null
+      }
+    }
+  ],
+  "layoutReferences": {
+    "dashboard": "src/components/workspace/dashboard-layout.stories.tsx#SiteLeader",
+    "directory": "src/components/workspace/directory-table.stories.tsx#DirectoryComposition",
+    "record": "src/components/workspace/record-layout.stories.tsx#ApplicantRecord",
+    "guided": "src/components/workflow/workflow-patterns.stories.tsx#GuidedSetup",
+    "builder": "src/components/workspace/studio-layout.stories.tsx#Editable",
+    "review": "src/components/workflow/workflow-patterns.stories.tsx#SplitReview",
+    "learning": "src/components/learning/ClassroomWorkspace.stories.tsx#Lesson",
+    "report": "src/components/workspace/report-analytics.stories.tsx#Interactive",
+    "public": "src/components/workspace/experience-layouts.stories.tsx#PublicRegistration",
+    "calendar": "src/components/workspace/experience-layouts.stories.tsx#Scheduling",
+    "communication": "src/components/communication/MessagesWorkspace.stories.tsx#Conversation",
+    "settings": "src/components/workspace/experience-layouts.stories.tsx#Administration"
+  }
+}

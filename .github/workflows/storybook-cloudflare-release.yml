@@ -1,0 +1,55 @@
+name: Storybook Cloudflare release
+on:
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: Deploy accepted static assets to the private Storybook Worker
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: becomuna-storybook-release
+  cancel-in-progress: false
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main' || (github.ref_type == 'branch' && !inputs.deploy)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --include=dev
+      - run: npm run storybook:check-playwright
+      - run: node node_modules/playwright/cli.js install --with-deps chromium
+      - run: npm run storybook:check-browser
+      - run: npm run storybook:acceptance
+      - run: npm run storybook:prepare-cloudflare
+      - name: Deploy exact accepted static assets
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.STORYBOOK_CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.STORYBOOK_CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" && test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "::error::Dedicated Storybook Cloudflare credentials missing"; exit 1; }
+          npm run deploy:storybook:cloudflare
+      - name: Preserve acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: storybook-release-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            acceptance-artifacts/storybook-release/receipt.json
+            acceptance-artifacts/storybook-release/tested-static-manifest.json
+            acceptance-artifacts/storybook-release/runs/
+            acceptance-artifacts/storybook-interaction-results.json
+            acceptance-artifacts/storybook-index.json
+            acceptance-artifacts/storybook-browser-results.json
+            acceptance-artifacts/storybook-browser-report/
+            acceptance-artifacts/storybook-browser-results/
+          if-no-files-found: warn

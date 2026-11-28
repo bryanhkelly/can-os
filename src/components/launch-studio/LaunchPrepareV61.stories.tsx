@@ -9,7 +9,7 @@ import { LaunchPrepareV61 } from "./LaunchPrepareV61";
  */
 const siteId = "00000000-0000-4000-8000-000000000001";
 const meta = {
-  title: "Workflows/Launch Studio/V6.1 Prepare",
+  id: "workflows-launch-studio-v6-1-prepare", title: "08 Feature workspaces/Launch Studio/Prepare",
   component: LaunchPrepareV61,
   parameters: { layout: "fullscreen" },
   args: { siteId, module: "facilities-resources" },
@@ -39,7 +39,12 @@ export const Facilities: Story = {
     await expect(canvas.getByRole("heading", { name: "Facilities & Resources" })).toBeInTheDocument();
     // Prepare modules live in the persistent Launch sidebar, not a duplicated
     // navigation inside the center pane of this story.
-    await expect(canvas.getByRole("heading", { name: "The decision to make" })).toBeInTheDocument();
+    await expect(canvas.getByRole("heading", { name: "Learning environment" })).toBeVisible();
+    await expect(canvas.getByRole("heading", { name: "Physical spaces, capacity & equipment" })).toBeVisible();
+    const guide=within(canvas.getByRole("region", { name: "Site Guide" }));
+    await expect(guide.getByRole("heading", { name: "Worth considering" })).toBeVisible();
+    await expect(guide.getByRole("heading", { name: "How this connects" })).toBeVisible();
+    await expect(canvas.getByRole("button", { name: "Reload saved environment" })).toBeVisible();
     await expect(canvas.queryByText("100%")).not.toBeInTheDocument();
   },
 };

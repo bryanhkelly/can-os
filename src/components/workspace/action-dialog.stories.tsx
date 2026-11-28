@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { ActionDialog } from "./action-dialog";
 
-const meta = { title: "Workspace/Action dialog", component: ActionDialog } satisfies Meta<typeof ActionDialog>;
+const meta = { id: "workspace-action-dialog", title: "04 Application patterns/Action dialog", component: ActionDialog } satisfies Meta<typeof ActionDialog>;
 export default meta;
 type Story = StoryObj<typeof meta>;
 const args = { open: false, title: "Revoke preview", description: "Existing links will stop working.",

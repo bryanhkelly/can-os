@@ -1,0 +1,43 @@
+import assert from "node:assert/strict";
+import {test} from "node:test";
+import {mkdtempSync,mkdirSync,writeFileSync,rmSync} from "node:fs";
+import {tmpdir} from "node:os";
+import {join,dirname} from "node:path";
+import {createInventory} from "./v61-source-audit.mjs";
+import {createImpactReport} from "./v61-impact-report.mjs";
+test("route impact follows named barrels and separates declared and inferred story relationships",t=>{
+ const root=mkdtempSync(join(tmpdir(),"v61-impact-"));
+ t.after(()=>rmSync(root,{recursive:true,force:true}));
+ function write(path,source){const file=join(root,path);mkdirSync(dirname(file),{recursive:true});writeFileSync(file,source);}
+ const button="src/components/ui/button.tsx",unused="src/components/ui/unused.tsx",story="src/components/example.stories.tsx",home="src/routes/home.tsx",detail="src/routes/detail.tsx";
+ write(button,'export const Button=()=> <button/>;');
+ write(unused,'export const Unused=()=> <input/>;');
+ write("src/components/ui/index.ts",'export {Button} from "./button"; export {Unused} from "./unused";');
+ write(home,'import {Button} from "@/components/ui"; export const Home=()=> <Button/>;');
+ write(detail,'import {Button} from "@/components/ui/button"; export const Detail=()=> <Button/>;');
+ write(story,'import {Button} from "@/components/ui"; export const Example={render:()=> <Button/>};');
+ write("src/components/type-only.stories.ts",'import type {Unused} from "@/components/ui/unused"; export const Example={};');
+ const registry={routes:[{path:home,stories:[story+"#Example"]},{path:detail,stories:[]}]};
+ const inventory=createInventory(root,{includeStoryImpact:true});
+ const report=createImpactReport(inventory,registry);
+ const row=report.components.find(row=>row.path===button);
+ assert.deepEqual(row.routePaths,[detail,home]);
+ assert.deepEqual(row.storyFamilies,[story]);
+ assert.deepEqual(row.matchingStoryRefs,[story+"#Example"]);
+ assert.deepEqual(row.routesWithoutLinkedFamily,[detail]);
+ assert.equal(report.components.find(row=>row.path===unused).routeCount,0);
+ assert.equal(report.components.find(row=>row.path===unused).storyFamilyCount,0);
+ assert.equal(report.routeCount,2);
+ assert.equal(inventory.routes.find(row=>row.file===home).reachableComponentFiles,1);
+ assert.equal(inventory.routes.find(row=>row.file===home).reachableSourceFiles,2);
+ assert.equal(createInventory(root).storyDependencies,undefined);
+});
+test("shared modules without coverage remain visible and source debt is not runtime evidence",()=>{
+ const path="src/components/workspace/panel.tsx",route="src/routes/home.tsx";
+ const issue={native:[{}],corners:[],appearance:[],syntaxErrors:[]};
+ const report=createImpactReport({inspected:[{path,...issue}],routes:[{file:route,reachableFiles:[path,path]}],storyDependencies:[]},{routes:[]});
+ assert.equal(report.sharedWithoutStoryFamilies,1);
+ assert.deepEqual(report.components[0].routePaths,[route]);
+ assert.equal(report.routes[0].reachable[0].native,1);
+ assert.equal(report.routes[0].review,"unregistered");
+});

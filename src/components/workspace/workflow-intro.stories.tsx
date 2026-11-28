@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { WorkflowIntro } from "./workflow-intro";
 
 const meta = {
-  title: "Foundations/Workflow introduction",
+  id: "foundations-workflow-introduction", title: "04 Application patterns/Workflow introduction",
   component: WorkflowIntro,
   parameters: { layout: "fullscreen" },
 } satisfies Meta<typeof WorkflowIntro>;

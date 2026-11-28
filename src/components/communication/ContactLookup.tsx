@@ -1,8 +1,5 @@
-import { Label } from "@/components/ui/label";
-import { useState } from "react";
-import { Check, Search } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import {useState} from "react";
+import {EntityPicker} from "@/components/workspace/entity-picker";
 import type { listThreadContacts } from "@/modules/communication/messages.functions";
 
 type Contact = Awaited<ReturnType<typeof listThreadContacts>>["contacts"][number];
@@ -17,25 +14,12 @@ export function ContactLookup({ contacts, value, onChange, disabled }: {
   const selected = contacts.find(contact => contact.personId === value);
   const matches = contacts.filter(contact =>
     contact.label.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
-  return <section aria-label="Contact lookup" className="grid gap-2">
-    <Label htmlFor="message-contact-search" className="text-sm font-semibold">Find a contact</Label>
-    <div className="relative">
-      <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-3 size-4 text-muted-foreground" />
-      <Input id="message-contact-search" type="search" value={query} disabled={disabled}
-        onChange={event => setQuery(event.target.value)} placeholder="Search by name or school relationship..." leadingIconInset />
-    </div>
-    <p className="text-xs text-muted-foreground">Only contacts available through your verified school relationships are shown.</p>
-    <ul aria-label="Matching contacts" className="max-h-52 overflow-y-auto divide-y border">
-      {matches.map(contact => <li key={contact.personId}>
-        <Button variant={value === contact.personId ? "secondary" : "ghost"} disabled={disabled}
-          aria-pressed={value === contact.personId} onClick={() => onChange(contact.personId)}
-          className="h-auto w-full justify-start whitespace-normal text-left">
-          {value === contact.personId && <Check aria-hidden="true" />}
-          <span className="min-w-0 break-words">{contact.label}</span>
-        </Button>
-      </li>)}
-    </ul>
-    {!matches.length && <p role="status" className="text-sm text-muted-foreground">No contacts match your search.</p>}
-    <p role="status" className="text-sm">{selected ? `To: ${selected.name}` : "Select a contact to address your message."}</p>
-  </section>;
+  return <EntityPicker label="Contact lookup" searchLabel="Find a contact"
+    searchDescription="Only contacts available through your verified school relationships are shown."
+    mode="single-action" options={matches.map(contact=>({id:contact.personId,label:contact.label}))}
+    query={query} onQueryChange={setQuery} selected={value?[value]:[]}
+    onChange={ids=>{if(ids[0])onChange(ids[0]);}} disabled={disabled}
+    resultsClassName="max-h-52 overflow-y-auto"
+    empty={<p role="status" className="text-sm text-muted-foreground">No contacts match your search.</p>}
+    selectionSummary={selected?`To: ${selected.name}`:"Select a contact to address your message."}/>;
 }

@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PageNavigation } from "./page-navigation";
 import { QueryState } from "./query-state";
 
-const meta = { title: "Foundations/Directory search and navigation" } satisfies Meta;
+const meta = { id: "foundations-directory-search-and-navigation", title: "03 Components/Directory navigation" } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
 const search = fn(async (query?: string) => [{ id: "fixture", name: query || "Example person" }]);

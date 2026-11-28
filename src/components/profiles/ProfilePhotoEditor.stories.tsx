@@ -3,7 +3,7 @@ import { expect, fn, userEvent, waitFor, within } from "storybook/test";
 import { ProfilePhotoEditor } from "./ProfilePhotoEditor";
 
 const meta = {
-  title: "V6.1 templates/People/Profile picture",
+  id: "v6-1-templates-people-profile-picture", title: "08 Feature workspaces/People/Profile picture",
   component: ProfilePhotoEditor,
   args: { name: "Alex Example", changed: fn(), createUploadTask: () => ({ run: async () => ({}) }), deletePhoto: fn(async () => ({})) },
   decorators: [Story => <div className="mx-auto max-w-xl bg-card p-6"><Story/></div>],

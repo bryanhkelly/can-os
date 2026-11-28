@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, userEvent, within } from "storybook/test";
-import { createMemoryHistory, createRootRoute, createRouter, RouterProvider } from "@tanstack/react-router";
+import { FixtureRouter } from "../../../.storybook/fixture-router";
 import { useState, type ReactNode } from "react";
 import { DashboardHome, DashboardPanel, DashboardShortcut, WorkspaceShell } from "@/components/workspace";
 import { WorkspaceSidebar } from "./WorkspaceSidebar";
@@ -31,15 +31,9 @@ function Shell({ children, sharedCredentialSwitching = false }: { children: Reac
 }
 
 const meta = {
-  title: "Shell/Layout alignment",
+  id: "shell-layout-alignment", title: "11 Accessibility and responsive/Shell alignment",
   parameters: { layout: "fullscreen" },
-  decorators: [Story => {
-    const router = createRouter({
-      routeTree: createRootRoute({ component: Story }),
-      history: createMemoryHistory({ initialEntries: [path] }),
-    });
-    return <RouterProvider router={router} />;
-  }],
+  decorators: [Story => <FixtureRouter initialPath={path}><Story /></FixtureRouter>],
 } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -120,6 +114,9 @@ export const CollapsibleSidebar: Story = {
     const sidebar = canvas.getByRole("complementary", { name: "Workspace sidebar" });
     const toggle = canvas.getByRole("button", { name: "Collapse navigation" });
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    const controlledId = toggle.getAttribute("aria-controls");
+    if (!controlledId) throw new Error("Sidebar toggle must identify its controlled navigation");
+    await expect(toggle.ownerDocument.getElementById(controlledId)).toContainElement(within(sidebar).getByRole("navigation", { name: "CAN OS primary navigation" }));
     // The control sits at the far left of the brand bar, before the wordmark.
     const brand = sidebar.firstElementChild as HTMLElement;
     await expect(brand.firstElementChild).toBe(toggle);
@@ -127,6 +124,7 @@ export const CollapsibleSidebar: Story = {
     await userEvent.click(toggle);
     const expand = canvas.getByRole("button", { name: "Expand navigation" });
     await expect(expand).toHaveAttribute("aria-expanded", "false");
+    await expect(expand).toHaveAttribute("aria-controls", controlledId);
     await expectShellGrid(canvasElement, 4.5);
     const nav = canvas.getByRole("navigation", { name: "CAN OS primary navigation" });
     await expect(within(nav).getByRole("link", { name: "Home" })).toBeVisible();

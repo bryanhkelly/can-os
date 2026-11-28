@@ -62,9 +62,25 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - run: npm run test:storybook
-      - run: npm run build-storybook
+      - run: npm run storybook:check-playwright
+      - run: node node_modules/playwright/cli.js install --with-deps chromium
+      - run: npm run storybook:check-browser
+      - run: npm run storybook:acceptance
+      - name: Preserve Storybook browser and index diagnostics
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: v61-storybook-acceptance-${{ github.run_attempt }}
+          path: |
+            acceptance-artifacts/storybook-release/receipt.json
+            acceptance-artifacts/storybook-release/runs/
+            acceptance-artifacts/storybook-release/tested-static-manifest.json
+            acceptance-artifacts/storybook-interaction-results.json
+            acceptance-artifacts/storybook-index.json
+            acceptance-artifacts/storybook-browser-results.json
+            acceptance-artifacts/storybook-browser-report/
+            acceptance-artifacts/storybook-browser-results/
+          if-no-files-found: warn
       - name: Compare rendered stories against reviewed Chromatic baselines
         env:
           CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}

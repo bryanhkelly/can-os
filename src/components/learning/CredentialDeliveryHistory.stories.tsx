@@ -3,7 +3,7 @@ import { expect } from "storybook/test";
 import { CredentialDeliveryHistory } from "./CredentialDeliveryHistory";
 
 const meta = {
-  title: "Learning/Credential delivery history",
+  id: "learning-credential-delivery-history", title: "08 Feature workspaces/Learning/Credential delivery history",
   component: CredentialDeliveryHistory,
 } satisfies Meta<typeof CredentialDeliveryHistory>;
 export default meta;

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "@tanstack/react-router";
-import { useWorkspaceSession } from "./WorkspaceSession";
+import { useWorkspaceSession } from "./workspace-session-context";
 import { WorkspaceAccountMenu, WorkspaceAccountTrigger } from "./WorkspaceAccountMenu";
 import { signOutOfWorkspace } from "./workspace-sign-out";
 import { mutationErrorMessage } from "@/lib/mutation-feedback";

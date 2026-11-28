@@ -49,10 +49,10 @@ export function Modal({ open, onClose, label, children, className, initialFocus,
       if (event.key !== "Tab") return;
       const focusable = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(
         'button, a[href], input, select, textarea, [tabindex]',
-      )).filter(element => element.tabIndex >= 0 && !element.matches(":disabled") && element.getClientRects().length > 0);
+      )).filter(element => element.tabIndex >= 0 && !element.matches(":disabled") && !element.closest("[inert], [hidden]") && getComputedStyle(element).visibility === "visible" && element.getClientRects().length > 0);
       const first = focusable[0];
       const last = focusable.at(-1);
-      if (!first) { event.preventDefault(); return; }
+      if (!first) { event.preventDefault(); event.currentTarget.focus(); return; }
       if (event.shiftKey && document.activeElement === first) {
         event.preventDefault(); last?.focus();
       } else if (!event.shiftKey && document.activeElement === last) {

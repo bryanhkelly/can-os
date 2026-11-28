@@ -3,7 +3,7 @@ import { expect, fn, userEvent, within } from "storybook/test";
 import { GoLinkLifecycleActions } from "./GoLinkLifecycleActions";
 
 const meta={
-  title:"Workflows/Go Links/Lifecycle actions",
+  id: "workflows-go-links-lifecycle-actions", title: "04 Application patterns/Go Links/Lifecycle actions",
   component:GoLinkLifecycleActions,
   args:{status:"active",onTest:fn(),onChange:fn()},
   decorators:[Story=><div className="flex flex-wrap gap-2 bg-background p-6"><Story/></div>],

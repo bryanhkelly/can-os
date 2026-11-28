@@ -23,3 +23,6 @@ public/school-template-previews/v1/*/*-[0-9]*.webp
 .wrangler/
 .dev.vars
 .dev.vars.*
+
+# Local Storybook acceptance receipts and private preview packages
+/acceptance-artifacts/

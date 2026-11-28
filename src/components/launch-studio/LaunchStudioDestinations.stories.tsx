@@ -6,7 +6,7 @@ import { LaunchModuleDestinationV61 } from "./LaunchModuleDestinationV61";
  * MarketingPackagesV61 route and should not be portrayed as a placeholder.
  */
 const meta = {
-  title: "Workflows/Launch Studio/V6.1 governed destination",
+  id: "workflows-launch-studio-v6-1-governed-destination", title: "08 Feature workspaces/Launch Studio/Governed destination",
   component: LaunchModuleDestinationV61,
   parameters: { layout: "fullscreen" },
   args: {

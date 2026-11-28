@@ -1,5 +1,6 @@
 import { decodeUuidPathParam } from "@/domain/opaque-url-id";
 import { previewSiteIntelligence } from "@/modules/sites/site-content-generation.functions";
+import { SiteGenerationStatus, type GenerationFeedback } from "@/components/launch-studio/SiteGenerationStatus";
 import { runSiteGeneration, useSiteGenerationPreview } from "@/components/launch-studio/useSiteGeneration";
 import { WebsiteReviewStep } from "@/components/launch-studio/WebsiteReviewStep";
 import { WebsiteBrandIdentityStep } from "@/components/launch-studio/WebsiteBrandIdentityStep";
@@ -318,7 +319,7 @@ function LocalWebsiteCopyEditor({
   const [preparingArtwork, setPreparingArtwork] = useState(false);
   const mutation = useMutationFeedback(() => router.invalidate());
   const [generating,setGenerating]=useState(false);
-  const [generationMessage,setGenerationMessage]=useState("");
+  const [generationFeedback,setGenerationFeedback]=useState<GenerationFeedback|null>(null);
   const generationRequest={siteId:data.siteId,consumer:"website" as const,options:{tone:"welcoming" as const,language:"en" as const,includeStory:true,includeLeadership:false,includeExistingCopy:false,includePublicReferences:false}};
   const generationStatus=useSiteGenerationPreview(generationRequest,step===4&&content.contentReuseConsent==="granted"&&data.canEdit,data.currentRevision);
   const busy = mutation.pending || mutation.refreshFailed || preparingArtwork || generating;
@@ -445,7 +446,7 @@ function LocalWebsiteCopyEditor({
     const consent=content.contentReuseConsent;
     if(consent!=="granted"&&consent!=="denied")return;
     // Save through the existing versioned draft command before reading the brief.
-    setGenerationMessage("");
+    setGenerationFeedback(null);
     setGenerating(true);
     try {
       if(!await saveDraft("stay"))return;
@@ -453,7 +454,7 @@ function LocalWebsiteCopyEditor({
       if(consent==="denied")return;
       const preview=await previewSiteIntelligence({data:generationRequest});
       const result=await runSiteGeneration(generationRequest,preview);
-      if(!result.success){setGenerationMessage(result.message+" Existing content is unchanged.");return;}
+      if(!result.success){setGenerationFeedback({kind:result.kind==="ready"?"refresh-required":result.kind,message:result.message+" Your working website wording is unchanged."});return;}
       const item=result.stored?.package;
       if(!item?.website)throw new Error("Current generated content is unavailable.");
       // Only initialize unchanged starter fields on Continue; explicit regeneration
@@ -468,9 +469,9 @@ function LocalWebsiteCopyEditor({
         if(item.websiteComposition&&!old.websiteComposition)next.websiteComposition=item.websiteComposition;
         return next;
       });
-      setGenerationMessage("Site content is ready. Review your wording and save your private draft.");
+      setGenerationFeedback({kind:"ready",message:"Site content is ready. Review your wording and save your private draft."});
     }catch(cause){
-      setGenerationMessage(mutationErrorMessage(cause,"Site content generation could not finish. Edit the wording manually or reload generation status."));
+      setGenerationFeedback({kind:"failed",message:mutationErrorMessage(cause,"Site content generation could not be confirmed. Edit the wording manually or reload generation status.")});
     }finally{setGenerating(false);generationStatus.reload();}
   }
   async function previewCurrentDraft() {
@@ -642,12 +643,11 @@ function LocalWebsiteCopyEditor({
       {step===4&&<WebsiteSiteContentStep data={data} content={content}
         setContent={setContent} busy={busy}/>}
       {step===4&&content.contentReuseConsent==="granted"&&<div className="space-y-2 border p-3">
-        <p role="status" className="text-sm">{generating?"Generating Site content…":generationMessage||generationStatus.error||generationStatus.preview?.eligibility.message||"Checking generation availability…"}</p>
+        <SiteGenerationStatus eligibility={generationStatus.preview?.eligibility} pending={generating} readError={generationStatus.error} feedback={generationFeedback} disabled={busy} onReload={generationStatus.reload}/>
         <Button type="button" disabled={!canSave||!generationStatus.preview?.eligibility.allowed} loading={generating} loadingLabel="Generating content…" onClick={()=>{
           if(window.confirm("Generate and replace the five main website text fields? Saved versions remain available."))void generateContent();
         }}>Generate Site Content</Button>
-        <Button type="button" variant="ghost" disabled={busy} onClick={generationStatus.reload}>Reload generation status</Button>
-        {generationStatus.preview&&!generationStatus.preview.eligibility.allowed&&<p role="status" className="text-xs text-muted-foreground">{generationStatus.preview.eligibility.message} You can continue with manual content.</p>}
+
       </div>}
       {step === 2 && <WebsiteVisualIdentityStep
         data={data} content={content} brandDirection={brandDirection} busy={busy}

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { EvidenceWorkflow } from "./EvidenceWorkflow";
-const meta = { title: "Evidence/Workflow", component: EvidenceWorkflow,
+const meta = { id: "evidence-workflow", title: "04 Application patterns/Evidence/Workflow", component: EvidenceWorkflow,
   args: { title: "School opening evidence", status: "pending" } } satisfies Meta<typeof EvidenceWorkflow>;
 export default meta;
 type Story = StoryObj<typeof meta>;

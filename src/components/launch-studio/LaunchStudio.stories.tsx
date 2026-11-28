@@ -1,6 +1,6 @@
 import { useState, type ComponentProps } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { createMemoryHistory, createRootRoute, createRouter, RouterProvider } from "@tanstack/react-router";
+import { FixtureRouter } from "../../../.storybook/fixture-router";
 import { expect, userEvent, within } from "storybook/test";
 import { LaunchStudioChrome, LaunchStudioShell, JourneyWelcome } from "./LaunchStudioShell";
 import { LaunchStudioOverview } from "./LaunchStudioOverviewV61";
@@ -8,13 +8,9 @@ import { Button } from "@/components/ui/button";
 import { LaunchConfigurationForm } from "@/components/operations/LaunchConfigurationForm";
 
 const meta = {
-  title: "Workflows/Launch Studio",
+  id: "workflows-launch-studio", title: "08 Feature workspaces/Launch Studio/Overview and shell",
   parameters: { layout: "fullscreen" },
-  decorators: [Story => {
-    const router = createRouter({ routeTree: createRootRoute({ component: Story }),
-      history: createMemoryHistory({ initialEntries: ["/launch"] }) });
-    return <RouterProvider router={router} />;
-  }],
+  decorators: [Story => <FixtureRouter initialPath="/launch"><Story /></FixtureRouter>],
 } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -140,3 +136,20 @@ export const NeedsJurisdictionReview: Story = {
     await expect(canvas.getByRole("textbox",{name:"School or offering name"})).toHaveValue("Example Academy");
   },
 };
+
+const returningSite={id:"storybook-site",name:"Example Community Learning Center",statusLabel:"Preparing",statusTone:"info" as const};
+const savedShape={"site-profile":"complete","site-information":"complete","programs-audiences":"complete","website-brand":"complete"} as const;
+export const ReturningWithSavedShape:Story={render:()=> <LaunchStudioOverview site={returningSite} mode="returning"
+  nextAction={{title:"Prepare first outreach",description:"Share your saved website preview.",href:"#outreach"}}
+  previewUrl="#website-preview" workspaceUrl="#site-workspace" completion={savedShape}/>,play:async({canvasElement})=>{
+ const c=within(canvasElement);
+ await expect(c.getByText("1 of 4 milestones confirmed complete")).toBeVisible();
+ await expect(c.getByRole("link",{name:"Open website preview"})).toHaveAttribute("href","#website-preview");
+}};
+export const CompletionUnavailable:Story={render:()=> <LaunchStudioOverview site={returningSite} mode="returning"
+ nextAction={{title:"Review Site information",description:"A saved-state read is unavailable.",href:"#information"}}
+ previewUrl={null} workspaceUrl="#site-workspace" completion={{...savedShape,"site-information":"unavailable"}}/>,play:async({canvasElement})=>{
+ const c=within(canvasElement);await expect(c.getByText("0 of 4 milestones confirmed complete")).toBeVisible();
+ await expect(c.getByText("Status unavailable")).toBeVisible();
+ await expect(c.queryByRole("link",{name:"Open website preview"})).not.toBeInTheDocument();
+}};

@@ -7,7 +7,7 @@ import { StatCard } from "./stat-card";
 import { WorkspaceNotice } from "./notice";
 
 const meta = {
-  title: "V6.1 templates/Shared dashboard homes",
+  id: "v6-1-templates-shared-dashboard-homes", title: "05 Page layouts/Shared dashboard homes",
   component: DashboardHome,
   parameters: { layout: "fullscreen" },
   args: {

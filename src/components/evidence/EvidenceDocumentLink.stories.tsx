@@ -4,7 +4,7 @@ import { DomainError } from "@/domain/errors";
 import { EvidenceDocumentLink } from "./EvidenceDocumentLink";
 
 const meta = {
-  title: "Evidence/Private document link",
+  id: "evidence-private-document-link", title: "04 Application patterns/Evidence/Private document link",
   component: EvidenceDocumentLink,
   args: { onGetDownloadUrl: fn(async () => { throw new DomainError("FORBIDDEN"); }) },
 } satisfies Meta<typeof EvidenceDocumentLink>;

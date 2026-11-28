@@ -6,7 +6,7 @@ type Upload = { fileName: string; mimeType: "application/pdf" | "image/jpeg" | "
 const uploadContract=(key:string)=>({key,uploadUrl:"https://private.test/put",
   uploadHeaders:{"Content-Type":"application/pdf"},expiresInSeconds:180});
 const meta = {
-  title: "Evidence/Uploader",
+  id: "evidence-uploader", title: "04 Application patterns/Evidence/Uploader",
   component: EvidenceUploader<Upload>,
   args: {
     adapter: { begin: async () => uploadContract("example"), finish: async () => {} },

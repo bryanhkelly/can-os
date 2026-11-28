@@ -20,7 +20,7 @@ export function AudienceIntentFieldsV61({selected, disabled=false, onChange}: {
           <legend className="sr-only">Audiences you desire to serve (optional)</legend>
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>Select all that apply. Optional.</span>
-            <span role="status">{selected.length} selected</span>
+            <span role="status" aria-label="Audience selection count">{selected.length} selected</span>
           </div>
           {siteAudienceGroups.map(group=>{
             const Icon=audienceIcons[group.id];
