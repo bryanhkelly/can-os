@@ -25,8 +25,8 @@ test('every documented operation is uniquely identified and fails closed without
           const publicRead=publicReads.has(op.operationId);
           const anonymousCommand=anonymousCommands.has(op.operationId);
           assert.ok(publicRead||anonymousCommand||op.security?.some(s=>Object.keys(s).length>0),'missing declared authentication');
-          assert.ok(Object.keys(op.responses||{}).some(k=>/^2\\d\\d$/.test(k)),'missing success response');
-          const response=await fetch(origin+path.replace(/\\{[^}]+\\}/g,id),{
+          assert.ok(Object.keys(op.responses||{}).some(k=>/^2\d\d$/.test(k)),'missing success response');
+          const response=await fetch(origin+path.replace(/\{[^}]+\}/g,id),{
             method:method.toUpperCase(),redirect:'manual',signal:AbortSignal.timeout(5000),
             headers:{'x-person-id':id,'x-role':'platform_owner','x-request-id':'forged',...(read?{}:{Origin:origin,'content-type':'application/json'})},
             ...(read?{}:{body:'{}'})
@@ -35,7 +35,7 @@ test('every documented operation is uniquely identified and fails closed without
           assert.match(response.headers.get('x-request-id')||'',/^[0-9a-f-]{36}$/);
           assert.equal(response.headers.get('cache-control'),'no-store');
           if(!publicRead){
-            assert.match(response.headers.get('content-type')||'',/application\\/problem\\+json/);
+            assert.match(response.headers.get('content-type')||'',/application\/problem\+json/);
             const problem=await response.json();
             assert.equal(problem.requestId,response.headers.get('x-request-id'));
             assert.equal(problem.status,response.status);
