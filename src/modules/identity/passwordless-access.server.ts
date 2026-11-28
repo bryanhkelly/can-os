@@ -1,5 +1,6 @@
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { db } from "@/db/client";
+import { writeAudit } from "@/platform/mutation";
 import { accessAccounts,accessAccountSignups,accessChallenges,accessSessions,accountPersonGrants,churchOnboardingRequests,people,programs,schoolSetupSignups } from "@/db/schema";
 import { roleCapabilities } from "@/domain/access-context";
 import { assertMembershipSwitchIdentity } from "@/domain/membership-switch-policy";
@@ -33,6 +34,20 @@ function publicOrigin():string {
  const origin=process.env.CAN_ACCESS_PUBLIC_ORIGIN;
  if(!origin || new URL(origin).protocol!=="https:") throw new Error("HTTPS access origin must be configured");
  return new URL(origin).origin;
+}
+/** Restricted operational audit: never store recipient addresses, tokens, URLs,
+ * provider response bodies or credentials. Audit outages cannot block sign-in. */
+async function recordAccessEmailSubmission(accountId:string,challengeId:string,
+ status:"attempted"|"submitted"|"failed"):Promise<void>{
+ try {
+  await db.transaction(tx=>writeAudit(tx,{
+   actorPersonId:null,action:"identity.access_email."+status,
+   resourceType:"access_challenge",resourceId:challengeId,scope:{},
+   after:{status},context:{accountId,channel:"email"},
+  }));
+ }catch{
+  console.error("Access email submission audit unavailable",{status});
+ }
 }
 /** Internal server-only dispatch outcome. Never expose eligibility/cooldown
  * distinctions through the public passwordless request endpoint. */
@@ -86,13 +101,15 @@ async function issueOneTimeAccess(rawEmail:string, sender:AccessEmailSender, ret
    if(!renewed)return "ineligible" as const;
   }
   const token=issueOpaqueSecret(),hash=hashAccessSecret(token,secretPepper());
-  await tx.insert(accessChallenges).values({
+  const [challenge]=await tx.insert(accessChallenges).values({
    accountId:account.id,tokenHash:hash,expiresAt,
-  });
-  return {token};
+  }).returning({id:accessChallenges.id});
+  if(!challenge)throw new AccessInfrastructureError("session_transaction");
+  return {token,challengeId:challenge.id};
  });
  if(issued==="ineligible")return "ineligible";
  if(!issued)return "cooldown";
+ await recordAccessEmailSubmission(account.id,issued.challengeId,"attempted");
  try {
   const accessUrl=new URL("/access/verify",accessOrigin);
   const safeReturnTo=safeAccessReturnTo(returnTo);
@@ -100,13 +117,15 @@ async function issueOneTimeAccess(rawEmail:string, sender:AccessEmailSender, ret
   accessUrl.hash="token="+encodeURIComponent(issued.token);
   const schoolIds=new Set(memberships.map(grant=>grant.siteId));
   const siteId=schoolIds.size===1&&!pendingInvitations.length?memberships[0]?.siteId:null;
-  await sender({to:email,accessUrl:accessUrl.toString(),...(siteId?{siteId}:{})});
+  await sender({to:email,accessUrl:accessUrl.toString(),
+   idempotencyKey:"access-challenge/"+issued.challengeId,...(siteId?{siteId}:{})});
  }catch(error){
-  // Preserve the issued challenge and cooldown on delivery failure; a rapid retry
-  // must not turn a mail-provider outage into unbounded request generation.
-  // The link remains unusable unless the provider actually delivered it.
+  // Retain cooldown and the original challenge. A timeout can be ambiguous:
+  // the provider may have accepted the message before its response was lost.
+  await recordAccessEmailSubmission(account.id,issued.challengeId,"failed");
   throw error;
  }
+ await recordAccessEmailSubmission(account.id,issued.challengeId,"submitted");
  return "dispatched";
 }
 /** Public API remains deliberately indistinguishable for unknown accounts,
