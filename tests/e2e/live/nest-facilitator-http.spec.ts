@@ -165,15 +165,15 @@ test("ordinary REST cancellation, replacement and live facilitator takeover pres
       expect(await post(b.http,"/class-session-openings",{classId,classSessionId:sessionId})).toMatchObject({alreadyStarted:true,facilitatedSessionId:roomId});
       // No learner re-pairing, replacement enrollment or fabricated evidence.
       expect(await evidence()).toEqual(originalEvidence);
-      const visible=await post<{activities:{id:string;responded:boolean}[]}>(l.http,"/classrooms/"+roomId+"/attempts/"+courseAttemptId+"/activities");
+      const visible=await get<{activities:{id:string;responded:boolean}[]}>(l.http,"/classrooms/"+roomId+"/attempts/"+courseAttemptId+"/activities");
       expect(visible.activities.find(x=>x.id===released.id)).toMatchObject({responded:true});
-      const hostActivity=await post<{pairedCount:number;releases:{id:string;respondingLearners:number}[]}>(b.http,"/classrooms/"+roomId+"/host-activity");
+      const hostActivity=await get<{pairedCount:number;releases:{id:string;respondingLearners:number}[]}>(b.http,"/classrooms/"+roomId+"/host-activity");
       expect(hostActivity.pairedCount).toBe(1);
       expect(hostActivity.releases.find(x=>x.id===released.id)).toMatchObject({respondingLearners:1});
       expect(await get(b.http,"/classrooms/"+roomId+"/projector")).toMatchObject({roomState:"live",latest:{commandKind:"pause",positionSeconds:15,lessonId,assetVersionId}});
       await denyPost(p.http,"/classroom-projector-commands",{...projector,requestId:randomUUID()});
       await denyGet(p.http,"/classrooms/"+roomId+"/attendance");
-      const roster=await post<{members:{courseAttemptId:string;latestStatus:string;pairedDevice:boolean}[]}>(b.http,"/classrooms/"+roomId+"/attendance");
+      const roster=await get<{members:{courseAttemptId:string;latestStatus:string;pairedDevice:boolean}[]}>(b.http,"/classrooms/"+roomId+"/attendance");
       expect(roster.members.find(x=>x.courseAttemptId===courseAttemptId)).toMatchObject({latestStatus:"present",pairedDevice:true});
       expect(await post(b.http,"/classroom-activity-closures",{...scope,activityReleaseId:released.id})).toMatchObject({closed:true});
       expect(await post(b.http,"/classroom-projector-commands",{...projector,requestId:randomUUID(),commandKind:"play"})).toMatchObject({accepted:true,duplicate:false});
