@@ -7,6 +7,9 @@ import { LaunchPreviewSharing } from "@/components/launch-studio/LaunchPreviewSh
 import { SiteEngagementLibrary } from "@/components/launch-studio/SiteEngagementLibrary";
 import { NativeEngagementCampaigns } from "@/components/launch-studio/NativeEngagementCampaigns";
 import { CampaignListMembers } from "@/components/launch-studio/CampaignListMembers";
+import { EngagementEmailDistribution } from "@/components/launch-studio/EngagementEmailDistribution";
+import { legacyCampaignTransport } from "@/modules/communication/campaign-workspace-transport";
+import type { CampaignTransport } from "@/domain/campaign-workspace-api";
 
 describe("Engagement component session isolation", () => {
   it("preserves a Go Link editor only for the same Site and package", () => {
@@ -54,6 +57,15 @@ describe("Engagement component session isolation", () => {
     expect(NativeEngagementCampaigns({...props,invitationReady:false}).key).toBe(initial.key);
     expect(NativeEngagementCampaigns({...props,linkId:"link-b"}).key).not.toBe(initial.key);
     expect(NativeEngagementCampaigns({...props,engagementId:"engagement-b"}).key).not.toBe(initial.key);
+  });
+  it("starts a fresh workspace session when the explicitly selected transport changes", () => {
+    const transport:CampaignTransport={kind:"nest",api:legacyCampaignTransport.api};
+    const props={engagementId:"engagement-a",linkId:"link-a",invitationReady:true};
+    expect(NativeEngagementCampaigns({...props,transport}).key).not.toBe(NativeEngagementCampaigns(props).key);
+    const memberProps={...props,listId:"list-a",onChange:()=>{}};
+    expect(CampaignListMembers({...memberProps,transport}).key).not.toBe(CampaignListMembers(memberProps).key);
+    const distributionProps={...props,onClose:()=>{}};
+    expect(EngagementEmailDistribution({...distributionProps,transport}).key).not.toBe(EngagementEmailDistribution(distributionProps).key);
   });
   it("isolates recipient selection and confirmation by exact list and link", () => {
     const props={engagementId:"engagement-a",linkId:"link-a",listId:"list-a",onChange:()=>{}};
