@@ -36,7 +36,7 @@ describe("Personal CAN account boundaries", () => {
     expect(personal).toContain("if (!existing.consumedAt)");
     expect(personal).toContain("if (demo) return provisionPrivatePersonalSignup(data,email)");
     expect(personal).toContain("if(!account)return genericResult");
-    expect(personal).toContain("privateAccessCodeHash");
+    expect(personal).toContain("readDemoCredentialDomain(email,tx)");
     expect(personal).toContain('emailVerified: approval==="verified_email"');
     expect(personal).toContain("await requestOneTimeAccess(email, sender");
     expect(personal).toContain("let personId=account.personId");
