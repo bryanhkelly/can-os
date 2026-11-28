@@ -5,7 +5,7 @@ import { z } from 'zod';
 export type Identity = {readSession:()=>Promise<unknown>;readReleaseOverview:(input:unknown)=>Promise<unknown>;readReleasePolicy:(input:unknown)=>Promise<unknown>;readReleaseQueue:(input:unknown)=>Promise<unknown>;createSite:(input:unknown)=>Promise<unknown>;submitRelease:(input:unknown)=>Promise<unknown>;saveReleasePolicy:(input:unknown)=>Promise<unknown>;decideRelease:(input:unknown)=>Promise<unknown>;publishCourses:(input:unknown)=>Promise<unknown>;approveAssetManifest:(input:unknown)=>Promise<unknown>;publishOffering:(input:unknown)=>Promise<unknown>;me:unknown;readStudentClasses:()=>Promise<unknown>;readLearningResume:(id:string)=>Promise<unknown>;readHomeworkSummary:(id:string)=>Promise<unknown>;selectMembership:(id:string)=>Promise<void>;recordActivity:()=>Promise<void>;completeLesson:(id:string,lessonId:string)=>Promise<unknown>;submitHomework:(id:string,assignmentId:string,responseText:string)=>Promise<unknown>};
 type AuthHandler='handleAccessRequest'|'handleAccessVerification'|'handlePersonalRegistration'|'handleSiteSignupRequest'|'handleAccessLogout';
 export type WorkflowMode='planning'|'canonical'|'can';
-export type Workflow=Record<'createCanonicalBlueprintConfiguration'|'saveCanonicalBlueprintConfiguration'|'submitCanonicalBlueprintConfiguration'|'decideCanonicalBlueprintReview'|'executeCanonicalBlueprintConfiguration'|'recordNativeDeploymentReadiness'|'placeNativeDeploymentSite'|'approveNativeOfferingAdoption',(input:unknown)=>Promise<unknown>>;
+export type Workflow=Record<'readCanonicalBlueprintConfiguration'|'readCanonicalBlueprintReview'|'readCanonicalBlueprintReviewHistory'|'createCanonicalBlueprintConfiguration'|'saveCanonicalBlueprintConfiguration'|'submitCanonicalBlueprintConfiguration'|'decideCanonicalBlueprintReview'|'executeCanonicalBlueprintConfiguration'|'recordNativeDeploymentReadiness'|'placeNativeDeploymentSite'|'approveNativeOfferingAdoption',(input:unknown)=>Promise<unknown>>;
 type Bridge = Record<AuthHandler,(request:Request)=>Promise<Response>> & {resolveGovernedWorkflow:(request:Request,mode:WorkflowMode)=>Promise<Workflow>;resolveHttpIdentity:(request:Request)=>Promise<Identity>;classifyHttpDomainError:(error:unknown)=>string};
 
 /** Only explicit verified local runtime configuration can enable this adapter. */
@@ -43,12 +43,13 @@ export class CanonicalIdentityService {
     if(typeof request.headers['user-agent']==='string')headers.set('user-agent',request.headers['user-agent']);
     return bridge[handler](new Request(this.writeOrigin!+'/api/v1/access',{method:'POST',headers,body:JSON.stringify(body)}));
   }
-  async authenticateWorkflow(request:FastifyRequest,mode:WorkflowMode):Promise<Workflow>{
-    this.assertWriteRequest(request);
+  async authenticateWorkflow(request:FastifyRequest,mode:WorkflowMode,method:'GET'|'POST'='POST'):Promise<Workflow>{
+    if(request.method!==method)throw new ForbiddenException();
+    if(method==='POST')this.assertWriteRequest(request);
     const cookie=request.headers.cookie;
     if(typeof cookie!=='string'||!cookie)throw new UnauthorizedException();
     const bridge=this.load();
-    try{return await bridge.resolveGovernedWorkflow(new Request(this.writeOrigin!+'/api/v1/workflow',{method:'POST',headers:{cookie,origin:this.writeOrigin!}}),mode);}
+    try{return await bridge.resolveGovernedWorkflow(new Request((method==='POST'?this.writeOrigin!:'http://127.0.0.1')+'/api/v1/workflow',{method,headers:{cookie,...(method==='POST'?{origin:this.writeOrigin!}:{})}}),mode);}
     catch(error){throw this.translate(bridge,error);}
   }
   async runWorkflow<T>(work:()=>Promise<T>):Promise<T>{

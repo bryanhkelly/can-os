@@ -182,3 +182,17 @@ test('Blueprint and deployment commands remain protected and disabled by default
   }
  });
 });
+
+test('Blueprint reads require credentials and have bounded history parameters',async()=>{
+ await withServer('0',async(url,document)=>{
+  const id='00000000-0000-4000-8000-000000000001';
+  for(const p of ['/api/v1/blueprint-configurations/{configurationId}','/api/v1/blueprint-configuration-versions/{configurationVersionId}/review','/api/v1/blueprint-configuration-versions/{configurationVersionId}/review-history']){
+   assert.ok(document.paths[p].get.security);
+   assert.equal((await fetch(url+p.replace(/\{[^}]+\}/,id))).status,401);
+  }
+ });
+ const {historyQuery}=require('../dist/workflow.contracts');
+ assert.equal(historyQuery.safeParse({page:'100'}).success,true);
+ assert.equal(historyQuery.safeParse({page:'101'}).success,false);
+ assert.equal(historyQuery.safeParse({page:'0',organizationId:'forged'}).success,false);
+});

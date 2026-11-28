@@ -32,13 +32,7 @@ const noStore=()=>setResponseHeader("Cache-Control","private, no-store");
 function invalid(reason:string):never { throw new DomainError("VALIDATION_FAILED",reason); }
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-function reviewerScope(actor:CommandContext):string{
-  if(!actor.actorPersonId||actor.role!=="blueprint_reviewer"||
-    actor.scope.organizationIds?.length!==1||actor.scope.siteIds?.length)
-    throw new AuthorizationError("independent Organization-wide Blueprint reviewer");
-  assertCapability(actor,"blueprint.review");
-  return actor.scope.organizationIds[0]!;
-}
+import {reviewerScope} from "./native-offering-adoption-scope.server";
 
 /**
  * Existing canonical Blueprint review authority, not an invented approval role.

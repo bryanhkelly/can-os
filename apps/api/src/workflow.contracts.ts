@@ -40,3 +40,26 @@ export const outputDocs={
  placementResult:obj({deploymentId:id,siteId:id,placementId:id,created:bool}),
  adoptionResult:obj({adoptionId:id,approvalStatus:en(['approved']),deploymentStatusUnchanged:str}),
 };
+
+const jsonValue:z.ZodType<unknown>=z.lazy(()=>z.union([z.null(),z.boolean(),z.string(),z.number().finite(),z.array(jsonValue),z.record(jsonValue)]));
+const jsonObject=z.record(jsonValue);
+const timestamp=z.string().datetime({offset:true});
+const decision=z.enum(['approved','conditional','rejected']);
+const decisionFields={id:uuid,decision,reviewerPersonId:uuid,decidedAt:timestamp};
+export const configParams=z.object({configurationId:uuid}).strict();
+export const versionParams=z.object({configurationVersionId:uuid}).strict();
+export const historyQuery=z.object({page:z.string().regex(/^(?:0|[1-9][0-9]{0,2})$/).transform(Number).pipe(z.number().max(100)).optional()}).strict();
+export const readResults={
+ configuration:configResult.extend({blueprintId:uuid,blueprintVersionId:uuid,name:z.string(),config:jsonObject,identity:z.object({religiousAffiliationCode:z.string().nullable(),editorialIdentity:z.string(),culturalContext:jsonObject}).strict(),
+ components:z.array(z.object({componentId:uuid,selectionStatus:z.string(),settings:jsonObject,referenceItemVersionIds:z.array(uuid)}).strict()),
+ offeringAdoptions:z.array(z.object({componentId:uuid,offeringVersionId:uuid,configuration:jsonObject}).strict()),
+ localExperiences:z.array(z.object({componentId:uuid,kind:z.string(),title:z.string(),summary:z.string(),configuration:jsonObject}).strict())}).strict(),
+ review:z.object({configurationVersionId:uuid,lifecycle:z.string(),latestReview:z.object(decisionFields).strict().nullable(),components:z.array(z.object({componentId:uuid,decision:z.string()}).strict())}).strict(),
+ history:z.object({configurationVersionId:uuid,page:z.number().int().min(0).max(100),hasMore:z.boolean(),items:z.array(z.object({...decisionFields,evidenceVersionId:uuid.nullable(),rationale:z.string().nullable()}).strict()).max(20)}).strict(),
+};
+const decided={id,decision:en(['approved','conditional','rejected']),reviewerPersonId:id,decidedAt:{...str,format:'date-time'}};
+export const readDocs={
+ configuration:obj({...outputDocs.configuration.properties,blueprintId:id,blueprintVersionId:id,name:str,config:json,identity:obj({religiousAffiliationCode:{...str,nullable:true},editorialIdentity:str,culturalContext:json}),components:arr(obj({componentId:id,selectionStatus:str,settings:json,referenceItemVersionIds:arr(id)})),offeringAdoptions:arr(obj({componentId:id,offeringVersionId:id,configuration:json})),localExperiences:arr(obj({componentId:id,kind:str,title:str,summary:str,configuration:json}))}),
+ review:obj({configurationVersionId:id,lifecycle:str,latestReview:{...obj(decided),nullable:true},components:arr(obj({componentId:id,decision:str}))}),
+ history:obj({configurationVersionId:id,page:{type:'integer',minimum:0,maximum:100},hasMore:bool,items:arr(obj({...decided,evidenceVersionId:nullableId,rationale:{...str,nullable:true}}),20)})
+};

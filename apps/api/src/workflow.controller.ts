@@ -1,14 +1,19 @@
-import {Controller,Post,Body,Req,HttpCode,applyDecorators} from '@nestjs/common';
-import {ApiTags,ApiCookieAuth,ApiOperation,ApiBody,ApiOkResponse,ApiHeader,ApiResponse} from '@nestjs/swagger';
+import {Controller,Get,Post,Body,Param,Query,Req,HttpCode,applyDecorators} from '@nestjs/common';
+import {ApiTags,ApiCookieAuth,ApiOperation,ApiBody,ApiOkResponse,ApiHeader,ApiResponse,ApiParam,ApiQuery} from '@nestjs/swagger';
 import type {FastifyRequest} from 'fastify';
 import {GovernedWorkflowOperation,verifiedWorkflow} from './security';
 import {CanonicalIdentityService,type WorkflowMode} from './identity.service';
 import {problemOpenApiSchema} from './contracts';
-import {inputs,results,outputDocs} from './workflow.contracts';
+import {validated} from './learning.contracts';
+import {inputs,results,outputDocs,readResults,readDocs,configParams,versionParams,historyQuery} from './workflow.contracts';
 function Governed(mode:WorkflowMode){
  return applyDecorators(GovernedWorkflowOperation(mode),HttpCode(200),ApiHeader({name:'Origin',required:true}),ApiCookieAuth('session'),
  ...(mode==='can'?[]:[ApiCookieAuth('nativeSession')]),
  ...[400,401,403,409,415,500,503].map(status=>ApiResponse({status,content:{'application/problem+json':{schema:problemOpenApiSchema}}})));
+}
+function GovernedRead(){
+ return applyDecorators(GovernedWorkflowOperation('planning','GET'),ApiCookieAuth('session'),ApiCookieAuth('nativeSession'),
+ ...[400,401,403,500,503].map(status=>ApiResponse({status,content:{'application/problem+json':{schema:problemOpenApiSchema}}})));
 }
 @ApiTags('Blueprint and deployment')
 @Controller()
@@ -85,5 +90,33 @@ export class WorkflowController{
  approveNativeOfferingAdoption(@Req() req:FastifyRequest,@Body() body:unknown){
    const workflow=verifiedWorkflow(req);
    return this.identity.runWorkflow(async()=>results.adoptionResult.parse(await workflow.approveNativeOfferingAdoption(body)));
+ }
+ @Get('blueprint-configurations/:configurationId')
+ @GovernedRead()
+ @ApiParam({name:'configurationId',type:String,format:'uuid',required:true})
+ @ApiOperation({operationId:'getBlueprintConfiguration',summary:'Read the current scoped private configuration'})
+ @ApiOkResponse({schema:readDocs.configuration})
+ configuration(@Req() req:FastifyRequest,@Param() params:unknown){
+  const input=validated(configParams,params),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>readResults.configuration.parse(await workflow.readCanonicalBlueprintConfiguration(input)));
+ }
+ @Get('blueprint-configuration-versions/:configurationVersionId/review')
+ @GovernedRead()
+ @ApiParam({name:'configurationVersionId',type:String,format:'uuid',required:true})
+ @ApiOperation({operationId:'getBlueprintReview',summary:'Read the exact version and current independent review'})
+ @ApiOkResponse({schema:readDocs.review})
+ review(@Req() req:FastifyRequest,@Param() params:unknown){
+  const input=validated(versionParams,params),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>readResults.review.parse(JSON.parse(JSON.stringify(await workflow.readCanonicalBlueprintReview(input)))));
+ }
+ @Get('blueprint-configuration-versions/:configurationVersionId/review-history')
+ @GovernedRead()
+ @ApiParam({name:'configurationVersionId',type:String,format:'uuid',required:true})
+ @ApiQuery({name:'page',required:false,type:Number})
+ @ApiOperation({operationId:'getBlueprintReviewHistory',summary:'Read append-only review decisions in bounded pages'})
+ @ApiOkResponse({schema:readDocs.history})
+ history(@Req() req:FastifyRequest,@Param() params:unknown,@Query() query:unknown){
+  const input=validated(versionParams,params),q=validated(historyQuery,query),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>readResults.history.parse(await workflow.readCanonicalBlueprintReviewHistory({...input,page:q.page??0})));
  }
 }
