@@ -1,3 +1,4 @@
+import {ContextualReportingRelationships} from "@/components/reporting/ContextualReportingRelationships";
 import { opaqueUuidPathParam } from "@/domain/opaque-url-id";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -654,6 +655,7 @@ function ManagingClass({workspace}:{workspace:Workspace}){
           <Suspense fallback={<p role="status" className="mt-4 text-sm">Loading Class evidence…</p>}>
             <NativeClassReportPanel classId={workspace.classId}/>
           </Suspense>
+          <ContextualReportingRelationships scopeKind="class" scopeId={workspace.classId}/>
         </>}
       </section>
       <aside className="border border-border bg-card p-5">
