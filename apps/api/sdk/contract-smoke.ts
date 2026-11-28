@@ -26,3 +26,16 @@ export async function checkParticipationContract(client:BecomunaBrowserApi, rele
  // @ts-expect-error withdrawal cannot be authorized using a release ID
  await client.POST('/api/v1/noncredit-registration-withdrawals',{body:{releaseId,confirm:true}});
 }
+
+export async function checkAdmissionsContract(client:BecomunaBrowserApi, applicationId:string,schoolYearId:string,offerId:string,classEnrollmentId:string){
+ await client.GET('/api/v1/admission-offer-options',{params:{query:{applicationId}}});
+ await client.POST('/api/v1/admission-offers',{body:{applicationId,schoolYearId}});
+ const response=await client.POST('/api/v1/admission-offer-responses',{body:{offerId,decision:'accept'}});
+ if(response.data){const acceptedOfferId:string=response.data.offerId;void acceptedOfferId;}
+ await client.POST('/api/v1/admission-enrollment-activations',{body:{offerId}});
+ await client.POST('/api/v1/admission-offer-withdrawals',{body:{offerId,reason:'Offer no longer available',confirmed:true}});
+ await client.POST('/api/v1/class-enrollment-withdrawals',{body:{classEnrollmentId}});
+ await client.POST('/api/v1/class-enrollment-cancellations',{body:{classEnrollmentId,reason:'operator_decision'}});
+ // @ts-expect-error acceptance never returns a newly activated enrollment
+ if(response.data){const enrollmentId=response.data.enrollmentId;void enrollmentId;}
+}
