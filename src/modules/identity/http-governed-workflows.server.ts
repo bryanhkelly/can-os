@@ -75,6 +75,7 @@ import {listLaunchOptionsService,getLaunchEntryService} from "@/modules/programs
 import { getNativeCourseDraftLessonsService, saveNativeCourseLessonDraftService, getNativeCourseReleaseReadinessService, createNativeCourseAssignmentDraftService, getNativeCourseAssignmentDraftsService } from "@/modules/learning/native-course-draft.server";
 import * as publisherPack from "@/modules/learning/publisher-pack-authoring-http.server";
 import * as marketplace from "@/modules/learning/curriculum-marketplace-http.server";
+import * as trackAuthoring from "@/modules/learning/instructional-track-authoring-http.server";
 export type WorkflowMode="planning"|"canonical"|"can"|"learner"|"operator-reporting";
 /** Existing independent native reviewer credentials remain distinct from CAN.
  * No fallback, new role, token or grant is manufactured by this adapter. */
@@ -84,6 +85,13 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
  const context=await (mode==="operator-reporting"?(readCookie(request,accessSessionCookie)!==undefined?getIdentityContext(request):getCanonicalCommandContext(request)):mode==="planning"?getBlueprintPlanningContext(request):mode==="canonical"?getCanonicalCommandContext(request):mode==="learner"?getInstructionalLearnerContext(request):getIdentityContext(request));
  if(!context.actorPersonId)throw new AuthorizationError("verified Person");
  return {
+  createRecordedInstructionDraft:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Instructional Track authoring context");return trackAuthoring.createRecordedInstructionDraftService(request,raw);},
+  saveRecordedInstructionDraft:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Instructional Track authoring context");return trackAuthoring.saveRecordedInstructionDraftService(request,raw);},
+  submitRecordedInstructionDraft:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Instructional Track authoring context");return trackAuthoring.submitRecordedInstructionDraftService(request,raw);},
+  decideRecordedInstructionReview:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Instructional Track authoring context");return trackAuthoring.decideRecordedInstructionReviewService(request,raw);},
+  publishRecordedInstruction:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Instructional Track authoring context");return trackAuthoring.publishRecordedInstructionService(request,raw);},
+  withdrawRecordedInstruction:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Instructional Track authoring context");return trackAuthoring.withdrawRecordedInstructionService(request,raw);},
+  getCreatorRecordedInstructionDraft:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Instructional Track authoring context");return trackAuthoring.getCreatorRecordedInstructionDraftService(request,raw);},
   getCurriculumAdopterPrograms:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Curriculum Marketplace context");return marketplace.getCurriculumAdopterProgramsService(request,raw);},
   getCurriculumJourneyReadiness:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Curriculum Marketplace context");return marketplace.getCurriculumJourneyReadinessService(request,raw);},
   getCurriculumMarketplace:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Curriculum Marketplace context");return marketplace.getCurriculumMarketplaceService(request,raw);},
