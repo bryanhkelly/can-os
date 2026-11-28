@@ -169,3 +169,21 @@ npm run qa:pilot -- schema
 The read-only schema gate checks exact committed SQL SHA-256 hashes for journal entries 0079 onward (the existing production parity boundary), malformed hashes across the ledger, duplicate timestamps, missing/extra modern migrations and required current application objects. Readiness reports this gate, and both HTTP/browser configurations enforce it before learner mutations. The rollback-only canonical regression is a separate historical-schema test; a pass does not override drift.
 
 Strict fixture preflight now independently maps the three supplied session digests to the intended actors, checks direct verified email-link authentication, fresh/nondelegated sessions and same-Person grants, and requires the primary learner's unconsumed independent adult review. The provider session must have an active Site Admin or Registrar grant for the exact registering Organization and delivery Site. These checks do not create personas, assign grants or replace the runtime independent identity evidence validation. Provisioning verified accounts, actual private identity evidence, and R2/media publication remain outstanding.
+
+
+### Replacement QA branch established — November 27
+
+After the explicitly authorized retirement of `main-pre-migration-recovery-20261102`, Neon branch `pilot-acceptance-20261127` (`br-solitary-art-arun91gj`) was created from current main and reached ready state. Default compute settings were used because the account does not permit a custom suspend interval. The original `br-spring-frog-arnmih9w` branch and its draft are preserved.
+
+All 55 migration SQL hashes (0079–0133) match the new branch's journal, all 135 ledger records have valid hash shape, and all seven required schema checks pass. The QA runner, fixture generator, draft bootstrap, planning scaffold and assessment key preparation now target only the replacement branch. Historical references above describe the previous branch, not current runtime instructions.
+
+The committed draft bootstrap and planning scaffold were executed twice on the replacement branch, retaining the exact same synthetic organization and training IDs on repeat:
+- Organization: `10e95da8-40d8-49db-b78e-786dec681040`, domain `pilot-acceptance.can.demo`
+- Training: `2b386aac-03ca-4b18-a901-2fb188006ead`
+- One draft Offering/Course/training, seven lessons, five objective questions, one draft survey, one draft Class, one draft primary instructor track; zero releases or registrations.
+
+The canonical 22-assertion SQL regression also passes on the migrated branch with rollback-only synthetic test records. No published content, verified adult identity, assessment key, active Class, enrollment release or application acceptance was created. The draft author is an unauthenticated synthetic Person, not an independent reviewer.
+
+**Data boundary:** this branch is a production-derived database clone, not a synthetic-only database. Keep it private, restrict access to authorized operators, use fresh branch-only credentials and secrets, and do not expose copied real accounts, data, sessions or media to QA testers. Do not deploy publicly or send real delivery traffic. A sanitized/schema-only QA environment or formal reviewed de-identification process is still required before broad tester access. No production row was changed during this work. New QA Personas must use independently verified controlled accounts and the standard identity-review flow; never reuse copied credentials or reviews.
+
+Runtime execution, actual R2 access, approved independent reviews and a full HTTP/browser journey remain outstanding.
