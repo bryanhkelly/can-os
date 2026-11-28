@@ -6,6 +6,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { resolve, join } from "node:path";
 import { tmpdir } from "node:os";
+import { assertQaStorageScope } from "./pilot-qa-storage-credentials.mjs";
 
 const root = fileURLToPath(new URL("../..", import.meta.url));
 const file = resolve(root, ".env.pilot-qa");
@@ -34,7 +35,7 @@ function init() {
     CAN_ACCESS_TOKEN_PEPPER: secret(), CAN_CANONICAL_ACCESS_TOKEN_PEPPER: secret(),
     CAN_NONCREDIT_ASSESSMENT_KEY_HEX: secret(),
     CAN_R2_ACCOUNT_ID: "", CAN_R2_BUCKET: "can-os-pilot-qa",
-    CAN_R2_ACCESS_KEY_ID: "", CAN_R2_SECRET_ACCESS_KEY: "",
+    CAN_R2_ACCESS_KEY_ID: "", CAN_R2_SECRET_ACCESS_KEY: "", CAN_R2_SESSION_TOKEN: "",
     CAN_PILOT_QA_LEARNER_SESSION: "", CAN_PILOT_QA_OTHER_SESSION: "", CAN_PILOT_QA_PROVIDER_SESSION: "",
     CAN_PILOT_QA_FIXTURE_JSON: "",
   };
@@ -54,20 +55,25 @@ function localConfiguration() {
     "TEST_DATABASE_URL","CAN_APPLICATION_DB_HOST","CAN_CANONICAL_AUTH_DATABASE_URL",
     "CAN_CANONICAL_OPERATIONS_DATABASE_URL","CAN_ACCESS_TOKEN_PEPPER","CAN_CANONICAL_ACCESS_TOKEN_PEPPER",
     "CAN_NONCREDIT_ASSESSMENT_KEY_HEX","CAN_NONCREDIT_AUTO_FINALIZATION_ENABLED",
-    "CAN_R2_ACCOUNT_ID","CAN_R2_BUCKET","CAN_R2_ACCESS_KEY_ID","CAN_R2_SECRET_ACCESS_KEY",
+    "CAN_R2_ACCOUNT_ID","CAN_R2_BUCKET","CAN_R2_ACCESS_KEY_ID","CAN_R2_SECRET_ACCESS_KEY","CAN_R2_SESSION_TOKEN",
     "CAN_PILOT_QA_LEARNER_SESSION","CAN_PILOT_QA_OTHER_SESSION","CAN_PILOT_QA_PROVIDER_SESSION","CAN_PILOT_QA_FIXTURE_JSON"
   ]);
   if (Object.keys(config).some(k=>!permitted.has(k))) fail("QA configuration contains an unsupported setting.");
   if(config.APP_ENV!=="test" || config.NODE_ENV!=="test" || config.CAN_TEST_DB_WRITES_ENABLED!=="true" ||
      config.CAN_PILOT_QA_BRANCH_ID!==allowedBranch) fail("Exact dedicated rehearsal branch and test mode required.");
-  if(config.CAN_R2_BUCKET!=="can-os-pilot-qa") fail("Use only the dedicated can-os-pilot-qa bucket and bucket-scoped credentials.");
+  if(config.CAN_R2_BUCKET!=="can-os-pilot-qa" || config.CAN_R2_SESSION_TOKEN){
+    try { assertQaStorageScope(config); }
+    catch { fail("Shared QA storage requires a current prefix-scoped R2 session. Run the storage configuration helper."); }
+  }
+  const storageReady=Boolean(config.CAN_R2_ACCOUNT_ID&&config.CAN_R2_BUCKET&&config.CAN_R2_ACCESS_KEY_ID&&config.CAN_R2_SECRET_ACCESS_KEY);
   const hostEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) =>
     /^(PATH|PATHEXT|SYSTEMROOT|WINDIR|COMSPEC|HOME|USERPROFILE|APPDATA|LOCALAPPDATA|TEMP|TMP|TMPDIR|LANG|LC_ALL|CI|PLAYWRIGHT_BROWSERS_PATH)$/i.test(k)));
   const git=(...args)=>execFileSync("git",args,{cwd:root,env:hostEnv,encoding:"utf8"}).trim();
   if(git("status","--porcelain")) fail("Use a clean checked-out revision.");
   return {...hostEnv,...config,CAN_RELEASE_SOURCE_SHA:git("rev-parse","HEAD"),
     CAN_ADMISSIONS_TEST_BRANCH_ID:allowedBranch,RESEND_API_KEY:"",RESEND_WEBHOOK_SECRET:"",
-    GLOO_API_KEY:"",CAN_CAMPAIGN_FROM_EMAIL:"",CAN_DEMO_FIXED_ACCESS_ENABLED:"false"};
+    GLOO_API_KEY:"",CAN_CAMPAIGN_FROM_EMAIL:"",CAN_DEMO_FIXED_ACCESS_ENABLED:"false",
+    CAN_R2_CURRICULUM_UPLOADS_ENABLED:storageReady?"true":"false"};
 }
 try {
   const mode=process.argv[2];
