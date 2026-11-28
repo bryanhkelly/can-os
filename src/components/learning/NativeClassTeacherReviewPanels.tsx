@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { HistoricalClassWork } from "./HistoricalClassWork";
 import { SubmissionRevisionHistory } from "./SubmissionRevisionHistory";
-import { getNativeClassTeacherHomework, getNativeClassTeacherHomeworkHistory, getNativeClassTeacherHistoricalWork, getNativeClassTeacherAssessments,
+import { getNativeClassTeacherHomework, getNativeClassTeacherMissingWork, getNativeClassTeacherHomeworkHistory, getNativeClassTeacherHistoricalWork, getNativeClassTeacherAssessments,
   returnNativeClassPracticeFeedback } from
   "@/modules/classes/native-class-teacher-homework.functions";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,12 @@ import { normalizeClientError } from "@/lib/client-error";
 /** Read-only native Class teacher queue. Official grading is a separate
  * verified-grader workflow, not a practice feedback mutation. */
 export function NativeClassTeacherHomeworkPanel({classId}:{classId:string}){
+  return <NativeClassTeacherWork key={classId} classId={classId}/>;
+}
+
+function NativeClassTeacherWork({classId}:{classId:string}){
   const client=useQueryClient();
+  const [offset,setOffset]=useState(0);
   const [feedback,setFeedback]=useState<Record<string,string>>({});
   const [scores,setScores]=useState<Record<string,string>>({});
   const [busy,setBusy]=useState<string|null>(null);
@@ -34,17 +39,18 @@ export function NativeClassTeacherHomeworkPanel({classId}:{classId:string}){
       setNotice("Practice feedback returned to the learner. No official grade was issued.");
       await Promise.all([
         client.invalidateQueries({queryKey:["native-class-teacher-homework",classId]}),
+        client.invalidateQueries({queryKey:["native-class-teacher-missing-work",classId]}),
         client.invalidateQueries({queryKey:["native-teacher-homework-history",classId,submissionId]}),
       ]);
     }catch(failure){setError(normalizeClientError(failure,"Unable to return practice feedback.").message);}
     finally{setBusy(null);}
   }
   const queue=useQuery({
-    queryKey:["native-class-teacher-homework",classId],
-    queryFn:()=>getNativeClassTeacherHomework({data:{classId}}),
+    queryKey:["native-class-teacher-homework",classId,offset],
+    queryFn:()=>getNativeClassTeacherHomework({data:{classId,offset}}),
     retry:false,
   });
-  return <section aria-label="Class homework review" className="space-y-4 border border-border bg-card p-5">
+  return <div className="space-y-4"><NativeClassMissingWork classId={classId}/><section aria-label="Class homework review" className="space-y-4 border border-border bg-card p-5">
     <div>
       <h2 className="font-serif text-2xl">Student homework</h2>
       <p className="mt-2 text-sm text-muted-foreground">
@@ -84,7 +90,7 @@ export function NativeClassTeacherHomeworkPanel({classId}:{classId:string}){
           </p>}
           <SubmissionRevisionHistory queryScope={["native-teacher-homework-history",classId,item.id]}
             loadPage={beforeRevision=>getNativeClassTeacherHomeworkHistory({data:{classId,submissionId:item.id,beforeRevision}})}/>
-          {queue.data.canReturnPracticeFeedback&&item.isPracticeSubmission&&<div className="space-y-3 border-t border-border pt-3">
+          {queue.data.canReturnPracticeFeedback&&item.isPracticeSubmission&&["submitted","returned"].includes(item.status)&&<div className="space-y-3 border-t border-border pt-3">
             <Field label={<>Return practice feedback<span className="sr-only"> for {item.studentName} on {item.assignmentTitle}</span></>}>
               <Textarea rows={3} maxLength={3000} value={feedback[item.id]??item.teacherFeedback??""}
                 onChange={event=>setFeedback(previous=>({...previous,[item.id]:event.target.value}))}/>
@@ -106,9 +112,42 @@ export function NativeClassTeacherHomeworkPanel({classId}:{classId:string}){
       </ul>
       {notice&&<WorkspaceNotice tone="success">{notice}</WorkspaceNotice>}
       {error&&<WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
-      {queue.data.partial&&<p className="text-xs">Only the most recent 100 records are shown.</p>}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" variant="outline" size="sm" disabled={offset===0||queue.isFetching} onClick={()=>setOffset(value=>Math.max(0,value-100))}>Previous</Button>
+        <span className="text-xs text-muted-foreground">Page {offset/100+1}</span>
+        <Button type="button" variant="outline" size="sm" disabled={queue.data.nextOffset===null||queue.isFetching} onClick={()=>setOffset(value=>value+100)}>Next</Button>
+      </div>
       <Button type="button" variant="outline" size="sm" disabled={queue.isFetching}
         onClick={()=>void queue.refetch()}>Refresh submissions</Button>
+    </>}
+  </section></div>;
+}
+
+function NativeClassMissingWork({classId}:{classId:string}){
+  const [offset,setOffset]=useState(0);
+  const queue=useQuery({
+    queryKey:["native-class-teacher-missing-work",classId,offset],
+    queryFn:()=>getNativeClassTeacherMissingWork({data:{classId,offset}}),retry:false,
+  });
+  return <section aria-label="Class missing work" className="space-y-4 border border-border bg-card p-5">
+    <h2 className="font-serif text-2xl">Missing work</h2>
+    <p className="text-sm text-muted-foreground">Past-due assignments that have not been submitted or have been returned for revision, for currently enrolled learners.</p>
+    <QueryState loading={queue.isPending&&"Checking current Class assignments…"}
+      error={queue.isError&&"Missing work is unavailable under your current teaching appointment."}
+      onRetry={()=>void queue.refetch()} retrying={queue.isFetching}/>
+    {queue.data&&<>
+      {queue.data.items.length===0&&<EmptyState title="No overdue work on this page."/>}
+      <ul className="divide-y divide-border">
+        {queue.data.items.map(item=><li key={`${item.classEnrollmentId}:${item.assignmentId}`} className="py-3 text-sm">
+          <p className="font-semibold">{item.studentName} · {item.assignmentTitle}</p>
+          <p className="text-xs text-muted-foreground">Due {new Date(item.dueAt).toLocaleDateString()} · {item.status.replaceAll("_"," ")}</p>
+        </li>)}
+      </ul>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" variant="outline" size="sm" disabled={offset===0||queue.isFetching} onClick={()=>setOffset(value=>Math.max(0,value-100))}>Previous</Button>
+        <span className="text-xs text-muted-foreground">Page {offset/100+1}</span>
+        <Button type="button" variant="outline" size="sm" disabled={queue.data.nextOffset===null||queue.isFetching} onClick={()=>setOffset(value=>value+100)}>Next</Button>
+      </div>
     </>}
   </section>;
 }
