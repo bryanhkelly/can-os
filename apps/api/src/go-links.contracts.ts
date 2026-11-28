@@ -52,3 +52,6 @@ export const docs={
  choices:arr(obj({destination:destinationDoc,title:str,description:str})),
  page:obj({items:arr(obj({...fields,packageId:nullableUuid,availability:en(availability.options),evidence:{...evidenceDoc,nullable:true}}),50),nextCursor:nullableUuid})
 };
+
+// Reuse the canonical HTTP destination and evidence shapes across Go and Engagement APIs.
+export {destination as goDestinationWireSchema,destinationDoc as goDestinationOpenApiSchema,evidence as goLinkEvidenceSchema,evidenceDoc as goLinkEvidenceOpenApiSchema};

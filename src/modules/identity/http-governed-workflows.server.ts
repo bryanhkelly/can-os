@@ -1,3 +1,5 @@
+import * as engagement from "@/modules/engagement/engagement-registry-service.server";
+import * as engagementInput from "@/modules/engagement/engagement-registry.inputs";
 import * as sender from "@/modules/communication/sender-registry-service.server";
 import * as senderInput from "@/modules/communication/sender-registry.inputs";
 import {parseCommandInput} from "@/domain/command-input";
@@ -59,6 +61,15 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
  const context=await (mode==="planning"?getBlueprintPlanningContext(request):mode==="canonical"?getCanonicalCommandContext(request):mode==="learner"?getInstructionalLearnerContext(request):getIdentityContext(request));
  if(!context.actorPersonId)throw new AuthorizationError("verified Person");
  return {
+  createEngagementDefinition:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Engagement context");return engagement.createEngagementDefinition(request,parseCommandInput(engagementInput.createEngagementDefinitionInput,raw));},
+  createEngagementGoLink:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Engagement context");return engagement.createEngagementGoLink(request,parseCommandInput(engagementInput.createEngagementGoLinkInput,raw));},
+  listEngagementGoLinks:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Engagement context");return engagement.listEngagementGoLinks(request,parseCommandInput(engagementInput.listEngagementGoLinksInput,raw));},
+  retireEngagementDefinition:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Engagement context");return engagement.retireEngagementDefinition(request,parseCommandInput(engagementInput.retireEngagementDefinitionInput,raw));},
+  revokeEngagementGoLink:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Engagement context");return engagement.revokeEngagementGoLink(request,parseCommandInput(engagementInput.revokeEngagementGoLinkInput,raw));},
+  listSiteEngagementDefinitions:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Engagement context");return engagement.listSiteEngagementDefinitions(request,parseCommandInput(engagementInput.listSiteEngagementDefinitionsInput,raw));},
+  prepareEngagementEmailDraft:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Engagement context");return engagement.prepareEngagementEmailDraft(request,parseCommandInput(engagementInput.prepareEngagementEmailDraftInput,raw));},
+  listOwnerEngagementDestinations:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Engagement context");return engagement.listOwnerEngagementDestinations(request,parseCommandInput(engagementInput.listOwnerEngagementDestinationsInput,raw));},
+  listOwnerEngagementDefinitions:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Engagement context");return engagement.listOwnerEngagementDefinitions(request,parseCommandInput(engagementInput.listOwnerEngagementDefinitionsInput,raw));},
   readSenderAdministration:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Sender administration context");return sender.readSenderAdministration(request,parseCommandInput(senderInput.scopeInput,raw).organizationId);},
   listSenderOrganizationsPage:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Sender administration context");return sender.listSenderOrganizationsPage(request,parseCommandInput(senderInput.pageInput,raw));},
   changeSenderAdministration:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Sender administration context");return sender.changeSenderAdministration(request,parseCommandInput(senderInput.changeInput,raw));},

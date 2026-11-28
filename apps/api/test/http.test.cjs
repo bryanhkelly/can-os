@@ -559,3 +559,22 @@ test('sender administration retains explicit owner authorization and bounded dis
  assert.equal(c.pageQuery.safeParse({afterId:id,afterName:'Example'}).success,true);
  assert.equal(c.results.current.safeParse({id,sender_from:'sender@example.test',postal_address:'address',verification_reference:'reference',apiKey:'secret'}).success,false);
 });
+
+test('engagement registry protects publication, owned discovery and invitation preparation',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const [route,method] of [["/api/v1/engagement-definitions","POST"],["/api/v1/engagement-go-links","POST"],["/api/v1/engagement-go-links","GET"],["/api/v1/engagement-retirements","POST"],["/api/v1/engagement-go-link-revocations","POST"],["/api/v1/site-engagement-definitions","GET"],["/api/v1/engagement-email-draft","GET"],["/api/v1/engagement-owner-destinations","GET"],["/api/v1/owner-engagement-definitions","GET"]]){
+   const op=document.paths[route][method.toLowerCase()];
+   assert.ok(op.security);assert.ok(op.responses['403']);
+   const response=await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);
+  }
+ });
+ const c=require('../dist/engagement.contracts');
+ const id='00000000-0000-4000-8000-000000000001';
+ assert.deepEqual(c.ownerQuery.parse({ownerKind:'platform'}),{owner:{kind:'platform'}});
+ assert.equal(c.ownerQuery.safeParse({ownerKind:'platform',organizationId:id}).success,false);
+ assert.equal(c.ownerQuery.safeParse({ownerKind:'organization'}).success,false);
+ assert.deepEqual(c.ownerQuery.parse({ownerKind:'organization',organizationId:id}),{owner:{kind:'organization',organizationId:id}});
+ assert.equal(c.linkQuery.safeParse({engagementId:id,linkId:id,actorPersonId:id}).success,false);
+ assert.equal(c.results.draft.safeParse({subject:'Invitation',body:'Public copy',url:'https://app.example.test/go/abcdefgh1234',recipientEmail:'private@example.test'}).success,false);
+});
