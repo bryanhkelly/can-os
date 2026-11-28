@@ -8,8 +8,7 @@ import { AuthorizationError } from "@/domain/command-context";
 import { AccessInfrastructureError, InvalidAccessCredentialError, type AccessFailureReason } from "@/domain/access-errors";
 import { clearSessionCookieHeader,hashAccessSecret,hashPrivateAccessCode,isPrivateAccessCode,equalSecretHashes,issueOpaqueSecret,normalizeAccessEmail,sessionCookieHeader,sessionIdleCutoff } from "@/domain/access-tokens";
 import {
- isDemoAccountEmail,isApprovedDemoGrant,
- LOCAL_DEMO_ACCESS_CODE,LOCAL_DEMO_ACCOUNTS,LOCAL_DEMO_ADMIN,
+ isDemoAccountEmail,LOCAL_DEMO_ACCESS_CODE,
 } from "@/domain/local-demo-access";
 import {readSessionGrants} from "./session-grants.server";
 import { recordSessionSecurityEvent } from "./session-security-audit.server";
@@ -337,7 +336,7 @@ export async function redeemDemoAccess(
    .from(accessAccounts)
    // Shared demo codes attest an explicitly bound synthetic Person and grant,
    // NOT control of a deliverable mailbox. The grant reader below enforces
-   // fixed Valor identities or exact registered-school/invitation bindings.
+   // approved synthetic scope and canonical current Account Person grants.
    .where(and(eq(accessAccounts.emailNormalized,email),eq(accessAccounts.disabled,false)))
    .for("update").limit(1);
   if(!account || account.email!==email)throw new InvalidAccessCredentialError("Invalid demo credentials");
@@ -347,7 +346,7 @@ export async function redeemDemoAccess(
     : code!==LOCAL_DEMO_ACCESS_CODE)
    throw new InvalidAccessCredentialError("Invalid demo credentials");
   step="grant_lookup";
-  if(!privateCredential && !email.endsWith("@valorschool.demo")){
+  if(!privateCredential){
    const bindings=await readDemoStaffBindings(account.id,tx);
    if(bindings.length){
     const pending=await listPendingStaffInvitations(tx,account.id);
@@ -357,15 +356,10 @@ export async function redeemDemoAccess(
   }
   const {grants,launchSiteId}=await readSessionGrants(account.id,account.email,tx,privateCredential?"private_access_code":"local_demo_code");
   const accountGrants=grants.filter(candidate=>candidate.accountId===account.id);
-  // Demo login chooses the fixed original primary membership; all additional
-  // roles are selected through the same normal server-authoritative switcher.
-  const fixed=privateCredential?undefined:LOCAL_DEMO_ACCOUNTS.find(candidate=>candidate.accountId===account.id);
-  const grant=!privateCredential && account.id===LOCAL_DEMO_ADMIN.accountId
-   ?accountGrants.find(candidate=>candidate.id===LOCAL_DEMO_ADMIN.grantId)
-   :fixed?accountGrants.find(candidate=>candidate.role===fixed.role.toLowerCase())
-   :[...accountGrants].sort((a,b)=>a.role.localeCompare(b.role)||a.id.localeCompare(b.id))[0];
-  if(!grant||(fixed && !isApprovedDemoGrant(grant,email)))
-   throw new InvalidAccessCredentialError("Invalid demo credentials");
+  // The current canonical grants, not fixture names, determine initial access.
+  const grant=accountGrants.find(candidate=>candidate.role==="site_admin"&&candidate.siteId===launchSiteId)
+   ?? [...accountGrants].sort((a,b)=>a.id.localeCompare(b.id))[0];
+  if(!grant)throw new InvalidAccessCredentialError("Invalid demo credentials");
   // Resolve the authenticated administrator's own operating Site, never a user-supplied ID.
   const adminSiteId=hasRegistrarAuthority(grant.role)?grant.siteId:undefined;
   const activeSchool=adminSiteId
