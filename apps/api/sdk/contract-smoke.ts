@@ -76,3 +76,15 @@ export async function checkFamilyApplicationContract(client:BecomunaBrowserApi,i
  // @ts-expect-error restoration must never reactivate revoked sessions
  await client.POST('/api/v1/admission-guardian-access-restorations',{body:{grantId:id,reason:'Verified authorization change',restoreSessions:true}});
 }
+
+export async function checkInterestAndTransferContract(client:BecomunaBrowserApi,id:string){
+ await client.GET('/api/v1/admission-interests',{params:{query:{siteId:id}}});
+ await client.POST('/api/v1/admission-interest-assignments',{body:{interestId:id,programId:id}});
+ await client.POST('/api/v1/admission-interest-invitations',{body:{interestId:id}});
+ await client.POST('/api/v1/admission-interest-status-changes',{body:{interestId:id,status:'contacted'}});
+ await client.GET('/api/v1/me/admission-offers',{params:{query:{studentPersonId:id}}});
+ await client.GET('/api/v1/me/transfer-destinations');
+ await client.POST('/api/v1/transfer-destination-family-starts',{body:{originTransferActionId:id,destinationProgramId:id,requestId:id,confirmedDestination:true}});
+ // @ts-expect-error conversion must use the formal admissions inquiry workflow
+ await client.POST('/api/v1/admission-interest-status-changes',{body:{interestId:id,status:'converted'}});
+}
