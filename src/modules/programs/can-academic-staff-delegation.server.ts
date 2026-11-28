@@ -5,6 +5,7 @@ import {
   roleAssignments, sites,
 } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
+import {assertCurrentCANGrantForMutation} from "@/modules/identity/current-can-grant-transaction.server";
 import { AuthorizationError } from "@/domain/command-context";
 import { activeRoleAssignmentPredicate } from "@/modules/identity/role-assignment-state.server";
 import { assertCANSteward } from "@/domain/network-agreement-policy";
@@ -22,7 +23,7 @@ const serviceFor = (role: AcademicStaffRole) => role === "teacher"
 async function scopedCANProgram(
   tx: Pick<typeof db,"select">, actor: AccessContext, programId: string,
 ) {
-  if (actor.sessionAccountId || !actor.actorPersonId || actor.grantSiteId !== null ||
+  if (actor.sessionAccountId || actor.delegatedByPlatformOwner || actor.impersonatedByAccountId || actor.delegationMode || !actor.actorPersonId || actor.grantSiteId !== null ||
       actor.scope.organizationIds?.length !== 1)
     throw new AuthorizationError("verified independent CAN steward identity");
   const [row] = await tx.select({
@@ -56,7 +57,7 @@ async function verifiedStaff(
     personId:people.id,
   }).from(accountPersonGrants)
     .innerJoin(people,eq(people.id,accountPersonGrants.personId))
-    .innerJoin(accessAccounts,eq(accessAccounts.id,accountPersonGrants.accountId))
+    .innerJoin(accessAccounts,and(eq(accessAccounts.id,accountPersonGrants.accountId),eq(accessAccounts.personId,accountPersonGrants.personId)))
     .where(and(
       eq(accountPersonGrants.personId,personId),
       eq(accountPersonGrants.organizationId,orgId),
@@ -65,17 +66,19 @@ async function verifiedStaff(
       eq(accountPersonGrants.active,true),
       eq(people.active,true),
       eq(accessAccounts.disabled,false),
-      sql`${accessAccounts.emailVerifiedAt} is not null`,
-    )).limit(1);
+      sql`${accessAccounts.emailVerifiedAt} is not null AND ${accessAccounts.emailNormalized} NOT LIKE '%.demo' AND ${accessAccounts.privateAccessCodeHash} IS NULL`,
+      sql`NOT EXISTS (SELECT 1 FROM public.account_person_grants conflict WHERE conflict.account_id=${accessAccounts.id} AND conflict.active AND conflict.person_id<>${people.id})`,
+    )).for("share").limit(1);
   if(!row)throw new AuthorizationError("existing verified original CAN employee account");
 }
 
 /** Does not create an account or auto-assign students, teachers or Sections. */
 export async function delegateCANAcademicProgramStaff(
-  actor:AccessContext,input:{
+  actor:AccessContext,request:Request,input:{
     programId:string;personId:string;role:AcademicStaffRole;reason:string;
   },
 ) {
+  if(request.method!=="POST")throw new AuthorizationError("explicit academic staff mutation");
   const reason=input.reason.trim();
   if(reason.length<10||reason.length>500)throw new Error("10–500 character authorization reason required");
   return db.transaction(async tx=>{
@@ -85,6 +88,7 @@ export async function delegateCANAcademicProgramStaff(
       .where(eq(programs.id,input.programId)).for("update").limit(1);
     if(!lock)throw new AuthorizationError("existing CAN service Program");
     const program=await scopedCANProgram(tx,actor,input.programId);
+    await assertCurrentCANGrantForMutation(tx,request,actor,{roles:["can_network_steward"],organizationId:program.institutionId,siteId:null,organizationType:"can_network"});
     if(actor.actorPersonId===input.personId)
       throw new AuthorizationError("CAN steward cannot delegate to themselves");
     await requireCurrentProgramSiteAuthorization(tx,input.programId,serviceFor(input.role));
@@ -143,8 +147,9 @@ export async function delegateCANAcademicProgramStaff(
  * assignment and its compliance evaluations are retained, never as a live role.
  */
 export async function revokeCANAcademicProgramStaff(
-  actor:AccessContext,input:{roleAssignmentId:string;reason:string},
+  actor:AccessContext,request:Request,input:{roleAssignmentId:string;reason:string},
 ) {
+  if(request.method!=="POST")throw new AuthorizationError("explicit academic staff mutation");
   const reason=input.reason.trim();
   if(reason.length<10||reason.length>500)throw new Error("10–500 character revocation reason required");
   return db.transaction(async tx=>{
@@ -156,6 +161,7 @@ export async function revokeCANAcademicProgramStaff(
       .where(eq(programs.id,lookup.programId)).for("update").limit(1);
     if(!lock)throw new AuthorizationError("existing delegated academic Program");
     const program=await scopedCANProgram(tx,actor,lookup.programId);
+    await assertCurrentCANGrantForMutation(tx,request,actor,{roles:["can_network_steward"],organizationId:program.institutionId,siteId:null,organizationType:"can_network"});
     const [current]=await tx.select().from(roleAssignments)
       .where(eq(roleAssignments.id,input.roleAssignmentId)).limit(1);
     if(!current || current.programId!==program.programId ||
@@ -205,7 +211,8 @@ export async function listCANAcademicProgramStaff(
         isNull(accountPersonGrants.siteId),
         inArray(accountPersonGrants.role,["teacher","registrar"]),
         eq(accountPersonGrants.active,true),eq(people.active,true),eq(accessAccounts.disabled,false),
-        sql`${accessAccounts.emailVerifiedAt} is not null`,
+        sql`${accessAccounts.emailVerifiedAt} is not null AND ${accessAccounts.emailNormalized} NOT LIKE '%.demo' AND ${accessAccounts.privateAccessCodeHash} IS NULL`,
+      sql`NOT EXISTS (SELECT 1 FROM public.account_person_grants conflict WHERE conflict.account_id=${accessAccounts.id} AND conflict.active AND conflict.person_id<>${people.id})`,
       )).orderBy(asc(people.legalLastName)).limit(101),
     db.select({
       id:roleAssignments.id,personId:roleAssignments.personId,
@@ -216,12 +223,13 @@ export async function listCANAcademicProgramStaff(
         isNull(roleAssignments.siteId),
         inArray(roleAssignments.roleKey,["teacher","registrar"]),
         activeRoleAssignmentPredicate(),
-      )).limit(101),
+        sql`${roleAssignments.metadata}->>'origin' = ${origin}`,
+      )).orderBy(roleAssignments.id).limit(101),
   ]);
   return {
     programId,siteId:program.siteId,
     candidates:candidates.slice(0,100).filter(c=>c.personId!==actor.actorPersonId),
-    current:grants.filter(g=>g.metadata?.origin===origin)
+    current:grants.slice(0,100).filter(g=>g.metadata?.origin===origin)
       .map(({metadata,...g})=>g),
     truncated:candidates.length>100||grants.length>100,
   };
