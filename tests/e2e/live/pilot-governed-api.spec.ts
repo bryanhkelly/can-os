@@ -31,6 +31,9 @@ const cohortSite=z.object({classId:uuid,siteId:uuid,ownerOrganizationId:uuid,cla
 const lessonInstruction=z.object({lessonId:uuid,assetVersionId:uuid,prompt:z.string().trim().min(5).max(1000),
   choices:z.array(z.string().trim().min(1).max(200)).min(2).max(8)}).strict();
 const scenario=z.discriminatedUnion("stage",[
+  z.object({stage:z.literal("review-deployment-readiness"),reviewer:actor,operator:actor,foreign:actor,
+    deploymentId:uuid,reviewId:uuid,reviewKind:z.enum(["operating","registration","delivery"]),
+    evidenceVersionId:uuid,expiresAt:z.string().datetime({offset:true}),supersedesId:uuid.nullable()}).strict(),
   z.object({stage:z.literal("place-deployment"),operator:actor,foreign:actor,deploymentId:uuid,siteId:uuid}).strict(),
   z.object({stage:z.literal("prepare-blueprint"),author:actor,siteId:uuid,
     configurationId:uuid,initialVersionId:uuid,blueprintId:uuid,blueprintVersionId:uuid,
@@ -156,7 +159,28 @@ test("governed pilot API stage",async({browser},info)=>{
   expect(identity).toEqual({project:"sweet-hall-62441909",branch});
   let evidence:Record<string,unknown>={stage:scenario.stage,revision:process.env.CAN_RELEASE_SOURCE_SHA};
   try{
-    if(scenario.stage==="place-deployment"){
+    if(scenario.stage==="review-deployment-readiness"){
+      const {reviewer,operator,foreign,deploymentId,reviewId,reviewKind,evidenceVersionId,expiresAt,supersedesId}=scenario;
+      expect(reviewer.email.endsWith(".test")).toBe(true);
+      expect(reviewer.organizationId).toBe(operator.organizationId);
+      expect(reviewer.email).not.toBe(operator.email);
+      expect(reviewer.organizationId).not.toBe(foreign.organizationId);
+      const page=await openActor(browser,reviewer,contexts),author=await openActor(browser,operator,contexts),outside=await openActor(browser,foreign,contexts);
+      const input={deploymentId,reviewId,reviewKind,evidenceVersionId,expiresAt,supersedesId,outcome:"ready"};
+      await deny(author,"readiness","recordNativeDeploymentReadiness",input);
+      await deny(outside,"readiness","recordNativeDeploymentReadiness",input);
+      const result=await rpc(page,"readiness","recordNativeDeploymentReadiness",input);
+      expect(result).toMatchObject({reviewId,deploymentId,created:true});
+      expect(await rpc(page,"readiness","recordNativeDeploymentReadiness",input)).toMatchObject({reviewId,created:false});
+      await deny(page,"readiness","recordNativeDeploymentReadiness",{...input,outcome:"not_ready"},["CONFLICT"]);
+      const [proof]=await sql`SELECT r.outcome,r.review_kind,r.evidence_version_id::text AS evidence,d.status
+        FROM public.deployment_readiness_reviews r JOIN public.program_deployments d ON d.id=r.deployment_id
+        JOIN public.access_accounts ac ON ac.person_id=r.evaluated_by_person_id
+        WHERE r.id=${reviewId}::uuid AND d.id=${deploymentId}::uuid AND ac.email_normalized=${reviewer.email}`;
+      expect(proof).toMatchObject({outcome:"ready",review_kind:reviewKind,evidence:evidenceVersionId});
+      expect(["planning","review","authorized"]).toContain(proof?.status);
+      evidence={...evidence,reviewId,deploymentId,reviewKind,recorded:true,activated:false};
+    }else if(scenario.stage==="place-deployment"){
       const {operator,foreign,deploymentId,siteId}=scenario;
       expect(operator.organizationId).not.toBe(foreign.organizationId);
       const page=await openActor(browser,operator,contexts),outside=await openActor(browser,foreign,contexts);
