@@ -2,7 +2,7 @@ name: API-first runtime spike (not a release gate)
 on:
   push:
     branches: [architecture/api-first-nestjs]
-    paths: ['apps/api/**', '.github/workflows/api-first-runtime-spike.yml', 'docs/architecture/api-first-engineering-standard.md']
+    paths: ['apps/api/**', 'src/**', 'scripts/architecture/**', 'scripts/acceptance/**', 'playwright.nest-student-api.config.ts', 'tests/e2e/**', 'package*.json', '.github/workflows/api-first-runtime-spike.yml', 'docs/architecture/api-first-engineering-standard.md']
   workflow_dispatch:
 permissions:
   contents: read
@@ -29,10 +29,25 @@ jobs:
           path: apps/api/package-lock.json
           if-no-files-found: error
       - run: npm ci
-      - run: npm test
       - name: Install existing locked root dependencies
         working-directory: .
         run: npm ci
+      - name: Verify shared source syntax and local imports
+        working-directory: .
+        run: |
+          npm run check:build-source-syntax
+          npm run check:local-import-exports
+      - name: Verify HTTP wiring and operation uniqueness
+        working-directory: .
+        run: |
+          set -o pipefail
+          node scripts/architecture/check-http-api-wiring.mjs | tee apps/api/wiring-report.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-wiring-report
+          path: apps/api/wiring-report.json
+          if-no-files-found: warn
       - name: Inventory existing server functions
         working-directory: .
         run: node scripts/architecture/inventory-business-api.mjs > apps/api/rpc-inventory.json
@@ -42,4 +57,5 @@ jobs:
           path: apps/api/rpc-inventory.json
       - name: Build canonical bridge and reject frontend dependencies
         run: npm run build:canonical
+      - run: npm test
       - run: npm audit --omit=dev --audit-level=high

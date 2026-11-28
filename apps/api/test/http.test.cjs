@@ -469,3 +469,26 @@ test('launch workspace drafts are revisioned, role-bound, and reject supplied id
  assert.equal(save.safeParse({...valid,audience:'family'}).success,false);
  assert.equal(entry.safeParse({siteId:'invalid'}).success,false);
 });
+
+test('all registered OpenAPI operations have unique IDs and explicit security posture',async()=>{
+ await withServer('0',async(url,document)=>{
+  const ids=new Set();
+  const anonymous=new Set(['getLiveness','requestAccessLink','verifyAccess','registerAccount','requestSiteSignup']);
+  const methods=new Set(['get','post','put','patch','delete','head','options']);
+  for(const [path,item] of Object.entries(document.paths)){
+   assert.ok(path.startsWith('/api/v1/'),path);
+   for(const [method,op] of Object.entries(item)){
+    if(!methods.has(method))continue;
+    assert.ok(op.operationId,path+' '+method);
+    assert.ok(!ids.has(op.operationId),'Duplicate operationId '+op.operationId);
+    ids.add(op.operationId);
+    if(!anonymous.has(op.operationId))assert.ok(op.security?.length,'Missing security: '+op.operationId);
+    assert.ok(Object.keys(op.responses??{}).some(s=>/^2\d\d$/.test(s)),'Missing success response: '+op.operationId);
+    for(const match of path.matchAll(/\{([^}]+)\}/g)){
+     assert.ok([...(item.parameters??[]),...(op.parameters??[])].some(p=>p.in==='path'&&p.name===match[1]&&p.required===true),'Missing required path parameter: '+op.operationId+' '+match[1]);
+    }
+   }
+  }
+  assert.ok(ids.size>=148,'Expected existing migration coverage including liveness');
+ });
+});
