@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getWorkspaceScopeLabel } from "./workspace-scope";
+import { PlatformOwnerDelegationPanel } from "@/components/platform/PlatformOwnerDelegationPanel";
 
 type AuthenticatedSession = Extract<WorkspaceSession, { authenticated: true }>;
 type WorkspaceGrant = AuthenticatedSession["grants"][number];
@@ -70,5 +71,6 @@ export function WorkspaceContextSwitcher({ session, open, changing, error, onClo
     </div>
     {!grants.length && <EmptyState title="No workspaces match your search."
       description="Try a person, role, or school name. Only your authorized memberships are shown." />}
+    {open && current?.role==="platform_owner" && !session.ownerDelegation && <div className="mt-5 border-t border-border pt-4"><PlatformOwnerDelegationPanel compact /></div>}
   </ContextTray>;
 }
