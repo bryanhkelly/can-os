@@ -1,3 +1,4 @@
+import {useAssessmentWorkspaceScope} from "@/lib/api/use-assessment-workspace-scope";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { QueryState, WorkspaceNotice } from "@/components/workspace";
@@ -15,7 +16,9 @@ export function CourseAssessmentPanel({courseAttemptId,phase="final",onAssessmen
   courseAttemptId:string;phase?:"baseline"|"final";onAssessmentCompleted?:()=>void;
   context?:"noncredit"|"class";
 }) {
-  return <KnowledgeCheckSession key={courseAttemptId+":"+phase}
+  const scope=useAssessmentWorkspaceScope();
+  if(!scope)return <WorkspaceNotice>Verified workspace membership is required.</WorkspaceNotice>;
+  return <KnowledgeCheckSession key={JSON.stringify([scope,courseAttemptId,phase])}
     courseAttemptId={courseAttemptId} phase={phase} context={context}
     onAssessmentCompleted={onAssessmentCompleted}/>;
 }

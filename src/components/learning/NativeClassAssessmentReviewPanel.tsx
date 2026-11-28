@@ -13,7 +13,7 @@ import {
 export function NativeClassAssessmentReviewPanel({classId}:{classId:string}){
   const scope=useAssessmentWorkspaceScope();
   if(!scope)return <p role="status">Verified workspace membership is required.</p>;
-  return <NativeClassAssessmentReviewPanelSession key={JSON.stringify(scope)} classId={classId} scope={scope}/>;
+  return <NativeClassAssessmentReviewPanelSession key={JSON.stringify([scope,classId])} classId={classId} scope={scope}/>;
 }
 function NativeClassAssessmentReviewPanelSession({classId,scope}:{classId:string;scope:NonNullable<ReturnType<typeof useAssessmentWorkspaceScope>>}){
   const client=useQueryClient();
@@ -36,8 +36,9 @@ function NativeClassAssessmentReviewPanelSession({classId,scope}:{classId:string
         "This canonical assessment result was already finalized.":
         "Canonical assessment result independently confirmed. A training completion decision is separate.");
       await Promise.all([
-        client.invalidateQueries({queryKey:["native-class-assessment-review",classId]}),
-        client.invalidateQueries({queryKey:["native-class-canonical-evidence",scope]}),
+        client.invalidateQueries({queryKey:["native-class-assessment-review",scope,classId]}),
+        client.invalidateQueries({queryKey:["ws3-class-completion-queue",scope,classId]}),
+        client.invalidateQueries({queryKey:["ws3-class-completion",scope,classEnrollmentId]}),
       ]);
     }catch(e){
       setError(normalizeClientError(e,

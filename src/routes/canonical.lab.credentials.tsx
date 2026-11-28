@@ -1,3 +1,4 @@
+import {useAssessmentWorkspaceScope} from "@/lib/api/use-assessment-workspace-scope";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState,useRef,useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -18,8 +19,10 @@ type PreviewFormat = "pdf" | "badge_svg" | "badge_json";
 
 function CredentialPreviewLab() {
   const result = Route.useLoaderData();
+  const scope=useAssessmentWorkspaceScope();
+  if(!scope)return <WorkspaceShell title="Credential previews"><p role="status">Verified workspace membership is required.</p></WorkspaceShell>;
   if (!result.ok) return <CanonicalBlueprintLoadError title="Credential previews" message={result.message}/>;
-  return <CredentialPreviewContent trainings={result.data.trainings}/>;
+  return <CredentialPreviewContent key={JSON.stringify(scope)} trainings={result.data.trainings}/>;
 }
 
 function CredentialPreviewContent({ trainings }: {

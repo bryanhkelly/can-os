@@ -133,8 +133,8 @@ function NativeClassCompletionOperatorPanelSession({classId,scope}:{classId:stri
         </p>
         {approvals.isPending&&<p role="status">Verifying current reviewer scope…</p>}
         {approvals.isError&&<p role="alert">Pending reviews are unavailable.</p>}
-        {approvals.data?.pending.length===0&&<p className="text-sm">No pending reviews at your authorized Site.</p>}
-        {approvals.data?.pending.map(item=>
+        {!approvals.isError&&approvals.data?.pending.length===0&&<p className="text-sm">No pending reviews at your authorized Site.</p>}
+        {!approvals.isError&&approvals.data?.pending.map(item=>
           <article key={item.requestId} className="space-y-2 border border-border p-4">
             <h4 className="font-semibold">{item.purpose.replaceAll("_"," ")}</h4>
             <p className="text-xs text-muted-foreground">Source: {item.sourceId}</p>
@@ -159,7 +159,7 @@ function NativeClassCompletionOperatorPanelSession({classId,scope}:{classId:stri
           <span className="text-xs text-muted-foreground">
             Approval page {approvalPage+1}
           </span>
-          <Button variant="outline" disabled={!approvals.data?.hasMore}
+          <Button variant="outline" disabled={approvals.isError||!approvals.data?.hasMore}
             onClick={()=>setApprovalPage(p=>p+1)}>Next</Button>
         </div>
         {review.isError&&<p role="alert">This evidence approval was denied or could not be saved.</p>}
@@ -204,7 +204,7 @@ function NativeClassCompletionOperatorPanelSession({classId,scope}:{classId:stri
                   onChange={e=>setPolicyEvidence(e.target.value)}
                   placeholder="Verified evidence UUID"/>
               </Label>
-              <Button disabled={publishPolicy.isPending ||
+              <Button disabled={list.isError || publishPolicy.isPending ||
                   !(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
                     .test(policyEvidence.trim())) ||
                   !(policyRequireLessons||policySessions>0||policyRequireAssessment)}

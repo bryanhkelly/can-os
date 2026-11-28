@@ -1,3 +1,4 @@
+import {useAssessmentWorkspaceScope} from "@/lib/api/use-assessment-workspace-scope";
 import { Button } from "@/components/ui/button";
 import { useEffect, useRef, useState } from "react";
 import { getCanonicalCourseEvidence } from "@/lib/api/browser-assessments-outcomes";
@@ -19,7 +20,9 @@ function dateTime(value: string) {
 
 /** Private learner evidence, with canonical results clearly separated from click observations. */
 export function CanonicalCourseEvidencePanel({ courseAttemptId }: {courseAttemptId:string}) {
-  return <CanonicalEvidenceSession key={courseAttemptId} courseAttemptId={courseAttemptId}/>;
+  const scope=useAssessmentWorkspaceScope();
+  if(!scope)return <p role="status">Verified workspace membership is required.</p>;
+  return <CanonicalEvidenceSession key={JSON.stringify([scope,courseAttemptId])} courseAttemptId={courseAttemptId}/>;
 }
 
 function CanonicalEvidenceSession({courseAttemptId}:{courseAttemptId:string}) {

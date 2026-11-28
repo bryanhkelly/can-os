@@ -57,7 +57,7 @@ function NativeClassEvidenceSession({classEnrollmentId,scope}:{classEnrollmentId
           </li>
           <li className="flex flex-wrap items-start justify-between gap-3 p-4">
             <div>
-              <p className="font-semibold">Knowledge check</p>
+              <p className="font-semibold">Final knowledge check</p>
               <p className="text-sm text-muted-foreground">
                 {query.data.finalizedPassed>0
                   ?`${query.data.finalizedPassed} independently confirmed passing result(s)`
@@ -104,10 +104,14 @@ function NativeClassEvidenceSession({classEnrollmentId,scope}:{classEnrollmentId
           completion, academic credit, grades or certificates.
         </p>
       </section>
+      {query.data.currentBaselineGrants>0&&<section className="border-t border-border pt-4" aria-label="Authorized baseline diagnostic">
+        <CourseAssessmentPanel courseAttemptId={query.data.courseAttemptId} phase="baseline" context="class" onAssessmentCompleted={()=>void query.refetch()}/>
+      </section>}
+      {query.data.finalizedBaselineAssessments>0&&<p className="text-sm text-muted-foreground">Baseline diagnostic recorded. It does not count as a final passing assessment.</p>}
       <p className="text-sm text-muted-foreground">
         {query.data.currentAssessmentGrants>0
-          ?"An approved canonical Course assessment grant is available. Open your knowledge check below. Final results require the responsible provider's independent confirmation."
-          :"No currently authorized knowledge check is assigned to this Course Attempt. Your provider can grant access to a published Class knowledge check. Your existing lesson progress remains available."}
+          ?"An approved canonical Course assessment grant is available. Open your final knowledge check below. Final results require the responsible provider's independent confirmation."
+          :"No currently authorized final knowledge check is assigned to this Course Attempt. Your provider can grant access to a published Class knowledge check. Your existing lesson progress remains available."}
       </p>
       {query.data.currentAssessmentGrants>0&&<section
         className="border-t border-border pt-4" aria-label="Authorized Course knowledge check">

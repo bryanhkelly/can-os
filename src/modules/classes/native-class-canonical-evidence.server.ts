@@ -5,12 +5,14 @@ import { db } from "@/db/client";
 import {
   canonicalClassOutcomes,
   learnerProfiles, learnerLessonProgress, courseLessons,
-  assessmentAccess, assessmentFormAdministrations,
+  assessmentAccess, assessmentFormAdministrations, assessmentVersions, assessmentDefinitions,
   assessmentExecutionAttempts, assessmentExecutionResults,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
 import { authorizeNativeLearnerClass } from "./native-learner-class-access.server";
+import {matchesNativeClassAssessmentPhase} from "@/modules/learning/native-class-assessment-phase.server";
+import {getCanonicalClassPublisher} from "./native-class-publisher.server";
 import { latestCanonicalAssessmentRevisions } from "@/domain/canonical-assessment-revisions";
 
 
@@ -30,7 +32,7 @@ export async function getNativeClassCanonicalEvidenceService(request:Request,raw
     if(!actor.actorPersonId||actor.role!=="learner")
       throw new AuthorizationError("current Class learner");
     return db.transaction(async tx=>{
-      const {enrollment,access}=await authorizeNativeLearnerClass(tx,actor,data.classEnrollmentId,"history_read");
+      const {enrollment,cls,access}=await authorizeNativeLearnerClass(tx,actor,data.classEnrollmentId,"history_read");
       const lessons=await tx.select({id:courseLessons.id})
         .from(courseLessons).where(eq(courseLessons.courseVersionId,access.courseVersionId))
         .limit(501);
@@ -52,8 +54,10 @@ export async function getNativeClassCanonicalEvidenceService(request:Request,raw
         .from(learnerProfiles).where(eq(learnerProfiles.personId,actor.actorPersonId!))
         .limit(1);
       const now=new Date();
+      const publisherOrganizationId=await getCanonicalClassPublisher(tx,{offeringVersionId:cls.offeringVersionId,courseVersionId:cls.courseVersionId});
       const grants=learner?await tx.select({
         id:assessmentAccess.id,
+        purpose:assessmentDefinitions.purpose,
         accessStatus:assessmentAccess.accessStatus,
         validFrom:assessmentAccess.validFrom,
         validThrough:assessmentAccess.validThrough,
@@ -63,7 +67,13 @@ export async function getNativeClassCanonicalEvidenceService(request:Request,raw
       }).from(assessmentAccess)
         .innerJoin(assessmentFormAdministrations,
           eq(assessmentFormAdministrations.id,assessmentAccess.administrationId))
+        .innerJoin(assessmentVersions,eq(assessmentVersions.id,assessmentFormAdministrations.assessmentVersionId))
+        .innerJoin(assessmentDefinitions,eq(assessmentDefinitions.id,assessmentVersions.assessmentId))
         .where(and(
+          eq(assessmentVersions.lifecycle,"published"),
+          eq(assessmentVersions.courseVersionId,access.courseVersionId),
+          eq(assessmentDefinitions.ownerOrganizationId,publisherOrganizationId),
+          eq(assessmentFormAdministrations.administeringOrganizationId,cls.operatingOrganizationId),
           eq(assessmentAccess.learnerId,learner.id),
           eq(assessmentAccess.courseAttemptId,access.courseAttemptId),
           eq(assessmentFormAdministrations.courseVersionId,access.courseVersionId),
@@ -76,11 +86,17 @@ export async function getNativeClassCanonicalEvidenceService(request:Request,raw
         g.administrationStatus==="open"&&g.validFrom<=now&&
         (!g.validThrough||g.validThrough>now)&&
         (!g.opensAt||g.opensAt<=now)&&(!g.closesAt||g.closesAt>now));
-      const grantIds=grants.map(g=>g.id);
+      const finalGrants=grants.filter(g=>matchesNativeClassAssessmentPhase(g.purpose,"final"));
+      const baselineGrants=grants.filter(g=>matchesNativeClassAssessmentPhase(g.purpose,"baseline"));
+      const finalGrantIds=new Set(finalGrants.map(g=>g.id));
+      const baselineGrantIds=new Set(baselineGrants.map(g=>g.id));
+      const grantIds=[...finalGrantIds,...baselineGrantIds];
       const attempts=grantIds.length?await tx.select({
         id:assessmentExecutionAttempts.id,
         state:assessmentExecutionAttempts.state,
+        grantId:assessmentExecutionAttempts.accessGrantId,
       }).from(assessmentExecutionAttempts)
+        .innerJoin(assessmentAccess,and(eq(assessmentExecutionAttempts.accessGrantId,assessmentAccess.id),eq(assessmentExecutionAttempts.learnerId,assessmentAccess.learnerId),eq(assessmentExecutionAttempts.administrationId,assessmentAccess.administrationId)))
         .where(inArray(assessmentExecutionAttempts.accessGrantId,grantIds)).limit(501):[];
       if(attempts.length>500)throw new AuthorizationError("Assessment history needs pagination");
       const attemptIds=attempts.map(a=>a.id);
@@ -101,6 +117,9 @@ export async function getNativeClassCanonicalEvidenceService(request:Request,raw
       const valid=projected.current.filter(row=>
         row.resultStatus==="finalized"&&
         attempts.some(a=>a.id===row.attemptId&&a.state==="finalized"));
+      const finalAttemptIds=new Set(attempts.filter(a=>finalGrantIds.has(a.grantId)).map(a=>a.id));
+      const baselineAttemptIds=new Set(attempts.filter(a=>baselineGrantIds.has(a.grantId)).map(a=>a.id));
+      const finalResults=valid.filter(r=>finalAttemptIds.has(r.attemptId));
       const completionRecords=await tx.select({
         id:canonicalClassOutcomes.id,
         resultCode:canonicalClassOutcomes.resultCode,
@@ -143,9 +162,11 @@ export async function getNativeClassCanonicalEvidenceService(request:Request,raw
       return {
         courseAttemptId:access.courseAttemptId,
         completedLessons,totalLessons:lessons.length,
-        currentAssessmentGrants:currentGrants.length,
-        finalizedAssessments:valid.length,
-        finalizedPassed:valid.filter(row=>row.outcome==="pass").length,
+        currentAssessmentGrants:currentGrants.filter(g=>finalGrantIds.has(g.id)).length,
+        currentBaselineGrants:currentGrants.filter(g=>baselineGrantIds.has(g.id)).length,
+        finalizedBaselineAssessments:valid.filter(r=>baselineAttemptIds.has(r.attemptId)).length,
+        finalizedAssessments:finalResults.length,
+        finalizedPassed:finalResults.filter(row=>row.outcome==="pass").length,
         classCompletionOutcomeRecorded:completionRecords.length>0,
         classCompletionAuthorityVerified,
         classCompletionEvidenceCount:completionRecords.length,
