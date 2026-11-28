@@ -253,8 +253,8 @@ export async function listReportingRelationships(request:Request,input:unknown){
       assertRelationshipActor(actor,scope.ownerOrganizationId,manager?"relationships.propose":"relationships.initiate",scope.siteId);
     }
     const scopeFilter=scope?sql`AND ((scope_kind=${scope.scopeKind} AND scope_id=${scope.scopeId}::uuid)
-      OR (status='accepted' AND scope_kind='organization' AND scope_id=${organizationId}::uuid)
-      OR (status='accepted' AND scope_kind='site' AND scope_id=${scope.siteId}::uuid))`:sql``;
+      OR (status='accepted' AND (valid_through IS NULL OR valid_through>CURRENT_TIMESTAMP) AND scope_kind='organization' AND scope_id=${organizationId}::uuid)
+      OR (status='accepted' AND (valid_through IS NULL OR valid_through>CURRENT_TIMESTAMP) AND scope_kind='site' AND scope_id=${scope.siteId}::uuid))`:sql``;
     const party=direction==="incoming"?sql`recipient_organization_id`:sql`owner_organization_id`;
     const result=await tx.execute(sql`
       SELECT r.*,
@@ -287,7 +287,7 @@ export async function listReportingRelationships(request:Request,input:unknown){
       });
       return {agreement,allowedActions,organizationName,scopeName,metricLabels,inherited};
     });
-    return {items,next:rows.length>25?rows[24]!.id:null,canAuthorize:manager};
+    return {items,next:rows.length>25?rows[24]!.id:null,canAuthorize:manager,metrics:manager&&scope?relationshipProposalMetrics(scope.scopeKind):[]};
   });
 }
 
