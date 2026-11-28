@@ -2,6 +2,8 @@ import {defineConfig} from "@playwright/test";
 import provision from "./playwright.pilot-provision.config";
 const env=process.env;
 const suites={
+ relationships:{fixture:"CAN_NEST_RELATIONSHIPS_QA_JSON",files:["nest-reporting-relationships.spec.ts"]},
+ identity:{fixture:"CAN_NEST_OWNER_QA_JSON",files:["nest-owner-control-http.spec.ts","nest-staff-admin-http.spec.ts","nest-institutional-identity-http.spec.ts"]},
  roles:{fixture:"CAN_NEST_ROLES_QA_JSON",files:["nest-role-workspaces.spec.ts"]},
  student:{fixture:"CAN_STUDENT_QA_JSON",files:["nest-student-http.spec.ts","nest-access-provisioning-http.spec.ts"]},
  reporting:{fixture:"CAN_NEST_REPORT_QA_JSON",files:["nest-pilot-report-readback.spec.ts"]},
@@ -14,7 +16,7 @@ const suite=suites[selected as keyof typeof suites];
 if(!env[suite.fixture])throw Error("Reviewed isolated QA fixture required");
 if(!provision.webServer||Array.isArray(provision.webServer))throw Error("Existing isolated QA server configuration required");
 export default defineConfig({
-  ...provision,...(selected==="pilot2"?{reporter:[["list"],["./tests/e2e/helpers/nest-pilot2-receipt-reporter.ts"]] as import("@playwright/test").ReporterDescription[]}:{}),use:{...provision.use,baseURL:"http://localhost:3001"},testMatch:[...suite.files],timeout:600000,projects:[{name:"http-only"}],
+  ...provision,reporter:[["list"],["./tests/e2e/helpers/nest-required-acceptance-reporter.ts"],...(selected==="pilot2"?[["./tests/e2e/helpers/nest-pilot2-receipt-reporter.ts"]]:[])] as import("@playwright/test").ReporterDescription[],use:{...provision.use,baseURL:"http://localhost:3001"},testMatch:[...suite.files],timeout:600000,projects:[{name:"http-only"}],
   webServer:[{
     command:"npm --prefix apps/api start",
     url:"http://127.0.0.1:3001/api/v1/health/live",reuseExistingServer:false,timeout:30000,
