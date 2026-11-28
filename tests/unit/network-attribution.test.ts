@@ -43,7 +43,7 @@ describe("network attribution is not a parallel enrollment system",()=>{
     expect(attribution).toContain("insert(participationAttributions)");
     expect(attribution).toContain("Class attribution requires its authorized Site");
     expect(native).toContain("Class enrollment requires a Site");
-    const assignment=read("src/modules/classes/native-class-assignment.functions.ts");
+    const assignment=read("src/modules/classes/native-class-assignment.server.ts");
     expect(assignment).toContain("writeNativeClassAttribution(tx,");
   });
   it("permits an optional verifiable affiliate selector but not freeform attribution",()=>{
