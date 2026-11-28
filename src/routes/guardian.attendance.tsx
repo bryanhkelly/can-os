@@ -123,7 +123,7 @@ function GuardianAttendancePage() {
       commandErrorMessage: "Unable to attach document. Retry to finish without uploading the file again." });
   };
 
-  const needsExcuse = absences.filter(absence => !absence.excuse &&
+  const needsExcuse = absences.filter(absence => absence.canSubmitExcuse && !absence.excuse &&
     (absence.status === "absent" || absence.status === "tardy"));
 
   return <WorkspaceShell width="wide" eyebrow="Family" title="Attendance & excuses"
@@ -195,7 +195,8 @@ function GuardianAttendancePage() {
                 >Attach document</Button>
               </div>}
             </div>}
-            {!absence.excuse && (absence.status === "absent" || absence.status === "tardy") && <div className="mt-3">
+            {!absence.excuse && !absence.canSubmitExcuse && (absence.status === "absent" || absence.status === "tardy") && <p className="mt-3 text-sm text-muted-foreground">You can review this attendance record, but your current guardian permissions do not allow you to submit an excuse.</p>}
+            {!absence.excuse && absence.canSubmitExcuse && (absence.status === "absent" || absence.status === "tardy") && <div className="mt-3">
               <Label className="block text-sm font-semibold">
                 Excuse reason
                 <Textarea

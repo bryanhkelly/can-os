@@ -314,6 +314,7 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
   : {absences:[],unavailable:false};
  const excuseItems = attendanceRead.absences.filter(row=>
   authorizedStudentIds.has(row.studentPersonId) &&
+  row.canSubmitExcuse &&
   (row.status==="absent" || row.status==="tardy") &&
   (!row.excuse || row.excuse.status==="rejected"))
   .map(row=>({
@@ -372,7 +373,19 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
   studentPersonId: row.studentPersonId,
   createdAt: "",
  }));
- const actionItems = openActions.filter(row => row.type !== "study_group_consent").map(row => {
+ const actionItems = openActions.filter(row => {
+  if (row.type === "study_group_consent") return false;
+  // The application projection has already rechecked enrollment authority.
+  // Do not fall back to academic authority, ownership, or an unscoped link.
+  if (row.type === "enrollment_document") return row.subjectType === "student_profile" &&
+   enrollmentApplicationByActionScope.has(`${row.subjectId}:${row.programId}`);
+  // The generic family feed is not the authority for other student-specific
+  // actions. Their owning workspaces must project them with the correct
+  // permission (health, custody, enrollment, academic, etc.).
+  if (row.subjectType === "student_profile") return false;
+  if (row.subjectType === "person") return row.subjectId === actor;
+  return true;
+ }).map(row => {
   const enrollmentApplication=row.type==="enrollment_document"
    ? enrollmentApplicationByActionScope.get(`${row.subjectId}:${row.programId}`) : undefined;
   return {

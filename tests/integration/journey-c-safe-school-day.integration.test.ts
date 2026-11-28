@@ -198,6 +198,33 @@ integration("Journey C: a safe school day including verified pickup", () => {
       const absence = first(absences.absences.filter(
         a => a.studentPersonId === familyB.studentPersonId));
       expect(absence.status).toBe("absent");
+      expect(absence.canSubmitExcuse).toBe(true);
+      // Exercise a verified guardian who may read academics but may not submit
+      // an excuse. The fixture changes only the child's relationship permission.
+      const [relationship] = await journey.tx.select().from(s.guardianRelationships)
+        .where(eq(s.guardianRelationships.studentPersonId, familyB.studentPersonId));
+      if (!relationship || relationship.guardianPersonId !== familyB.guardian.person.id)
+        throw new Error("Expected the journey guardian relationship");
+      await journey.tx.update(s.guardianRelationships).set({canSubmitAttendanceExcuse:false})
+        .where(eq(s.guardianRelationships.id, relationship.id));
+      const readOnly = await attendance.listGuardianEffectiveAbsences({data:{studentPersonId:familyB.studentPersonId}});
+      expect(first(readOnly.absences).canSubmitExcuse).toBe(false);
+      await expectJourneyDenied(attendance.submitEffectiveAttendanceExcuse({data:{
+        attendanceEventId:absence.attendanceEventId, reason:"Read-only guardian cannot submit an excuse",
+      }}), "guardian cannot excuse this student");
+      const {getGuardianNeedsYou}=await import("@/modules/family/family-home.functions");
+      expect((await getGuardianNeedsYou()).items.some(item=>item.type==="attendance_excuse"&&
+        item.studentPersonId===familyB.studentPersonId)).toBe(false);
+      await journey.tx.update(s.guardianRelationships).set({canSubmitAttendanceExcuse:true})
+        .where(eq(s.guardianRelationships.id, relationship.id));
+      // An old action must not expose a second child's enrollment information.
+      const [staleAction]=await journey.tx.insert(s.actions).values({
+        type:"enrollment_document",title:"Restricted enrollment details",description:"Restricted child details",
+        subjectType:"student_profile",subjectId:familyA.studentProfileId,
+        ownerPersonId:familyB.guardian.person.id,organizationId:school.school.id,
+        siteId:school.site.id,programId:school.program.id,
+      }).returning({id:s.actions.id});
+      expect((await getGuardianNeedsYou()).items.some(item=>item.id===staleAction!.id)).toBe(false);
       const excuse = await attendance.submitEffectiveAttendanceExcuse({ data: {
         attendanceEventId: absence.attendanceEventId,
         reason: "Bailey had a verified medical appointment this morning.",

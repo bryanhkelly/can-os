@@ -78,7 +78,7 @@ export function FamilyHomePage({action,student}: {action?:string;student?:string
     : "");
    setLoading(false);
   }).catch(() => {
-   if (active) { setError("Sign in with an authorized guardian account to view your family home."); setLoading(false); }
+   if (active) { setError("Unable to load your family home. Try again or confirm that your guardian access is current."); setLoading(false); }
   });
   return () => { active = false; };
  }, [retryKey]);

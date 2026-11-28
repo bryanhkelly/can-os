@@ -542,6 +542,7 @@ export const listGuardianEffectiveAbsences = createServerFn({ method: "GET" })
     const actor = await guardian();
     const relationships = await db.select({
       studentPersonId: guardianRelationships.studentPersonId,
+      canSubmitExcuse: guardianRelationships.canSubmitAttendanceExcuse,
       preferredName: people.preferredName, firstName: people.legalFirstName,
       lastName: people.legalLastName,
     }).from(guardianRelationships)
@@ -596,6 +597,7 @@ export const listGuardianEffectiveAbsences = createServerFn({ method: "GET" })
       .orderBy(desc(attendanceExcuses.createdAt));
 
     const profileToPerson = new Map(profiles.map(p => [p.id, p.personId]));
+    const excuseAuthorized = new Set(relationships.filter(r => r.canSubmitExcuse).map(r => r.studentPersonId));
     const nameByPerson = new Map(relationships.map(r => [r.studentPersonId,
       personDisplayName({ preferredName: r.preferredName, legalFirstName: r.firstName, legalLastName: r.lastName })]));
     return {
@@ -619,6 +621,7 @@ export const listGuardianEffectiveAbsences = createServerFn({ method: "GET" })
             attendanceEventId: eventId,
             relatedAttendanceEventIds: history.map(row => row.id),
             studentPersonId: profileToPerson.get(f.studentProfileId) ?? "",
+            canSubmitExcuse: excuseAuthorized.has(profileToPerson.get(f.studentProfileId) ?? ""),
             studentName: nameByPerson.get(profileToPerson.get(f.studentProfileId) ?? "") ?? "Student",
             expectedAt: f.expectedAt.toISOString(),
             timezone: timezoneBySite.get(f.siteId ?? "") ?? "UTC",
