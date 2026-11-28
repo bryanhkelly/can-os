@@ -33,7 +33,7 @@ export function resolveR2Config(): R2Config {
     }
     // Dedicated legacy QA buckets retain their existing keys. Shared buckets
     // require a scoped temporary session and always map every logical key.
-    if (bucket !== "can-os-pilot-qa") {
+    if (bucket !== "can-os-pilot-qa" || sessionToken) {
       namespace = "qa/" + branch + "/";
       if (!sessionToken) throw new Error("Shared QA storage requires scoped temporary credentials");
     }
