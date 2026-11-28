@@ -56,8 +56,10 @@ if(apiReady){
 }else block("Nest source/build/SDK suite","Locked API dependencies unavailable");
 if(release){
   if(rootReady&&apiReady&&bridge&&apiTests&&contract&&results.every(r=>r.status==="passed")){
+    run("Attested database migration parity",process.execPath,["scripts/acceptance/run-pilot-qa.mjs","schema"]);
     run("Attested Nest signup, student isolation and replay",process.execPath,["scripts/acceptance/run-pilot-qa.mjs","nest-http"]);
-  }else block("Attested Nest signup, student isolation and replay","Source, dependency or runtime preconditions failed");
+    run("Attested both-pilot report readback and cross-tenant denial",process.execPath,["scripts/acceptance/run-pilot-qa.mjs","nest-reporting"]);
+  }else for(const name of ["Attested database migration parity","Attested Nest signup, student isolation and replay","Attested both-pilot report readback and cross-tenant denial"])block(name,"Source, dependency or runtime preconditions failed");
   // Deliberately fail closed until the following independent suites exist.
   // The older TanStack pilot runner is not equivalent evidence.
   for(const [name,reason] of [
