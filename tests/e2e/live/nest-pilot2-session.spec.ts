@@ -1,5 +1,6 @@
 import {test,expect} from "@playwright/test";
 import {randomUUID} from "node:crypto";
+import {neon} from "@neondatabase/serverless";
 import {z} from "zod";
 import {NestQaClient,actorSchema,uuid} from "../helpers/nest-qa-client";
 const meeting=z.object({requestId:uuid,agendaRequestId:uuid,startsAt:z.string().datetime({offset:true}),endsAt:z.string().datetime({offset:true}),lessonId:uuid,assetVersionId:uuid,prompt:z.string().min(5).max(1000),choices:z.array(z.string().min(1).max(200)).min(2).max(8)}).strict();
@@ -32,6 +33,9 @@ test("facilitated pilot: ordinary Nest scheduling or one due Class Session",asyn
  const clients:NestQaClient[]=[];
  async function open(actor:z.infer<typeof actorSchema>){const c=await NestQaClient.create();clients.push(c);await c.login(actor);return c;}
  try{
+  const sql=neon(process.env.TEST_DATABASE_URL!);
+  const [dbIdentity]=await sql`SELECT current_setting('neon.project_id',true) AS project,current_setting('neon.branch_id',true) AS branch`;
+  expect(dbIdentity).toEqual({project:"sweet-hall-62441909",branch:"br-solitary-art-arun91gj"});
   if(f.stage==="schedule"){
    const hosts=await Promise.all(f.sites.map(s=>open(s.host)));
    const evidence=[];
@@ -51,6 +55,9 @@ test("facilitated pilot: ordinary Nest scheduling or one due Class Session",asyn
      expect(await host.get(path)).toMatchObject({revisionNo:1,items:[{kind:"watch",referenceId:m.lessonId}]});
      await hosts[1-i]!.deny("GET",path);
     }
+    const [counts]=await sql`SELECT count(*)::int AS count FROM public.class_sessions
+      WHERE class_id=${s.classId}::uuid AND request_id=ANY(${input.meetings.map(m=>m.requestId)}::uuid[])`;
+    expect(counts?.count).toBe(4);
     evidence.push({siteId:s.siteId,classId:s.classId,sessions:first.sessions.map((r,j)=>({classSessionId:r.classSessionId,requestId:s.meetings[j]!.requestId}))});
    }
    await info.attach("schedule-receipts",{body:JSON.stringify({revision:process.env.CAN_RELEASE_SOURCE_SHA,sites:evidence,deliveryVerified:false}),contentType:"application/json"});
@@ -58,6 +65,9 @@ test("facilitated pilot: ordinary Nest scheduling or one due Class Session",asyn
    const host=await open(f.host),outside=await open(f.foreign.actor);
    const paired=new Map<string,NestQaClient>();
    for(const p of f.participants.filter(p=>p.paired))paired.set(p.courseAttemptId,await open(p.actor));
+   const [scheduled]=await sql`SELECT count(*)::int AS count FROM public.class_sessions
+     WHERE id=${f.classSessionId}::uuid AND class_id=${f.classId}::uuid AND request_id=${f.meeting.requestId}::uuid`;
+   expect(scheduled?.count).toBe(1);
    const target={classId:f.classId,classSessionId:f.classSessionId};
    await outside.deny("POST","/class-session-openings",target);
    const room=await host.post<{facilitatedSessionId:string;pairingCode:string|null;alreadyStarted:boolean}>("/class-session-openings",target);
@@ -117,6 +127,17 @@ test("facilitated pilot: ordinary Nest scheduling or one due Class Session",asyn
     }
     const after=await host.get<Roster>(path+"/attendance");
     for(const p of f.participants)expect(after.members.find(m=>m.courseAttemptId===p.courseAttemptId)?.latestStatus).toBe(p.present?"present":"absent");
+    const [attestations]=await sql`SELECT count(*)::int AS assertions,
+       count(DISTINCT course_attempt_id)::int AS learners FROM public.facilitated_room_attendance_assertions
+       WHERE facilitated_session_id=${scope.facilitatedSessionId}::uuid`;
+    expect(attestations).toEqual({assertions:f.participants.length+f.participants.filter(p=>!p.present).length,learners:f.participants.length});
+    const [responses]=await sql`SELECT count(*)::int AS responses,count(DISTINCT course_attempt_id)::int AS attempts
+       FROM public.facilitated_room_activity_responses WHERE activity_release_id=${released.id}::uuid
+       AND facilitated_session_id=${scope.facilitatedSessionId}::uuid`;
+    expect(responses).toEqual({responses:paired.size,attempts:paired.size});
+    const [presence]=await sql`SELECT count(*)::int AS events,count(DISTINCT course_attempt_id)::int AS attempts
+       FROM public.facilitated_room_presence_events WHERE facilitated_session_id=${scope.facilitatedSessionId}::uuid AND event_kind='heartbeat'`;
+    expect(presence).toEqual({events:paired.size,attempts:paired.size});
    }finally{
     expect(await host.post("/classroom-closures",scope)).toMatchObject({ended:true});
     expect(await host.post("/classroom-closures",scope)).toMatchObject({ended:true,alreadyEnded:true});
