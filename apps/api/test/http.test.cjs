@@ -152,3 +152,15 @@ test('publisher reads expose protected release and bounded review queue contract
  assert.equal(queueQuery.safeParse({createdAt:'2026-11-28T00:00:00Z'}).success,false);
  assert.equal(queueQuery.safeParse({createdAt:'2026-11-28T00:00:00Z',id:'00000000-0000-4000-8000-000000000001'}).success,true);
 });
+
+test('anonymous access endpoints are not an ungated public bypass',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const p of ['request','verify','register','site-signups','logout']){
+   const path='/api/v1/access/'+p;
+   assert.ok(document.paths[path].post.requestBody);
+   assert.ok(document.paths[path].post.responses['429']);
+   assert.equal((await fetch(url+path,{method:'POST',headers:{Origin:url,'content-type':'application/json'},body:'{}'})).status,503);
+  }
+  assert.equal((await fetch(url+'/api/v1/access/session')).status,401);
+ });
+});

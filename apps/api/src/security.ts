@@ -8,6 +8,7 @@ const CANONICAL = Symbol('canonical-operation');
 export const PublicOperation = () => SetMetadata(PUBLIC, true);
 export const CanonicalReadOperation = () => SetMetadata(CANONICAL, 'read');
 export const CanonicalWriteOperation = () => SetMetadata(CANONICAL, 'write');
+export const AnonymousAccessOperation = () => SetMetadata(CANONICAL, 'anonymous-access');
 const identities = new WeakMap<FastifyRequest, Identity>();
 export function verifiedIdentity(request: FastifyRequest): Identity {
   const identity = identities.get(request);
@@ -21,8 +22,12 @@ export class DefaultDenyGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const targets = [context.getHandler(), context.getClass()];
     const publicOperation = this.reflector.getAllAndOverride<boolean>(PUBLIC, targets) === true;
-    const mode = this.reflector.getAllAndOverride<'read'|'write'>(CANONICAL, targets);
+    const mode = this.reflector.getAllAndOverride<'read'|'write'|'anonymous-access'>(CANONICAL, targets);
     if (publicOperation && !mode) return true;
+    if(mode==='anonymous-access'&&!publicOperation){
+      this.canonical.assertWriteRequest(context.switchToHttp().getRequest<FastifyRequest>());
+      return true;
+    }
     if ((mode==='read'||mode==='write') && !publicOperation) {
       const request = context.switchToHttp().getRequest<FastifyRequest>();
       identities.set(request, await this.canonical.authenticate(request,mode));

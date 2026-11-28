@@ -10,38 +10,14 @@ import { WorkspaceShell, WorkspacePanel, WorkspaceNotice } from "@/components/wo
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { safeAccessReturnTo } from "@/domain/access-navigation";
 import { useHydrated } from "@/lib/use-hydrated";
-import { logAuthenticationUnavailable } from "@/domain/access-errors";
 
 export const Route = createFileRoute("/access/register")({
   validateSearch: (search: Record<string, unknown>) => ({
     returnTo: safeAccessReturnTo(search.returnTo),
   }),
   server: { handlers: { POST: createServerOnlyFn(async ({ request }) => {
-    if (new URL(request.url).origin !== request.headers.get("origin"))
-      return Response.json({ error: "Invalid request origin" }, { status: 403 });
-    try {
-      const gate = await import("@/modules/identity/anonymous-auth-admission.server");
-      const denial = gate.anonymousAuthAdmissionResponse(
-        await gate.admitAnonymousAuthRequest("account_signup"));
-      if (denial) return denial;
-    } catch {
-      logAuthenticationUnavailable("admission");
-      return Response.json({ error: "Registration temporarily unavailable" },
-        { status: 503, headers: { "Cache-Control": "no-store" } });
-    }
-    let data: unknown;
-    try { data = await request.json(); }
-    catch { return Response.json({ error: "Invalid request" }, { status: 400 }); }
-    try {
-      const result = await (await import("@/modules/identity/personal-account-signup.server"))
-        .requestPersonalCanAccount(data);
-      return Response.json(result, { headers: { "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" } });
-    } catch (error) {
-      if (error && typeof error === "object" && "issues" in error)
-        return Response.json({ error: "Check your registration details" }, { status: 400 });
-      logAuthenticationUnavailable("personal_registration");
-      return Response.json({ accepted: true }, { headers: { "Cache-Control": "no-store" } });
-    }
+   const {handlePersonalRegistration}=await import("@/modules/identity/access-http.server");
+   return handlePersonalRegistration(request);
   }) } },
   component: RegisterPersonalAccount,
 });

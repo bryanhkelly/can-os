@@ -6,6 +6,7 @@ import { readNativeClassResume } from "@/modules/classes/native-class-learning-r
 import { readNativeClassHomeworkSummary } from "@/modules/classes/native-class-homework-read.server";
 import {createLaunchSiteService} from "@/modules/programs/launch-site-create.server";
 import {submitNativeOfferingReleaseService,saveNativeOfferingReleasePolicyService,decideNativeOfferingReleaseService,publishNativeOfferingCoursesService,approveNativeOfferingAssetManifestService,publishNativeOfferingVersionService,getNativeOfferingReleaseOverviewService,getNativeOfferingReleasePolicyReviewService,getNativeOfferingReleaseReviewQueueService} from "@/modules/learning/native-offering-release.server";
+import {readWorkspaceSession} from "./workspace-session.server";
 import { getIdentityContext } from "./command-context.server";
 import { normalizeClientError } from "@/lib/client-error";
 import { readStudentClasses } from "@/modules/classes/native-class-student-home.server";
@@ -46,6 +47,14 @@ export async function resolveHttpIdentity(request: Request) {
     recordActivity:async ()=>{requireWrite();await recordCurrentSessionActivity(actor);},
     completeLesson:async (classEnrollmentId:string,lessonId:string)=>{requireWrite();return completeNativeClassLesson(await learner(),{classEnrollmentId,lessonId});},
     submitHomework:async (classEnrollmentId:string,assignmentId:string,responseText:string)=>{requireWrite();return submitNativeClassHomeworkCommand(await learner(),{classEnrollmentId,assignmentId,responseText});},
+    readSession:async ()=>{
+      const session=await readWorkspaceSession(request);
+      if(!session.authenticated)throw new AuthorizationError("current session");
+      return {authenticated:true as const,activeGrantId:session.activeGrantId,role:session.role,
+        grants:session.grants.map(({id,personId,role,organizationId,siteId})=>({id,personId,role,organizationId,siteId})),
+        ...(session.ownerDelegation?{ownerDelegation:session.ownerDelegation}:{}),
+      };
+    },
     readStudentClasses: () => readStudentClasses(actor),
     readLearningResume: async (id:string) => readNativeClassResume(await learner(),id),
     readHomeworkSummary: async (id:string) => readNativeClassHomeworkSummary(await learner(),id),
@@ -54,3 +63,6 @@ export async function resolveHttpIdentity(request: Request) {
 export function classifyHttpDomainError(error: unknown) {
   return normalizeClientError(error).kind;
 }
+
+export {handleAccessRequest,handleAccessVerification,handlePersonalRegistration,handleAccessLogout} from "./access-http.server";
+export {handleSiteSignupRequest} from "./site-signup-http.server";

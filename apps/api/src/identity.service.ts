@@ -2,8 +2,9 @@ import { createRequire } from 'node:module';
 import { Injectable, ServiceUnavailableException, UnauthorizedException, ForbiddenException, BadRequestException, ConflictException, UnsupportedMediaTypeException } from '@nestjs/common';
 import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
-export type Identity = {readReleaseOverview:(input:unknown)=>Promise<unknown>;readReleasePolicy:(input:unknown)=>Promise<unknown>;readReleaseQueue:(input:unknown)=>Promise<unknown>;createSite:(input:unknown)=>Promise<unknown>;submitRelease:(input:unknown)=>Promise<unknown>;saveReleasePolicy:(input:unknown)=>Promise<unknown>;decideRelease:(input:unknown)=>Promise<unknown>;publishCourses:(input:unknown)=>Promise<unknown>;approveAssetManifest:(input:unknown)=>Promise<unknown>;publishOffering:(input:unknown)=>Promise<unknown>;me:unknown;readStudentClasses:()=>Promise<unknown>;readLearningResume:(id:string)=>Promise<unknown>;readHomeworkSummary:(id:string)=>Promise<unknown>;selectMembership:(id:string)=>Promise<void>;recordActivity:()=>Promise<void>;completeLesson:(id:string,lessonId:string)=>Promise<unknown>;submitHomework:(id:string,assignmentId:string,responseText:string)=>Promise<unknown>};
-type Bridge = {resolveHttpIdentity:(request:Request)=>Promise<Identity>;classifyHttpDomainError:(error:unknown)=>string};
+export type Identity = {readSession:()=>Promise<unknown>;readReleaseOverview:(input:unknown)=>Promise<unknown>;readReleasePolicy:(input:unknown)=>Promise<unknown>;readReleaseQueue:(input:unknown)=>Promise<unknown>;createSite:(input:unknown)=>Promise<unknown>;submitRelease:(input:unknown)=>Promise<unknown>;saveReleasePolicy:(input:unknown)=>Promise<unknown>;decideRelease:(input:unknown)=>Promise<unknown>;publishCourses:(input:unknown)=>Promise<unknown>;approveAssetManifest:(input:unknown)=>Promise<unknown>;publishOffering:(input:unknown)=>Promise<unknown>;me:unknown;readStudentClasses:()=>Promise<unknown>;readLearningResume:(id:string)=>Promise<unknown>;readHomeworkSummary:(id:string)=>Promise<unknown>;selectMembership:(id:string)=>Promise<void>;recordActivity:()=>Promise<void>;completeLesson:(id:string,lessonId:string)=>Promise<unknown>;submitHomework:(id:string,assignmentId:string,responseText:string)=>Promise<unknown>};
+type AuthHandler='handleAccessRequest'|'handleAccessVerification'|'handlePersonalRegistration'|'handleSiteSignupRequest'|'handleAccessLogout';
+type Bridge = Record<AuthHandler,(request:Request)=>Promise<Response>> & {resolveHttpIdentity:(request:Request)=>Promise<Identity>;classifyHttpDomainError:(error:unknown)=>string};
 
 /** Only explicit verified local runtime configuration can enable this adapter. */
 @Injectable()
@@ -21,10 +22,8 @@ export class CanonicalIdentityService {
     return this.bridge;
   }
 
-  async authenticate(request: FastifyRequest, mode:'read'|'write'='read'): Promise<Identity> {
-    // No caller-supplied role, account, grant or forwarding headers.
-    if(mode==='read' && request.method!=='GET')throw new ForbiddenException();
-    if(mode==='write'){
+  assertWriteRequest(request:FastifyRequest):void {
+
       if(request.method!=='POST')throw new ForbiddenException();
       if(!this.writeOrigin)throw new ServiceUnavailableException();
       if(request.headers.origin!==this.writeOrigin)throw new ForbiddenException();
@@ -32,7 +31,20 @@ export class CanonicalIdentityService {
       const contentType=request.headers['content-type'];
       if(typeof contentType!=='string'||contentType.split(';')[0]?.trim().toLowerCase()!=='application/json')
         throw new UnsupportedMediaTypeException();
-    }
+  }
+  /** Explicit fixed operation selected by the controller, never by the caller. */
+  async executeAccess(handler:AuthHandler,request:FastifyRequest,body:unknown):Promise<Response>{
+    this.assertWriteRequest(request);
+    const bridge=this.load();
+    const headers=new Headers({'content-type':'application/json','origin':this.writeOrigin!});
+    if(typeof request.headers.cookie==='string')headers.set('cookie',request.headers.cookie);
+    if(typeof request.headers['user-agent']==='string')headers.set('user-agent',request.headers['user-agent']);
+    return bridge[handler](new Request(this.writeOrigin!+'/api/v1/access',{method:'POST',headers,body:JSON.stringify(body)}));
+  }
+  async authenticate(request: FastifyRequest, mode:'read'|'write'='read'): Promise<Identity> {
+    // No caller-supplied role, account, grant or forwarding headers.
+    if(mode==='read' && request.method!=='GET')throw new ForbiddenException();
+    if(mode==='write')this.assertWriteRequest(request);
     const cookie = request.headers.cookie;
     if (typeof cookie !== 'string' || !cookie) throw new UnauthorizedException();
     const bridge = this.load();
