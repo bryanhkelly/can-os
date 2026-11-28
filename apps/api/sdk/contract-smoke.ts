@@ -28,3 +28,15 @@ export async function checkOwnerControlContract(client:BecomunaBrowserApi,grantI
  // @ts-expect-error explicit confirmation required
  await client.POST('/api/v1/owner/delegation/return',{body:{}});
 }
+
+export async function checkStaffAdministrationContract(client:BecomunaBrowserApi,siteId:string,grantId:string){
+ await client.GET('/api/v1/staff/sites');
+ await client.GET('/api/v1/staff/people',{params:{query:{query:'teacher'}}});
+ await client.GET('/api/v1/staff/accounts');
+ await client.POST('/api/v1/staff/invitations',{body:{email:'teacher@example.test',firstName:'Test',lastName:'Teacher',role:'teacher',siteId}});
+ await client.POST('/api/v1/staff/grant-state',{body:{grantId,active:false}});
+ // @ts-expect-error staff invitations cannot grant owner roles
+ await client.POST('/api/v1/staff/invitations',{body:{email:'teacher@example.test',firstName:'Test',lastName:'Teacher',role:'platform_owner',siteId}});
+ // @ts-expect-error no caller-selected actor
+ await client.POST('/api/v1/staff/grant-state',{body:{grantId,active:false,actorId:grantId}});
+}
