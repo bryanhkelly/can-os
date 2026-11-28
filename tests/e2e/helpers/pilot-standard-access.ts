@@ -3,6 +3,7 @@ import { readdir, readFile, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { z } from "zod";
+import {isEligiblePrivilegedMailbox} from "../../../src/domain/domain-classification";
 
 const origins={legacy:"http://localhost:5183",nest:"http://localhost:3001"} as const;
 type Transport=keyof typeof origins;
@@ -22,8 +23,12 @@ const sessionSchema=z.object({
 });
 export type QaSession=z.infer<typeof sessionSchema>;
 
-function guard(email:string){
-  emailSchema.parse(email);
+function guard(email:string,owner=false){
+  if(owner){
+    if(email!==process.env.CAN_NEST_OWNER_QA_EMAIL||email!==email.toLowerCase()||
+      !z.string().email().safeParse(email).success||!isEligiblePrivilegedMailbox(email))
+      throw Error("Explicit reviewed isolated owner mailbox fixture required");
+  }else emailSchema.parse(email);
   if(process.env.APP_ENV!=="test"||process.env.NODE_ENV!=="test"||
     process.env.CAN_PILOT_QA_BRANCH_ID!=="br-solitary-art-arun91gj"||
     !process.env.CAN_ACCESS_MAIL_OUTBOX_DIR||process.env.RESEND_API_KEY||
@@ -31,8 +36,8 @@ function guard(email:string){
     throw Error("Isolated local QA mail is required");
 }
 
-async function tokenFor(email:string):Promise<string>{
-  guard(email);
+async function tokenFor(email:string,owner=false):Promise<string>{
+  guard(email,owner);
   const directory=process.env.CAN_ACCESS_MAIL_OUTBOX_DIR!;
   const deadline=Date.now()+20000;
   while(Date.now()<deadline){
@@ -62,10 +67,11 @@ export async function qaSession(context:Pick<BrowserContext,"request">,transport
   return sessionSchema.parse(await response.json());
 }
 
-export async function authenticateQaActor(context:Pick<BrowserContext,"request">,email:string,signup?:
+async function authenticateQaActorInternal(context:Pick<BrowserContext,"request">,email:string,signup?:
   {kind:"person";firstName:string;lastName:string}|
-  {kind:"site";firstName:string;lastName:string;name:string;organizationName:string;organizationType:"church"|"other_partner"|"denomination"|"consortium"},transport:Transport="legacy"){
-  guard(email);
+  {kind:"site";firstName:string;lastName:string;name:string;organizationName:string;organizationType:"church"|"other_partner"|"denomination"|"consortium"},transport:Transport="legacy",owner=false){
+  guard(email,owner);
+  if(owner&&(signup||transport!=="nest"))throw Error("Owner QA requires an existing provisioned account and NestJS");
   const paths=accessPaths(transport),origin=paths.origin;
   const path=signup?.kind==="person"?paths.register:signup?.kind==="site"?paths.site:paths.request;
   const payload=signup?.kind==="person"?{email,firstName:signup.firstName,lastName:signup.lastName,adultConfirmed:true}:
@@ -75,7 +81,7 @@ export async function authenticateQaActor(context:Pick<BrowserContext,"request">
   const request=await context.request.post(origin+path,{headers:{Origin:origin},data:payload});
   if(!request.ok())throw Error("Standard access request failed: "+request.status());
   expect((await context.request.get(origin+paths.session)).status()).toBe(401);
-  const token=await tokenFor(email);
+  const token=await tokenFor(email,owner);
   const verified=await context.request.post(origin+paths.verify,{headers:{Origin:origin},data:{token}});
   if(!verified.ok())throw Error("One-time access verification failed: "+verified.status());
   const session=await qaSession(context,transport);
@@ -84,4 +90,18 @@ export async function authenticateQaActor(context:Pick<BrowserContext,"request">
     expect(replay.status()).toBe(401);
   }
   return session;
+}
+
+export function authenticateQaActor(context:Parameters<typeof authenticateQaActorInternal>[0],email:string,signup?:Parameters<typeof authenticateQaActorInternal>[2],transport:Transport="legacy"){
+ return authenticateQaActorInternal(context,email,signup,transport);
+}
+/** Only the isolated local outbox may redeem the explicitly reviewed existing
+ * privileged mailbox. No reserved .test/.demo owner, provider delivery, or
+ * test-only API is introduced. */
+export async function authenticateQaPlatformOwner(context:Pick<BrowserContext,"request">){
+ const email=process.env.CAN_NEST_OWNER_QA_EMAIL;
+ if(!email)throw Error("Reviewed existing QA owner account required");
+ const session=await authenticateQaActorInternal(context,email,undefined,"nest",true);
+ if(session.role!=="platform_owner")throw Error("Fixture is not a Platform Owner");
+ return session;
 }
