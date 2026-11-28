@@ -432,28 +432,30 @@ export async function selectAccessGrant(sessionId:string,accountId:string,grantI
   }).from(accessSessions)
    .innerJoin(accessAccounts,eq(accessAccounts.id,accessSessions.accountId))
    .where(and(eq(accessSessions.id,sessionId),eq(accessSessions.accountId,accountId),
-    eq(accessAccounts.disabled,false),isNull(accessSessions.revokedAt),
+    eq(accessAccounts.disabled,false),isNull(accessSessions.revokedAt),isNull(accessSessions.delegatedGrantId),
+    isNull(accessSessions.delegatedMode),isNull(accessSessions.delegatedUntil),isNull(accessSessions.delegatedReason),
     gt(accessSessions.expiresAt,now),gt(accessSessions.updatedAt,sessionIdleCutoff(now))))
    .limit(1).for("update");
   if(!session || (session.sharedDevice && now.getTime()-session.lastActivityAt.getTime()>=300000))throw new AuthorizationError("authenticated session");
-  const {grants,demoAccountSwitching}=await readSessionGrants(session.accountId,session.email,tx,session.authenticationMethod);
+  const {grants}=await readSessionGrants(session.accountId,session.email,tx,session.authenticationMethod);
   // Independently verify the entire real account inside the locked session
   // transaction. Filtered invitation grants cannot conceal a second Person.
-  const activePersonIds=demoAccountSwitching?[]:(
+  const activePersonIds=(
    await tx.selectDistinct({personId:accountPersonGrants.personId}).from(accountPersonGrants)
     .where(and(eq(accountPersonGrants.accountId,accountId),
       eq(accountPersonGrants.active,true))).limit(2)
   ).map(row=>row.personId);
-  if(!demoAccountSwitching&&activePersonIds.length>1)
+  if(activePersonIds.length>1)
    throw new AuthorizationError("account Person reconciliation");
   const grant=assertMembershipSwitchIdentity({
    accountId,accountPersonId:session.personId,targetGrantId:grantId,
-   grants,activePersonIds,demoAccountSwitching,
+   grants,activePersonIds,demoAccountSwitching:false,
   });
   if(!Object.hasOwn(roleCapabilities,grant.role))throw new AuthorizationError("active membership");
   const [changed]=await tx.update(accessSessions).set({activeGrantId:grant.id,updatedAt:new Date(),lastActivityAt:new Date()})
    .where(and(eq(accessSessions.id,sessionId),eq(accessSessions.accountId,accountId),
-    isNull(accessSessions.revokedAt),gt(accessSessions.expiresAt,now),
+    isNull(accessSessions.revokedAt),isNull(accessSessions.delegatedGrantId),
+    isNull(accessSessions.delegatedMode),isNull(accessSessions.delegatedUntil),isNull(accessSessions.delegatedReason),gt(accessSessions.expiresAt,now),
     gt(accessSessions.updatedAt,sessionIdleCutoff(now))))
    .returning({id:accessSessions.id});
   if(!changed)throw new Error("Session expired");
