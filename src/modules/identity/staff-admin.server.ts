@@ -30,6 +30,10 @@ import { verifiedStaffIdentityPredicate } from "./verified-staff-identity.server
 // The staff-invite flow must not grant student, guardian, or CAN institutional identities.
 const assignableRoles = localStaffInviteRoles;
 
+// A malformed historical Site/Organization edge is not a visible membership.
+// Keep the exact existing tenant filter as well as the canonical Person join.
+const currentSiteOwnership=(grant:typeof import("@/db/schema").accountPersonGrants)=>sql`(${grant.siteId} IS NULL OR EXISTS (SELECT 1 FROM public.sites AS scoped_site WHERE scoped_site.id=${grant.siteId} AND scoped_site.organization_id=${grant.organizationId}))`;
+
 /** Every admin function requires the registrar role, admin.manage, and a non-empty organization scope. */
 async function requireRegistrar(actor:Actor): Promise<Actor & { organizationIds: string[]; grantSiteId: string | null }> {
   if(!actor.actorPersonId||!hasRegistrarAuthority(actor.role))throw new AuthorizationError("role: registrar");
@@ -90,7 +94,9 @@ export async function listPeopleService(context:Actor,raw:unknown) {
     const personRows = await db.selectDistinct({ personId: accountPersonGrants.personId })
       .from(accountPersonGrants)
       .innerJoin(people, eq(people.id, accountPersonGrants.personId))
-      .where(and(inArray(accountPersonGrants.organizationId, actor.organizationIds),actor.grantSiteId?eq(accountPersonGrants.siteId,actor.grantSiteId):undefined,nameFilter))
+      .innerJoin(accessAccounts,and(eq(accessAccounts.id,accountPersonGrants.accountId),eq(accessAccounts.personId,accountPersonGrants.personId)))
+      .where(and(inArray(accountPersonGrants.organizationId, actor.organizationIds),currentSiteOwnership(accountPersonGrants),actor.grantSiteId?eq(accountPersonGrants.siteId,actor.grantSiteId):undefined,nameFilter))
+      .orderBy(accountPersonGrants.personId)
       .limit(50);
     const personIds = personRows.map(row => row.personId);
     if (personIds.length === 0) return { people: [] };
@@ -113,6 +119,7 @@ export async function listPeopleService(context:Actor,raw:unknown) {
       .where(and(
         inArray(accountPersonGrants.personId, personIds),
         inArray(accountPersonGrants.organizationId, actor.organizationIds),
+        currentSiteOwnership(accountPersonGrants),
         actor.grantSiteId?eq(accountPersonGrants.siteId,actor.grantSiteId):undefined,
       ));
     const byPerson = new Map<string, {
@@ -155,7 +162,7 @@ export async function listAccessAccountsService(context:Actor) {
   }).from(accountPersonGrants)
     .innerJoin(accessAccounts, and(eq(accessAccounts.id, accountPersonGrants.accountId),eq(accessAccounts.personId,accountPersonGrants.personId)))
     .innerJoin(people, eq(people.id, accountPersonGrants.personId))
-    .where(and(inArray(accountPersonGrants.organizationId, actor.organizationIds),actor.grantSiteId?eq(accountPersonGrants.siteId,actor.grantSiteId):undefined));
+    .where(and(inArray(accountPersonGrants.organizationId, actor.organizationIds),currentSiteOwnership(accountPersonGrants),actor.grantSiteId?eq(accountPersonGrants.siteId,actor.grantSiteId):undefined));
   const grantIds = rows.map(row => row.grantId);
   const personIds = [...new Set(rows.map(row => row.personId))];
   const invitationEvents = grantIds.length ? await db.select({
@@ -390,6 +397,10 @@ export async function setGrantActiveService(context:Actor,request:Request,raw:un
       }
       const pending = (await listPendingStaffInvitations(tx, grant.accountId)).some(invitation => invitation.id === grant.id);
       if (pending) throw new AuthorizationError("pending staff invitations must be accepted through the recipient's sign-in");
+      if(grant.siteId){
+        const [site]=await tx.select({id:sites.id}).from(sites).where(and(eq(sites.id,grant.siteId),eq(sites.organizationId,grant.organizationId))).for("share").limit(1);
+        if(!site)throw new AuthorizationError("current grant Site ownership");
+      }
       if(data.active){
         const [target]=await tx.select({personId:accessAccounts.personId,disabled:accessAccounts.disabled,personActive:people.active})
           .from(accessAccounts).innerJoin(people,eq(people.id,accessAccounts.personId))
@@ -397,10 +408,6 @@ export async function setGrantActiveService(context:Actor,request:Request,raw:un
         if(!target||target.disabled||!target.personActive||target.personId!==grant.personId)
           throw new AuthorizationError("current canonical account Person");
         await assertRawAccountPerson(grant.accountId,grant.personId,tx);
-        if(grant.siteId){
-          const [site]=await tx.select({id:sites.id}).from(sites).where(and(eq(sites.id,grant.siteId),eq(sites.organizationId,grant.organizationId))).for("share").limit(1);
-          if(!site)throw new AuthorizationError("current grant Site ownership");
-        }
       }
       const now=new Date();
       // Clean up historic stale bearers on both deactivation and restoration.
