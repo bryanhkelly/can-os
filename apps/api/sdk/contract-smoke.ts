@@ -29,23 +29,3 @@ export async function checkWorkApprovalContract(client:BecomunaBrowserApi,id:str
  // @ts-expect-error independent decision evidence is required
  await client.POST('/api/v1/credential-issuer-approvals/{approvalId}/decisions',{params:{path:{approvalId:id}},body:{decision:'reject'}});
 }
-
-export async function checkManualWorkContract(client:BecomunaBrowserApi,id:string){
- const page=await client.GET('/api/v1/work/tasks',{params:{query:{siteId:id,afterId:id}}});
- if(page.data){const cursor:string|null=page.data.nextAfterId;void cursor;}
- await client.GET('/api/v1/work/inbox');
- await client.POST('/api/v1/work/tasks',{body:{requestId:id,siteId:id,title:'Prepare materials',ownerPersonId:null}});
- await client.POST('/api/v1/work/tasks/{id}/escalations',{params:{path:{id}},body:{requestId:id,expectedUpdatedAt:'2026-11-28T00:00:00Z',reason:'Immediate operational need'}});
- // @ts-expect-error cannot create a domain-specific approval using a manual task
- await client.POST('/api/v1/work/tasks',{body:{requestId:id,siteId:id,title:'Prepare materials',ownerPersonId:null,type:'credential_approval'}});
-}
-
-export async function checkWorkDependencyContract(client:BecomunaBrowserApi,id:string,blockedByActionId:string){
- const current=await client.GET('/api/v1/work/tasks/{id}/dependencies',{params:{path:{id}}});
- if(current.data){
-  const blocked:boolean=current.data.blocked;void blocked;
-  await client.POST('/api/v1/work/tasks/{id}/dependencies',{params:{path:{id}},body:{blockedByActionId,operation:'add',expectedUpdatedAt:current.data.updatedAt,reason:'Prerequisite for operations'}});
- }
- // @ts-expect-error stale-write revision is mandatory
- await client.POST('/api/v1/work/tasks/{id}/dependencies',{params:{path:{id}},body:{blockedByActionId,operation:'remove',reason:'Changed plan'}});
-}

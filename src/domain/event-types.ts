@@ -55,8 +55,6 @@ export const EventTypes = {
   CommunicationMessageSent: "CommunicationMessageSent",
   InsightCreated: "InsightCreated",
   ActionCreated: "ActionCreated",
-  ActionEscalated: "ActionEscalated",
-  ActionDependencyChanged: "ActionDependencyChanged",
   ActionDeadlineChanged: "ActionDeadlineChanged",
   ActionResolved: "ActionResolved",
   StudentLearningGoalReviewed: "StudentLearningGoalReviewed",

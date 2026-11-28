@@ -58,34 +58,3 @@ export const docs={
  pending:a(o({id:i,requestedByAccountId:i,evidenceReference:t,requestedAt:date,grantId:i,...scope,role:t}),101),
  decision:o({status:choice('approved','rejected')}),revoked:o({revoked:yes})
 };
-
-// Manual work and read-only federated inbox.
-export const manualQueries={page:obj({siteId:id.optional(),programId:id.optional(),afterId:id.optional()}),inbox:obj({})};
-export const manualBodies={
- create:obj({requestId:id,siteId:id,programId:id.optional(),title:s.trim().min(3).max(200),description:s.trim().max(2000).optional(),ownerPersonId:id.nullable(),priority:priority.default('normal'),dueAt:dt.nullable().optional()}),
- escalate:obj({requestId:id,expectedUpdatedAt:dt,reason:s.trim().min(5).max(500)})
-};
-const manualRow=obj({id,title:s,status:s,priority,siteId:id.nullable(),programId:id.nullable(),ownerPersonId:id.nullable(),dueAt:dt.nullable(),updatedAt:dt});
-const inboxItem=obj({id,title:s,status:s,priority:z.enum(['critical','high','normal']),siteId:id.nullable(),programId:id.nullable(),dueAt:dt.nullable(),createdAt:dt,href:s});
-const inboxSource=obj({source:z.enum(['operations','credential_request','credential_review','jurisdiction_review','reporting_relationship_review']),items:z.array(inboxItem).max(250),possiblyTruncated:b,limit:n,href:s});
-export const manualResults={created:obj({actionId:id,replayed:b}),escalated:obj({changed:b,replayed:b}),page:obj({items:z.array(manualRow).max(50),nextAfterId:id.nullable()}),inbox:obj({sources:z.array(inboxSource).max(3)})};
-export const manualBodyDocs={
- create:o({requestId:i,siteId:i,programId:i,title:{...t,minLength:3,maxLength:200},description:{...t,maxLength:2000},ownerPersonId:ni,priority:{...choice('normal','high','urgent'),default:'normal'},dueAt:nd},['requestId','siteId','title','ownerPersonId']),
- escalate:o({requestId:i,expectedUpdatedAt:date,reason:{...t,minLength:5,maxLength:500}})
-};
-export const manualDocs={
- created:o({actionId:i,replayed:bool}),escalated:o({changed:bool,replayed:bool}),
- page:o({items:a(o({id:i,title:t,status:t,priority:choice('normal','high','urgent'),siteId:ni,programId:ni,ownerPersonId:ni,dueAt:nd,updatedAt:date}),50),nextAfterId:ni}),
- inbox:o({sources:a(o({source:choice('operations','credential_request','credential_review','jurisdiction_review','reporting_relationship_review'),items:a(o({id:i,title:t,status:t,priority:choice('critical','high','normal'),siteId:ni,programId:ni,dueAt:nd,createdAt:date,href:t}),250),possiblyTruncated:bool,limit:integer,href:t}),3)})
-};
-
-export const dependencyBody=obj({blockedByActionId:id,operation:z.enum(['add','remove']),expectedUpdatedAt:dt,reason:s.trim().min(5).max(500)});
-export const dependencyResults={
- read:obj({actionId:id,updatedAt:dt,blocked:b,prerequisites:z.array(obj({id,title:s,status:s,satisfied:b})).max(100)}),
- changed:obj({changed:b,updatedAt:dt})
-};
-export const dependencyBodyDoc=o({blockedByActionId:i,operation:choice('add','remove'),expectedUpdatedAt:date,reason:{...t,minLength:5,maxLength:500}});
-export const dependencyDocs={
- read:o({actionId:i,updatedAt:date,blocked:bool,prerequisites:a(o({id:i,title:t,status:t,satisfied:bool}),100)}),
- changed:o({changed:bool,updatedAt:date})
-};

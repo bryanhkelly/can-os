@@ -1,7 +1,3 @@
-import {assertManualPrerequisitesSatisfied} from "./work-dependencies.server";
-import {assertManualTaskOwner,assertManualTaskResource} from "./manual-work.server";
-import {assertCurrentCANGrantForMutation} from "@/modules/identity/current-can-grant-transaction.server";
-import {manualTaskType} from "./manual-work-policy.server";
 import {parseCommandInput} from "@/domain/command-input";
 import {actionStatusSchema,actionAssignmentSchema,actionDeadlineSchema,ownedActionResolutionSchema} from "./action-workspace.inputs";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
@@ -32,14 +28,6 @@ async function operator(request:Request) {
  return actor;
 }
 
-async function assertManualMutation(tx:Parameters<Parameters<typeof db.transaction>[0]>[0],request:Request,actor:Awaited<ReturnType<typeof operator>>,record:typeof actions.$inferSelect){
- if(record.type!==manualTaskType)return;
- if(!record.organizationId||!record.siteId)throw new AuthorizationError("manual task resource");
- await assertCurrentCANGrantForMutation(tx,request,actor,{roles:["site_admin","registrar"],organizationId:record.organizationId,siteId:actor.grantSiteId});
- await assertManualTaskResource(tx,actor,record.organizationId,record.siteId,record.programId);
-}
-const nextManualRevision=(record:typeof actions.$inferSelect)=>record.type===manualTaskType?new Date(Math.max(Date.now(),record.updatedAt.getTime()+1)):new Date();
-
 /** Operational work is sourced from canonical Actions, irrespective of data origin. */
 export async function getOperationsActionsService(request:Request,raw:unknown){
  const data=parseCommandInput(operationsSelectionSchema,raw);
@@ -52,8 +40,8 @@ export async function getOperationsActionsService(request:Request,raw:unknown){
   ownerFirstName:people.legalFirstName,ownerLastName:people.legalLastName,
   status:actions.status,priority:actions.priority,dueAt:actions.dueAt,createdAt:actions.createdAt,
   metadata:actions.metadata
- }).from(actions).leftJoin(people,eq(people.id,actions.ownerPersonId)).where(and(inArray(actions.siteId,scoped.siteIds),inArray(actions.organizationId,actor.scope.organizationIds??[]),inArray(actions.status,["open","in_progress","waiting"]),ne(actions.subjectType,"class_enrollment"),allowedPrograms,...(data.programId?[eq(actions.programId,data.programId)]:[]))).orderBy(sql`CASE ${actions.priority} WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 ELSE 2 END`,
-   asc(actions.dueAt),desc(actions.createdAt),asc(actions.id)).limit(250));
+ }).from(actions).leftJoin(people,eq(people.id,actions.ownerPersonId)).where(and(inArray(actions.siteId,scoped.siteIds),inArray(actions.status,["open","in_progress","waiting"]),ne(actions.subjectType,"class_enrollment"),allowedPrograms,...(data.programId?[eq(actions.programId,data.programId)]:[]))).orderBy(sql`CASE ${actions.priority} WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 ELSE 2 END`,
+   asc(actions.dueAt),desc(actions.createdAt)).limit(250));
  // Resolve distinct coverage owners concurrently instead of performing one
  // sequential database read per matching Program.
  const coverageProgramIds=[...new Set(records.filter(record=>
@@ -116,7 +104,6 @@ export async function updateOperationsActionService(request:Request,raw:unknown)
    if(!record||!record.organizationId||!actor.scope.organizationIds?.includes(record.organizationId))throw new AuthorizationError("action scope");
    if(record.subjectType==="class_enrollment")throw new AuthorizationError("Use the assigned native Class academic Action workflow");
    if(record.programId&&!(actor.scope.programIds??[]).includes(record.programId))throw new AuthorizationError("action program scope");
-   await assertManualMutation(tx,request,actor,record);
    if(record.type==="support_referral")throw new DomainError("CONFLICT","Use the referral lifecycle");
    if(record.type==="section_creation_request")
      throw new DomainError("CONFLICT","Use academic setup to fulfill or decline the teacher class request");
@@ -142,8 +129,7 @@ export async function updateOperationsActionService(request:Request,raw:unknown)
       record.resolutionNote===data.resolutionNote?.trim())return {saved:true};
    if(record.status==="cancelled"||record.status==="resolved")throw new DomainError("CONFLICT","Action is closed");
    if(record.status===data.status)return {saved:true};
-   if(data.status==="in_progress"||data.status==="resolved")await assertManualPrerequisitesSatisfied(tx,record);
-   const now=nextManualRevision(record);
+   const now=new Date();
    await tx.update(actions).set({status:data.status,resolvedAt:data.status==="resolved"?now:null,resolutionNote:data.status==="resolved"?data.resolutionNote?.trim():record.resolutionNote,updatedAt:now}).where(eq(actions.id,record.id));
    await writeAudit(tx,actor,{action:"action.status.change",entityType:"action",entityId:record.id,scope:{siteId:record.siteId,programId:record.programId},before:{status:record.status},after:{status:data.status}});
    if(data.status==="resolved")await emitEvent(tx,{eventType:EventTypes.ActionResolved,aggregateType:"action",aggregateId:record.id,actorPersonId:actor.actorPersonId,payload:{subjectType:record.subjectType,subjectId:record.subjectId}});
@@ -177,7 +163,6 @@ export async function assignOperationsActionService(request:Request,raw:unknown)
    if(!record||!record.organizationId||!actor.scope.organizationIds?.includes(record.organizationId)||["resolved","cancelled"].includes(record.status))throw new AuthorizationError("active action scope");
    if(record.subjectType==="class_enrollment")throw new AuthorizationError("Use the assigned native Class academic Action workflow");
    if(record.programId&&!(actor.scope.programIds??[]).includes(record.programId))throw new AuthorizationError("action program scope");
-   await assertManualMutation(tx,request,actor,record);
    if(record.type==="support_referral")throw new DomainError("CONFLICT","Use the referral lifecycle");
    if(record.type==="section_creation_request")
      throw new DomainError("CONFLICT","Teacher class requests retain their original requester; use academic setup");
@@ -200,14 +185,12 @@ export async function assignOperationsActionService(request:Request,raw:unknown)
     if(!record.siteId)throw new AuthorizationError("site-scoped action required for assignment");
     const [grant]=await tx.select({id:accountPersonGrants.id}).from(accountPersonGrants).where(and(eq(accountPersonGrants.personId,data.ownerPersonId),eq(accountPersonGrants.siteId,record.siteId!),eq(accountPersonGrants.active,true),inArray(accountPersonGrants.role,["site_admin","registrar","teacher","specialist","counselor"]))).limit(1);
     if(!grant)throw new AuthorizationError("assignee must have active site membership");
-    if(record.type===manualTaskType)await assertManualTaskOwner(tx,record.organizationId!,record.siteId,data.ownerPersonId);
     if(academic)await assertAcademicActionStaff(tx,data.ownerPersonId,record);
    }
    const priority=coverageGap&&!data.ownerPersonId?"urgent":data.priority;
-   if(record.type===manualTaskType&&record.priority!=="urgent"&&priority==="urgent")throw new DomainError("CONFLICT","Use the audited operational task escalation command");
    if(record.ownerPersonId===data.ownerPersonId&&record.priority===priority&&
       (!coverageGap||record.metadata.ownerEscalation===(data.ownerPersonId===null)))return {saved:true};
-   await tx.update(actions).set({ownerPersonId:data.ownerPersonId,priority,updatedAt:nextManualRevision(record),
+   await tx.update(actions).set({ownerPersonId:data.ownerPersonId,priority,updatedAt:new Date(),
      ...(coverageGap?{metadata:{...record.metadata,ownerEscalation:data.ownerPersonId===null}}:{})}).where(eq(actions.id,record.id));
    if(data.ownerPersonId&&data.ownerPersonId!==record.ownerPersonId)await notify(tx,{recipientPersonId:data.ownerPersonId,type:"operations_action_assigned",title:"Assigned action: "+record.title,body:"An action requires your attention.",resourceType:"action",resourceId:record.id});
    await writeAudit(tx,actor,{action:"action.assignment.change",entityType:"action",entityId:record.id,scope:{siteId:record.siteId,programId:record.programId},before:{ownerPersonId:record.ownerPersonId,priority:record.priority},after:{ownerPersonId:data.ownerPersonId,priority}});
@@ -231,7 +214,6 @@ export async function setOperationsActionDeadlineService(request:Request,raw:unk
        throw new AuthorizationError("action school ownership");
      if(record.programId&&!actor.scope.programIds?.includes(record.programId))
        throw new AuthorizationError("action program");
-     await assertManualMutation(tx,request,actor,record);
      if(record.type==="support_referral"||record.type===openingHandoffType||record.type==="onsite_pickup_custody_hold")
        throw new DomainError("CONFLICT","Use the Action's owning domain workflow");
      if(record.type===gradeResponseActionType&&!(record.subjectType==="student_profile"&&record.sectionId))throw new AuthorizationError("academic grade follow-up scope");
@@ -240,7 +222,7 @@ export async function setOperationsActionDeadlineService(request:Request,raw:unk
      const newDate=data.dueAt?new Date(data.dueAt):null;
      if((record.dueAt?.getTime()??null)===(newDate?.getTime()??null))
        return {changed:false as const};
-     await tx.update(actions).set({dueAt:newDate,updatedAt:nextManualRevision(record)})
+     await tx.update(actions).set({dueAt:newDate,updatedAt:new Date()})
        .where(eq(actions.id,record.id));
      await writeAudit(tx,actor,{
        action:"action.deadline.change",entityType:"action",entityId:record.id,

@@ -10,11 +10,65 @@ import { db } from "@/db/client";
 import { writeAudit } from "@/platform/mutation";
 import {
  jurisdictionProfileVersions, jurisdictionProfileVerificationDecisions,
+ jurisdictions, organizations,
 } from "@/db/schema";
 import { and, eq, desc, inArray, isNotNull } from "drizzle-orm";
 
-import {assertJurisdictionProfileAuthority,listJurisdictionProfileReviewsService} from "./jurisdiction-profile-reads.server";
-export const listJurisdictionProfileReviews=createServerFn({method:"GET"}).handler(()=>listJurisdictionProfileReviewsService(getRequest()));
+type ProfileAuthority = "manage" | "verify";
+async function assertJurisdictionProfileAuthority(
+ context: Awaited<ReturnType<typeof getCommandContext>>,
+ authority: ProfileAuthority,
+) {
+ const manager=authority==="manage";
+ const role=manager?"can_network_steward":"can_jurisdiction_reviewer";
+ const capability=manager?"jurisdiction.profile.manage":"jurisdiction.profile.verify";
+ if(context.role!==role||!context.actorPersonId||context.grantSiteId!==null)
+  throw new AuthorizationError(capability);
+ assertCapability(context,capability);
+ const organizationIds=context.scope.organizationIds??[];
+ if(organizationIds.length===0)throw new AuthorizationError("CAN network organization scope");
+ const [organization]=await db.select({id:organizations.id}).from(organizations).where(and(
+  eq(organizations.type,"can_network"),inArray(organizations.id,organizationIds),
+ )).limit(1);
+ if(!organization)throw new AuthorizationError("CAN network organization scope");
+}
+
+/**
+ * Registrar-facing editorial read. Review records are never exposed through
+ * public launch projections; only a published version can inform launch.
+ */
+export const listJurisdictionProfileReviews = createServerFn({method:"GET"}).handler(async()=>{
+ const context=await getCommandContext(getRequest());
+ const canManage=context.role==="can_network_steward";
+ const canVerify=context.role==="can_jurisdiction_reviewer";
+ if(!canManage&&!canVerify)throw new AuthorizationError("jurisdiction profile review access");
+ await assertJurisdictionProfileAuthority(context,canManage?"manage":"verify");
+ const rows=await db.select({
+  id:jurisdictionProfileVersions.id,
+  jurisdictionId:jurisdictions.id,
+  code:jurisdictions.code,
+  name:jurisdictions.name,
+  revision:jurisdictionProfileVersions.revision,
+  status:jurisdictionProfileVersions.status,
+  verificationStatus:jurisdictionProfileVersions.verificationStatus,
+  title:jurisdictionProfileVersions.title,
+  summary:jurisdictionProfileVersions.summary,
+  profile:jurisdictionProfileVersions.profile,
+  evidence:jurisdictionProfileVersions.evidence,
+  lastEditedByPersonId:jurisdictionProfileVersions.lastEditedByPersonId,
+  verifiedByPersonId:jurisdictionProfileVersions.verifiedByPersonId,
+  verificationEvidence:jurisdictionProfileVersions.verificationEvidence,
+  reviewedAt:jurisdictionProfileVersions.reviewedAt,
+  nextReviewAt:jurisdictionProfileVersions.nextReviewAt,
+  publishedAt:jurisdictionProfileVersions.publishedAt,
+ }).from(jurisdictionProfileVersions)
+ .innerJoin(jurisdictions,eq(jurisdictions.id,jurisdictionProfileVersions.jurisdictionId))
+ .where(inArray(jurisdictionProfileVersions.status,["draft","in_review","published"]))
+ .orderBy(jurisdictions.name,desc(jurisdictionProfileVersions.createdAt));
+ return rows.map(row=>({...row,canEdit:canManage,canVerify,canPublish:canManage,
+  profile:JSON.stringify(row.profile),evidence:JSON.stringify(row.evidence),
+  verificationEvidence:JSON.stringify(row.verificationEvidence)}));
+});
 
 export const listPublishedJurisdictionGuidance = createServerFn({method:"GET"}).handler(async()=>{
  const context=await getCommandContext(getRequest());

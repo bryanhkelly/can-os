@@ -1,6 +1,3 @@
-import * as workDependencies from "@/modules/operations/work-dependencies.server";
-import * as manualWork from "@/modules/operations/manual-work.server";
-import {getWorkInboxService} from "@/modules/operations/work-inbox.server";
 import * as work from "@/modules/operations/action-workspace.server";
 import * as actionDetail from "@/modules/actions/action-detail.server";
 import * as credentialApproval from "@/modules/identity/canonical-sensitive-approvals.server";
@@ -87,12 +84,6 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
  const context=await (mode==="operator-reporting"?(readCookie(request,accessSessionCookie)!==undefined?getIdentityContext(request):getCanonicalCommandContext(request)):mode==="planning"?getBlueprintPlanningContext(request):mode==="canonical"?getCanonicalCommandContext(request):mode==="learner"?getInstructionalLearnerContext(request):getIdentityContext(request));
  if(!context.actorPersonId)throw new AuthorizationError("verified Person");
  return {
-  createOperationalTask:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Work and approval context");return manualWork.createOperationalTaskService(request,raw);},
-  escalateOperationalTask:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Work and approval context");return manualWork.escalateOperationalTaskService(request,raw);},
-  listOperationalTasks:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Work and approval context");return manualWork.listOperationalTasksService(request,raw);},
-  getWorkInbox:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Work and approval context");return getWorkInboxService(request,raw);},
-  getOperationalTaskDependencies:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Work and approval context");return workDependencies.getOperationalTaskDependenciesService(request,raw);},
-  changeOperationalTaskDependency:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Work and approval context");return workDependencies.changeOperationalTaskDependencyService(request,raw);},
   getOperationsActions:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Work and approval context");return work.getOperationsActionsService(request,raw);},
   getActionDetail:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Work and approval context");return actionDetail.getActionDetailService(request,raw);},
   updateOperationsAction:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Work and approval context");return work.updateOperationsActionService(request,raw);},
