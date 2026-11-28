@@ -21,7 +21,7 @@ async function operator(request:Request){
  assertCapability(actor,"action.resolve");
  return {actor,org:actor.scope.organizationIds[0]};
 }
-async function assertResource(tx:Tx,actor:Awaited<ReturnType<typeof operator>>["actor"],org:string,siteId:string,programId:string|null){
+export async function assertManualTaskResource(tx:Tx,actor:Awaited<ReturnType<typeof operator>>["actor"],org:string,siteId:string,programId:string|null){
  if(!actor.scope.siteIds?.includes(siteId)||programId&&!actor.scope.programIds?.includes(programId))throw new AuthorizationError("operational task scope");
  const [site]=await tx.select({id:sites.id}).from(sites).innerJoin(organizations,eq(organizations.id,sites.organizationId))
   .where(and(eq(sites.id,siteId),eq(sites.organizationId,org),eq(organizations.lifecycleStatus,"active"),inArray(sites.lifecycleStatus,["planning","active"]))).for("share").limit(1);
@@ -50,7 +50,7 @@ export async function createOperationalTaskService(request:Request,raw:unknown){
  const id=manualTaskId(actor.accountId,input.requestId);
  return db.transaction(async tx=>{
   await assertCurrentCANGrantForMutation(tx,request,actor,{roles:["site_admin","registrar"],organizationId:org,siteId:actor.grantSiteId});
-  await assertResource(tx,actor,org,data.siteId,data.programId);
+  await assertManualTaskResource(tx,actor,org,data.siteId,data.programId);
   if(data.ownerPersonId)await assertManualTaskOwner(tx,org,data.siteId,data.ownerPersonId);
   await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"manual-task:"+id}))`);
   const [existing]=await tx.select().from(actions).where(eq(actions.id,id)).for("update").limit(1);
@@ -73,21 +73,21 @@ export async function createOperationalTaskService(request:Request,raw:unknown){
 export async function escalateOperationalTaskService(request:Request,raw:unknown){
  const input=parseCommandInput(escalateOperationalTaskSchema,raw);
  const {actor,org}=await operator(request);
- const fingerprint=taskFingerprint([actor.accountId,input.requestId,input.expectedUpdatedAt,input.reason]);
+ const fingerprint=taskFingerprint([actor.accountId,input.requestId,new Date(input.expectedUpdatedAt).toISOString(),input.reason]);
  return db.transaction(async tx=>{
   await assertCurrentCANGrantForMutation(tx,request,actor,{roles:["site_admin","registrar"],organizationId:org,siteId:actor.grantSiteId});
   const [record]=await tx.select().from(actions).where(and(eq(actions.id,input.id),eq(actions.organizationId,org),eq(actions.type,manualTaskType),inArray(actions.siteId,actor.scope.siteIds!))).for("update").limit(1);
   if(!record||!record.siteId)throw new AuthorizationError("manual operational task");
-  await assertResource(tx,actor,org,record.siteId,record.programId);
+  await assertManualTaskResource(tx,actor,org,record.siteId,record.programId);
   const disposition=escalationDisposition({status:record.status,priority:record.priority,updatedAt:record.updatedAt.toISOString(),expectedUpdatedAt:new Date(input.expectedUpdatedAt).toISOString(),priorFingerprint:record.metadata.escalationFingerprint,fingerprint});
+  if(record.ownerPersonId)await assertManualTaskOwner(tx,org,record.siteId,record.ownerPersonId);
   if(disposition==="replay")return {changed:false,replayed:true};
   if(disposition==="conflict"||record.metadata.escalationRequestId===input.requestId)throw new DomainError("CONFLICT","Task changed or already urgent");
-  if(record.ownerPersonId)await assertManualTaskOwner(tx,org,record.siteId,record.ownerPersonId);
   const now=new Date(Math.max(Date.now(),record.updatedAt.getTime()+1));
   await tx.update(actions).set({priority:"urgent",updatedAt:now,metadata:{...record.metadata,escalationFingerprint:fingerprint,escalationRequestId:input.requestId}}).where(eq(actions.id,record.id));
   const scope={organizationId:org,siteId:record.siteId,programId:record.programId};
   await writeAudit(tx,actor,{action:"action.operational.escalate",entityType:"action",entityId:record.id,scope,before:{priority:record.priority},after:{priority:"urgent",reason:input.reason}});
-  await emitEvent(tx,{eventType:"ActionEscalated",aggregateType:"action",aggregateId:record.id,actorPersonId:actor.actorPersonId,...scope,payload:{priority:"urgent"}});
+  await emitEvent(tx,{eventType:EventTypes.ActionEscalated,aggregateType:"action",aggregateId:record.id,actorPersonId:actor.actorPersonId,...scope,payload:{priority:"urgent"}});
   if(record.ownerPersonId)await notify(tx,{recipientPersonId:record.ownerPersonId,type:"operations_action_escalated",title:"Operational task escalated",body:"Review the urgent task in your operations workspace.",resourceType:"action",resourceId:record.id});
   return {changed:true,replayed:false};
  });
