@@ -3,16 +3,18 @@ import {NativeEngagementCampaigns} from "./NativeEngagementCampaigns";
 import {Button} from "@/components/ui/button";
 import {Checkbox} from "@/components/ui/choice";
 import {ActionFooter, QueryState, WorkspaceNotice, WorkspacePanel} from "@/components/workspace";
-import {prepareEngagementEmailDraft} from "@/modules/engagement/engagement-registry.functions";
+import {legacyCampaignTransport} from "@/modules/communication/campaign-workspace-transport";
+import type {CampaignTransport} from "@/domain/campaign-workspace-api";
 import {buildInvitationMailto,parseInvitationRecipients,type EngagementInvitation} from "@/domain/engagement-distribution";
 
 /** Shared operator-mediated handoff. Recipient addresses stay in this browser
  * and never appear in logs, links sent to participants or a shadow CRM. */
-type DistributionProps={engagementId:string;linkId:string;onClose:()=>void};
+type DistributionProps={transport?:CampaignTransport;engagementId:string;linkId:string;onClose:()=>void};
 export function EngagementEmailDistribution(props:DistributionProps){
-  return <EmailDistributionSession key={props.engagementId+":"+props.linkId} {...props}/>;
+  return <EmailDistributionSession key={JSON.stringify([props.engagementId,props.linkId,props.transport?.kind??'legacy'])} {...props}/>;
 }
-function EmailDistributionSession({engagementId,linkId,onClose}:DistributionProps){
+function EmailDistributionSession({engagementId,linkId,onClose,transport=legacyCampaignTransport}:DistributionProps){
+  const {prepareEngagementEmailDraft}=transport.api;
   const [draft,setDraft]=useState<EngagementInvitation|null>(null);
   const [recipients,setRecipients]=useState("");
   const [authorized,setAuthorized]=useState(false);
@@ -30,7 +32,7 @@ function EmailDistributionSession({engagementId,linkId,onClose}:DistributionProp
       .then(value=>{if(active)setDraft(value);})
       .catch(()=>{if(active)setError("The saved email invitation could not be verified. You can prepare recipients, but sending and copying remain unavailable. Ask your platform administrator to check the approved public origin and invitation destination.");});
     return()=>{active=false;};
-  },[engagementId,linkId,revision]);
+  },[engagementId,linkId,revision,prepareEngagementEmailDraft]);
   const parsed=parseInvitationRecipients(recipients);
   const ready=!!draft&&authorized&&parsed.recipients.length>0&&!parsed.invalid.length&&!parsed.tooMany;
   async function handoff(){
@@ -61,7 +63,7 @@ function EmailDistributionSession({engagementId,linkId,onClose}:DistributionProp
     <WorkspaceNotice className="mt-3">Send through the platform using the recipient form below. You may also copy the invitation or open an external email draft.</WorkspaceNotice>
     {draft&&<WorkspacePanel headingLevel="h4" title={draft.subject} className="mt-3"><p className="whitespace-pre-wrap [overflow-wrap:anywhere] text-sm">{draft.body}</p></WorkspacePanel>}
     {!draft&&<QueryState loading={!error?"Verifying saved invitation…":undefined} error={error||undefined} onRetry={()=>setRevision(v=>v+1)}/>}
-    <NativeEngagementCampaigns engagementId={engagementId} linkId={linkId} invitationReady={!!draft} recipientDraft={recipients} onRecipientDraftChange={value=>{setRecipients(value);setAuthorized(false);}}/>
+    <NativeEngagementCampaigns transport={transport} engagementId={engagementId} linkId={linkId} invitationReady={!!draft} recipientDraft={recipients} onRecipientDraftChange={value=>{setRecipients(value);setAuthorized(false);}}/>
     <ActionFooter layout="inline"><Button type="button" variant="outline" disabled={!draft||busy||copying} loading={copying} onClick={()=>void copy()}>Copy invitation</Button><Button type="button" variant="outline" disabled={busy||copying} onClick={()=>setExternal(v=>!v)}>{external?"Hide external draft":"More: external email draft"}</Button></ActionFooter>
     {external&&<div className="space-y-3 mt-3">
       <p className="text-sm text-muted-foreground">Uses the same entered addresses (up to 20) in BCC. Your email application handles delivery; the platform cannot verify it.</p>
