@@ -21,6 +21,8 @@ export async function checkStudentContract(client:BecomunaBrowserApi, enrollment
  if(host.data){const paired:number=host.data.pairedCount;void paired;}
  const rehearsal=await client.GET('/api/v1/classroom-rehearsal/choices');
  if(rehearsal.data){const partial:boolean=rehearsal.data.partial;void partial;}
+ const workspace=await client.GET('/api/v1/classes/{classId}/workspace',{params:{path:{classId:enrollmentId},query:{view:'learn'}}});
+ if(workspace.data){const control:boolean=workspace.data.canControlRoom;void control;}
  // Browser-owned Origin is still mandatory on the wire; the browser, not UI code, supplies it.
  await client.POST('/api/v1/me/session/membership',{body:{grantId:enrollmentId}});
  await client.POST('/api/v1/me/session/activity',{body:{}});

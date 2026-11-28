@@ -691,12 +691,13 @@ test('learning module resolves the shared identity provider without a duplicate 
  const {ClassroomController}=require('../dist/classroom.controller');
  const {InstructionalController}=require('../dist/instructional.controller');
  const {RehearsalController}=require('../dist/rehearsal.controller');
+ const {ClassWorkspaceController}=require('../dist/class-workspace.controller');
  const {app}=await createApi(readConfig({}));
  try{
   const shared=app.select(IdentityModule).get(CanonicalIdentityService,{strict:true});
   assert.equal(app.get(CanonicalIdentityService),shared);
   const module=app.select(LearningModule);
-  for(const controller of [LearningController,RoomController,ClassroomController,InstructionalController,RehearsalController])
+  for(const controller of [LearningController,RoomController,ClassroomController,InstructionalController,RehearsalController,ClassWorkspaceController])
    assert.equal(module.get(controller,{strict:true}).identity,shared);
  }finally{await app.close();}
 });
@@ -776,4 +777,21 @@ test('rehearsal REST operations are protected and separate from live learning ev
  assert.equal(results.playback.safeParse({saved:true,duplicate:true,rehearsalOnly:true}).success,false);
  assert.equal(results.playback.safeParse({saved:true,duplicate:false,rehearsalOnly:true,attendance:true}).success,false);
  assert.equal(results.access.safeParse({downloadUrl:'http://example.test',expiresInSeconds:30}).success,false);
+});
+
+test('Class workspace and roster use protected explicit contracts',async()=>{
+ await withServer('0',async(url,document)=>{
+  const id='00000000-0000-4000-8000-000000000001';
+  for(const resource of ['workspace','roster']){
+   const path='/api/v1/classes/{classId}/'+resource;
+   assert.ok(document.paths[path].get.security);
+   assert.equal((await fetch(url+path.replace('{classId}',id),{headers:{'x-role':'site_admin'}})).status,401);
+  }
+ });
+ const {queries,results}=require('../dist/class-workspace.contracts');
+ assert.deepEqual(queries.roster.parse({}),{offset:0});
+ assert.deepEqual(queries.roster.parse({offset:'50'}),{offset:50});
+ assert.equal(queries.roster.safeParse({offset:'100001'}).success,false);
+ assert.equal(queries.workspace.safeParse({view:'manage',role:'site_admin'}).success,false);
+ assert.equal(results.roster.safeParse({members:[],total:0,nextOffset:null,rawPeople:[]}).success,false);
 });

@@ -3,6 +3,7 @@ import { IdentityModule } from './identity.module';
 import { LearningController } from './learning.controller';
 import { ClassroomController } from './classroom.controller';
 import { InstructionalController } from './instructional.controller';
+import { ClassWorkspaceController } from './class-workspace.controller';
 import { RehearsalController } from './rehearsal.controller';
 import { RoomController } from './room.controller';
 
@@ -12,6 +13,6 @@ import { RoomController } from './room.controller';
  */
 @Module({
  imports:[IdentityModule],
- controllers:[LearningController,ClassroomController,RoomController,InstructionalController,RehearsalController],
+ controllers:[LearningController,ClassroomController,RoomController,InstructionalController,RehearsalController,ClassWorkspaceController],
 })
 export class LearningModule {}
