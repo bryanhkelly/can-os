@@ -1,3 +1,5 @@
+import {canonicalSessions} from "@/db/canonical-v301";
+import {canonicalSessionCookie} from "@/domain/canonical-access";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { db } from "@/db/client";
 import { writeAudit } from "@/platform/mutation";
@@ -409,8 +411,8 @@ export async function redeemDemoAccess(
 }
 /** Compatibility entry point used by the existing access-verification route. */
 export const redeemLocalDemoAccess=redeemDemoAccess;
-export async function revokeAccessSession(sessionId:string,accountId:string):Promise<string> {
- await db.transaction(async tx=>{
+type SessionRevocationTx=Parameters<Parameters<typeof db.transaction>[0]>[0];
+async function revokeAccessSessionInTransaction(tx:SessionRevocationTx,sessionId:string,accountId:string):Promise<void>{
   const [row]=await tx.update(accessSessions).set({revokedAt:new Date(),updatedAt:new Date()})
    .where(and(eq(accessSessions.id,sessionId),eq(accessSessions.accountId,accountId),isNull(accessSessions.revokedAt))).returning({activeGrantId:accessSessions.activeGrantId});
   if(row?.activeGrantId){
@@ -424,18 +426,42 @@ export async function revokeAccessSession(sessionId:string,accountId:string):Pro
     sessionId,grantId:row.activeGrantId,role:member?.role??null,
    });
   }
- });
+}
+export async function revokeAccessSession(sessionId:string,accountId:string):Promise<string>{
+ await db.transaction(tx=>revokeAccessSessionInTransaction(tx,sessionId,accountId));
  return clearSessionCookieHeader();
 }
-/** Revocation grants no business authority. Resolve the original session by its
- * opaque credential even when its effective grant is disabled or delegated.
- * A missing/expired/revoked credential can safely clear only its own cookie. */
-export async function revokePresentedAccessSession(request:Request):Promise<string> {
+/** Browser logout revokes the exact presented bearers, not an entire account,
+ * and does not require an active business grant. Parse both names before any
+ * mutation and commit both revocations and their audit in one transaction. */
+export async function revokePresentedAccessSessions(request:Request):Promise<string[]>{
  const token=readCookie(request,accessSessionCookie);
- if(!token || !/^[A-Za-z0-9_-]{40,128}$/.test(token))return clearSessionCookieHeader();
- const [session]=await db.select({id:accessSessions.id,accountId:accessSessions.accountId})
-  .from(accessSessions).where(and(eq(accessSessions.secretHash,hashAccessSecret(token,secretPepper())),isNull(accessSessions.revokedAt))).limit(1);
- return session?revokeAccessSession(session.id,session.accountId):clearSessionCookieHeader();
+ const native=readCookie(request,canonicalSessionCookie);
+ const valid=(value:string|undefined):value is string=>!!value&&/^[A-Za-z0-9_-]{40,128}$/.test(value);
+ const canDigest=valid(token)?hashAccessSecret(token,secretPepper()):null;
+ let nativeDigest:string|null=null;
+ if(valid(native)){
+  const pepper=process.env.CAN_CANONICAL_ACCESS_TOKEN_PEPPER;
+  if(!pepper||pepper.length<32)throw new AccessInfrastructureError("session_configuration");
+  nativeDigest=hashAccessSecret(native,pepper);
+ }
+ if(canDigest||nativeDigest)await db.transaction(async tx=>{
+  if(canDigest){
+   const [session]=await tx.select({id:accessSessions.id,accountId:accessSessions.accountId})
+    .from(accessSessions).where(and(eq(accessSessions.secretHash,canDigest),isNull(accessSessions.revokedAt))).limit(1);
+   if(session)await revokeAccessSessionInTransaction(tx,session.id,session.accountId);
+  }
+  if(nativeDigest){
+   const [session]=await tx.update(canonicalSessions).set({revokedAt:new Date()})
+    .where(and(eq(canonicalSessions.secretHash,nativeDigest),isNull(canonicalSessions.revokedAt)))
+    .returning({id:canonicalSessions.id,accountId:canonicalSessions.accountId,grantId:canonicalSessions.activeGrantId});
+   // Bearer possession authorizes revocation only, not acting as a Person.
+   if(session)await writeAudit(tx,{actorPersonId:null,action:"identity.native_session.revoked",
+    resourceType:"canonical_session",resourceId:session.id,scope:{},
+    context:{nativeAccountId:session.accountId,nativeGrantId:session.grantId,outcome:"success"}});
+  }
+ });
+ return [clearSessionCookieHeader(),`${canonicalSessionCookie}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`];
 }
 /** Selection is restricted to a grant assigned to the authenticated account. */
 export async function selectAccessGrant(sessionId:string,accountId:string,grantId:string):Promise<void> {
