@@ -7,12 +7,15 @@ import { secureSessionCookieHeader } from "@/domain/session-cookies";
 import { hashAccessSecret, issueOpaqueSecret } from "@/domain/access-tokens";
 import { AuthorizationError } from "@/domain/command-context";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
+import type {AccessContext} from "@/domain/access-context";
+import {assertCurrentCANGrantForMutation} from "@/modules/identity/current-can-grant-transaction.server";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertRawAccountPerson, assertUnambiguousAdultAccount } from "@/modules/identity/unambiguous-adult-account.server";
 
 import { hasApprovedDemoPersonalCredential, readDemoCredentialDomain } from "@/modules/identity/demo-school-tenants.server";
 
-type VerifiedSelfEnrollmentActor = {
+export type VerifiedSelfEnrollmentActor = {
+  context:AccessContext;
   accountId: string; personId: string; email: string;
   preferredName: string | null; emailVerifiedAt: Date;
 };
@@ -20,7 +23,7 @@ type VerifiedSelfEnrollmentActor = {
 export async function resolveVerifiedAdultAccount(request:Request): Promise<VerifiedSelfEnrollmentActor> {
   const actor = await getCommandContext(request);
   // Synthetic demo switching is not acceptable evidence of a unique adult.
-  if (actor.sessionAccountId || !actor.actorPersonId)
+  if (actor.sessionAccountId || actor.impersonatedByAccountId || actor.delegatedByPlatformOwner || actor.delegationMode || !actor.actorPersonId)
     throw new AuthorizationError("verified individual CAN identity");
   const [account] = await db.select({
     email:accessAccounts.emailNormalized,
@@ -35,7 +38,7 @@ export async function resolveVerifiedAdultAccount(request:Request): Promise<Veri
     preferredName:people.preferredName,firstName:people.legalFirstName,
   }).from(people).where(eq(people.id,actor.actorPersonId)).limit(1);
   if(!person?.active)throw new AuthorizationError("active account Person");
-  return {accountId:actor.accountId,personId:actor.actorPersonId,
+  return {context:actor,accountId:actor.accountId,personId:actor.actorPersonId,
     email:account.email,preferredName:person.preferredName??person.firstName,
     emailVerifiedAt:account.verified};
 }
@@ -110,7 +113,20 @@ const NATIVE_SESSION_SECONDS = 12 * 60 * 60;
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 /** Only the server may issue a privileged native learning session cookie. */
-export async function issueNativeLearnerSession(tx:Tx, accountId:string, grantId:string, now:Date) {
+export async function assertVerifiedAdultSessionForMutation(tx:Tx,request:Request,owner:VerifiedSelfEnrollmentActor){
+ const actor=owner.context;
+ if(request.method!=="POST"||actor.accountId!==owner.accountId||actor.actorPersonId!==owner.personId||
+    (actor.scope.organizationIds?.length??0)>1)
+   throw new AuthorizationError("direct verified adult mutation");
+ await assertCurrentCANGrantForMutation(tx,request,actor,{
+   roles:[actor.role],organizationId:actor.scope.organizationIds?.[0]??null,siteId:actor.grantSiteId,
+ });
+ await assertUnambiguousAdultAccount(owner.accountId,owner.personId,tx);
+}
+/** All transitional native session issuance is bound to the same current CAN
+ * Account/Person/session, under the outer write transaction. */
+export async function issueNativeLearnerSession(tx:Tx, request:Request, owner:VerifiedSelfEnrollmentActor, accountId:string, grantId:string, now:Date) {
+  await assertVerifiedAdultSessionForMutation(tx,request,owner);
   const pepper=process.env.CAN_CANONICAL_ACCESS_TOKEN_PEPPER;
   if(!pepper||pepper.length<32)
     throw new Error("Native learning session is temporarily unavailable");
