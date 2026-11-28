@@ -492,3 +492,28 @@ test('all registered OpenAPI operations have unique IDs and explicit security po
   assert.ok(ids.size>=148,'Expected existing migration coverage including liveness');
  });
 });
+
+test('actual browser SDK projection retains all operations while canonical writes require Origin',async()=>{
+ const {browserSdkDocument}=require('../scripts/browser-sdk-document.cjs');
+ await withServer('0',async(url,document)=>{
+  const browser=browserSdkDocument(document);
+  let writes=0;
+  for(const [path,item] of Object.entries(document.paths)){
+   for(const method of ['get','post','put','patch','delete']){
+    const operation=item[method];
+    if(!operation)continue;
+    const projected=browser.paths[path][method];
+    assert.equal(projected.operationId,operation.operationId);
+    assert.deepEqual(projected.security,operation.security);
+    assert.deepEqual(projected.requestBody,operation.requestBody);
+    assert.deepEqual(projected.responses,operation.responses);
+    if(method==='post'){
+     writes++;
+     assert.ok([...(item.parameters??[]),...(operation.parameters??[])].some(p=>p.in==='header'&&p.name.toLowerCase()==='origin'&&p.required===true),'Missing canonical Origin: '+operation.operationId);
+    }
+    assert.ok(![...(browser.paths[path].parameters??[]),...(projected.parameters??[])].some(p=>p.in==='header'&&['origin','cookie','sec-fetch-site'].includes(p.name.toLowerCase())),'Browser-owned input: '+operation.operationId);
+   }
+  }
+  assert.ok(writes>0);
+ });
+});
