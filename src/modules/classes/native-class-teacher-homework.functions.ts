@@ -8,10 +8,12 @@ import { db } from "@/db/client";
 import { canonicalClasses, canonicalClassStaffAssignments } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
+import { nativeClassWorkRows,nativeOverdueWorkPredicate } from "./native-class-work-query.server";
 import { currentClassAuthority } from "./native-class-authority.server";
 import { writeCanonicalAudit } from "@/platform/canonical-mutation.server";
 
 const input=z.object({classId:z.string().uuid()}).strict();
+const pageInput=input.extend({offset:z.number().int().min(0).max(1000000).default(0)}).strict();
 const asRecord=(value:unknown):Record<string,unknown>=>
   value && typeof value==="object" && !Array.isArray(value)
     ?value as Record<string,unknown>:{};
@@ -59,7 +61,7 @@ async function authorizedTeacher(tx:Tx,classId:string){
  * independent grader authorization, and cannot alter grades or submissions.
  */
 export const getNativeClassTeacherHomework=createServerFn({method:"GET"})
- .validator((value:unknown)=>input.parse(value))
+ .validator((value:unknown)=>pageInput.parse(value))
  .handler(async({data})=>{
    setResponseHeader("Cache-Control","private, no-store");
    setResponseHeader("Referrer-Policy","no-referrer");
@@ -71,26 +73,16 @@ export const getNativeClassTeacherHomework=createServerFn({method:"GET"})
          p.legal_first_name AS first_name,
          p.legal_last_name AS last_name,
          p.preferred_name
-       FROM public.graded_submissions gs
-       INNER JOIN public.learner_course_attempts ca
-         ON ca.id=gs.course_attempt_id
-        AND ca.course_version_id=gs.course_version_id
-       INNER JOIN public.class_enrollments ce
-         ON ce.id=ca.class_enrollment_id
-        AND ce.course_attempt_id=ca.id
-        AND ce.status='active'
-       INNER JOIN public.people p ON p.id=ce.learner_person_id
+       FROM (${nativeClassWorkRows([cls.id])}) w
+       INNER JOIN public.graded_submissions gs ON gs.id=w.submission_id
+       INNER JOIN public.people p ON p.id=w.learner_person_id
        INNER JOIN public.graded_assignments ga
          ON ga.id=gs.assignment_id
-        AND ga.course_version_id=ca.course_version_id
+        AND ga.course_version_id=gs.course_version_id
         AND ga.section_id IS NULL
-       WHERE ce.class_id=${cls.id}::uuid
-         AND ca.status='active'
-         AND ca.section_id IS NULL
-         AND ca.course_version_id=${cls.courseVersionId}::uuid
-         AND gs.status IN ('submitted','returned','graded')
+       WHERE gs.status IN ('submitted','returned','graded')
        ORDER BY gs.submitted_at DESC NULLS LAST,gs.id
-       LIMIT 101
+       LIMIT 101 OFFSET ${data.offset}
      `);
      const rows=(result.rows as HomeworkRow[]).slice(0,100);
      return {
@@ -112,10 +104,11 @@ export const getNativeClassTeacherHomework=createServerFn({method:"GET"})
            practiceScoreMax:response.practiceResponse===true
              ?(typeof response.practiceScoreMax==="number"?response.practiceScoreMax:
                typeof response.maxDemoScore==="number"?response.maxDemoScore:null):null,
-           submittedAt:row.submitted_at?.toISOString()??null,
+           submittedAt:row.submitted_at?new Date(row.submitted_at).toISOString():null,
          };
        }),
        partial:result.rows.length>100,
+       nextOffset:result.rows.length>100?data.offset+100:null,
        canRecordOfficialGrade:false,
        canReturnPracticeFeedback:true,
        notice:"Viewing submitted work does not confer independent grading authority. Official grading requires a verified independent grader appointment and governed Course policy.",
@@ -124,6 +117,40 @@ export const getNativeClassTeacherHomework=createServerFn({method:"GET"})
  });
 
 
+
+/** Exact Class overdue-work roster, using the same population and deadline
+ * predicate as Teacher Today. This is a read, not an intervention or grade. */
+export const getNativeClassTeacherMissingWork=createServerFn({method:"GET"})
+ .validator((value:unknown)=>pageInput.parse(value))
+ .handler(async({data})=>{
+   setResponseHeader("Cache-Control","private, no-store");
+   setResponseHeader("Referrer-Policy","no-referrer");
+   return db.transaction(async tx=>{
+     const {cls}=await authorizedTeacher(tx,data.classId);
+     const result=await tx.execute(sql`
+       WITH work AS (
+         ${nativeClassWorkRows([cls.id])}
+       )
+       SELECT w.enrollment_id,w.assignment_id,w.title,w.due_at,
+         coalesce(w.submission_status,'not_started') AS status,
+         p.preferred_name,p.legal_first_name,p.legal_last_name
+       FROM work w
+       JOIN public.people p ON p.id=w.learner_person_id
+       WHERE ${nativeOverdueWorkPredicate}
+       ORDER BY w.due_at,w.enrollment_id,w.assignment_id
+       LIMIT 101 OFFSET ${data.offset}
+     `);
+     const rows=result.rows as Array<{
+       enrollment_id:string;assignment_id:string;title:string;due_at:Date|string;
+       status:string;preferred_name:string|null;legal_first_name:string|null;legal_last_name:string|null;
+     }>;
+     return {items:rows.slice(0,100).map(row=>({
+       classEnrollmentId:row.enrollment_id,assignmentId:row.assignment_id,
+       assignmentTitle:row.title,dueAt:new Date(row.due_at).toISOString(),status:row.status,
+       studentName:row.preferred_name??([row.legal_first_name,row.legal_last_name].filter(Boolean).join(" ")||"Learner"),
+     })),nextOffset:rows.length>100?data.offset+100:null};
+   });
+ });
 
 /** Exact active Class appointment, active learner enrollment and native attempt.
  * No history is disclosed on the basis of a submission UUID alone. */
