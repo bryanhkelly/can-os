@@ -2,6 +2,7 @@ import {defineConfig} from "@playwright/test";
 import provision from "./playwright.pilot-provision.config";
 const env=process.env;
 const suites={
+ roles:{fixture:"CAN_NEST_ROLES_QA_JSON",files:["nest-role-workspaces.spec.ts"]},
  student:{fixture:"CAN_STUDENT_QA_JSON",files:["nest-student-http.spec.ts","nest-access-provisioning-http.spec.ts"]},
  reporting:{fixture:"CAN_NEST_REPORT_QA_JSON",files:["nest-pilot-report-readback.spec.ts"]},
  pilot1:{fixture:"CAN_NEST_PILOT1_QA_JSON",files:["nest-pilot1-learning.spec.ts"]},
