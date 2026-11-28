@@ -1,0 +1,13 @@
+import {z} from "zod";
+import {curriculumDraftContent} from "@/domain/curriculum-authoring";
+import {classTeacherGuidesSchema} from "@/domain/class-teacher-guides";
+import {classLessonSchema} from "@/domain/class-content";
+const uuid=z.string().uuid(),key=z.string().min(1).max(100).regex(/^[a-zA-Z0-9_-]+$/);
+export const empty=z.object({}).strict();
+export const program=z.object({programId:uuid}).strict();
+const version=program.extend({versionId:uuid,expectedRevision:z.string().regex(/^[a-f0-9]{64}$/)});
+export const create=program.extend({requestId:uuid,code:z.string().trim().min(2).max(32).regex(/^[A-Za-z0-9_-]+$/),title:z.string().trim().min(2).max(160),subject:z.string().trim().min(2).max(100)}).strict();
+export const draft=program.extend({courseId:uuid,sourceVersionId:uuid.optional(),requestId:uuid}).strict();
+export const save=version.extend({content:curriculumDraftContent,teacherGuides:classTeacherGuidesSchema.nullable().optional()}).strict();
+export const lesson=version.extend({moduleId:key,lessonId:key,lesson:classLessonSchema}).strict();
+export const publish=version.extend({reason:z.string().trim().min(10).max(2000),confirmed:z.literal(true)}).strict();
