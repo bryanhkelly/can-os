@@ -3,7 +3,7 @@ import {selectCurrentSessionMembership,recordCurrentSessionActivity} from "./ses
 import { getInstructionalLearnerContext } from "./learning-command-context.server";
 import { AuthorizationError } from "@/domain/command-context";
 import { readNativeClassLearning, readNativeClassResume } from "@/modules/classes/native-class-learning-read.server";
-import { readNativeClassHomeworkSummary } from "@/modules/classes/native-class-homework-read.server";
+import { readNativeClassHomework, readNativeClassHomeworkSummary } from "@/modules/classes/native-class-homework-read.server";
 import {createLaunchSiteService} from "@/modules/programs/launch-site-create.server";
 import {submitNativeOfferingReleaseService,saveNativeOfferingReleasePolicyService,decideNativeOfferingReleaseService,publishNativeOfferingCoursesService,approveNativeOfferingAssetManifestService,publishNativeOfferingVersionService,getNativeOfferingReviewContentService,getNativeOfferingReleaseOverviewService,getNativeOfferingReleasePolicyReviewService,getNativeOfferingReleaseReviewQueueService} from "@/modules/learning/native-offering-release.server";
 import {readWorkspaceSession} from "./workspace-session.server";
@@ -68,6 +68,7 @@ export async function resolveHttpIdentity(request: Request) {
       };
     },
     readLearningResume: async (id:string) => readNativeClassResume(await learner(),id),
+    readHomeworkWorkspace: async (id:string) => readNativeClassHomework(await learner(),id),
     readHomeworkSummary: async (id:string) => readNativeClassHomeworkSummary(await learner(),id),
   };
 }
