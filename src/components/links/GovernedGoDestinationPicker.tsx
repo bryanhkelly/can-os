@@ -5,7 +5,7 @@ import {GoDestinationChoiceField} from "./GoDestinationChoiceField";
 import {useGoDestinationChoices} from "@/hooks/use-go-destination-choices";
 import {Input} from "@/components/ui/input";
 import {Select} from "@/components/ui/select";
-import {listAvailableGoDestinations} from "@/modules/engagement/site-go-links.functions";
+import {legacyGoLinkTransport,type GoLinkWorkspaceTransport} from "@/modules/engagement/go-link-workspace-transport";
 import type {GoDestination} from "@/domain/site-go-links";
 
 type Kind=GoDestination["kind"];
@@ -21,17 +21,17 @@ const kindLabels:Record<Exclude<Kind,"website-preview">,string>={
  * The server still rechecks publication at publish time AND at /go resolution.
  */
 export function GovernedGoDestinationPicker({
-  siteId,packageId,value,onChange,disabled=false,
+  siteId,packageId,value,onChange,disabled=false,transport=legacyGoLinkTransport,
 }:{
-  siteId:string;packageId?:string;
+  siteId:string;packageId?:string;transport?:GoLinkWorkspaceTransport;
   value:GoDestination|null;onChange:(value:GoDestination|null)=>void;
   disabled?:boolean;
 }){
   const [kind,setKind]=useState<Kind>("information");
   const [search,setSearch]=useState("");
   const {choices,loading,error,retry}=useGoDestinationChoices(
-    ["site",siteId,packageId??null,kind,search.trim()],
-    ()=>listAvailableGoDestinations({data:{siteId,packageId,kind,term:search.trim()}}),
+    ["site",transport.kind,siteId,packageId??null,kind,search.trim()],
+    ()=>transport.api.listAvailableGoDestinations({data:{siteId,packageId,kind,term:search.trim()}}),
   );
   return <div className="grid gap-3 sm:grid-cols-2">
     <Field label="Destination type"><Select value={kind} disabled={disabled} onChange={event=>{
