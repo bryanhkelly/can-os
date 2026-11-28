@@ -35,8 +35,20 @@ test("verified personal and institutional signup through NestJS only",async()=>{
    expect((await personal.post(api+"/me/session/membership",{headers:{Origin:origin},data:{grantId:sg.id}})).status()).toBe(403);
    expect((await qaSession({request:personal},"nest")).activeGrantId).toBe(pg.id);
    for(const client of [personal,site]){
+     for(const path of ["delegation","delegation-targets?search=QA"]){
+       expect((await client.get(api+"/owner/"+path,{headers:{"x-role":"platform_owner"}})).status()).toBe(403);
+     }
+     for(const [path,data] of [
+       ["delegation",{grantId:sg.id,mode:"view",reason:"Unauthorized QA delegation attempt"}],
+       ["delegation/return",{confirm:true}],
+       ["private-credential-recovery",{grantId:sg.id,reason:"Unauthorized QA credential recovery",confirm:true}],
+     ] as const){
+       expect((await client.post(api+"/owner/"+path,{headers:{Origin:origin},data})).status()).toBe(403);
+     }
      expect((await client.post(api+"/access/logout",{headers:{Origin:origin},data:{}})).status()).toBe(204);
      expect((await client.get(api+"/access/session")).status()).toBe(401);
+     expect((await client.post(api+"/access/logout",{headers:{Origin:origin},data:{}})).status()).toBe(204);
+     expect((await client.post(api+"/access/logout",{headers:{Origin:"https://foreign.example"},data:{}})).status()).toBe(403);
    }
  }finally{await Promise.all([personal.dispose(),site.dispose()]);}
 });
