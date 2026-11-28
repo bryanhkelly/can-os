@@ -16,3 +16,18 @@ export async function checkStudentContract(client:BecomunaBrowserApi, enrollment
  // @ts-expect-error the exact enrollment path parameter is required
  await client.GET('/api/v1/me/class-enrollments/{classEnrollmentId}/resume',{params:{path:{}}});
 }
+
+import {createCampaignApi} from './campaign-api';
+export async function checkCampaignContract(client:BecomunaBrowserApi,id:string){
+ const scope={engagementId:id,linkId:id};
+ const campaigns=createCampaignApi(client);
+ const workspace=await campaigns.readEngagementCampaignWorkspace({data:scope});
+ const pending:number|undefined=workspace.campaigns[0]?.pending;void pending;
+ await campaigns.queueEngagementCampaign({data:{...scope,listId:id,requestId:id,scheduledAt:new Date().toISOString(),confirmed:true}});
+ // @ts-expect-error stable request ID is required
+ await campaigns.queueEngagementCampaign({data:{...scope,listId:id,scheduledAt:new Date().toISOString(),confirmed:true}});
+ // @ts-expect-error explicit consent attestation is required
+ await campaigns.saveCampaignRecipientList({data:{...scope,name:'Pilot',raw:'test@example.test',consentSource:'Documented permission',attested:false}});
+ // @ts-expect-error direct and saved-list recipients cannot be mixed
+ await campaigns.queueEngagementCampaign({data:{...scope,listId:id,raw:'test@example.test',consentSource:'Documented permission',attested:true,requestId:id,scheduledAt:new Date().toISOString(),confirmed:true}});
+}
