@@ -24,7 +24,10 @@ export const getMyStudentClasses=createServerFn({method:"GET"}).handler(async()=
     throw error;
   }
   const membership=studentSiteScope(actor);
-  if(!membership)return {kind:"other" as const,classes:[]};
+  if(!membership){
+    if(actor.role==="student")throw new AuthorizationError("exact current student Site grant");
+    return {kind:"other" as const,classes:[]};
+  }
 
   return db.transaction(async tx=>{
     const scope=and(

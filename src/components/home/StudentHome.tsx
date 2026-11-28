@@ -58,7 +58,11 @@ export async function loadStudentToday() {
       if (!view.connected) throw new DataUnavailableError();
       return { connected: view.connected, events: view.events, notices: view.notices };
     })(),
-    safeLoader(loadNativeStudentHomework)(),
+    safeLoader(async()=>{
+      const classes=await classesPromise;
+      if(!classes.ok)throw new DataUnavailableError();
+      return loadNativeStudentHomework(classes.data);
+    })(),
   ]);
   let success: StudentSuccessPriorities | null = null;
   if (assignmentResult.ok) success = deriveStudentSuccessPriorities(assignmentResult.data, new Date(today.generatedAt));

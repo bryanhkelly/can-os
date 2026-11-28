@@ -33,6 +33,7 @@ export function StudentExperience({ liveData, success, support, dashboard }: {
   {liveData.hasEnrollmentGuardian === false && <WorkspaceNotice tone="danger">
    Your student record does not have a verified guardian with enrollment permission. Study-group requests need guardian permission. Ask your school office to verify the parent or guardian on your record; you cannot add or verify a guardian from this student account.
   </WorkspaceNotice>}
+  {liveData.schoolRecordsUnavailable && <WorkspaceNotice tone="attention">School records could not be verified. Your native Class access is checked independently.</WorkspaceNotice>}
   <StudentDashboard liveData={liveData} data={dashboard} />
   <div className="student-dashboard-followups">
   {success !== undefined && <StudentSuccessPriorityPanel plan={success} />}

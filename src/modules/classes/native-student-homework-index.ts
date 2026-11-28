@@ -5,8 +5,12 @@ import { orderedBatches } from "@/lib/ordered-batches";
 
 /** Compose authorized reads without transporting answer text or teacher feedback
  * to an aggregate list. The Class workspace still owns all homework commands. */
-export async function loadNativeStudentHomework() {
-  const membership = await getMyStudentClasses();
+export async function loadNativeStudentHomework(
+  verifiedClasses?:Awaited<ReturnType<typeof getMyStudentClasses>>,
+) {
+  // The caller may reuse an already fetched display index; the homework RPC
+  // independently reauthorizes every enrollment before reading any record.
+  const membership = verifiedClasses ?? await getMyStudentClasses();
   if (membership.kind !== "student") return {kind:"other" as const,classes:[]};
   const enrolled = membership.classes.filter(item=>item.status==="active" && item.enrollmentId && item.courseAttemptId);
   const classes = [];

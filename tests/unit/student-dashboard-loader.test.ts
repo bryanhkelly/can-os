@@ -59,6 +59,26 @@ describe("refined student dashboard composition",()=>{
     expect(getClassWorkspace).not.toHaveBeenCalled();
     expect(result.dashboard.learning).toEqual({ok:true,data:{classId:"class",title:"Algebra",lesson:{id:"lesson",title:"Equations"},completed:0,total:1}});
   });
+  it("opens a canonical-only student day and native homework without school records",async()=>{
+    vi.mocked(getMyStudentToday).mockResolvedValue({
+      student:{studentProfileId:null,personId:"person",firstName:"Jordan",preferredName:null,gradeLevel:null},
+      generatedAt:new Date("2030-11-05T15:00:00Z"),sections:[],
+      coursework:[],events:[],openActions:[],recoveryCandidates:[],firstWeek:[],
+      schoolRecordsUnavailable:true,
+    } as Awaited<ReturnType<typeof getMyStudentToday>>);
+    vi.mocked(getAssignments).mockRejectedValue(new AuthorizationError("school records"));
+    const classes={kind:"student" as const,classes:[{classId:"class",title:"Algebra",deliveryMode:"self_paced" as const,enrollmentId:"enrollment",status:"active" as const,courseAttemptId:"attempt",creditMode:"not_applicable" as const,canJoin:false}]};
+    vi.mocked(getMyStudentClasses).mockResolvedValue(classes);
+    vi.mocked(getNativeClassLearningResume).mockResolvedValue({classId:"class",title:"Algebra",lesson:{id:"lesson",title:"Equations"},completed:0,total:1});
+    vi.mocked(loadNativeStudentHomework).mockResolvedValue({kind:"student",classes:[{classId:"class",title:"Algebra",creditMode:"not_applicable",available:true,assignments:[{id:"work",title:"Practice",dueAt:null,status:"not_started",submittedAt:null}]}]});
+    const result=await loadStudentToday();
+    expect(result.today.student.studentProfileId).toBeNull();
+    expect(result.dashboard.learning).toMatchObject({ok:true,data:{classId:"class"}});
+    expect(result.dashboard.nativeHomework).toMatchObject({ok:true,data:{classes:[{classId:"class",assignments:[{id:"work"}]}]}});
+    expect(getMyStudentClasses).toHaveBeenCalledTimes(1);
+    expect(loadNativeStudentHomework).toHaveBeenCalledWith(classes);
+    expect(getClassWorkspace).not.toHaveBeenCalled();
+  });
   it("uses current identity APIs and projects only real instructional progress and released grade fields",async()=>{
     const result=await loadStudentToday();
     expect(getMyStudentToday).toHaveBeenCalledWith();

@@ -121,6 +121,10 @@ function NativeLearnerClasses({navigation}:{navigation:ReactNode}){
     title="My Classes">
     <p role="status" className="mt-5 text-sm">Checking your Class membership…</p>
   </WorkspaceShell>;
+  if(student.isError)return <WorkspaceShell width="wide" eyebrow="CAN OS" title="My Classes">
+    <p role="alert" className="mt-5 text-sm">Class membership could not be verified. Retry or select your authorized membership.</p>
+    <Button type="button" variant="outline" className="mt-3" onClick={()=>void student.refetch()}>Retry</Button>
+  </WorkspaceShell>;
   if(student.data?.kind==="student")return <NativeStudentClassHome
     classes={student.data.classes} navigation={navigation}/>;
   return <NativeTeacherOrAdultClasses navigation={navigation}/>;
