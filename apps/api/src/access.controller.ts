@@ -27,7 +27,9 @@ async function translateResponse(response:Response,reply:FastifyReply,status:num
  if(cookie){
    // JSON verification and logout issue exactly one existing secure cookie.
    // Never manufacture a session cookie or copy arbitrary response headers.
-   if(!/^__Host-can_os_session=/.test(cookie)||!cookie.includes('HttpOnly')||!cookie.includes('Secure')||!cookie.includes('Path=/'))throw new InternalServerErrorException();
+   // Exact canonical cookie grammar; reject additional cookies, Domain, and
+   // malformed attributes instead of accepting substring matches.
+   if(!/^__Host-can_os_session=(?:[A-Za-z0-9_-]{40,128})?; Path=\/; HttpOnly; Secure; SameSite=Lax; Max-Age=\d+$/.test(cookie))throw new InternalServerErrorException();
    reply.header('Set-Cookie',cookie);
  }
  reply.header('Referrer-Policy','no-referrer');
