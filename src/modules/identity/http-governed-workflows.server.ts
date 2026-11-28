@@ -83,6 +83,13 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
  if(!context.actorPersonId)throw new AuthorizationError("verified Person");
  const participation=participationWorkflow(request,mode);
  return {
+  getAdmissionOfferOptions:participation.getAdmissionOfferOptions,
+  issueAdmissionOffer:participation.issueAdmissionOffer,
+  respondToAdmissionOffer:participation.respondToAdmissionOffer,
+  activateOfferedEnrollment:participation.activateOfferedEnrollment,
+  withdrawIssuedAdmissionOffer:participation.withdrawIssuedAdmissionOffer,
+  withdrawMyNativeClassEnrollment:participation.withdrawMyNativeClassEnrollment,
+  cancelNativeClassEnrollment:participation.cancelNativeClassEnrollment,
   joinNoncreditWaitlist:participation.joinNoncreditWaitlist,
   cancelMyNoncreditWaitlist:participation.cancelMyNoncreditWaitlist,
   getMyNoncreditWaitlistPage:participation.getMyNoncreditWaitlistPage,
