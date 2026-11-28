@@ -1,7 +1,7 @@
-import { and, eq, isNotNull, sql } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { accessAccounts, accessAccountSignups, accountPersonGrants, people } from "@/db/schema";
-import { canonicalSessions } from "@/db/canonical-v301";
+import { accessAccounts, accessAccountSignups, accessAccountNoncreditPrincipals, accountPersonGrants, people } from "@/db/schema";
+import { canonicalSessions,canonicalAccounts,canonicalAccountGrants } from "@/db/canonical-v301";
 import { canonicalSessionCookie } from "@/domain/canonical-access";
 import { secureSessionCookieHeader } from "@/domain/session-cookies";
 import { hashAccessSecret, issueOpaqueSecret } from "@/domain/access-tokens";
@@ -127,6 +127,25 @@ export async function assertVerifiedAdultSessionForMutation(tx:Tx,request:Reques
  * Account/Person/session, under the outer write transaction. */
 export async function issueNativeLearnerSession(tx:Tx, request:Request, owner:VerifiedSelfEnrollmentActor, accountId:string, grantId:string, now:Date) {
   await assertVerifiedAdultSessionForMutation(tx,request,owner);
+  // Lock the independently bound native account/grant before minting.
+  // This compatibility credential must not create a new identity or switch
+  // the verified current public Person, even if a caller passes a stale ID.
+  const [bound]=await tx.select({id:canonicalAccountGrants.id})
+    .from(canonicalAccountGrants)
+    .innerJoin(canonicalAccounts,eq(canonicalAccounts.id,canonicalAccountGrants.accountId))
+    .innerJoin(accessAccountNoncreditPrincipals,and(
+      eq(accessAccountNoncreditPrincipals.canonicalAccountId,canonicalAccounts.id),
+      eq(accessAccountNoncreditPrincipals.canonicalPersonId,canonicalAccountGrants.personId)))
+    .where(and(eq(canonicalAccountGrants.id,grantId),eq(canonicalAccounts.id,accountId),
+      eq(accessAccountNoncreditPrincipals.accessAccountId,owner.accountId),
+      eq(accessAccountNoncreditPrincipals.accessPersonId,owner.personId),
+      eq(canonicalAccountGrants.personId,owner.personId),
+      eq(canonicalAccountGrants.roleCode,"learner"),eq(canonicalAccountGrants.active,true),
+      isNull(canonicalAccountGrants.revokedAt),isNull(canonicalAccountGrants.siteId),
+      eq(canonicalAccounts.emailNormalized,owner.email),
+      isNotNull(canonicalAccounts.emailVerifiedAt),isNull(canonicalAccounts.disabledAt)))
+    .for("share").limit(1);
+  if(!bound)throw new AuthorizationError("current linked native learner grant");
   const pepper=process.env.CAN_CANONICAL_ACCESS_TOKEN_PEPPER;
   if(!pepper||pepper.length<32)
     throw new Error("Native learning session is temporarily unavailable");
