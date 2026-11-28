@@ -1,0 +1,33 @@
+name: API-first quality gate
+on:
+  pull_request:
+    branches: [architecture/api-first-nestjs]
+  push:
+    branches: [api-first/ws12-quality-engineering]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ws12-source-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      TMPDIR: ${{ runner.temp }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Exact revision source and runtime gate (no QA credentials)
+        run: node scripts/acceptance/run-api-first-release-gate.mjs --source
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ws12-source-evidence
+          path: ${{ runner.temp }}/becomuna-ws12-*/evidence.json
+          if-no-files-found: warn
