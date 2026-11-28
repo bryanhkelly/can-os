@@ -324,3 +324,17 @@ test('cross-package schema failure cannot be mistaken for caller validation',asy
  service.bridge={classifyHttpDomainError:error=>error?.name==='ZodError'?'unexpected':'validation'};
  await assert.rejects(()=>service.runWorkflow(async()=>{throw Object.assign(Error('private persistence value'),{name:'ZodError'});}),e=>e.message==='Unexpected domain failure');
 });
+
+test('program launch commands do not collapse evidence submission, review and activation',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const path of ["/api/v1/program-launches","/api/v1/launch-requirement-completions","/api/v1/launch-evidence-submissions","/api/v1/launch-evidence-decisions","/api/v1/program-launch-activations","/api/v1/launch-orientations"]){
+   const op=document.paths[path].post;assert.ok(op.security);assert.ok(op.requestBody);assert.ok(op.responses['403']);
+   assert.equal((await fetch(url+path,{method:'POST',headers:{Origin:url,'content-type':'application/json'},body:'{}'})).status,503);
+  }
+ });
+ const {bodies}=require('../dist/launch.contracts');
+ const id='00000000-0000-4000-8000-000000000001';
+ assert.equal(bodies.complete.safeParse({journeyRequirementId:id,confirmed:false}).success,false);
+ assert.equal(bodies.submit.safeParse({journeyRequirementId:id,statement:'Reviewed documentation',decision:'accepted'}).success,false);
+ assert.equal(bodies.activate.safeParse({programId:id,overrideReadiness:true}).success,false);
+});
