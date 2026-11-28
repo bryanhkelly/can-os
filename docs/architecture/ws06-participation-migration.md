@@ -92,3 +92,25 @@ Existing admissions and family authorization remain authoritative: registrar sco
 Three shared Request-based service modules replace business logic in the old adapters. Added strict boundary contracts, OpenAPI schemas, HTTP/SDK assertions, and adjusted the source boundary test. Static inspection finds 33 incremental operation IDs wired through controller/workflow/bridge (37 in ParticipationController including original four), with no duplicate controller routes or operation IDs. No runtime/build/SDK/database tests executed.
 
 Remaining: public interest inbox/conversion and family-start request, guardian offer reads and enrollment requirements, noncredit catalog/history/operator queues, frontend SDK cutover, retirement of legacy RPC, authenticated lifecycle and both pilot tests. Existing business policy, migrations and production environments unchanged.
+
+## Increment 4 — Interest inbox, guardian offer visibility and transfer destination entry
+
+Seven additional REST operations under /api/v1:
+
+| Method | Resource |
+|---|---|
+| GET | admission-interests |
+| POST | admission-interest-assignments |
+| POST | admission-interest-invitations |
+| POST | admission-interest-status-changes |
+| GET | me/admission-offers |
+| GET | me/transfer-destinations |
+| POST | transfer-destination-family-starts |
+
+The registrar can read the scoped, cursor-paginated interest inbox, assign a Site-level lead to an independently authorized Program, request the existing consented-interest private family-start invitation, or record follow-up/closure. Conversion is intentionally not a status override: use admission-inquiries with the existing public-interest linkage and identity review. A verified email is not guardian verification. Neither interest assignment nor invitation creates a child, seat or Application.
+
+Guardian offer visibility uses the existing verified relationship and Program scope; the response preserves blockers, offer progress and same-year enrollment/class placement. Transfer destination discovery is restricted to published, independently authorized academic destinations, and the family-start command requires a verified guardian's existing transfer and explicit destination confirmation. A request receipt is not delivery or enrollment confirmation.
+
+The existing anonymous published-site submission and token redemption routes are unchanged. No new public bypass, provider or identity logic. Three shared Request-based service modules with legacy adapters; protected REST boundary, private/no-store and no-referrer, strict request/response schemas, HTTP and SDK contract assertions. Source check: all 40 incremental operations wired, 44 operation IDs in ParticipationController, unique local routes/IDs and every referenced contract export present. Runtime build, SDK generation, authenticated/negative HTTP tests, RLS and both pilot journeys remain unexecuted.
+
+Remaining: public anonymous ingress/token redemption parity, staff family invitation batch management (coordinate WS05), enrollment requirements/checklist, participation history/catalog/operator management, frontend cutover and legacy retirement. 
