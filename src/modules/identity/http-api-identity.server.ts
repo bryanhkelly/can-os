@@ -62,6 +62,10 @@ export async function resolveHttpIdentity(request: Request) {
   };
 }
 export function classifyHttpDomainError(error: unknown) {
+  // Raw schema errors are not presumed to be client faults. The caller
+  // input boundary marks a VALIDATION_FAILED DomainError explicitly.
+  // This also handles separate Zod installations across the Node bridge.
+  if(error&&typeof error==="object"&&"name" in error&&error.name==="ZodError")return "unexpected";
   return normalizeClientError(error).kind;
 }
 

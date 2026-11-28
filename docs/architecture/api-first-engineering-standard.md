@@ -32,3 +32,6 @@ Exit: both pilots independently run against deployed target through documented A
 ## Known runtime boundaries
 
 Existing src/db/client.ts already supports a Node pool and Worker request-scoped pools. Existing readWorkspaceSession(request) uses Web Request; canonical context has a separate restricted reader and explicit cookie policy. These are reuse candidates, not proof of parity. Audit their transitive dependencies, existing Worker environment bindings and canonical transaction scope before integrating. Do not wrap TanStack server functions as the new business API.
+
+### Validation and fault classification
+Every caller-facing command parser must explicitly mark invalid request data using the shared domain input boundary (or equivalent reviewed HTTP validation). Raw schema failures from database rows, internal invariants, and response DTOs are internal faults, not 400 responses; this rule also applies across package/runtime boundaries. Contract tests must distinguish malformed input from invalid persisted/output data, and must not echo private values. New endpoints are not accepted on source coverage alone.

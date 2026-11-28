@@ -478,9 +478,9 @@ export async function saveNativeOfferingReleasePolicyService(actor:Actor,raw:unk
 /** Only a current Course-appointed publisher reviewer sees submitted items.
  * Publisher Organization membership alone is never enough. */
 export async function getNativeOfferingReleaseReviewQueueService(actor:Actor,raw:unknown){
-    const data=z.object({
+    const data=parseCommandInput(z.object({
     cursor:z.object({createdAt:z.string().datetime({offset:true}),id:uuid}).strict().nullable(),
-  }).strict().parse(raw);
+  }).strict(),raw);
     const reviewerPersonId=actor.actorPersonId;
     if(!reviewerPersonId||actor.role!=="academic_content_reviewer"||
       !actor.scope.organizationIds?.length)throw new AuthorizationError("publisher reviewer");

@@ -1,3 +1,4 @@
+import {parseCommandInput} from "@/domain/command-input";
 import {assertCapability} from "@/domain/command-context";
 import {z} from "zod";
 import {getCanonicalCommandContext} from "@/modules/identity/canonical-command-context.server";
@@ -11,14 +12,14 @@ import {createBlueprintConfiguration,getBlueprintConfiguration,saveBlueprintConf
 import {decideBlueprintReview,getBlueprintReview,getBlueprintReviewHistory} from "./blueprint-review.server";
 import {executeBlueprintConfiguration} from "./blueprint-execution.server";
 export async function createCanonicalBlueprintConfigurationService(request:Request,raw:unknown){
-    const data=createBlueprintConfigurationInputSchema.parse(raw);
+    const data=parseCommandInput(createBlueprintConfigurationInputSchema,raw);
     const context = await getBlueprintPlanningContext(request);
     requireBlueprintSiteScope(context, data.version.config);
     return createBlueprintConfiguration(context, data);
 }
 
 export async function saveCanonicalBlueprintConfigurationService(request:Request,raw:unknown){
-    const data=saveBlueprintConfigurationInputSchema.parse(raw);
+    const data=parseCommandInput(saveBlueprintConfigurationInputSchema,raw);
     const context = await getBlueprintPlanningContext(request);
     const siteId = requireBlueprintSiteScope(context, data.version.config);
     const existing = await getBlueprintConfiguration(context, data.configurationId);
@@ -29,7 +30,7 @@ export async function saveCanonicalBlueprintConfigurationService(request:Request
 }
 
 export async function submitCanonicalBlueprintConfigurationService(request:Request,raw:unknown){
-    const data=submitBlueprintConfigurationInputSchema.parse(raw);
+    const data=parseCommandInput(submitBlueprintConfigurationInputSchema,raw);
     const context = await getBlueprintPlanningContext(request);
     const existing = await getBlueprintConfiguration(context, data.configurationId);
     requireBlueprintSiteScope(context, existing.config);
@@ -37,17 +38,17 @@ export async function submitCanonicalBlueprintConfigurationService(request:Reque
 }
 
 export async function decideCanonicalBlueprintReviewService(request:Request,raw:unknown){
-    const data=decideBlueprintReviewInputSchema.parse(raw);
+    const data=parseCommandInput(decideBlueprintReviewInputSchema,raw);
     return decideBlueprintReview(await getCanonicalCommandContext(request), data);
 }
 
 export async function executeCanonicalBlueprintConfigurationService(request:Request,raw:unknown){
-    const data=executeBlueprintConfigurationInputSchema.parse(raw);
+    const data=parseCommandInput(executeBlueprintConfigurationInputSchema,raw);
     return executeBlueprintConfiguration(await getCanonicalCommandContext(request), data);
 }
 
 export async function readCanonicalBlueprintConfigurationService(request:Request,raw:unknown){
- const data=z.object({configurationId:z.string().uuid()}).strict().parse(raw);
+ const data=parseCommandInput(z.object({configurationId:z.string().uuid()}).strict(),raw);
     const context = await getBlueprintPlanningContext(request);
     const detail = await getBlueprintConfiguration(context, data.configurationId);
     requireBlueprintSiteScope(context, detail.config);

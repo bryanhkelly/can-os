@@ -316,3 +316,11 @@ test('explicit domain input errors map to 400 while local response schema failur
  await assert.rejects(()=>service.runWorkflow(async()=>{throw Object.assign(new Error('private value'),{code:'VALIDATION_FAILED'});}),e=>e.getStatus()===400&&!e.message.includes('private value'));
  await assert.rejects(()=>service.runWorkflow(async()=>z.string().parse(123)),e=>e.name==='ZodError');
 });
+
+test('cross-package schema failure cannot be mistaken for caller validation',async()=>{
+ const {CanonicalIdentityService}=require('../dist/identity.service');
+ const service=new CanonicalIdentityService();
+ service.configure(true);
+ service.bridge={classifyHttpDomainError:error=>error?.name==='ZodError'?'unexpected':'validation'};
+ await assert.rejects(()=>service.runWorkflow(async()=>{throw Object.assign(Error('private persistence value'),{name:'ZodError'});}),e=>e.message==='Unexpected domain failure');
+});

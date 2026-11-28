@@ -64,3 +64,5 @@ Seventeen HTTP operations now share existing native teacher home, homework, foll
 
 ## Command input boundary (incremental)
 Class administration, session lifecycle, teacher/guardian workflows and learner mutations explicitly mark invalid command inputs using shared parseCommandInput. Schema defaults, transforms and strict validation are preserved. This does not yet complete the global error migration: raw schema failures in other domain services still need explicit input/output separation before changing the shared bridge classifier.
+
+The explicit command boundary now covers direct entry parsing in the migrated Class, role, classroom, participation, Offering, Blueprint and reporting services (79 marked parser sites across these increments, including shared Blueprint review and reporting discovery). Raw Zod errors are treated as internal errors by the HTTP bridge; caller-validation DomainErrors remain 400. Remaining nested/unmarked domain entry parsers must be audited; do not assume all failures have been classified by these changes. Existing UI transport and error normalization outside this bridge remain unchanged.

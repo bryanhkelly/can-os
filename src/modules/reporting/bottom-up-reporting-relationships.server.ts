@@ -1,3 +1,4 @@
+import {parseCommandInput} from "@/domain/command-input";
 import {sql} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
@@ -131,7 +132,7 @@ export async function proposeReportingRelationship(request:Request,input:unknown
   const canAuthorize=actor.capabilities.has("relationships.propose");
   if((!canAuthorize&&!actor.capabilities.has("relationships.initiate"))||actor.scope.organizationIds?.length!==1)
     throw new AuthorizationError("relationship initiation");
-  const candidate=relationshipProposalSchema.parse(input);
+  const candidate=parseCommandInput(relationshipProposalSchema,input);
   return db.transaction(async tx=>{
     const ownerId=await requireRelationshipAuthority(tx,request,actor,true);
     const scope=await resolveScope(tx,candidate.scopeKind,candidate.scopeId,ownerId);
@@ -165,7 +166,7 @@ const actionInput=z.object({agreementId:uuid,action:z.enum(["accept","decline","
  * lifecycle event in the same transaction. No decision can modify scope. */
 export async function decideReportingRelationship(request:Request,input:unknown):Promise<ReportingRelationship>{
   const actor=await getIdentityContext(request);
-  const {agreementId,action}=actionInput.parse(input);
+  const {agreementId,action}=parseCommandInput(actionInput,input);
   const capability=action==="accept"||action==="decline"?"relationships.decide":"relationships.revoke";
   if(!actor.capabilities.has(capability)||actor.scope.organizationIds?.length!==1)
     throw new AuthorizationError(capability);
@@ -220,7 +221,7 @@ const lookupInput=z.object({query:z.string().trim().min(2).max(80),after:z.strin
  * management appointment are requestable; never expose contacts or accounts. */
 export async function searchRelationshipRecipients(request:Request,input:unknown){
   const actor=await getIdentityContext(request);
-  const {query,after}=lookupInput.parse(input);
+  const {query,after}=parseCommandInput(lookupInput,input);
   return db.transaction(async tx=>{
     const ownerId=await requireRelationshipAuthority(tx,request,actor,true);
     const domain=await ownerDomain(tx,ownerId);
@@ -251,7 +252,7 @@ const listInput=z.object({direction:z.enum(["incoming","outgoing"]),after:uuid.o
  * access to the other party's private workspace. */
 export async function listReportingRelationships(request:Request,input:unknown){
   const actor=await getIdentityContext(request);
-  const {direction,after,scope:selection}=listInput.parse(input);
+  const {direction,after,scope:selection}=parseCommandInput(listInput,input);
   return db.transaction(async tx=>{
     const manager=actor.capabilities.has("relationships.propose");
     if(!manager&&(!selection||direction!=="outgoing"))throw new AuthorizationError("exact Site relationship scope");
@@ -304,7 +305,7 @@ const scopeInput=z.object({kind:relationshipProposalSchema.shape.scopeKind,after
 /** Resource choices are independently resolved from the current owner's data. */
 export async function listRelationshipScopes(request:Request,input:unknown){
   const actor=await getIdentityContext(request);
-  const {kind,after}=scopeInput.parse(input);
+  const {kind,after}=parseCommandInput(scopeInput,input);
   return db.transaction(async tx=>{
     const owner=await requireRelationshipAuthority(tx,request,actor);
     const source=kind==="organization"?sql`SELECT id,name FROM public.organizations WHERE id=${owner}::uuid`:
@@ -372,7 +373,7 @@ const internalReportInput=z.object({
  * review of overlapping cuts are available. Never return source facts. */
 export async function readInternalRelationshipRegistrationProjection(request:Request,input:unknown){
   const actor=await getIdentityContext(request);
-  const {metric,from,to}=internalReportInput.parse(input);
+  const {metric,from,to}=parseCommandInput(internalReportInput,input);
   if(!actor.capabilities.has("relationships.report"))throw new AuthorizationError("relationships.report");
   return db.transaction(async tx=>{
     const recipient=await requireRelationshipAuthority(tx,request,actor);

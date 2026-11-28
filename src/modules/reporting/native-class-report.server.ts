@@ -1,3 +1,4 @@
+import {parseCommandInput} from "@/domain/command-input";
 import {and,eq,inArray} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
@@ -37,7 +38,7 @@ function iso(value:Date){return value.toISOString();}
  */
 import {DomainError} from "@/domain/errors";
 export async function getNativeClassReportService(request:Request,raw:unknown){
- const data=nativeClassReportInput.parse(raw);
+ const data=parseCommandInput(nativeClassReportInput,raw);
     const from=new Date(data.from+"T00:00:00.000Z");
     const to=new Date(data.to+"T00:00:00.000Z");
     const asOf=new Date();

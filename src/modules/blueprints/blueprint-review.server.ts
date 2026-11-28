@@ -1,3 +1,4 @@
+import {parseCommandInput} from "@/domain/command-input";
 import { and, desc, eq, gte, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { withBlueprintDatabase } from "@/modules/blueprints/blueprint-database-scope.server";
@@ -82,7 +83,7 @@ export async function getBlueprintReview(
 ) {
   if (!context.actorPersonId) throw new AuthorizationError("authenticated session");
   assertCapability(context, "blueprint.read");
-  const { configurationVersionId } = blueprintReviewReadInputSchema.parse(rawInput);
+  const { configurationVersionId } = parseCommandInput(blueprintReviewReadInputSchema,rawInput);
   const isCanPlanning = isVerifiedCanSitePlanning(context);
   const databaseRole = isCanPlanning ? null : blueprintReadDatabaseRole(context);
   return withBlueprintDatabase(context, () => db.transaction(async tx => {
@@ -144,7 +145,7 @@ export async function getBlueprintReviewHistory(
 ) {
   if (!context.actorPersonId) throw new AuthorizationError("authenticated session");
   assertCapability(context, "blueprint.read");
-  const { configurationVersionId, page } = blueprintReviewHistoryInputSchema.parse(rawInput);
+  const { configurationVersionId, page } = parseCommandInput(blueprintReviewHistoryInputSchema,rawInput);
   const isCanPlanning = isVerifiedCanSitePlanning(context);
   const databaseRole = isCanPlanning ? null : blueprintReadDatabaseRole(context);
   return withBlueprintDatabase(context, () => db.transaction(async tx => {
@@ -195,7 +196,7 @@ export async function decideBlueprintReview(
 ): Promise<BlueprintReviewResult> {
   if (!context.actorPersonId) throw new AuthorizationError("authenticated session");
   assertCapability(context, "blueprint.review");
-  const input = decideBlueprintReviewInputSchema.parse(rawInput);
+  const input = parseCommandInput(decideBlueprintReviewInputSchema,rawInput);
   const actorPersonId = context.actorPersonId;
 
   const databaseRole = blueprintDatabaseRole(context, "blueprint_reviewer");
