@@ -317,3 +317,45 @@ export async function listRelationshipScopes(request:Request,input:unknown){
     return {items:rows.slice(0,25),next:rows.length>25?rows[24]!.id:null,metrics:relationshipProposalMetrics(kind)};
   });
 }
+
+/** Setup inventory only. The counts describe current relationship terms, not
+ * executable reporting authority or learner outcomes. Never total a paged inbox. */
+export async function readRelationshipPortfolio(request:Request){
+  const actor=await getIdentityContext(request);
+  return db.transaction(async tx=>{
+    const organizationId=await requireRelationshipAuthority(tx,request,actor);
+    const population=relationshipPopulation(await ownerDomain(tx,organizationId));
+    if(!population)throw new AuthorizationError("classified relationship portfolio");
+    const result=await tx.execute(sql`
+      SELECT r.id,r.owner_organization_id AS "ownerId",r.recipient_organization_id AS "recipientId",
+        r.scope_kind AS "scopeKind",r.scope_id AS "scopeId",r.relationship_kind AS "kind",r.status,
+        r.data_population AS population,jsonb_array_length(r.metrics)::integer AS "metricCount",
+        owner.domain AS "ownerDomain",recipient.domain AS "recipientDomain"
+      FROM public.reporting_relationship_agreements r
+      JOIN public.organizations owner ON owner.id=r.owner_organization_id AND owner.lifecycle_status='active'
+      JOIN public.organizations recipient ON recipient.id=r.recipient_organization_id AND recipient.lifecycle_status='active'
+      WHERE (r.owner_organization_id=${organizationId}::uuid OR r.recipient_organization_id=${organizationId}::uuid)
+        AND r.status IN ('accepted','pending')
+        AND (r.valid_through IS NULL OR r.valid_through>CURRENT_TIMESTAMP)
+      ORDER BY r.id LIMIT 10001`);
+    const rows=z.array(z.object({id:uuid,ownerId:uuid,recipientId:uuid,
+      scopeKind:relationshipProposalSchema.shape.scopeKind,scopeId:uuid,
+      kind:relationshipProposalSchema.shape.relationshipKind,status:z.enum(["accepted","pending"]),
+      population:z.enum(["real","synthetic","unknown"]),metricCount:z.number().int().nonnegative(),
+      ownerDomain:z.string().nullable(),recipientDomain:z.string().nullable()})).parse(result.rows);
+    if(rows.length>10000)throw new Error("Relationship portfolio exceeds bounded inventory; use a scoped report.");
+    const current=rows.filter(row=>row.population===population&&
+      relationshipPopulation(row.ownerDomain)===population&&relationshipPopulation(row.recipientDomain)===population);
+    const accepted=current.filter(row=>row.status==="accepted");
+    const connectedOrganizations=new Set(accepted.map(row=>row.ownerId===organizationId?row.recipientId:row.ownerId)).size;
+    const byKind=Object.entries(accepted.reduce<Record<string,number>>((counts,row)=>{
+      counts[row.kind]=(counts[row.kind]??0)+1;return counts;
+    },{})).sort(([a],[b])=>a.localeCompare(b)).map(([kind,count])=>({kind,count}));
+    return {population,asOf:new Date().toISOString(),connectedOrganizations,
+      acceptedRelationships:accepted.length,acceptedWithReportingTerms:accepted.filter(row=>row.metricCount>0).length,
+      awaitingOurResponse:current.filter(row=>row.status==="pending"&&row.recipientId===organizationId).length,
+      awaitingPartnerResponse:current.filter(row=>row.status==="pending"&&row.ownerId===organizationId).length,
+      taggedPrograms:new Set(accepted.filter(row=>row.scopeKind==="program"&&row.ownerId===organizationId).map(row=>row.scopeId)).size,
+      excludedUnclassifiedOrChanged:rows.length-current.length,byKind};
+  });
+}
