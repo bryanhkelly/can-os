@@ -29,8 +29,9 @@ export const placeNativeDeploymentSite=createServerFn({method:"POST"})
   return db.transaction(async tx=>{
     // Current operator + Site + immutable Blueprint execution provenance.
     // Every comparison is against the persisted canonical records.
-    const scope=await tx.execute(sql`
-      SELECT DISTINCT d.id FROM public.program_deployments d
+    const verifyScope=async()=>{
+      const scope=await tx.execute(sql`
+      SELECT DISTINCT d.id,b.id AS batch_id FROM public.program_deployments d
       JOIN public.education_operations op ON op.id=d.operation_id
       JOIN public.education_operation_organization_roles r ON r.operation_id=op.id
       JOIN public.education_operation_sites os ON os.operation_id=op.id
@@ -55,17 +56,31 @@ export const placeNativeDeploymentSite=createServerFn({method:"POST"})
         AND v.config->>'siteId'=s.id::text AND cr.decision='approved'
         AND cr.decided_at<=clock_timestamp() AND cr.reviewer_person_id<>b.executed_by_person_id
         AND EXISTS (SELECT 1 FROM public.blueprint_outputs oo WHERE oo.execution_batch_id=b.id AND oo.operation_id=op.id)
+        AND EXISTS (
+          SELECT 1 FROM public.deployment_offering_adoptions a
+          JOIN public.blueprint_configuration_offering_intents i
+            ON i.configuration_version_id=v.id AND i.offering_version_id=a.offering_version_id
+          JOIN public.offering_versions ov ON ov.id=a.offering_version_id AND ov.offering_id=d.offering_id
+          JOIN public.offerings o ON o.id=ov.offering_id
+          WHERE a.deployment_id=d.id AND a.offering_id=d.offering_id
+            AND a.approval_status IN ('proposed','approved') AND a.valid_from<=clock_timestamp()
+            AND (a.valid_through IS NULL OR a.valid_through>clock_timestamp())
+            AND ov.lifecycle='published' AND ov.published_at IS NOT NULL AND o.status='active'
+        )
         AND NOT EXISTS (SELECT 1 FROM public.blueprint_configuration_versions newer
           WHERE newer.configuration_id=v.configuration_id AND newer.revision>v.revision)
         AND NOT EXISTS (SELECT 1 FROM public.configuration_reviews newer
           WHERE newer.configuration_version_id=v.id AND (newer.decided_at,newer.id)>(cr.decided_at,cr.id))
     `);
-    if(scope.rows.length!==1)throw new AuthorizationError("current independently reviewed Blueprint deployment at this Site");
+      if(scope.rows.length!==1)throw new AuthorizationError("current independently reviewed Blueprint deployment at this Site");
+    };
+    await verifyScope();
     const [deployment]=await tx.select({id:programDeployments.id,status:programDeployments.status})
       .from(programDeployments).where(eq(programDeployments.id,data.deploymentId)).for("update").limit(1);
     if(!deployment||!["planning","review","authorized","active"].includes(deployment.status))
       throw new AuthorizationError("current planning or operational deployment");
-    // Revalidate after the lock, before every write or retry receipt.
+    // Re-evaluate resource and session authority after waiting for the lock.
+    await verifyScope();
     await assertCurrentCanonicalStaffForMutation(tx,request,provider.actor);
     const existing=await tx.select({id:classroomDeploymentSites.id}).from(classroomDeploymentSites)
       .where(and(eq(classroomDeploymentSites.deploymentId,data.deploymentId),

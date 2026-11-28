@@ -163,7 +163,7 @@ test("governed pilot API stage",async({browser},info)=>{
       const input={deploymentId,siteId};
       await deny(outside,"deployment","placeNativeDeploymentSite",input);
       const before=await sql`SELECT d.status,a.approval_status FROM public.program_deployments d
-        JOIN public.deployment_offering_adoptions a ON a.deployment_id=d.id WHERE d.id=${deploymentId}::uuid`;
+        JOIN public.deployment_offering_adoptions a ON a.deployment_id=d.id WHERE d.id=${deploymentId}::uuid ORDER BY a.id`;
       expect(before.length).toBeGreaterThan(0);
       expect(before.every(r=>["planning","review"].includes(r.status)&&r.approval_status==="proposed")).toBe(true);
       const placed=await rpc<{placementId:string;created:boolean}>(page,"deployment","placeNativeDeploymentSite",input);
@@ -173,7 +173,7 @@ test("governed pilot API stage",async({browser},info)=>{
         AND site_id=${siteId}::uuid AND purpose='instruction'`;
       expect(rows).toEqual([{id:placed.placementId}]);
       const after=await sql`SELECT d.status,a.approval_status FROM public.program_deployments d
-        JOIN public.deployment_offering_adoptions a ON a.deployment_id=d.id WHERE d.id=${deploymentId}::uuid`;
+        JOIN public.deployment_offering_adoptions a ON a.deployment_id=d.id WHERE d.id=${deploymentId}::uuid ORDER BY a.id`;
       expect(after).toEqual(before);
       evidence={...evidence,placementId:placed.placementId,deploymentId,siteId,placementCreated:true,adoptionApproved:false,deploymentActivated:false};
     }else if(scenario.stage==="prepare-blueprint"){
