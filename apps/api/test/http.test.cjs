@@ -718,3 +718,30 @@ test('owner control requires original cookie, exact method and trusted write ori
  await assert.rejects(()=>service.authenticateOwnerControl({method:'POST',headers:{origin:'https://foreign.example','content-type':'application/json',cookie:'opaque'}},'POST'),/Forbidden/);
  await assert.rejects(()=>service.authenticateOwnerControl({method:'POST',headers:{origin:'http://localhost:3001','content-type':'text/plain',cookie:'opaque'}},'POST'),/Unsupported Media Type/);
 });
+
+test('staff administration is documented and denies anonymous callers',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const path of ['sites','people','accounts']){
+   const route='/api/v1/staff/'+path;
+   assert.ok(document.paths[route].get.security);assert.ok(document.paths[route].get.responses['403']);
+   assert.equal((await fetch(url+route,{headers:{'x-role':'registrar','x-site-id':'forged'}})).status,401);
+  }
+  for(const path of ['invitations','grant-state']){
+   const route='/api/v1/staff/'+path;
+   assert.ok(document.paths[route].post.security);assert.ok(document.paths[route].post.requestBody);
+   assert.equal((await fetch(url+route,{method:'POST',headers:{Origin:url,'content-type':'application/json'},body:'{}'})).status,503);
+  }
+ });
+});
+test('staff wire contracts deny arbitrary roles and caller-selected actor/Person',()=>{
+ const c=require('../dist/staff-admin.contracts');
+ const id='00000000-0000-4000-8000-000000000001';
+ const input={siteId:id,email:'teacher@example.test',firstName:'Test',lastName:'Teacher',role:'teacher'};
+ assert.equal(c.invite.safeParse(input).success,true);
+ for(const role of ['platform_owner','app_admin','student','guardian','site_admin','academic_content_reviewer'])
+  assert.equal(c.invite.safeParse({...input,role}).success,false);
+ assert.equal(c.invite.safeParse({...input,organizationId:id}).success,false);
+ assert.equal(c.invite.safeParse({...input,personId:id}).success,false);
+ assert.equal(c.grantState.safeParse({grantId:id,active:false,actorId:id}).success,false);
+ assert.equal(c.query.safeParse({query:'test',organizationId:id}).success,false);
+});
