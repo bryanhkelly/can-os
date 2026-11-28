@@ -781,3 +781,19 @@ test('WS03 Site Intelligence requires exact preview digest and consent to extern
  assert.equal(results.stored.safeParse({status:'consent-required',generation:null,package:null}).success,true);
  assert.equal(results.process.safeParse({status:'ready',approved:true}).success,false);
 });
+
+
+test('WS03 affiliation workflows require independently scoped sessions',async()=>{
+ const id='00000000-0000-4000-8000-000000000001';
+ await withServer('0',async(url,document)=>{
+  for(const [method,path] of [["GET","/api/v1/affiliation-networks"],["GET","/api/v1/sites/{siteId}/affiliations"],["POST","/api/v1/sites/{siteId}/affiliations"],["GET","/api/v1/me/network-affiliations"],["POST","/api/v1/me/network-affiliations/{affiliationId}/decisions"],["POST","/api/v1/sites/{siteId}/affiliations/{affiliationId}/withdrawals"]]){
+   assert.ok(document.paths[path][method.toLowerCase()].security);
+   const response=await fetch(url+path.replace(/\{\w+\}/g,id),method==='POST'?{method,headers:{origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);
+  }
+ });
+ const {bodies,results}=require('../dist/network-affiliations.contracts');
+ assert.equal(bodies.request.safeParse({denominationOrganizationId:id,note:'Request affiliation'}).success,true);
+ assert.equal(bodies.review.safeParse({decision:'approve',reason:'Verified',organizationId:id}).success,false);
+ assert.equal(results.decision.safeParse({affiliationId:id,status:'approved',reportingAccess:true}).success,false);
+});

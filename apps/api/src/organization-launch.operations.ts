@@ -58,5 +58,11 @@ export type OrganizationLaunchOperation =
   | 'revokeSchoolSiteMediaFolder'
   | 'readSiteIntelligenceContent'
   | 'previewSiteIntelligence'
-  | 'processSiteIntelligence';
+  | 'processSiteIntelligence'
+  | 'listAffiliationNetworks'
+  | 'listSiteAffiliations'
+  | 'requestSiteAffiliation'
+  | 'listNetworkAffiliations'
+  | 'reviewNetworkAffiliation'
+  | 'withdrawSiteAffiliation';
 export type OrganizationLaunchWorkflow=Record<OrganizationLaunchOperation,(input:unknown)=>Promise<unknown>>;

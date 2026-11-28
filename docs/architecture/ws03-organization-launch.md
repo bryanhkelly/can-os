@@ -29,3 +29,7 @@ Five protected media management routes reuse the canonical Document and private 
 ## Site Intelligence increment
 
 Three governed REST operations for stored consumer-specific content, exact provider-input preview and explicit generation. The original services remain authoritative for consent, digest, lease, retry, reauthorization and output integrity; client cannot supply replacement provider input. The existing Website & Brand-only generation restriction is reflected in the REST write schema. Administrative diagnostics, raw private brief and provider runtime validation remain outstanding. No external provider call was made.
+
+## Network affiliation lifecycle
+
+Six authenticated routes reuse existing local Site and denomination HQ authority, current network agreement checks, scoped rows, transaction locking, audit and events. No affiliation creates a reporting grant, changes Site ownership or replaces the accepted-tag relationship model. Invalid state transitions are explicit conflicts. Existing TanStack handlers delegate to the same service. Existing directory bounds and transaction-time authority revalidation still need runtime review.

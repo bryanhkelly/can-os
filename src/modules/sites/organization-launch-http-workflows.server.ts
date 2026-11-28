@@ -31,9 +31,16 @@ import {siteMediaUploadSchema,siteMediaReviewSchema,siteMediaRevokeSchema} from 
 import {beginSiteMediaFolderUpload,finishSiteMediaFolderUpload,listSiteMediaFolder,reviewSiteMediaFolder,revokeSiteMediaFolder,siteMediaKeyPattern} from "@/modules/sites/site-media-folder.server";
 const mediaFinish=siteMediaUploadSchema.extend({key:z.string().regex(siteMediaKeyPattern)});
 import {readSiteIntelligenceContentService,previewSiteIntelligenceService,processSiteIntelligenceService} from "@/modules/sites/site-content-generation-http.server";
+import {listAffiliationNetworksService,listSiteAffiliationsService,requestSiteAffiliationService,listNetworkAffiliationsService,reviewNetworkAffiliationService,withdrawSiteAffiliationService} from "@/modules/networks/network-affiliations.server";
 const geographyInput=z.object({siteId:z.string().uuid()}).strict();
 export function organizationLaunchWorkflows(request:Request,mode:string){
  return {
+  listAffiliationNetworks:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Affiliation context");return listAffiliationNetworksService(request,raw);},
+  listSiteAffiliations:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Affiliation context");return listSiteAffiliationsService(request,raw);},
+  requestSiteAffiliation:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Affiliation context");return requestSiteAffiliationService(request,raw);},
+  listNetworkAffiliations:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Affiliation context");return listNetworkAffiliationsService(request,raw);},
+  reviewNetworkAffiliation:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Affiliation context");return reviewNetworkAffiliationService(request,raw);},
+  withdrawSiteAffiliation:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Affiliation context");return withdrawSiteAffiliationService(request,raw);},
   readSiteIntelligenceContent:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Site Intelligence context");return readSiteIntelligenceContentService(request,raw);},
   previewSiteIntelligence:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Site Intelligence context");return previewSiteIntelligenceService(request,raw);},
   processSiteIntelligence:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Site Intelligence context");return processSiteIntelligenceService(request,raw);},

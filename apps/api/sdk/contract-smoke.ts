@@ -45,3 +45,10 @@ export async function checkSiteMediaContract(client:BecomunaBrowserApi,siteId:st
  // @ts-expect-error rights review must explicitly confirm each file
  await client.POST('/api/v1/sites/{siteId}/media-reviews',{params,body:{documentIds:[siteId],rightsConfirmed:true,subjectRelease:'no_identifiable_people',reason:'Reviewed all files'}});
 }
+
+export async function checkNetworkAffiliationContract(client:BecomunaBrowserApi,siteId:string,affiliationId:string){
+ await client.GET('/api/v1/sites/{siteId}/affiliations',{params:{path:{siteId}}});
+ await client.POST('/api/v1/me/network-affiliations/{affiliationId}/decisions',{params:{path:{affiliationId}},body:{decision:'approve',reason:'Verified agreement'}});
+ // @ts-expect-error caller cannot supply organization authority
+ await client.POST('/api/v1/me/network-affiliations/{affiliationId}/decisions',{params:{path:{affiliationId}},body:{decision:'approve',reason:'Verified agreement',organizationId:siteId}});
+}
