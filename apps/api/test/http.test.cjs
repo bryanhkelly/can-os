@@ -659,3 +659,28 @@ test('knowledge checks and completion require verified learner or provider autho
 test('noncredit enrollment publication protects provider scope and explicit Site selection',async()=>{await withServer('0',async(url,document)=>{for(const [route,method] of [["/api/v1/noncredit-enrollment-publisher","GET"],["/api/v1/noncredit-training-readiness","GET"],["/api/v1/noncredit-enrollment-releases","POST"],["/api/v1/noncredit-enrollment-closures","POST"],["/api/v1/noncredit-multisite-releases","POST"]]){assert.ok(document.paths[route][method.toLowerCase()].security);assert.equal((await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined)).status,method==='POST'?503:401);}assert.ok(document.paths['/api/v1/noncredit-enrollment-releases'].post.requestBody.content['application/json'].schema.required.includes('siteId'));});});
 
 test('completion administration requires canonical provider credentials and distinguishes decisions from corrections',async()=>{await withServer('0',async(url,document)=>{for(const [route,method] of [["/api/v1/noncredit-completion-decisions","POST"],["/api/v1/noncredit-completion-policy-catalog","GET"],["/api/v1/noncredit-completion-policies","POST"],["/api/v1/noncredit-completion-review","GET"],["/api/v1/noncredit-completion-queue","GET"],["/api/v1/noncredit-completion-corrections","POST"]]){assert.ok(document.paths[route][method.toLowerCase()].security);assert.equal((await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined)).status,method==='POST'?503:401);}});const c=require('../dist/completion-admin.contracts');assert.equal(c.queueQuery.safeParse({page:'101'}).success,false);assert.equal(c.queueQuery.parse({page:'2'}).page,2);});
+
+test('waitlist and withdrawal are private standard operations with strict distinct contracts',async()=>{
+ const id='00000000-0000-4000-8000-000000000001';
+ await withServer('0',async(url,document)=>{
+  for(const [method,path] of [['POST','/api/v1/noncredit-waitlist-entries'],['POST','/api/v1/noncredit-waitlist-cancellations'],['GET','/api/v1/me/noncredit-waitlist'],['POST','/api/v1/noncredit-registration-withdrawals']]){
+   const op=document.paths[path][method.toLowerCase()];
+   assert.ok(op.security);assert.ok(op.responses['403']);
+   if(method==='POST')assert.ok(op.requestBody);
+   const res=await fetch(url+path,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(res.status,method==='POST'?503:401);
+  }
+ });
+ const c=require('../dist/participation.contracts');
+ const terms={releaseId:id,consentVersion:'v01',consentSha256:'a'.repeat(64),acceptedConsent:true,adultConfirmed:true};
+ assert.equal(c.waitlistJoinInput.safeParse(terms).success,true);
+ for(const field of ['personId','accountId','siteId','classId','registrationId'])assert.equal(c.waitlistJoinInput.safeParse({...terms,[field]:id}).success,false);
+ assert.equal(c.waitlistJoinInput.safeParse({...terms,adultConfirmed:false}).success,false);
+ assert.equal(c.waitlistQuery.safeParse({joinedAt:'2026-11-28T00:00:00Z'}).success,false);
+ assert.equal(c.waitlistQuery.safeParse({joinedAt:'2026-11-28T00:00:00.123456Z',waitlistId:id}).success,true);
+ assert.equal(c.waitlistPageResult.safeParse({items:[],nextCursor:null}).success,true);
+ assert.equal(c.waitlistPageResult.safeParse({items:[],nextCursor:null,accountId:id}).success,false);
+ assert.equal(c.waitlistJoinResult.safeParse({status:'waiting',alreadyQueued:false,courseAttemptId:id}).success,false);
+ assert.equal(c.withdrawRegistrationInput.safeParse({registrationId:id,confirm:false}).success,false);
+ assert.equal(c.withdrawRegistrationResult.safeParse({withdrawn:true,alreadyWithdrawn:true}).success,true);
+});
