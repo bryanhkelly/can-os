@@ -283,7 +283,7 @@ export async function redeemOneTimeAccess(rawToken:string,device?:SessionDeviceC
   const [boundAccount]=await tx.select({personId:accessAccounts.personId})
     .from(accessAccounts).where(eq(accessAccounts.id,account.id)).limit(1);
   const [chosenGrant]=await tx.select({personId:accountPersonGrants.personId})
-    .from(accountPersonGrants).where(eq(accountPersonGrants.id,activeGrant.id)).limit(1);
+    .from(accountPersonGrants).where(and(eq(accountPersonGrants.id,activeGrant.id),eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true))).for("share").limit(1);
   if(!boundAccount?.personId ||
      boundAccount.personId!==chosenGrant?.personId)
     throw new InvalidAccessCredentialError("Verified CAN Person unavailable");
@@ -361,6 +361,11 @@ export async function redeemDemoAccess(
   const grant=accountGrants.find(candidate=>candidate.role==="site_admin"&&candidate.siteId===launchSiteId)
    ?? [...accountGrants].sort((a,b)=>a.id.localeCompare(b.id))[0];
   if(!grant)throw new InvalidAccessCredentialError("Invalid demo credentials");
+  // Serialize session issuance with a membership revocation, including
+  // a grant that was active when the initial projection was read.
+  const [currentGrant]=await tx.select({personId:accountPersonGrants.personId})
+    .from(accountPersonGrants).where(and(eq(accountPersonGrants.id,grant.id),eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.personId,grant.personId),eq(accountPersonGrants.active,true))).for("share").limit(1);
+  if(!currentGrant)throw new InvalidAccessCredentialError("Invalid demo credentials");
   // Resolve the authenticated administrator's own operating Site, never a user-supplied ID.
   const adminSiteId=hasRegistrarAuthority(grant.role)?grant.siteId:undefined;
   const activeSchool=adminSiteId
