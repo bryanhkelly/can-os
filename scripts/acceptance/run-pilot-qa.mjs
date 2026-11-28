@@ -13,6 +13,7 @@ const file = resolve(root, ".env.pilot-qa");
 const allowedBranch = "br-solitary-art-arun91gj";
 const secret = () => randomBytes(32).toString("hex");
 const modes = {
+  "nest-roles": ["node_modules/@playwright/test/cli.js", "test", "--config", "playwright.nest-student-api.config.ts", "--fail-on-flaky-tests"],
   "nest-pilot1": ["node_modules/@playwright/test/cli.js", "test", "--config", "playwright.nest-student-api.config.ts", "--fail-on-flaky-tests"],
   "nest-pilot2": ["node_modules/@playwright/test/cli.js", "test", "--config", "playwright.nest-student-api.config.ts", "--fail-on-flaky-tests"],
   "nest-reporting": ["node_modules/@playwright/test/cli.js", "test", "--config", "playwright.nest-student-api.config.ts", "--fail-on-flaky-tests"],
@@ -50,7 +51,7 @@ function init() {
     CAN_R2_ACCESS_KEY_ID: "", CAN_R2_SECRET_ACCESS_KEY: "", CAN_R2_SESSION_TOKEN: "",
     CAN_PILOT_QA_LEARNER_SESSION: "", CAN_PILOT_QA_OTHER_SESSION: "", CAN_PILOT_QA_PROVIDER_SESSION: "",
     CAN_PILOT_QA_FIXTURE_JSON: "", CAN_PILOT_QA_GOVERNED_JSON: "",
-    CAN_PILOT_QA_API_ACTORS_JSON: "", CAN_PILOT_QA_PLAN_JSON: "", CAN_PARENT_QA_JSON: "", CAN_STUDENT_QA_JSON: "", CAN_FACILITATOR_QA_JSON: "", CAN_NEST_SIGNUP_QA_JSON: "", CAN_NEST_REPORT_QA_JSON: "", CAN_NEST_PILOT1_QA_JSON: "", CAN_NEST_PILOT2_QA_JSON: "",
+    CAN_PILOT_QA_API_ACTORS_JSON: "", CAN_PILOT_QA_PLAN_JSON: "", CAN_PARENT_QA_JSON: "", CAN_STUDENT_QA_JSON: "", CAN_FACILITATOR_QA_JSON: "", CAN_NEST_SIGNUP_QA_JSON: "", CAN_NEST_REPORT_QA_JSON: "", CAN_NEST_PILOT1_QA_JSON: "", CAN_NEST_PILOT2_QA_JSON: "", CAN_NEST_ROLES_QA_JSON: "",
   };
   writeFileSync(file, Object.entries(config).map(([k,v]) => k+"="+v).join("\n")+"\n", {flag:"wx",mode:0o600});
   console.log("Created ignored .env.pilot-qa with independent random secrets. Fill in isolated connections and approved sessions locally; no secrets printed.");
@@ -70,7 +71,7 @@ function localConfiguration() {
     "CAN_NONCREDIT_ASSESSMENT_KEY_HEX","CAN_NONCREDIT_AUTO_FINALIZATION_ENABLED",
     "CAN_R2_ACCOUNT_ID","CAN_R2_BUCKET","CAN_R2_ACCESS_KEY_ID","CAN_R2_SECRET_ACCESS_KEY","CAN_R2_SESSION_TOKEN",
     "CAN_PILOT_QA_LEARNER_SESSION","CAN_PILOT_QA_OTHER_SESSION","CAN_PILOT_QA_PROVIDER_SESSION","CAN_PILOT_QA_FIXTURE_JSON","CAN_PILOT_QA_GOVERNED_JSON",
-    "CAN_PILOT_QA_API_ACTORS_JSON","CAN_PILOT_QA_PLAN_JSON","CAN_PARENT_QA_JSON","CAN_STUDENT_QA_JSON","CAN_FACILITATOR_QA_JSON","CAN_NEST_SIGNUP_QA_JSON","CAN_NEST_REPORT_QA_JSON","CAN_NEST_PILOT1_QA_JSON","CAN_NEST_PILOT2_QA_JSON"
+    "CAN_PILOT_QA_API_ACTORS_JSON","CAN_PILOT_QA_PLAN_JSON","CAN_PARENT_QA_JSON","CAN_STUDENT_QA_JSON","CAN_FACILITATOR_QA_JSON","CAN_NEST_SIGNUP_QA_JSON","CAN_NEST_REPORT_QA_JSON","CAN_NEST_PILOT1_QA_JSON","CAN_NEST_PILOT2_QA_JSON","CAN_NEST_ROLES_QA_JSON"
   ]);
   if (Object.keys(config).some(k=>!permitted.has(k))) fail("QA configuration contains an unsupported setting.");
   if(config.APP_ENV!=="test" || config.NODE_ENV!=="test" || config.CAN_TEST_DB_WRITES_ENABLED!=="true" ||
@@ -91,11 +92,15 @@ function localConfiguration() {
 }
 try {
   const mode=process.argv[2];
-  if(process.argv.length!==3) fail("Use exactly one QA action: init, prepare, provision, governed, parent, parent-readiness, student, nest-http, nest-reporting, nest-pilot1, nest-pilot2, facilitator, readiness, executive, report, schema, regression, keys, fixture, api, browser, pilot1, pilot2, all.");
+  if(process.argv.length!==3) fail("Use exactly one QA action: init, prepare, provision, governed, parent, parent-readiness, student, nest-http, nest-reporting, nest-pilot1, nest-pilot2, nest-roles, facilitator, readiness, executive, report, schema, regression, keys, fixture, api, browser, pilot1, pilot2, all.");
   if(mode==="init") init();
   else {
     if(!Object.hasOwn(modes,mode)&&!["pilot1","pilot2","all"].includes(mode)) fail("Unknown QA action.");
     const env=localConfiguration();
+    if(mode==="nest-roles"){
+      if(!env.CAN_NEST_ROLES_QA_JSON)fail("Reviewed synthetic role fixture required.");
+      env.CAN_NEST_QA_SUITE="roles";
+    }
     if(mode==="nest-pilot1"||mode==="nest-pilot2"){
       const key=mode==="nest-pilot1"?"CAN_NEST_PILOT1_QA_JSON":"CAN_NEST_PILOT2_QA_JSON";
       if(!env[key])fail("Reviewed isolated pilot fixture required.");
@@ -121,7 +126,7 @@ try {
       const {neon}=await import("@neondatabase/serverless");
       for(const key of ["CAN_CANONICAL_AUTH_DATABASE_URL","CAN_CANONICAL_OPERATIONS_DATABASE_URL"]){
         if(!env[key]) {
-          if(key==="CAN_CANONICAL_AUTH_DATABASE_URL" && (mode==="prepare"||mode==="provision"||mode==="governed"||mode==="parent"||mode==="student"||mode==="nest-http"||mode==="nest-reporting"||mode==="nest-pilot1"||mode==="nest-pilot2"||mode==="facilitator"||mode==="api"||mode==="browser"||["pilot1","pilot2","all"].includes(mode))) fail(key+" is required for QA runtime.");
+          if(key==="CAN_CANONICAL_AUTH_DATABASE_URL" && (mode==="prepare"||mode==="provision"||mode==="governed"||mode==="parent"||mode==="student"||mode==="nest-http"||mode==="nest-reporting"||mode==="nest-pilot1"||mode==="nest-pilot2"||mode==="nest-roles"||mode==="facilitator"||mode==="api"||mode==="browser"||["pilot1","pilot2","all"].includes(mode))) fail(key+" is required for QA runtime.");
           continue;
         }
         const expectedLogin=key==="CAN_CANONICAL_AUTH_DATABASE_URL"?"can_os_canonical_auth_app":"can_os_canonical_ops_app";
@@ -134,7 +139,7 @@ try {
     // Prepare the real application privately, before any fixture or sessions exist.
     // Use the existing isolated .test access-mail transport, never Resend.
     // Outbox holds single-use credentials: no artifact or Git persistence.
-    const outbox=(["prepare","provision","governed","parent","student","nest-http","nest-reporting","nest-pilot1","nest-pilot2","facilitator","api","pilot1","pilot2","all"].includes(mode))?mkdtempSync(join(tmpdir(),"can-pilot-qa-mail-")):null;
+    const outbox=(["prepare","provision","governed","parent","student","nest-http","nest-reporting","nest-pilot1","nest-pilot2","nest-roles","facilitator","api","pilot1","pilot2","all"].includes(mode))?mkdtempSync(join(tmpdir(),"can-pilot-qa-mail-")):null;
     try {
       if(outbox){
         const {checkPilotMigrationParity}=await import("./check-pilot-migration-parity.mjs");
