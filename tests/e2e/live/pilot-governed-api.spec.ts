@@ -6,7 +6,9 @@ import {authenticateQaActor,qaSession} from "../helpers/pilot-standard-access";
 import {pilotRpcPage,pilotRpc as rpc} from "../helpers/pilot-governed-rpc";
 
 const uuid=z.string().uuid();
-const actor=z.object({email:z.string().email().refine(v=>v.endsWith(".test")&&v===v.toLowerCase()),grantId:uuid,organizationId:uuid}).strict();
+const actor=z.object({email:z.string().email().refine(v=>v===v.toLowerCase()&&(v.endsWith(".test")||v.endsWith(".demo"))),
+  grantId:uuid,organizationId:uuid,privateAccessCode:z.string().regex(/^[A-Za-z0-9_-]{43}$/).optional()}).strict()
+  .refine(a=>a.email.endsWith(".demo")===Boolean(a.privateAccessCode),"Use ordinary email-link QA or the existing individual synthetic credential");
 const meeting=z.object({requestId:uuid,startsAt:z.string().datetime({offset:true}),endsAt:z.string().datetime({offset:true}),lessonId:uuid,agendaRequestId:uuid}).strict();
 const metric=z.object({metricKey:z.enum(["class.registrations","class.uniquePeople","noncredit.registrations","noncredit.distinctLearners"]),definitionVersion:z.string().min(1).max(64)}).strict();
 const siteScope=z.object({host:actor,classId:uuid,siteId:uuid,meetings:z.array(meeting).length(4)}).strict();
@@ -14,6 +16,7 @@ const learner=z.object({actor,courseAttemptId:uuid,paired:z.boolean()}).strict()
 const manifest=z.object({offeringVersionId:uuid,manifestId:uuid,expectedHash:z.string().regex(/^[a-f0-9]{64}$/)}).strict();
 const scenario=z.discriminatedUnion("stage",[
   z.object({stage:z.literal("publish"),publisher:actor,offering:manifest}).strict(),
+  z.object({stage:z.literal("enroll"),learner:actor,classId:uuid,siteId:uuid,ownerOrganizationId:uuid,classOfferingVersionId:uuid,creditMode:z.enum(["for_credit","audit","not_applicable"])}).strict(),
   z.object({stage:z.literal("schedule"),sites:z.array(siteScope).length(2)}).strict(),
   z.object({stage:z.literal("deliver"),host:actor,classId:uuid,siteId:uuid,classSessionId:uuid,
     learners:z.array(learner).min(2).max(20),foreign:learner}).strict(),
@@ -26,7 +29,9 @@ async function authorizeFixture(a:Actor){
   const [row]=await sql`SELECT count(*)::int AS count FROM public.access_accounts ac
     JOIN public.people p ON p.id=ac.person_id
     JOIN public.organizations o ON o.id=${a.organizationId}::uuid
-    WHERE ac.email_normalized=${a.email} AND ac.email_verified_at IS NOT NULL AND NOT ac.disabled AND p.active
+    WHERE ac.email_normalized=${a.email} AND NOT ac.disabled AND p.active
+      AND ((${a.email.endsWith(".test")} AND ac.email_verified_at IS NOT NULL)
+        OR (${a.email.endsWith(".demo")} AND o.domain LIKE '%.demo' AND ac.private_access_code_hash IS NOT NULL))
       AND p.metadata->>'qa_only'='true' AND p.metadata->>'intended_branch'=${branch}
       AND o.metadata->>'qa_only'='true' AND o.metadata->>'intended_branch'=${branch}`;
   expect(row?.count).toBe(1);
@@ -34,7 +39,14 @@ async function authorizeFixture(a:Actor){
 async function openActor(browser:Browser,a:Actor,contexts:BrowserContext[]):Promise<Page>{
   await authorizeFixture(a);
   const context=await browser.newContext();contexts.push(context);
-  const initial=await authenticateQaActor(context,a.email);
+  if(a.privateAccessCode){
+    // Standard individual synthetic credential, never the shared fixed code.
+    // No credential issuance or permission changes occur in the test.
+    const response=await context.request.post("http://localhost:5183/access/verify",
+      {headers:{Origin:"http://localhost:5183"},data:{email:a.email,code:a.privateAccessCode}});
+    if(!response.ok())throw Error("Existing individual synthetic credential was rejected");
+  }
+  const initial=a.privateAccessCode?await qaSession(context):await authenticateQaActor(context,a.email);
   const grant=initial.grants.find(g=>g.id===a.grantId);
   if(!grant||grant.organizationId!==a.organizationId)throw Error("Exact authorized QA membership required");
   if(initial.activeGrantId!==a.grantId){
@@ -74,6 +86,30 @@ test("governed pilot API stage",async({browser},info)=>{
       const [published]=await sql`SELECT lifecycle FROM public.offering_versions WHERE id=${offering.offeringVersionId}::uuid`;
       expect(published?.lifecycle).toBe("published");
       evidence={...evidence,offeringsPublished:1};
+    }else if(scenario.stage==="enroll"){
+      const {learner,classId,siteId,ownerOrganizationId,classOfferingVersionId,creditMode}=scenario;
+      await classScope(classId,siteId,ownerOrganizationId);
+      const [target]=await sql`SELECT count(*)::int AS count FROM public.class_offering_versions
+        WHERE id=${classOfferingVersionId}::uuid AND class_id=${classId}::uuid AND state='published'`;
+      expect(target?.count).toBe(1);
+      const page=await openActor(browser,learner,contexts);
+      const counts=async()=> (await sql`SELECT
+        (SELECT count(*)::int FROM public.noncredit_registrations n JOIN public.access_accounts a ON a.person_id=n.participant_person_id
+          WHERE a.email_normalized=${learner.email}) AS registrations,
+        (SELECT count(*)::int FROM public.class_enrollments e JOIN public.access_accounts a ON a.person_id=e.learner_person_id
+          WHERE a.email_normalized=${learner.email} AND e.class_id=${classId}::uuid) AS enrollments`)[0];
+      const before=await counts();expect(before?.enrollments).toBe(0);
+      const input={classOfferingVersionId,creditMode,adultAttested:true,consentAccepted:true};
+      const fresh=await rpc<{classEnrollmentId:string;courseAttemptId:string;alreadyEnrolled:boolean}>(page,"enrollment","enrollInNativeClass",input);
+      expect(fresh.alreadyEnrolled).toBe(false);
+      expect(await rpc(page,"enrollment","enrollInNativeClass",input)).toMatchObject({...fresh,alreadyEnrolled:true});
+      const after=await counts();
+      expect(after).toEqual({registrations:before?.registrations,enrollments:1});
+      const [link]=await sql`SELECT a.class_enrollment_id::text AS enrollment,a.noncredit_registration_id::text AS registration
+        FROM public.learner_course_attempts a JOIN public.class_enrollments e ON e.id=a.class_enrollment_id AND e.course_attempt_id=a.id
+        WHERE a.id=${fresh.courseAttemptId}::uuid AND e.id=${fresh.classEnrollmentId}::uuid AND e.class_id=${classId}::uuid`;
+      expect(link).toEqual({enrollment:fresh.classEnrollmentId,registration:null});
+      evidence={...evidence,newClassEnrollments:1,newNoncreditRegistrations:0};
     }else if(scenario.stage==="schedule"){
       expect(new Set(scenario.sites.map(s=>s.siteId)).size).toBe(2);
       expect(new Set(scenario.sites.map(s=>s.host.organizationId)).size).toBe(2);
@@ -147,6 +183,8 @@ test("governed pilot API stage",async({browser},info)=>{
       }
     }else{
       const {owner,recipient,foreign,siteId,metrics}=scenario;
+      if(!owner.privateAccessCode||!recipient.privateAccessCode||!foreign.privateAccessCode)
+        throw Error("Reporting relationship authority requires individually authenticated synthetic .demo managers, not .test mailboxes");
       expect(new Set([owner.organizationId,recipient.organizationId,foreign.organizationId]).size).toBe(3);
       const [site]=await sql`SELECT count(*)::int AS count FROM public.sites WHERE id=${siteId}::uuid AND organization_id=${owner.organizationId}::uuid`;
       expect(site?.count).toBe(1);

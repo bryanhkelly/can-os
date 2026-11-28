@@ -17,6 +17,7 @@ const modes = {
   provision: ["node_modules/@playwright/test/cli.js", "test", "--config", "playwright.pilot-provision.config.ts"],
   prepare: ["scripts/dev.mjs","--host","localhost","--port","5183","--strictPort"],
   readiness: ["scripts/acceptance/diagnose-noncredit-pilot-qa.mjs"],
+  report: ["scripts/acceptance/report-pilot-network-qa.mjs"],
   executive: ["scripts/acceptance/diagnose-pilot-executive-readiness.mjs"],
   schema: ["scripts/acceptance/check-pilot-migration-parity.mjs"],
   regression: ["scripts/acceptance/test-noncredit-assessment-provisioning-qa.mjs"],
@@ -79,7 +80,7 @@ function localConfiguration() {
 }
 try {
   const mode=process.argv[2];
-  if(process.argv.length!==3) fail("Use exactly one QA action: init, prepare, provision, governed, readiness, executive, schema, regression, keys, fixture, api, browser.");
+  if(process.argv.length!==3) fail("Use exactly one QA action: init, prepare, provision, governed, readiness, executive, report, schema, regression, keys, fixture, api, browser.");
   if(mode==="init") init();
   else {
     if(!Object.hasOwn(modes,mode)) fail("Unknown QA action.");

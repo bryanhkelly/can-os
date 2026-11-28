@@ -89,8 +89,24 @@ test("actual application RPC and canonical evidence: independent pilot",async({b
    // Activate the existing independent review without creating another Person.
    expect(await rpc(learner.page,"onboarding","activateReviewedNativeClassLearner",undefined)).toMatchObject({ready:true});
    expect(await rpc(learner.page,"recovery","resumeLinkedNativeClassLearner",undefined)).toMatchObject({ready:true});
-   const first=await rpc<{registrationId:string;courseAttemptId:string;alreadyEnrolled:boolean}>(learner.page,"enrollment","enrollMyselfInNoncredit",enrollment);
+   const first=await rpc<{registrationId:string;courseAttemptId:string;classId:string;classEnrollmentId:string;alreadyEnrolled:boolean}>(learner.page,"enrollment","enrollMyselfInNoncredit",enrollment);
    expect(first.alreadyEnrolled).toBe(false);uuid.parse(first.registrationId);uuid.parse(first.courseAttemptId);
+   uuid.parse(first.classId);uuid.parse(first.classEnrollmentId);
+   expect(first.registrationId).not.toBe(first.classEnrollmentId);
+   // Registration and Class enrollment are distinct canonical records. This
+   // noncredit pathway atomically places the Course registration into a Class.
+   const placementSql=neon(process.env.TEST_DATABASE_URL!);
+   const [placement]=await placementSql`
+     SELECT n.id::text AS registration,e.id::text AS enrollment,e.class_id::text AS class_id,
+       a.id::text AS attempt,e.status AS enrollment_status
+     FROM public.noncredit_registrations n
+     JOIN public.learner_course_attempts a ON a.noncredit_registration_id=n.id
+     JOIN public.class_enrollments e ON e.id=a.class_enrollment_id AND e.course_attempt_id=a.id
+       AND e.learner_person_id=n.participant_person_id
+     WHERE n.id=${first.registrationId}::uuid AND a.id=${first.courseAttemptId}::uuid
+   `;
+   expect(placement).toEqual({registration:first.registrationId,enrollment:first.classEnrollmentId,
+     class_id:first.classId,attempt:first.courseAttemptId,enrollment_status:"active"});
    const retry=await rpc<typeof first>(learner.page,"enrollment","enrollMyselfInNoncredit",enrollment);
    expect(retry).toMatchObject({...first,alreadyEnrolled:true});
    const course={courseAttemptId:first.courseAttemptId};
