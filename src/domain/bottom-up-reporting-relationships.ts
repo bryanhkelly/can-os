@@ -26,6 +26,7 @@ export type RelationshipProposal = z.infer<typeof relationshipProposalSchema>;
 export type RelationshipMetric = z.infer<typeof relationshipMetricSchema>;
 export type ReportingRelationship = RelationshipProposal & {
   id:string;
+  dataPopulation?:"real"|"synthetic"|"unknown";
   ownerOrganizationId:string;
   proposedByPersonId:string;
   proposedAt:string;
