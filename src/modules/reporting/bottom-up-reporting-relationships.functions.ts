@@ -41,3 +41,9 @@ export const getRelationshipScopes=createServerFn({method:"GET"})
     const service=await import("./bottom-up-reporting-relationships.server");
     return service.listRelationshipScopes(getRequest(),data);
   });
+
+export const getRelationshipPortfolio=createServerFn({method:"GET"}).handler(async()=>{
+  noStore();
+  const service=await import("./bottom-up-reporting-relationships.server");
+  return service.readRelationshipPortfolio(getRequest());
+});
