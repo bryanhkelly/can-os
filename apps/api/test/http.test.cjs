@@ -42,14 +42,14 @@ test('Swagger cannot be enabled on a production or network-facing listener', () 
   assert.throws(() => readConfig({ API_DOCS: '1', NODE_ENV: 'production' }));
   assert.throws(() => readConfig({ API_DOCS: '1', API_HOST: '0.0.0.0' }));
 });
-test('unmarked operations fail closed', () => {
-  const guard = new DefaultDenyGuard(new Reflector());
+test('unmarked operations fail closed', async () => {
+  const guard = new DefaultDenyGuard(new Reflector(), {});
   const handler = () => {};
   class Controller {}
   const context = { getHandler: () => handler, getClass: () => Controller };
-  assert.throws(() => guard.canActivate(context), /Unauthorized/);
+  await assert.rejects(() => guard.canActivate(context), /Unauthorized/);
   PublicOperation()(Controller.prototype, 'method', { value: handler });
-  assert.equal(guard.canActivate(context), true);
+  assert.equal(await guard.canActivate(context), true);
 });
 
 test('canonical reads deny anonymous callers and do not trust forged identity headers', async () => {
@@ -62,4 +62,9 @@ test('canonical reads deny anonymous callers and do not trust forged identity he
     assert.ok(document.paths['/api/v1/me'].get.security);
     assert.ok(document.paths['/api/v1/me/student/classes'].get.security);
   });
+});
+
+test('canonical reads cannot be enabled outside local development', () => {
+  assert.throws(() => readConfig({ API_CANONICAL_READS:'1', NODE_ENV:'production' }));
+  assert.throws(() => readConfig({ API_CANONICAL_READS:'1', API_HOST:'0.0.0.0' }));
 });

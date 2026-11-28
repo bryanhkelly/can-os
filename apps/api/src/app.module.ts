@@ -3,7 +3,8 @@ import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { healthOpenApiSchema, healthSchema, type Health } from './contracts';
 import { DefaultDenyGuard, PublicOperation } from './security';
-import { IdentityController, CanonicalIdentityService } from './identity';
+import { IdentityController } from './identity';
+import { CanonicalIdentityService } from './identity.service';
 import { ProblemFilter } from './problem.filter';
 
 @ApiTags('Platform')
