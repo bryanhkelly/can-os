@@ -14,6 +14,7 @@ const modules={
   agenda:"/src/modules/classes/native-class-session-agenda.functions.ts",
   room:"/src/modules/learning/facilitated-learning.functions.ts",
   attendance:"/src/modules/learning/classroom-attendance.functions.ts",
+  projector:"/src/modules/learning/classroom-projector.functions.ts",
   activity:"/src/modules/learning/classroom-evidence.functions.ts",
   relationships:"/src/modules/reporting/bottom-up-reporting-relationships.functions.ts",
   report:"/src/modules/reporting/native-class-report.functions.ts",

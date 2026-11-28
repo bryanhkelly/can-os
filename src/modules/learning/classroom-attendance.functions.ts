@@ -154,8 +154,6 @@ export const attestClassroomParticipation=createServerFn({method:"POST"})
       const room=await ownedRoom(tx,host,data.facilitatedSessionId,true);
       if(await nativeClassForRoom(tx,room))
         await assertNativeClassAttendanceReader(tx,room,host.actor.actorPersonId!);
-      if(!classroomAttestationOpen(room,new Date()))
-        throw new AuthorizationError("attestation window is closed");
       const subject=await registeredRoomParticipant(tx,room,data.courseAttemptId);
       const [paired]=await tx.select({
         personId:facilitatedLearningParticipants.participantPersonId,
@@ -179,6 +177,8 @@ export const attestClassroomParticipation=createServerFn({method:"POST"})
           throw new Error("Conflicting attendance evidence retry");
         return {saved:true,duplicate:true,noDeviceEvidence:!paired};
       }
+      if(!classroomAttestationOpen(room,new Date()))
+        throw new AuthorizationError("attestation window is closed");
       const [previous]=await tx.select({
         status:facilitatedRoomAttendanceAssertions.status,
         method:facilitatedRoomAttendanceAssertions.method,

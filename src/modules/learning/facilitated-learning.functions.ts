@@ -1,7 +1,6 @@
 import { requireFacilitatedLearningEnabled } from "@/modules/learning/canonical-learning-release.server";
 import { attemptInAssignedClassroomRelease } from "./classroom-release-boundary.server";
-import { nativeClassForRoom, assertNativeClassRoomStaff } from "@/modules/classes/native-class-room-boundary.server";
-import { assertCurrentNativeClassFacilitatorSession } from "@/modules/classes/native-class-facilitator-session.server";
+import { assertNativeClassRoomStaff } from "@/modules/classes/native-class-room-boundary.server";
 import { createServerFn } from "@tanstack/react-start";
 import { digestCode, generatePairingCode, displayCode, recordRoomAuditAndEvent, roomHostIsCurrent, schoolAttemptIsPlacedAtSite, ownedRoom, assertRoomLive, currentRoomMediaAudience, assertRoomMediaRightsForAudience, assertAuthorizedFacilitatedRoomMedia, createFacilitatedRoomForHost, selfEnrolledNoncreditRoomSitePermitted } from "./facilitated-learning-operations.server";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
@@ -287,8 +286,6 @@ export const endFacilitatedLearningRoom = createServerFn({method:"POST"})
     const host=await requireCanonicalFacilitator();
     return db.transaction(async tx=>{
       const room=await ownedRoom(tx,host,data.facilitatedSessionId,true);
-      if(await nativeClassForRoom(tx,room))
-        await assertCurrentNativeClassFacilitatorSession(tx,host.actor);
       if(room.state==="ended")return {ended:true,alreadyEnded:true};
       await tx.update(facilitatedLearningSessions)
         .set({state:"ended",endedAt:new Date()})

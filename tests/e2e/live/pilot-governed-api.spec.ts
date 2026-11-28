@@ -501,6 +501,9 @@ test("governed pilot API stage",async({browser},info)=>{
       for(const site of scenario.sites){
         await classScope(site.classId,site.siteId,site.host.organizationId);
         const page=await openActor(browser,site.host,contexts);
+        const session=await qaSession(page.context());
+        expect(session.role).toBe("room_facilitator");
+        expect(session.grants.find(g=>g.id===session.activeGrantId)).toMatchObject({role:"room_facilitator",siteId:site.siteId});
         const input={classId:site.classId,cadence:"custom",meetings:site.meetings.map(({requestId,startsAt,endsAt})=>({requestId,startsAt,endsAt}))};
         const result=await rpc<{sessions:{classSessionId:string;duplicate:boolean}[]}>(page,"session","scheduleNativeClassSessions",input);
         expect(result.sessions).toHaveLength(4);
@@ -536,6 +539,9 @@ test("governed pilot API stage",async({browser},info)=>{
         expect(enrollment?.count).toBe(1);
       }
       const page=await openActor(browser,host,contexts);
+      const facilitatorSession=await qaSession(page.context());
+      expect(facilitatorSession.role).toBe("room_facilitator");
+      expect(facilitatorSession.grants.find(g=>g.id===facilitatorSession.activeGrantId)).toMatchObject({role:"room_facilitator",siteId});
       const room=await rpc<{facilitatedSessionId:string;pairingCode:string|null}>(page,"session","openNativeClassSession",{classId,classSessionId});
       if(!room.pairingCode)throw Error("Fresh due Class Session is required");
       const scope={facilitatedSessionId:room.facilitatedSessionId};
@@ -560,6 +566,14 @@ test("governed pilot API stage",async({browser},info)=>{
           const access=await rpc<{downloadUrl:string;expiresInSeconds:number}>(page,"room","getFacilitatedRoomMediaAccess",{...scope,lessonId,assetVersionId});
           // Never attach the signed media URL or manufacture played/ended events.
           if(!access.downloadUrl.startsWith("https://"))throw Error("Expected authorized HTTPS media access");
+          // Commands are intent only; this does not certify actual media playback.
+          for(const commandKind of ["load","play","pause","seek","stop"] as const){
+            const command={...scope,lessonId,assetVersionId,requestId:randomUUID(),commandKind,positionSeconds:0};
+            await deny(outside,"projector","issueClassroomProjectorCommand",command);
+            expect(await rpc(page,"projector","issueClassroomProjectorCommand",command)).toMatchObject({accepted:true,duplicate:false});
+            expect(await rpc(page,"projector","issueClassroomProjectorCommand",command)).toMatchObject({accepted:true,duplicate:true});
+            expect(await rpc(page,"projector","getClassroomProjectorCommand",scope)).toMatchObject({roomState:"live",latest:{commandKind,lessonId,assetVersionId}});
+          }
           const input={...scope,lessonId,requestId:randomUUID(),prompt,answerType:"single_choice",choices};
           const released=await rpc<{id:string;duplicate:boolean}>(page,"activity","releaseClassroomActivity",input);
           expect(released.duplicate).toBe(false);
@@ -575,7 +589,9 @@ test("governed pilot API stage",async({browser},info)=>{
             expect(await rpc(participant,"activity","submitClassroomResponse",answer)).toMatchObject({saved:true,duplicate:true,graded:false});
             activityResponses++;
           }
-          expect(await rpc(page,"activity","closeClassroomActivity",{...scope,activityReleaseId:released.id})).toMatchObject({closed:true});
+          expect(await rpc(page,"activity","closeClassroomActivity",{...scope,activityReleaseId:released.id})).toMatchObject({closed:true,duplicate:false});
+          expect(await rpc(page,"activity","closeClassroomActivity",{...scope,activityReleaseId:released.id})).toMatchObject({closed:true,duplicate:true});
+          await deny(outside,"attendance","getClassroomAttendanceRoster",scope);
           const [persisted]=await sql`SELECT count(*)::int AS responses,count(DISTINCT course_attempt_id)::int AS attempts
             FROM public.facilitated_room_activity_responses WHERE activity_release_id=${released.id}::uuid
             AND facilitated_session_id=${scope.facilitatedSessionId}::uuid`;

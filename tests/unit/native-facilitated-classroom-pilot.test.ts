@@ -52,11 +52,12 @@ describe("native facilitated classroom end-to-end wiring",()=>{
     expect(activity).toContain("allowed.clear()");
     expect(pairing).toContain("nativeClassRoomParticipant(tx,room,courseAttemptId,participantPersonId)");
   });
-  it("rechecks facilitator session on native room closing and protects short-lived private video links",()=>{
+  it("rechecks facilitator session for locked native room commands and protects short-lived private video links",()=>{
     const rooms=source("src/modules/learning/facilitated-learning.functions.ts");
     const projector=source("src/components/learning/ClassroomProjectorPlayer.tsx");
-    expect(rooms).toContain("if(await nativeClassForRoom(tx,room))");
-    expect(rooms).toContain("await assertCurrentNativeClassFacilitatorSession(tx,host.actor)");
+    const operations=source("src/modules/learning/facilitated-learning-operations.server.ts");
+    expect(operations).toContain("if(lock && nativeClass)await assertCurrentNativeClassFacilitatorSession(tx,host.actor)");
+    expect(rooms).toContain("ownedRoom(tx,host,data.facilitatedSessionId,true)");
     expect(rooms).toContain("endFacilitatedLearningRoom");
     expect(rooms).toContain("expiresSeconds:30");
     expect(projector).toContain("expiredForNewCommand");

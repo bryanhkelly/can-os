@@ -10,6 +10,7 @@ import { AuthorizationError } from "@/domain/command-context";
 import { facilitatedCodeAlphabet, facilitatedCodeLength, facilitatedPairingWindowMs, facilitatedRoomOperationalState, roomMediaAudienceEligible } from "@/domain/facilitated-learning";
 import { attemptInAssignedClassroomRelease } from "./classroom-release-boundary.server";
 import { assertNativeClassRoomStaff, nativeClassRoomParticipant } from "@/modules/classes/native-class-room-boundary.server";
+import { assertCurrentNativeClassFacilitatorSession } from "@/modules/classes/native-class-facilitator-session.server";
 import { requireCanonicalFacilitator } from "./canonical-facilitator-access.server";
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Host = Awaited<ReturnType<typeof requireCanonicalFacilitator>>;
@@ -212,7 +213,10 @@ export async function ownedRoom(tx:Tx, host:Host, id:string, lock=false) {
   if(!room) throw new AuthorizationError("owned facilitated learning room");
   const access = await authorizedHostDeployment(tx,host,room.deploymentId,room.siteId);
   if(access.siteId!==room.siteId) throw new AuthorizationError("current Site hosting authority");
-  await assertNativeClassRoomStaff(tx,room);
+  const nativeClass=await assertNativeClassRoomStaff(tx,room);
+  // Every locked native Class room command rechecks the current selected bearer.
+  // Legacy non-Class rooms retain their existing independent authorization.
+  if(lock && nativeClass)await assertCurrentNativeClassFacilitatorSession(tx,host.actor);
   return room;
 }
 export function assertRoomLive(room: typeof facilitatedLearningSessions.$inferSelect, now:Date) {

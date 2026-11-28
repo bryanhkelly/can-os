@@ -115,6 +115,20 @@ export const releaseClassroomActivity = createServerFn({ method: "POST" })
     const host = await requireCanonicalFacilitator();
     return db.transaction(async tx => {
       const room = await ownedRoom(tx, host, data.facilitatedSessionId, true);
+      // Recover a committed request before applying the live-window gate to a new write.
+      const [prior] = await tx.select().from(facilitatedRoomActivityReleases)
+        .where(and(
+          eq(facilitatedRoomActivityReleases.facilitatedSessionId, room.id),
+          eq(facilitatedRoomActivityReleases.requestId, data.requestId),
+        )).limit(1);
+      if (prior) {
+        if (prior.releasedByPersonId !== host.actor.actorPersonId ||
+            prior.lessonId !== data.lessonId || prior.prompt !== data.prompt ||
+            prior.answerType !== data.answerType ||
+            JSON.stringify(prior.choices) !== JSON.stringify(data.choices))
+          throw new Error("Conflicting classroom activity retry");
+        return { id: prior.id, duplicate: true };
+      }
       assertLive(room, new Date());
       if (data.lessonId) {
         const [lesson] = await tx.select({ id: courseLessons.id }).from(courseLessons)
@@ -153,6 +167,13 @@ export const closeClassroomActivity = createServerFn({ method: "POST" })
     const host = await requireCanonicalFacilitator();
     return db.transaction(async tx => {
       const room = await ownedRoom(tx, host, data.facilitatedSessionId, true);
+      const [prior] = await tx.select({ closedAt: facilitatedRoomActivityReleases.closedAt })
+        .from(facilitatedRoomActivityReleases).where(and(
+          eq(facilitatedRoomActivityReleases.id, data.activityReleaseId),
+          eq(facilitatedRoomActivityReleases.facilitatedSessionId, room.id),
+        )).limit(1);
+      if (!prior) throw new AuthorizationError("activity in this classroom");
+      if (prior.closedAt) return { closed: true, duplicate: true };
       assertLive(room, new Date());
       const [closed] = await tx.update(facilitatedRoomActivityReleases)
         .set({ closedAt: new Date() }).where(and(
@@ -160,7 +181,7 @@ export const closeClassroomActivity = createServerFn({ method: "POST" })
           eq(facilitatedRoomActivityReleases.facilitatedSessionId, room.id),
           isNull(facilitatedRoomActivityReleases.closedAt),
         )).returning({ id: facilitatedRoomActivityReleases.id });
-      return { closed: !!closed };
+      return { closed: !!closed, duplicate: false };
     });
   });
 
