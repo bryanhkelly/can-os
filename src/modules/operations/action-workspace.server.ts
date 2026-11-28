@@ -91,7 +91,6 @@ export async function getOperationsActionsService(request:Request,raw:unknown){
   measureServerStep("operations.actions","program-choices",()=>scoped.programIds.length ? db.select({id:programs.id,name:programs.name,siteId:programs.siteId}).from(programs).where(and(inArray(programs.id,scoped.programIds),isNotNull(programs.siteId))) : Promise.resolve([])),
  ]);
  return {items:scopedItems,assignees,sites:siteChoices,programs:programChoices,selected:data,summary:{...notificationSummary(items),...schoolActionBacklog(scopedItems)}};
-
 }
 
 /** Generic Actions only: domain-owned referrals must use their own state machine. */
@@ -149,12 +148,11 @@ export async function updateOperationsActionService(request:Request,raw:unknown)
       title:data.status==="resolved"?"School responded to your enrollment request":"School enrollment request updated",
       body:"Review the school response in your family enrollment-change workspace. An update does not by itself change enrollment.",
       resourceType:"action",resourceId:record.id,
-
-}
+    });
    }
    return {saved:true};
   });
- });
+}
 
 export async function assignOperationsActionService(request:Request,raw:unknown){
  const data=parseCommandInput(actionAssignmentSchema,raw);
@@ -197,9 +195,8 @@ export async function assignOperationsActionService(request:Request,raw:unknown)
    if(data.ownerPersonId&&data.ownerPersonId!==record.ownerPersonId)await notify(tx,{recipientPersonId:data.ownerPersonId,type:"operations_action_assigned",title:"Assigned action: "+record.title,body:"An action requires your attention.",resourceType:"action",resourceId:record.id});
    await writeAudit(tx,actor,{action:"action.assignment.change",entityType:"action",entityId:record.id,scope:{siteId:record.siteId,programId:record.programId},before:{ownerPersonId:record.ownerPersonId,priority:record.priority},after:{ownerPersonId:data.ownerPersonId,priority}});
    return {saved:true};
-
+  });
 }
- });
 
 /** Give a verified school Action a real due date. Domain-owned referrals and
  * opening handoffs retain their own lifecycle. Changes are audited/events. */
@@ -232,8 +229,7 @@ export async function setOperationsActionDeadlineService(request:Request,raw:unk
        scope:{organizationId:record.organizationId,siteId:record.siteId,programId:record.programId},
        before:{dueAt:record.dueAt?.toISOString()??null},
        after:{dueAt:newDate?.toISOString()??null,reason:data.reason},
-
-}
+     });
      await emitEvent(tx,{
        eventType:EventTypes.ActionDeadlineChanged,aggregateType:"action",
        aggregateId:record.id,actorPersonId:actor.actorPersonId,
@@ -247,7 +243,7 @@ export async function setOperationsActionDeadlineService(request:Request,raw:unk
          resourceType:"action",resourceId:record.id});
      return {changed:true as const};
    });
- });
+}
 
 /** Onsite exceptions the named local owner (usually the church Site director)
  * closes personally. Everything else stays in the registrar operations
@@ -305,8 +301,7 @@ export async function resolveOwnedSiteOperationalActionService(request:Request,r
        aggregateId:record.id,actorPersonId:actor.actorPersonId,
        organizationId:record.organizationId,siteId:record.siteId,programId:record.programId,
        payload:{subjectType:record.subjectType,subjectId:record.subjectId,type:record.type},
-
-}
+     });
      return {saved:true};
    });
- });
+}
