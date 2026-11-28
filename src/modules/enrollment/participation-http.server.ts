@@ -13,12 +13,15 @@ import * as family from "./guardian-family-applications.server";
 import * as access from "./guardian-access-revocation.server";
 import * as interest from "./public-admissions-interest-http.server";
 import * as guardianOffers from "./guardian-admission-offers-http.server";
+import * as transfer from "./guardian-transfer-destination.server";
 const readInput=z.object({cursor:waitlistCursor.nullable(),releaseId:z.string().uuid().optional()}).strict();
 export function participationWorkflow(request:Request,mode:string){
  const authorize=(method:"GET"|"POST",expectedMode="can")=>{
   if(request.method!==method||mode!==expectedMode)throw new AuthorizationError("verified participation context");
  };
  return {
+  listPublicTransferDestinations:async(raw:unknown)=>{authorize("GET");parseCommandInput(z.object({}).strict(),raw);return transfer.listPublicTransferDestinationsService(request);},
+  requestTransferDestinationFamilyStart:async(raw:unknown)=>{authorize("POST");return transfer.requestTransferDestinationFamilyStartService(request,parseCommandInput(transfer.transferDestinationInput,raw));},
   listPublicAdmissionsInterests:async(raw:unknown)=>{authorize("GET");return interest.listPublicAdmissionsInterestsService(request,parseCommandInput(interest.listPublicAdmissionsInterestsInput,raw));},
   assignPublicSiteInterestToProgram:async(raw:unknown)=>{authorize("POST");return interest.assignPublicSiteInterestToProgramService(request,parseCommandInput(interest.assignPublicSiteInterestToProgramInput,raw));},
   invitePublicAdmissionsInterestToApply:async(raw:unknown)=>{authorize("POST");return interest.invitePublicAdmissionsInterestToApplyService(request,parseCommandInput(interest.invitePublicAdmissionsInterestToApplyInput,raw));},
