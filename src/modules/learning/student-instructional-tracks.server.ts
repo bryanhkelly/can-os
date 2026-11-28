@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, inArray, isNull, lte, or } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -1161,10 +1161,9 @@ export async function recordFormativePractice(
   });
 }
 
-export async function readFormativePracticeHistory(
-  context: CommandContext,
-  raw: z.input<typeof readInstructionalTrackSchema>,
-): Promise<Array<{
+const practiceHistoryPageSize=10;
+export const practiceHistoryPageSchema=readInstructionalTrackSchema.extend({beforeId:uuidSchema.optional()}).strict();
+type PracticeHistoryRow={
   id: string;
   courseUnitId: string;
   trackVersionId: string | null;
@@ -1174,9 +1173,23 @@ export async function readFormativePracticeHistory(
   trackTitle: string | null;
   courseUnitTitle: string | null;
   answers: RecordedPracticeAnswer[];
-}>> {
+};
+/** Existing RPC remains compatible until its consumers migrate. REST uses bounded pages. */
+export async function readFormativePracticeHistory(
+  context:CommandContext,raw:z.input<typeof readInstructionalTrackSchema>,
+):Promise<PracticeHistoryRow[]>{
+  const input=readInstructionalTrackSchema.parse(raw);
+  return (await loadPracticeHistory(context,input,false)).items;
+}
+export async function readFormativePracticeHistoryPage(
+  context:CommandContext,raw:z.input<typeof practiceHistoryPageSchema>,
+):Promise<{items:PracticeHistoryRow[];nextBeforeId:string|null}>{
+  return loadPracticeHistory(context,practiceHistoryPageSchema.parse(raw),true);
+}
+async function loadPracticeHistory(
+  context:CommandContext,input:z.infer<typeof practiceHistoryPageSchema>,paged:boolean,
+):Promise<{items:PracticeHistoryRow[];nextBeforeId:string|null}>{
   assertAuthenticated(context, "learner_or_guardian");
-  const input = readInstructionalTrackSchema.parse(raw);
   return db.transaction(async (tx) => {
     const { attempt, participant } = await loadAuthorizedParticipant(
       tx,
@@ -1184,7 +1197,18 @@ export async function readFormativePracticeHistory(
       input.courseAttemptId,
       true,
     );
-    const rows = await tx.select({
+    // Resolve a cursor only inside the already-authorized attempt. Compare
+    // the database timestamp itself, not a JS Date truncated to milliseconds.
+    const beforeId=input.beforeId;
+    if(beforeId){
+      const [cursor]=await tx.select({id:formativePracticeAttempts.id})
+        .from(formativePracticeAttempts).where(and(
+          eq(formativePracticeAttempts.id,beforeId),
+          eq(formativePracticeAttempts.courseAttemptId,attempt.id),
+        )).limit(1);
+      if(!cursor)throw new AuthorizationError("practice history cursor in your Course attempt");
+    }
+    const historyQuery = tx.select({
       id: formativePracticeAttempts.id,
       courseUnitId: formativePracticeAttempts.courseUnitId,
       trackVersionId: formativePracticeAttempts.trackVersionId,
@@ -1206,12 +1230,20 @@ export async function readFormativePracticeHistory(
         courseUnits.id,
         formativePracticeAttempts.courseUnitId,
       ))
-      .where(eq(formativePracticeAttempts.courseAttemptId, attempt.id))
-      .orderBy(desc(formativePracticeAttempts.recordedAt));
+      .where(and(eq(formativePracticeAttempts.courseAttemptId, attempt.id),
+        beforeId?sql`(${formativePracticeAttempts.recordedAt},${formativePracticeAttempts.id}) <
+          (select ${formativePracticeAttempts.recordedAt},${formativePracticeAttempts.id}
+           from ${formativePracticeAttempts}
+           where ${formativePracticeAttempts.id}=${beforeId}::uuid
+             and ${formativePracticeAttempts.courseAttemptId}=${attempt.id}::uuid)`:undefined))
+      .orderBy(desc(formativePracticeAttempts.recordedAt),desc(formativePracticeAttempts.id));
+    const fetched=paged?await historyQuery.limit(practiceHistoryPageSize+1):await historyQuery;
+    const rows=paged?fetched.slice(0,practiceHistoryPageSize):fetched;
+    const nextBeforeId=paged&&fetched.length>practiceHistoryPageSize?rows[rows.length-1]!.id:null;
 
     // Guardians may inspect the history summary; the learner owns private answers.
     if (participant.selectionSource !== "learner" || rows.length === 0) {
-      return rows.map(row => ({ ...row, answers: [] as RecordedPracticeAnswer[] }));
+      return {items:rows.map(row => ({ ...row, answers: [] as RecordedPracticeAnswer[] })),nextBeforeId};
     }
     const saved = await tx.select({
       practiceAttemptId: formativePracticeResponses.practiceAttemptId,
@@ -1240,7 +1272,7 @@ export async function readFormativePracticeHistory(
         response: answer.response,
       })));
     }
-    return rows.map(row => ({ ...row, answers: answersByAttempt.get(row.id) ?? [] }));
+    return {items:rows.map(row => ({ ...row, answers: answersByAttempt.get(row.id) ?? [] })),nextBeforeId};
   });
 }
 

@@ -43,10 +43,16 @@ import {publishNativeClassSessionAgendaService} from "@/modules/classes/native-c
 import {pairWithFacilitatedRoomService,leaveFacilitatedRoomService,renewFacilitatedLearningPairingService,endFacilitatedLearningRoomService,recordFacilitatedPlaybackService} from "@/modules/learning/facilitated-learning.server";
 import {attestClassroomParticipationService,getClassroomAttendanceRosterService} from "@/modules/learning/classroom-attendance.server";
 import {issueClassroomProjectorCommandService,getClassroomProjectorCommandService} from "@/modules/learning/classroom-projector.server";
-import {releaseClassroomActivityService,closeClassroomActivityService,submitClassroomResponseService,recordClassroomPresenceService,getClassroomLearnerActivitiesService,getClassroomPresentationStateService} from "@/modules/learning/classroom-evidence.server";
+import {releaseClassroomActivityService,closeClassroomActivityService,submitClassroomResponseService,recordClassroomPresenceService,getClassroomLearnerActivitiesService,getClassroomHostActivityService,getClassroomPresentationStateService} from "@/modules/learning/classroom-evidence.server";
 import {getClassroomConnectCourseChoicesService} from "@/modules/learning/classroom-connect.server";
 import {getInstructionalLearnerContext} from "./learning-command-context.server";
-import {getFacilitatedRoomMediaService,getFacilitatedRoomMediaAccessService,getLearnerFacilitatedRoomService} from "@/modules/learning/facilitated-learning.server";
+import {getRecentClassroomFeedbackService,submitClassroomFeedbackService,historyInput as classroomFeedbackHistoryInput,feedbackInput as classroomFeedbackInput} from "@/modules/learning/classroom-feedback.server";
+import {recordClassroomAssistedActivityService,assistedActivityInput} from "@/modules/learning/classroom-assisted-activity.server";
+import {getLearnerCourseParticipationKindService,participationKindInput} from "@/modules/learning/noncredit-learning.server";
+import {getMyNativeClassCalendarService,calendarInput} from "@/modules/classes/native-class-calendar.server";
+import {getNativeClassWorkspaceService,getNativeClassRosterPageService,classWorkspaceInput,rosterPageInput} from "@/modules/classes/native-class-workspace.server";
+import { getClassroomRehearsalChoicesService, getClassroomRehearsalMediaService, getClassroomRehearsalMediaAccessService, recordClassroomRehearsalPlaybackService, rehearsalInput, mediaInput, playbackInput } from "@/modules/learning/classroom-rehearsal.server";
+import {getFacilitatedHostWorkspaceService,getFacilitatedRoomMediaService,getFacilitatedRoomMediaAccessService,getLearnerFacilitatedRoomService} from "@/modules/learning/facilitated-learning.server";
 import {getNativeClassSessionAgendaService} from "@/modules/classes/native-class-session-agenda.server";
 import {resumeLinkedNativeClassLearnerService} from "@/modules/classes/native-class-session-recovery.server";
 import {activateReviewedNativeClassLearnerService} from "@/modules/classes/native-class-reviewed-onboarding.server";
@@ -230,6 +236,26 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
   getMyUnifiedClassDrafts:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("class operator context");return getMyUnifiedClassDraftsService(request,raw);},
   getNativeClassOperatorSites:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("class operator context");return getNativeClassOperatorSitesService(request,raw);},
   getUnifiedClassCourseOptions:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("class operator context");return getUnifiedClassCourseOptionsService(request,raw);},
+  getRecentClassroomFeedback:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="learner")throw new AuthorizationError("learning operation context");return getRecentClassroomFeedbackService(request,parseCommandInput(classroomFeedbackHistoryInput,raw));},
+  submitClassroomFeedback:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="learner")throw new AuthorizationError("learning operation context");return submitClassroomFeedbackService(request,parseCommandInput(classroomFeedbackInput,raw));},
+  recordClassroomAssistedActivity:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("learning operation context");return recordClassroomAssistedActivityService(request,parseCommandInput(assistedActivityInput,raw));},
+  getMyNativeClassCalendar:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("learning operation context");return getMyNativeClassCalendarService(request,parseCommandInput(calendarInput,raw));},
+  getLearnerCourseParticipationKind:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="learner")throw new AuthorizationError("learning operation context");return getLearnerCourseParticipationKindService(request,parseCommandInput(participationKindInput,raw));},
+  getNativeClassWorkspace:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Class workspace context");return getNativeClassWorkspaceService(request,parseCommandInput(classWorkspaceInput,raw));},
+  getNativeClassRosterPage:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Class roster context");return getNativeClassRosterPageService(request,parseCommandInput(rosterPageInput,raw));},
+  getClassroomRehearsalChoices:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("facilitator rehearsal context");return getClassroomRehearsalChoicesService(request);},
+  getClassroomRehearsalMedia:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("facilitator rehearsal context");return getClassroomRehearsalMediaService(request,parseCommandInput(rehearsalInput,raw));},
+  getClassroomRehearsalMediaAccess:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("facilitator rehearsal context");return getClassroomRehearsalMediaAccessService(request,parseCommandInput(mediaInput,raw));},
+  recordClassroomRehearsalPlayback:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("facilitator rehearsal context");return recordClassroomRehearsalPlaybackService(request,parseCommandInput(playbackInput,raw));},
+  getFacilitatedHostWorkspace:async(raw:unknown)=>{
+    if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("facilitator workspace context");
+    const workspace=await getFacilitatedHostWorkspaceService(request,raw);
+    return {...workspace,rooms:workspace.rooms.map(room=>({...room,latestPlayback:room.latestPlayback?{...room.latestPlayback,occurredAt:room.latestPlayback.occurredAt.toISOString()}:null}))};
+  },
+  getClassroomHostActivity:async(raw:unknown)=>{
+    if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("facilitator room context");
+    return getClassroomHostActivityService(request,raw);
+  },
   getFacilitatedRoomMedia:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("governed workflow context");return getFacilitatedRoomMediaService(request,raw);},
   getFacilitatedRoomMediaAccess:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("governed workflow context");return getFacilitatedRoomMediaAccessService(request,raw);},
   getLearnerFacilitatedRoom:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="learner")throw new AuthorizationError("governed workflow context");return getLearnerFacilitatedRoomService(request,raw);},

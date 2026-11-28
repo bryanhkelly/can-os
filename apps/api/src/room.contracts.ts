@@ -71,3 +71,19 @@ export const mediaDocs={
  access:obj({downloadUrl:{...s,format:'uri'},expiresInSeconds:{...n,enum:[0,30]}}),
  joined:obj({rooms:arr(obj({...room,siteId:id,startedAt:dt,latestPlayback:{...obj({roomId:id,kind:en(['opened','played','paused','ended']),lessonId:id,assetVersionId:id,positionSeconds:{...n,nullable:true},occurredAt:dt}),nullable:true}}),5),notice:s})
 };
+
+const hostChoice={deploymentId:uuid,courseVersionId:uuid,courseTitle:str,siteId:uuid,deploymentName:str};
+const hostPlayback=z.object({sessionId:uuid,kind:z.enum(['opened','played','paused','ended']),lessonId:uuid,assetVersionId:uuid,occurredAt:date}).strict();
+const hostRoom={id:uuid,deploymentId:uuid,courseVersionId:uuid,siteId:uuid,hostOrganizationId:uuid,facilitatorPersonId:uuid,state:z.enum(['live','ended','expired']),expiresAt:date,pairedLearners:count,latestPlayback:hostPlayback.nullable(),startedAt:date,pairingExpiresAt:date,endedAt:date.nullable()};
+export const hostResults={
+ workspace:z.object({siteId:uuid,choices:z.array(z.object(hostChoice).strict()),rooms:z.array(z.object(hostRoom).strict()).max(30),asOf:date,note:str}).strict(),
+ activity:z.object({roomState:z.enum(['live','ended','expired']),releases:z.array(z.object({...prompt,closed:bool,releasedAt:date,responseEvents:count,respondingLearners:count,choiceCounts:z.array(count).max(8)}).strict()).max(50),pairedCount:count,activeDevicesEstimate:count,partial:bool,labels:z.object({device:str,response:str}).strict()}).strict(),
+};
+const hostChoiceDoc=obj({deploymentId:id,courseVersionId:id,courseTitle:s,siteId:id,deploymentName:s});
+const hostPlaybackDoc=obj({sessionId:id,kind:en(['opened','played','paused','ended']),lessonId:id,assetVersionId:id,occurredAt:dt});
+const hostRoomDoc=obj({id,deploymentId:id,courseVersionId:id,siteId:id,hostOrganizationId:id,facilitatorPersonId:id,state:en(['live','ended','expired']),expiresAt:dt,pairedLearners:n,latestPlayback:{...hostPlaybackDoc,nullable:true},startedAt:dt,pairingExpiresAt:dt,endedAt:{...dt,nullable:true}});
+export const hostDocs={
+ workspace:obj({siteId:id,choices:arr(hostChoiceDoc),rooms:arr(hostRoomDoc,30),asOf:dt,note:s}),
+ activity:obj({roomState:en(['live','ended','expired']),releases:arr(obj({...activity,closed:b,releasedAt:dt,responseEvents:n,respondingLearners:n,choiceCounts:arr(n,8)}),50),pairedCount:n,activeDevicesEstimate:n,partial:b,labels:obj({device:s,response:s})}),
+};
+export const emptyHostQuery=z.object({}).strict();

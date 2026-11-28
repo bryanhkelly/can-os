@@ -71,7 +71,7 @@ test('canonical reads cannot be enabled outside local development', () => {
 
 test('learner resource routes require the standard session and publish explicit UUID parameters', async ()=>{
   await withServer('0',async (url,document)=>{
-    for(const resource of ['resume','assignments']){
+    for(const resource of ['resume','assignments','learning','assignment-workspace']){
       const path='/api/v1/me/class-enrollments/00000000-0000-4000-8000-000000000001/'+resource;
       const response=await fetch(url+path,{headers:{'x-role':'student','x-person-id':'forged'}});
       assert.equal(response.status,401);
@@ -659,3 +659,172 @@ test('knowledge checks and completion require verified learner or provider autho
 test('noncredit enrollment publication protects provider scope and explicit Site selection',async()=>{await withServer('0',async(url,document)=>{for(const [route,method] of [["/api/v1/noncredit-enrollment-publisher","GET"],["/api/v1/noncredit-training-readiness","GET"],["/api/v1/noncredit-enrollment-releases","POST"],["/api/v1/noncredit-enrollment-closures","POST"],["/api/v1/noncredit-multisite-releases","POST"]]){assert.ok(document.paths[route][method.toLowerCase()].security);assert.equal((await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined)).status,method==='POST'?503:401);}assert.ok(document.paths['/api/v1/noncredit-enrollment-releases'].post.requestBody.content['application/json'].schema.required.includes('siteId'));});});
 
 test('completion administration requires canonical provider credentials and distinguishes decisions from corrections',async()=>{await withServer('0',async(url,document)=>{for(const [route,method] of [["/api/v1/noncredit-completion-decisions","POST"],["/api/v1/noncredit-completion-policy-catalog","GET"],["/api/v1/noncredit-completion-policies","POST"],["/api/v1/noncredit-completion-review","GET"],["/api/v1/noncredit-completion-queue","GET"],["/api/v1/noncredit-completion-corrections","POST"]]){assert.ok(document.paths[route][method.toLowerCase()].security);assert.equal((await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined)).status,method==='POST'?503:401);}});const c=require('../dist/completion-admin.contracts');assert.equal(c.queueQuery.safeParse({page:'101'}).success,false);assert.equal(c.queueQuery.parse({page:'2'}).page,2);});
+
+test('full learning workspace contract rejects unprojected learner data',()=>{
+ const {workspaceSchema}=require('../dist/learning.contracts');
+ const id='00000000-0000-4000-8000-000000000001';
+ const lesson={unitId:id,unitTitle:'Unit',unitOrder:1,lessonId:id,lessonTitle:'Lesson',lessonOrder:1,progressStatus:null,observedAt:null,lessonBody:'Approved content',videoResources:[]};
+ const workspace={classId:id,classEnrollmentId:id,courseAttemptId:id,classTitle:'Class',courseVersionId:id,enrollmentStatus:'active',creditMode:'noncredit',lessons:[lesson],outcomes:[],awards:[]};
+ assert.equal(workspaceSchema.safeParse(workspace).success,true);
+ assert.equal(workspaceSchema.safeParse({...workspace,personId:id}).success,false);
+ assert.equal(workspaceSchema.safeParse({...workspace,lessons:[{...lesson,rawContent:{}}]}).success,false);
+ assert.equal(workspaceSchema.safeParse({...workspace,lessons:[{...lesson,observedAt:'not a timestamp'}]}).success,false);
+ assert.equal(workspaceSchema.safeParse({...workspace,lessons:Array(501).fill(lesson)}).success,false);
+});
+
+test('detailed homework projection rejects raw submission and identity fields',()=>{
+ const {homeworkWorkspaceSchema}=require('../dist/learning.contracts');
+ const id='00000000-0000-4000-8000-000000000001';
+ const assignment={id,title:'Practice',dueAt:null,status:'not_started',submittedAt:null,instructions:'Write a response',responseText:'',practiceFeedback:null,practiceScore:null,practiceScoreMax:null,submitted:false};
+ const value={courseAttemptId:id,legacySectionId:null,assignments:[assignment]};
+ assert.equal(homeworkWorkspaceSchema.safeParse(value).success,true);
+ assert.equal(homeworkWorkspaceSchema.safeParse({...value,assignments:[{...assignment,response:{text:'private'}}]}).success,false);
+ assert.equal(homeworkWorkspaceSchema.safeParse({...value,personId:id}).success,false);
+ assert.equal(homeworkWorkspaceSchema.safeParse({...value,assignments:[{...assignment,practiceScore:'invalid'}]}).success,false);
+});
+test('learning module resolves the shared identity provider without a duplicate adapter',async()=>{
+ const {IdentityModule}=require('../dist/identity.module');
+ const {CanonicalIdentityService}=require('../dist/identity.service');
+ const {LearningModule}=require('../dist/learning.module');
+ const {LearningController}=require('../dist/learning.controller');
+ const {RoomController}=require('../dist/room.controller');
+ const {ClassroomController}=require('../dist/classroom.controller');
+ const {InstructionalController}=require('../dist/instructional.controller');
+ const {RehearsalController}=require('../dist/rehearsal.controller');
+ const {ClassWorkspaceController}=require('../dist/class-workspace.controller');
+ const {app}=await createApi(readConfig({}));
+ try{
+  const shared=app.select(IdentityModule).get(CanonicalIdentityService,{strict:true});
+  assert.equal(app.get(CanonicalIdentityService),shared);
+  const module=app.select(LearningModule);
+  for(const controller of [LearningController,RoomController,ClassroomController,InstructionalController,RehearsalController,ClassWorkspaceController])
+   assert.equal(module.get(controller,{strict:true}).identity,shared);
+ }finally{await app.close();}
+});
+
+test('WS07 recorded instruction and history operations require ordinary authentication and document paths',async()=>{
+ await withServer('0',async(url,document)=>{
+  const id='00000000-0000-4000-8000-000000000001';
+  const paths=['instructors','instruction','practice-history'].map(p=>'/api/v1/me/course-attempts/{courseAttemptId}/'+p);
+  paths.push('/api/v1/me/class-enrollments/{classEnrollmentId}/historical-work','/api/v1/me/class-enrollments/{classEnrollmentId}/assignments/{assignmentId}/revisions');
+  for(const route of paths){
+   const op=document.paths[route].get;assert.ok(op.security);assert.ok(op.responses['403']);
+   const res=await fetch(url+route.replace(/\{\w+\}/g,id));assert.equal(res.status,401);
+  }
+  for(const p of ['instructor-selections','instruction-asset-access','recorded-lesson-completions','practice-attempts']){
+   const op=document.paths['/api/v1/me/course-attempts/{courseAttemptId}/'+p].post;
+   assert.ok(op.security);assert.ok(op.requestBody);assert.ok(op.responses['409']);
+   const res=await fetch(url+'/api/v1/me/course-attempts/'+id+'/'+p,{method:'POST',headers:{Origin:url,'content-type':'application/json'},body:'{}'});
+   assert.equal(res.status,503);
+  }
+ });
+});
+test('recorded instruction wire contracts reject caller-selected identity, invalid revisions, and leaked practice keys',()=>{
+ const {input,output,historyQuery}=require('../dist/instructional.contracts');
+ const id='00000000-0000-4000-8000-000000000001';
+ const selection={requestId:id,trackVersionId:id,expectedRevision:0};
+ assert.equal(input.select.safeParse(selection).success,true);
+ assert.equal(input.select.safeParse({...selection,courseAttemptId:id}).success,false);
+ assert.equal(input.select.safeParse({...selection,expectedRevision:-1}).success,false);
+ assert.equal(input.complete.safeParse({requestId:id,lessonId:id,expectedRevision:0}).success,false);
+ assert.equal(output.choices.safeParse({choices:[],blocked:[],selection:null}).success,true);
+ assert.equal(output.choices.safeParse({choices:[],blocked:[],selection:null,personId:id}).success,false);
+ assert.equal(output.download.safeParse({downloadUrl:'https://example.test/signed',expiresInSeconds:60}).success,false);
+ const row={id,courseUnitId:id,trackVersionId:id,policyVersionId:id,scoreNumeric:null,recordedAt:'2026-11-28T00:00:00.000Z',trackTitle:null,courseUnitTitle:null,answers:[{promptKey:'a',promptText:'Question',response:'Answer'}]};
+ assert.equal(output.history.safeParse({items:[row],nextBeforeId:null}).success,true);
+ assert.equal(output.history.safeParse({items:[{...row,answers:[{...row.answers[0],answerKey:'private'}]}],nextBeforeId:null}).success,false);
+ assert.equal(output.history.safeParse({items:Array(11).fill(row),nextBeforeId:id}).success,false);
+ assert.equal(historyQuery.safeParse({beforeId:id}).success,true);
+ assert.equal(historyQuery.safeParse({beforeId:'invalid'}).success,false);
+ assert.equal(historyQuery.safeParse({personId:id}).success,false);
+ assert.equal(output.download.safeParse({downloadUrl:'http://example.test/signed',expiresInSeconds:30}).success,false);
+});
+
+test('facilitator workspace and activity aggregates have protected contracts',async()=>{
+ await withServer('0',async(url,document)=>{
+  const id='00000000-0000-4000-8000-000000000001';
+  for(const route of ['/api/v1/me/facilitated-classroom-workspace','/api/v1/classrooms/{facilitatedSessionId}/host-activity']){
+   assert.ok(document.paths[route].get.security);
+   const response=await fetch(url+route.replace('{facilitatedSessionId}',id),{headers:{'x-role':'facilitator','x-person-id':id}});
+   assert.equal(response.status,401);
+  }
+ });
+ const {hostResults}=require('../dist/room.contracts');
+ const value={roomState:'live',releases:[],pairedCount:0,activeDevicesEstimate:0,partial:false,labels:{device:'Not attendance',response:'Not grades'}};
+ assert.equal(hostResults.activity.safeParse(value).success,true);
+ assert.equal(hostResults.activity.safeParse({...value,roster:[]}).success,false);
+ assert.equal(hostResults.activity.safeParse({...value,rawAnswers:[]}).success,false);
+});
+
+test('rehearsal REST operations are protected and separate from live learning evidence',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const route of ['choices','media']){
+   const path='/api/v1/classroom-rehearsal/'+route;
+   assert.ok(document.paths[path].get.security);
+   assert.equal((await fetch(url+path,{headers:{'x-role':'room_facilitator'}})).status,401);
+  }
+  for(const route of ['media-access','playback-events']){
+   const path='/api/v1/classroom-rehearsal/'+route;
+   assert.ok(document.paths[path].post.security);
+   assert.ok(document.paths[path].post.responses['409']);
+   assert.equal((await fetch(url+path,{method:'POST',headers:{Origin:url,'content-type':'application/json'},body:'{}'})).status,503);
+  }
+ });
+ const {inputs,results}=require('../dist/rehearsal.contracts');
+ const id='00000000-0000-4000-8000-000000000001';
+ const scope={deploymentId:id,courseVersionId:id,siteId:id,adoptionId:id};
+ const event={...scope,lessonId:id,assetVersionId:id,requestId:id,kind:'played'};
+ assert.equal(inputs.playback.safeParse(event).success,true);
+ assert.equal(inputs.playback.safeParse({...event,courseAttemptId:id}).success,false);
+ assert.equal(inputs.scope.safeParse({...scope,personId:id}).success,false);
+ assert.equal(results.playback.safeParse({saved:true,duplicate:false,rehearsalOnly:true}).success,true);
+ assert.equal(results.playback.safeParse({saved:false,duplicate:true,rehearsalOnly:true}).success,true);
+ assert.equal(results.playback.safeParse({saved:true,duplicate:true,rehearsalOnly:true}).success,false);
+ assert.equal(results.playback.safeParse({saved:true,duplicate:false,rehearsalOnly:true,attendance:true}).success,false);
+ assert.equal(results.access.safeParse({downloadUrl:'http://example.test',expiresInSeconds:30}).success,false);
+});
+
+test('Class workspace and roster use protected explicit contracts',async()=>{
+ await withServer('0',async(url,document)=>{
+  const id='00000000-0000-4000-8000-000000000001';
+  for(const resource of ['workspace','roster']){
+   const path='/api/v1/classes/{classId}/'+resource;
+   assert.ok(document.paths[path].get.security);
+   assert.equal((await fetch(url+path.replace('{classId}',id),{headers:{'x-role':'site_admin'}})).status,401);
+  }
+ });
+ const {queries,results}=require('../dist/class-workspace.contracts');
+ assert.deepEqual(queries.roster.parse({}),{offset:0});
+ assert.deepEqual(queries.roster.parse({offset:'50'}),{offset:50});
+ assert.equal(queries.roster.safeParse({offset:'100001'}).success,false);
+ assert.equal(queries.workspace.safeParse({view:'manage',role:'site_admin'}).success,false);
+ assert.equal(results.roster.safeParse({members:[],total:0,nextOffset:null,rawPeople:[]}).success,false);
+});
+
+test('learning evidence routes enforce authentication and distinguish ratings and assisted practice from grades',async()=>{
+ await withServer('0',async(url,document)=>{
+  const id='00000000-0000-4000-8000-000000000001';
+  for(const route of ['/api/v1/me/course-attempts/{courseAttemptId}/classroom-feedback','/api/v1/me/course-attempts/{courseAttemptId}/participation-kind','/api/v1/me/class-enrollments/{classEnrollmentId}/calendar']){
+   assert.ok(document.paths[route].get.security);
+   assert.equal((await fetch(url+route.replace(/\{\w+\}/g,id))).status,401);
+  }
+  for(const route of ['/api/v1/me/course-attempts/{courseAttemptId}/classroom-feedback','/api/v1/classroom-assisted-activities']){
+   assert.ok(document.paths[route].post.security);
+   assert.equal((await fetch(url+route.replace(/\{\w+\}/g,id),{method:'POST',headers:{Origin:url,'content-type':'application/json'},body:'{}'})).status,503);
+  }
+ });
+ const {inputs,results}=require('../dist/learning-evidence.contracts');
+ const id='00000000-0000-4000-8000-000000000001';
+ const feedback={facilitatedSessionId:id,questionKey:'clarity',rating:5};
+ assert.equal(inputs.feedback.safeParse(feedback).success,true);
+ assert.equal(inputs.feedback.safeParse({...feedback,rating:6}).success,false);
+ assert.equal(inputs.feedback.safeParse({...feedback,participantPersonId:id}).success,false);
+ const assisted={facilitatedSessionId:id,activityReleaseId:id,courseAttemptId:id,requestId:id,method:'paper',answerChoice:0,answerText:null,evidenceNote:'Observed paper answer during classroom practice'};
+ assert.equal(inputs.assisted.safeParse(assisted).success,true);
+ assert.equal(inputs.assisted.safeParse({...assisted,answerText:'second answer'}).success,false);
+ assert.equal(inputs.assisted.safeParse({...assisted,answerChoice:null}).success,false);
+ assert.equal(inputs.assisted.safeParse({...assisted,learnerPersonId:id}).success,false);
+ assert.equal(results.assisted.safeParse({recorded:true,duplicate:false,facilitatorAttributed:true}).success,true);
+ assert.equal(results.assisted.safeParse({recorded:true,duplicate:false,facilitatorAttributed:true,grade:100}).success,false);
+ assert.equal(results.feedbackHistory.safeParse({rooms:[{facilitatedSessionId:id,startedAt:'2026-11-28T00:00:00Z',feedbackClosesAt:'2026-12-05T00:00:00Z',ratings:{clarity:3}}],notice:'Optional ratings'}).success,true);
+});

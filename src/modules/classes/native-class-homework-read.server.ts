@@ -1,3 +1,6 @@
+import { projectSubmissionRevisionPage } from "@/domain/submission-revisions";
+import { AuthorizationError } from "@/domain/command-context";
+import {readHistoricalClassWork} from "./historical-class-work.server";
 import { sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import type { CommandContext } from "@/domain/command-context";
@@ -57,4 +60,75 @@ export async function readNativeClassHomeworkSummary(actor:CommandContext,classE
       const rows=await readHomeworkRows(tx,cls.courseVersionId,courseAttemptId,false);
       return {assignments:rows.map(homeworkSummary)};
     });
+}
+
+/** Own current assignment workspace, including only this attempt's response and feedback. */
+export async function readNativeClassHomework(actor:CommandContext,classEnrollmentId:string){
+    return db.transaction(async tx => {
+      const {cls,enrollment,courseAttemptId} = await authorizeNativeLearnerClass(tx,actor,classEnrollmentId,"active_read");
+      const rows = await readHomeworkRows(tx,cls.courseVersionId,courseAttemptId,true);
+      // Preserve access to original academic evidence during the cutover.
+      // Exact recovery provenance only; no title inference or new enrollment.
+      const legacy = actor.role==="student" ? await tx.execute(sql`
+        SELECT DISTINCT sec.id AS section_id
+        FROM public.academic_enrollment_cutover_links link
+        JOIN public.enrollments e ON e.id=link.legacy_enrollment_id
+        JOIN public.student_profiles sp ON sp.id=e.student_profile_id
+        JOIN public.sections sec ON sec.id=e.section_id
+        WHERE sp.person_id=${enrollment.learnerPersonId}::uuid
+          AND e.kind='section' AND e.status='active'
+          AND sec.site_id=${cls.siteId}::uuid
+          AND e.organization_id=${cls.operatingOrganizationId}::uuid
+          AND link.class_enrollment_id=${enrollment.id}::uuid
+          AND md5('valor-v61:class:'||sec.code)::uuid=${cls.id}::uuid
+        LIMIT 2
+      `) : null;
+      const legacySectionId=legacy?.rows.length===1?String(legacy.rows[0]?.section_id):null;
+      return {courseAttemptId, legacySectionId, assignments:rows.map(item => {
+        const spec=asRecord(item.assignment_spec);
+        const official=asRecord(item.official_spec);
+        const response=asRecord(item.response);
+        return {
+          ...homeworkSummary(item),
+          instructions:String(spec.instructions??official.instructions??"Submit your written response."),
+          responseText:typeof response.text==="string"?response.text:"",
+          practiceFeedback:response.practiceResponse===true&&typeof response.teacherFeedback==="string"
+            ?response.teacherFeedback:null,
+          practiceScore:response.practiceResponse===true
+            ?(typeof response.practiceScore==="number"?response.practiceScore:
+              typeof response.demoScore==="number"?response.demoScore:null):null,
+          practiceScoreMax:response.practiceResponse===true
+            ?(typeof response.practiceScoreMax==="number"?response.practiceScoreMax:
+              typeof response.maxDemoScore==="number"?response.maxDemoScore:null):null,
+          submitted:!!item.submission_id,
+        };
+      })};
+    });
+}
+
+/** Current learner's own revision history; raw response JSON remains server-side. */
+export async function readNativeHomeworkHistory(actor:CommandContext,data:{classEnrollmentId:string;assignmentId:string;beforeRevision?:number}){
+    return db.transaction(async tx=>{
+      const {cls,courseAttemptId}=await authorizeNativeLearnerClass(tx,actor,data.classEnrollmentId,"active_read");
+      const result=await tx.execute(sql`
+        SELECT r.revision_no,r.status,r.response,r.submitted_at,r.recorded_at,r.source
+        FROM public.graded_submission_revisions r
+        JOIN public.graded_submissions gs ON gs.id=r.submission_id AND gs.course_version_id=r.course_version_id
+        JOIN public.graded_assignments ga ON ga.id=gs.assignment_id AND ga.course_version_id=gs.course_version_id
+        WHERE gs.course_attempt_id=${courseAttemptId}::uuid
+          AND gs.course_version_id=${cls.courseVersionId}::uuid
+          AND ga.id=${data.assignmentId}::uuid AND ga.section_id IS NULL
+          AND (${data.beforeRevision??null}::int IS NULL OR r.revision_no<${data.beforeRevision??null}::int)
+        ORDER BY r.revision_no DESC LIMIT 21
+      `);
+      return projectSubmissionRevisionPage(result.rows);
+    });
+}
+/** Preserved school evidence is restricted to the current student grant. */
+export async function readNativeHistoricalWork(actor:CommandContext,data:{classEnrollmentId:string;beforeId?:string}){
+  if(actor.role!=="student")throw new AuthorizationError("own school records");
+  return db.transaction(async tx=>{
+   const {cls,enrollment}=await authorizeNativeLearnerClass(tx,actor,data.classEnrollmentId,"active_read");
+   return readHistoricalClassWork(tx,{classId:cls.id,classEnrollmentId:enrollment.id,beforeId:data.beforeId});
+  });
 }

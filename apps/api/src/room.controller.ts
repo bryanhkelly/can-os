@@ -1,11 +1,12 @@
-import {Controller,Get,Post,Body,Param,Req,HttpCode,applyDecorators} from '@nestjs/common';
+import {Controller,Get,Post,Body,Param,Query,Req,HttpCode,applyDecorators} from '@nestjs/common';
 import {ApiTags,ApiCookieAuth,ApiOperation,ApiBody,ApiOkResponse,ApiHeader,ApiResponse,ApiParam} from '@nestjs/swagger';
 import type {FastifyRequest} from 'fastify';
 import {GovernedWorkflowOperation,verifiedWorkflow} from './security';
 import {CanonicalIdentityService,type WorkflowMode} from './identity.service';
 import {problemOpenApiSchema} from './contracts';
 import {validated} from './learning.contracts';
-import {inputs,results,docs,roomParams,learnerParams,attemptParams,mediaResults,mediaDocs} from './room.contracts';
+import {inputs,results,docs,roomParams,learnerParams,attemptParams,mediaResults,mediaDocs,hostResults,hostDocs,emptyHostQuery} from './room.contracts';
+import * as evidence from './learning-evidence.contracts';
 function RoomOperation(mode:WorkflowMode,method:'GET'|'POST'){
  return applyDecorators(GovernedWorkflowOperation(mode,method),ApiCookieAuth('session'),
  ...(method==='POST'?[HttpCode(200),ApiHeader({name:'Origin',required:true})]:[]),
@@ -15,6 +16,74 @@ function RoomOperation(mode:WorkflowMode,method:'GET'|'POST'){
 @Controller()
 export class RoomController{
  constructor(private readonly identity:CanonicalIdentityService){}
+ @Get('me/course-attempts/:courseAttemptId/classroom-feedback')
+ @RoomOperation('learner','GET')
+ @ApiParam({name:'courseAttemptId',type:String,format:'uuid',required:true})
+ @ApiOperation({operationId:'getRecentClassroomFeedback',summary:'Read own feedback and eligible recently paired rooms; no attendance or grade evidence'})
+ @ApiOkResponse({schema:evidence.docs.feedbackHistory})
+ feedbackHistory(@Req() req:FastifyRequest,@Param() params:unknown,@Query() query:unknown){
+  validated(evidence.inputs.empty,query);
+  const input=validated(evidence.inputs.attempt,params),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>evidence.results.feedbackHistory.parse(await workflow.getRecentClassroomFeedback(input)));
+ }
+ @Post('me/course-attempts/:courseAttemptId/classroom-feedback')
+ @RoomOperation('learner','POST')
+ @ApiParam({name:'courseAttemptId',type:String,format:'uuid',required:true})
+ @ApiOperation({operationId:'submitClassroomFeedback',summary:'Save or revise own subjective rating within the current feedback window'})
+ @ApiBody({schema:evidence.bodies.feedback})
+ @ApiOkResponse({schema:evidence.docs.feedbackSaved})
+ feedback(@Req() req:FastifyRequest,@Param() params:unknown,@Body() body:unknown){
+  const input={...validated(evidence.inputs.attempt,params),...validated(evidence.inputs.feedback,body)},workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>evidence.results.feedbackSaved.parse(await workflow.submitClassroomFeedback(input)));
+ }
+ @Post('classroom-assisted-activities')
+ @RoomOperation('canonical','POST')
+ @ApiOperation({operationId:'recordClassroomAssistedActivity',summary:'Record facilitator-attributed paper, verbal or shared-device practice evidence separately from learner submissions'})
+ @ApiBody({schema:evidence.bodies.assisted})
+ @ApiOkResponse({schema:evidence.docs.assisted})
+ assisted(@Req() req:FastifyRequest,@Body() body:unknown){
+  const input=validated(evidence.inputs.assisted,body),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>evidence.results.assisted.parse(await workflow.recordClassroomAssistedActivity(input)));
+ }
+ @Get('me/course-attempts/:courseAttemptId/participation-kind')
+ @RoomOperation('learner','GET')
+ @ApiParam({name:'courseAttemptId',type:String,format:'uuid',required:true})
+ @ApiOperation({operationId:'getLearnerCourseParticipationKind',summary:'Read authorized course participation source and baseline/final check availability'})
+ @ApiOkResponse({schema:evidence.docs.participation})
+ participationKind(@Req() req:FastifyRequest,@Param() params:unknown,@Query() query:unknown){
+  validated(evidence.inputs.empty,query);
+  const input=validated(evidence.inputs.attempt,params),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>evidence.results.participation.parse(await workflow.getLearnerCourseParticipationKind(input)));
+ }
+ @Get('me/class-enrollments/:classEnrollmentId/calendar')
+ @RoomOperation('canonical','GET')
+ @ApiParam({name:'classEnrollmentId',type:String,format:'uuid',required:true})
+ @ApiOperation({operationId:'getMyNativeClassCalendar',summary:'Read upcoming own authorized adult learner Class schedule; no pairing secrets'})
+ @ApiOkResponse({schema:evidence.docs.calendar})
+ calendar(@Req() req:FastifyRequest,@Param() params:unknown,@Query() query:unknown){
+  validated(evidence.inputs.empty,query);
+  const input=validated(evidence.inputs.enrollment,params),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>evidence.results.calendar.parse(await workflow.getMyNativeClassCalendar(input)));
+ }
+ @Get('me/facilitated-classroom-workspace')
+ @RoomOperation('canonical','GET')
+ @ApiOperation({operationId:'getMyFacilitatedClassroomWorkspace',summary:'Read facilitator-owned rooms and current authorized hosting choices'})
+ @ApiOkResponse({schema:hostDocs.workspace})
+ workspace(@Req() req:FastifyRequest,@Query() query:unknown){
+  validated(emptyHostQuery,query);
+  const workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>hostResults.workspace.parse(await workflow.getFacilitatedHostWorkspace(undefined)));
+ }
+ @Get('classrooms/:facilitatedSessionId/host-activity')
+ @RoomOperation('canonical','GET')
+ @ApiParam({name:'facilitatedSessionId',type:String,format:'uuid',required:true})
+ @ApiOperation({operationId:'getClassroomHostActivity',summary:'Read bounded aggregate activity only for current authorized room host'})
+ @ApiOkResponse({schema:hostDocs.activity})
+ hostActivity(@Req() req:FastifyRequest,@Param() params:unknown,@Query() query:unknown){
+  validated(emptyHostQuery,query);
+  const body=validated(roomParams,params),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>hostResults.activity.parse(await workflow.getClassroomHostActivity(body)));
+ }
  @Post('classroom-pairings')
  @RoomOperation('learner','POST')
  @ApiOperation({operationId:'pairWithFacilitatedRoom',summary:'classroom pairings — existing participant and room authority'})

@@ -2,14 +2,18 @@ import {completeNativeClassLesson,submitNativeClassHomeworkCommand} from "@/modu
 import {selectCurrentSessionMembership,recordCurrentSessionActivity} from "./session-lifecycle.server";
 import { getInstructionalLearnerContext } from "./learning-command-context.server";
 import { AuthorizationError } from "@/domain/command-context";
-import { readNativeClassResume } from "@/modules/classes/native-class-learning-read.server";
-import { readNativeClassHomeworkSummary } from "@/modules/classes/native-class-homework-read.server";
+import { readNativeClassLearning, readNativeClassResume } from "@/modules/classes/native-class-learning-read.server";
+import { readNativeClassHomework, readNativeClassHomeworkSummary, readNativeHomeworkHistory, readNativeHistoricalWork } from "@/modules/classes/native-class-homework-read.server";
 import {createLaunchSiteService} from "@/modules/programs/launch-site-create.server";
 import {submitNativeOfferingReleaseService,saveNativeOfferingReleasePolicyService,decideNativeOfferingReleaseService,publishNativeOfferingCoursesService,approveNativeOfferingAssetManifestService,publishNativeOfferingVersionService,getNativeOfferingReviewContentService,getNativeOfferingReleaseOverviewService,getNativeOfferingReleasePolicyReviewService,getNativeOfferingReleaseReviewQueueService} from "@/modules/learning/native-offering-release.server";
 import {readWorkspaceSession} from "./workspace-session.server";
 import { getIdentityContext } from "./command-context.server";
 import { normalizeClientError } from "@/lib/client-error";
 import { readStudentClasses } from "@/modules/classes/native-class-student-home.server";
+
+import { listAvailableInstructionalTracks, selectInstructionalTrack, readSelectedInstructionalTrack, getSelectedInstructionalTrackAssetDownload, completeRecordedLesson, recordFormativePractice, readFormativePracticeHistoryPage } from "@/modules/learning/student-instructional-tracks.server";
+import type { z } from "zod";
+import type { selectInstructionalTrackSchema, completeRecordedLessonSchema, recordFormativePracticeSchema } from "@/modules/learning/student-instructional-tracks.server";
 
 /** Transport-neutral adapter. No new tokens, grant selectors, or demo privileges. */
 export async function resolveHttpIdentity(request: Request) {
@@ -57,7 +61,36 @@ export async function resolveHttpIdentity(request: Request) {
       };
     },
     readStudentClasses: () => readStudentClasses(actor),
+    readLearningWorkspace: async (id:string) => {
+      const workspace=await readNativeClassLearning(await learner(),id);
+      // Preserve RPC Date objects; HTTP uses explicit ISO timestamps.
+      return {
+        ...workspace,
+        lessons:workspace.lessons.map(lesson=>({...lesson,observedAt:lesson.observedAt?.toISOString()??null})),
+        outcomes:workspace.outcomes.map(outcome=>({...outcome,recordedAt:outcome.recordedAt.toISOString()})),
+        awards:workspace.awards.map(award=>({...award,issuedAt:award.issuedAt.toISOString(),revokedAt:award.revokedAt?.toISOString()??null})),
+      };
+    },
     readLearningResume: async (id:string) => readNativeClassResume(await learner(),id),
+    readHomeworkWorkspace: async (id:string) => readNativeClassHomework(await learner(),id),
+    readHomeworkHistory: async (data:{classEnrollmentId:string;assignmentId:string;beforeRevision?:number})=>readNativeHomeworkHistory(await learner(),data),
+    readHistoricalWork: async (data:{classEnrollmentId:string;beforeId?:string})=>readNativeHistoricalWork(await learner(),data),
+    instruction: {
+      choices: async (courseAttemptId:string)=>listAvailableInstructionalTracks(await learner(),{courseAttemptId}),
+      selected: async (courseAttemptId:string)=>{
+        const value=await readSelectedInstructionalTrack(await learner(),{courseAttemptId});
+        return {...value,selection:{...value.selection,selectedAt:value.selection.selectedAt.toISOString()},
+          lessons:value.lessons.map(lesson=>({...lesson,progress:lesson.progress?{...lesson.progress,observedAt:lesson.progress.observedAt.toISOString()}:null}))};
+      },
+      select: async (input:z.input<typeof selectInstructionalTrackSchema>)=>{requireWrite();return selectInstructionalTrack(await learner(),input);},
+      download: async (input:{courseAttemptId:string;assetVersionId:string})=>{requireWrite();return getSelectedInstructionalTrackAssetDownload(await learner(),input);},
+      complete: async (input:z.input<typeof completeRecordedLessonSchema>)=>{requireWrite();return completeRecordedLesson(await learner(),input);},
+      practice: async (input:z.input<typeof recordFormativePracticeSchema>)=>{requireWrite();return recordFormativePractice(await learner(),input);},
+      history: async (input:{courseAttemptId:string;beforeId?:string})=>{
+        const page=await readFormativePracticeHistoryPage(await learner(),input);
+        return {items:page.items.map(row=>({...row,recordedAt:row.recordedAt.toISOString()})),nextBeforeId:page.nextBeforeId};
+      },
+    },
     readHomeworkSummary: async (id:string) => readNativeClassHomeworkSummary(await learner(),id),
   };
 }
