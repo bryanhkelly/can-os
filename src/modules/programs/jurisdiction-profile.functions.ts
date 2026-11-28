@@ -10,7 +10,6 @@ import { db } from "@/db/client";
 import { writeAudit } from "@/platform/mutation";
 import {
  jurisdictionProfileVersions, jurisdictionProfileVerificationDecisions,
- jurisdictions, organizations,
 } from "@/db/schema";
 import { and, eq, desc, inArray, isNotNull } from "drizzle-orm";
 
