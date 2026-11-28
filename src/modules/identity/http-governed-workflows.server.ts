@@ -30,6 +30,9 @@ import {readCanonicalBlueprintHomeService} from "@/modules/blueprints/blueprint-
 import {getNativeClassReportService} from "@/modules/reporting/native-class-report.server";
 import {requestReportingRelationshipService,decideRelationshipRequestService} from "@/modules/reporting/reporting-relationship-commands.server";
 import {readRelationshipPortfolio} from "@/modules/reporting/bottom-up-reporting-relationships.server";
+import {getMyNativeTeachingClassesService,getNativeTeacherTodayService} from "@/modules/classes/native-class-teacher-home.server";
+import {getNativeClassTeacherHomeworkService,getNativeClassTeacherMissingWorkService,getNativeClassTeacherOpenFollowUpsService,createNativeClassMissingWorkFollowUpService,getNativeClassTeacherHomeworkHistoryService,returnNativeClassPracticeFeedbackService,getNativeClassTeacherAssessmentsService,getNativeClassTeacherHistoricalWorkService} from "@/modules/classes/native-class-teacher-homework.server";
+import {getMyNativeGuardianLearnersService,requestNativeGuardianClassApprovalService,getMyNativeGuardianClassApprovalsService,acceptNativeGuardianClassApprovalService,withdrawMyGuardianNativeClassEnrollmentService,getMyNativeGuardianClassEnrollmentsService,getGuardianCommunitySummaryService} from "@/modules/classes/native-class-guardian-enrollment.server";
 export type WorkflowMode="planning"|"canonical"|"can"|"learner";
 /** Existing independent native reviewer credentials remain distinct from CAN.
  * No fallback, new role, token or grant is manufactured by this adapter. */
@@ -38,6 +41,23 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
  const context=await (mode==="planning"?getBlueprintPlanningContext(request):mode==="canonical"?getCanonicalCommandContext(request):mode==="learner"?getInstructionalLearnerContext(request):getIdentityContext(request));
  if(!context.actorPersonId)throw new AuthorizationError("verified Person");
  return {
+  getMyNativeTeachingClasses:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("role workspace context");if(context.role!=="teacher")throw new AuthorizationError("teacher membership");return getMyNativeTeachingClassesService(request,raw);},
+  getNativeTeacherToday:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("role workspace context");if(context.role!=="teacher")throw new AuthorizationError("teacher membership");return getNativeTeacherTodayService(request,raw);},
+  getNativeClassTeacherHomework:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("role workspace context");return getNativeClassTeacherHomeworkService(request,raw);},
+  getNativeClassTeacherMissingWork:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("role workspace context");return getNativeClassTeacherMissingWorkService(request,raw);},
+  getNativeClassTeacherOpenFollowUps:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("role workspace context");return getNativeClassTeacherOpenFollowUpsService(request,raw);},
+  createNativeClassMissingWorkFollowUp:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("role workspace context");return createNativeClassMissingWorkFollowUpService(request,raw);},
+  getNativeClassTeacherHomeworkHistory:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("role workspace context");return getNativeClassTeacherHomeworkHistoryService(request,raw);},
+  returnNativeClassPracticeFeedback:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("role workspace context");return returnNativeClassPracticeFeedbackService(request,raw);},
+  getNativeClassTeacherAssessments:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("role workspace context");return getNativeClassTeacherAssessmentsService(request,raw);},
+  getNativeClassTeacherHistoricalWork:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("role workspace context");return getNativeClassTeacherHistoricalWorkService(request,raw);},
+  getMyNativeGuardianLearners:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("role workspace context");return getMyNativeGuardianLearnersService(request,raw);},
+  getMyNativeGuardianClassApprovals:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("role workspace context");return getMyNativeGuardianClassApprovalsService(request,raw);},
+  getMyNativeGuardianClassEnrollments:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("role workspace context");return getMyNativeGuardianClassEnrollmentsService(request,raw);},
+  getGuardianCommunitySummary:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("role workspace context");return getGuardianCommunitySummaryService(request,raw);},
+  requestNativeGuardianClassApproval:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("role workspace context");return requestNativeGuardianClassApprovalService(request,raw);},
+  acceptNativeGuardianClassApproval:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("role workspace context");return acceptNativeGuardianClassApprovalService(request,raw);},
+  withdrawMyGuardianNativeClassEnrollment:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("role workspace context");return withdrawMyGuardianNativeClassEnrollmentService(request,raw);},
   getNativeClassReport:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("reporting context");return getNativeClassReportService(request,raw);},
   requestReportingRelationship:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("reporting context");return requestReportingRelationshipService(request,raw);},
   decideRelationshipRequest:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("reporting context");return decideRelationshipRequestService(request,raw);},

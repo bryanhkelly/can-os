@@ -290,3 +290,19 @@ test('reporting endpoints protect source-owned evidence and never approve public
  assert.equal(metricKeys.length,16);
  assert.equal(reportQuery.safeParse({from:'2026-01-01',to:'2026-02-01',organizationId:'forged'}).success,false);
 });
+
+test('teacher and guardian workspace operations retain explicit authorization and bounded projections',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const [method,route] of [["GET","/api/v1/me/teacher/classes"],["GET","/api/v1/me/teacher/today"],["GET","/api/v1/classes/{classId}/teacher/homework"],["GET","/api/v1/classes/{classId}/teacher/missing-work"],["GET","/api/v1/classes/{classId}/teacher/follow-ups"],["POST","/api/v1/classes/{classId}/teacher/follow-ups"],["GET","/api/v1/classes/{classId}/teacher/homework/{submissionId}/history"],["POST","/api/v1/classes/{classId}/teacher/practice-feedback"],["GET","/api/v1/classes/{classId}/teacher/assessment-readiness"],["GET","/api/v1/classes/{classId}/teacher/historical-work"],["GET","/api/v1/me/guardian/learners"],["GET","/api/v1/me/guardian/class-approvals"],["GET","/api/v1/me/guardian/class-enrollments"],["GET","/api/v1/me/guardian/community"],["POST","/api/v1/guardian-class-approval-requests"],["POST","/api/v1/guardian-class-approval-acceptances"],["POST","/api/v1/guardian-class-withdrawals"]]){
+   const op=document.paths[route][method.toLowerCase()];assert.ok(op.security);assert.ok(op.responses['403']);
+   const response=await fetch(url+route.replace(/\{[^}]+\}/g,'00000000-0000-4000-8000-000000000001'),method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);
+  }
+ });
+ const {bodies,results,queries}=require('../dist/role-workspaces.contracts');
+ const id='00000000-0000-4000-8000-000000000001';
+ assert.equal(bodies.feedback.safeParse({submissionId:id,feedback:'Review this answer',practiceScore:8,officialGrade:100}).success,false);
+ assert.equal(bodies.accept.safeParse({approvalRequestId:id,creditMode:'for_credit',consentAccepted:true}).success,false);
+ assert.equal(queries.page.safeParse({offset:'1000001'}).success,false);
+ assert.equal(results.followUp.safeParse({actionId:null,created:false,assignedToAnotherTeacher:true}).success,true);
+});
