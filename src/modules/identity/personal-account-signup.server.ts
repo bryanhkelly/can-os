@@ -4,7 +4,8 @@ import { db } from "@/db/client";
 import {
   accessAccountSignups, accessAccounts, accountPersonGrants, people, schoolSetupSignups,
 } from "@/db/schema";
-import { issuePrivateAccountCredential } from "./private-account-credential.server";
+import { LOCAL_DEMO_ACCESS_CODE } from "@/domain/local-demo-access";
+import { readDemoCredentialDomain } from "./demo-school-tenants.server";
 import { normalizeAccessEmail } from "@/domain/access-tokens";
 import { personalCanSignupSchema } from "@/domain/personal-account-signup";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
@@ -76,22 +77,22 @@ export async function requestPersonalCanAccount(input: unknown,
   return genericResult;
 }
 
-/** Public registration can issue an individual credential only for a genuinely
+/** Public registration can approve a shared credential in a registered synthetic domain only for a genuinely
  * new Account. An existing invitation, Account, or revoked identity cannot be
  * claimed through registration. No Organization or membership is inferred. */
 async function provisionPrivatePersonalSignup(data: ReturnType<typeof personalCanSignupSchema.parse>, email:string) {
-  const {privateAccessCode,privateAccessCodeHash}=issuePrivateAccountCredential();
   return db.transaction(async tx=>{
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"personal-signup:" + email}))`);
+    if (!await readDemoCredentialDomain(email,tx)) return genericResult;
     const now=new Date();
-    const [account]=await tx.insert(accessAccounts).values({emailNormalized:email,privateAccessCodeHash})
+    const [account]=await tx.insert(accessAccounts).values({emailNormalized:email})
       .onConflictDoNothing().returning({id:accessAccounts.id});
     if(!account)return genericResult;
     await tx.insert(accessAccountSignups).values({accountId:account.id,firstName:data.firstName,lastName:data.lastName,
       expiresAt:new Date(now.getTime()+SIGNUP_LIFETIME_MS)});
     const grantId=await provisionVerifiedPersonalCanAccount(tx,account.id,email,now,"demo_code");
     if(!grantId)throw new Error("Personal account approval unavailable");
-    return {...genericResult,privateAccessCode};
+    return {...genericResult,privateAccessCode:LOCAL_DEMO_ACCESS_CODE};
   });
 }
 
