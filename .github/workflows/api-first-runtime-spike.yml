@@ -3,6 +3,8 @@ on:
   push:
     branches: [architecture/api-first-nestjs]
     paths: ['apps/api/**', 'src/**', 'scripts/architecture/**', 'scripts/acceptance/**', 'playwright.nest-student-api.config.ts', 'tests/e2e/**', 'package*.json', '.github/workflows/api-first-runtime-spike.yml', 'docs/architecture/api-first-engineering-standard.md']
+  pull_request:
+    branches: [architecture/api-first-nestjs]
   workflow_dispatch:
 permissions:
   contents: read
@@ -60,10 +62,19 @@ jobs:
       - run: npm test
       - name: Generate typed SDK from the executable OpenAPI document
         run: npm run sdk:generate && npm run sdk:check
-      - run: npm run sdk:test
+      - run: npm run sdk:test && npm run sdk:verify
       - uses: actions/upload-artifact@v4
         with:
           name: api-contract-and-sdk-types
           path: apps/api/sdk/generated/
           if-no-files-found: error
       - run: npm audit --omit=dev --audit-level=high
+      - name: Build and smoke locked transport image
+        working-directory: .
+        run: |
+          if ! git ls-files --error-unmatch apps/api/package-lock.json >/dev/null 2>&1; then
+            echo '::warning::No committed API lock; container packaging remains blocked.'
+            exit 0
+          fi
+          docker build -f apps/api/Dockerfile -t becomuna-api:ws01 .
+          node apps/api/scripts/smoke-container.mjs becomuna-api:ws01
