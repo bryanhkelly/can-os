@@ -2,11 +2,11 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { getNativeCourseDraftLessonsService, saveNativeCourseLessonDraftService, getNativeCourseReleaseReadinessService, createNativeCourseAssignmentDraftService, getNativeCourseAssignmentDraftsService } from "./native-course-draft.server";
 
-import { draftCourseInput, draftLessonInput, assignmentInput, draftAssignmentsInput } from "./native-course-draft.inputs";
+import { draftCourseInput, draftLessonInput, assignmentInput, draftAssignmentsInput, draftLessonListInput } from "./native-course-draft.inputs";
 const noStore=()=>setResponseHeader("Cache-Control","private, no-store");
 // All input validation and publisher authorization are shared with REST.
 export const getNativeCourseDraftLessons=createServerFn({method:"GET"})
-  .validator((raw:unknown)=>draftCourseInput.parse(raw))
+  .validator((raw:unknown)=>draftLessonListInput.parse(raw))
   .handler(async({data})=>{noStore();return getNativeCourseDraftLessonsService(getRequest(),data);});
 
 export const saveNativeCourseLessonDraft=createServerFn({method:"POST"})

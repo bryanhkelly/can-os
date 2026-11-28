@@ -8,7 +8,7 @@ export const queries={empty:z.object({}).strict(),assignments:z.object({offset:s
 export const inputs={lesson:editable.extend({expectedRevision:hash}).strict().refine(duration),assignment:z.object({assignmentKey:str.trim().regex(/^[a-z][a-z0-9_-]{2,79}$/),title:str.trim().min(3).max(200),instructions:str.trim().min(5).max(12000),required:z.boolean()}).strict()};
 const base={courseVersionId:uuid,courseTitle:str,versionNo:positive,limited:z.boolean()};
 export const results={
- lessons:z.object({...base,lessons:z.array(z.object({id:uuid,title:str,unitTitle:str,lessonOrder:count,revision:hash,editable:editable.refine(duration).nullable()}).strict()).max(80)}).strict(),
+ lessons:z.object({...base,nextOffset:count.nullable(),lessons:z.array(z.object({id:uuid,title:str,unitTitle:str,lessonOrder:count,revision:hash,editable:editable.refine(duration).nullable()}).strict()).max(80)}).strict(),
  saved:z.object({revision:hash,changed:z.boolean()}).strict(),
  readiness:z.object({...base,courseLifecycle:z.literal('draft'),lessonCount:count,offerings:z.array(z.object({offeringVersionId:uuid,offeringTitle:str,versionNo:positive,lifecycle:str,published:z.boolean()}).strict()).max(80),independentPublicationVerified:z.literal(false),siteAndOperatorAuthorizationVerified:z.literal(false)}).strict(),
  assignment:z.object({assignmentVersionId:uuid,created:z.boolean()}).strict(),
@@ -22,7 +22,7 @@ const editableDoc={title:text(3,200),objectives:arr(text(3,250),10,1),segments:a
 const baseDoc={courseVersionId:id,courseTitle:s,versionNo:p,limited:b};
 export const inputDocs={lesson:obj({...editableDoc,expectedRevision:h}),assignment:obj({assignmentKey:{...s,pattern:'^[a-z][a-z0-9_-]{2,79}$'},title:text(3,200),instructions:text(5,12000),required:b})};
 export const docs={
- lessons:obj({...baseDoc,lessons:arr(obj({id,title:s,unitTitle:s,lessonOrder:n,revision:h,editable:{...obj(editableDoc),nullable:true}}),80)}),
+ lessons:obj({...baseDoc,nextOffset:{...n,nullable:true},lessons:arr(obj({id,title:s,unitTitle:s,lessonOrder:n,revision:h,editable:{...obj(editableDoc),nullable:true}}),80)}),
  saved:obj({revision:h,changed:b}),
  readiness:obj({...baseDoc,courseLifecycle:{...s,enum:['draft']},lessonCount:n,offerings:arr(obj({offeringVersionId:id,offeringTitle:s,versionNo:p,lifecycle:s,published:b}),80),independentPublicationVerified:{...b,enum:[false]},siteAndOperatorAuthorizationVerified:{...b,enum:[false]}}),
  assignment:obj({assignmentVersionId:id,created:b}),

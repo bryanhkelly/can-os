@@ -13,7 +13,7 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertTrackProvider } from "./instructional-track-access.server";
 import { writeAudit } from "@/platform/mutation";
 
-import { draftCourseInput, draftLessonInput, assignmentInput, draftAssignmentsInput } from "./native-course-draft.inputs";
+import { draftCourseInput, draftLessonInput, assignmentInput, draftAssignmentsInput, draftLessonListInput } from "./native-course-draft.inputs";
 
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Actor=Awaited<ReturnType<typeof getCommandContext>>;
@@ -50,7 +50,7 @@ async function requireAssignedNativeDraft(tx:Tx,actor:Actor,courseVersionId:stri
 /** Only the appointed creator sees a native unpublished Course's lesson outline.
  * Neither a URL nor a Site Operator role grants publisher-edit rights. */
 export async function getNativeCourseDraftLessonsService(request:Request,raw:unknown){
-    const data=parseCommandInput(draftCourseInput,raw);
+    const data=parseCommandInput(draftLessonListInput,raw);
     const actor=await getCommandContext(request);
     return db.transaction(async tx=>{
       const course=await requireAssignedNativeDraft(tx,actor,data.courseVersionId);
@@ -66,12 +66,13 @@ export async function getNativeCourseDraftLessonsService(request:Request,raw:unk
           eq(courseUnits.courseVersionId,courseLessons.courseVersionId),
         ))
         .where(eq(courseLessons.courseVersionId,data.courseVersionId))
-        .orderBy(asc(courseUnits.sequenceNo),asc(courseLessons.lessonOrder))
-        .limit(81);
+        .orderBy(asc(courseUnits.sequenceNo),asc(courseLessons.lessonOrder),asc(courseLessons.id))
+        .limit(81).offset(data.offset);
       return {
         courseVersionId:data.courseVersionId,
         courseTitle:course.courseTitle,versionNo:course.versionNo,
         limited:rows.length>80,
+        nextOffset:rows.length>80&&data.offset+80<=1000000?data.offset+80:null,
         lessons:rows.slice(0,80).map(row=>({
           id:row.id,title:row.title,unitTitle:row.unitTitle,
           lessonOrder:row.lessonOrder,

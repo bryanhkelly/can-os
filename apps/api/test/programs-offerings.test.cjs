@@ -124,3 +124,14 @@ test('Publisher Pack contract rejects duplicate courses, hidden authority and un
  assert.equal(inputs.publish.safeParse({expectedRevision,confirmed:true,reason:'Reviewed publication',reviewerPersonId:id}).success,false);
  assert.equal(results.draft.safeParse({versionId:id,created:true,offeringPublished:true}).success,false);
 });
+
+test('native Course lesson paging exposes continuation and rejects unreasonable offsets',()=>{
+ const {queries,results}=require('../dist/native-course-draft.contracts');
+ const id='00000000-0000-4000-8000-000000000001';
+ assert.equal(queries.assignments.parse({offset:'80'}).offset,80);
+ assert.equal(queries.assignments.safeParse({offset:'1000001'}).success,false);
+ assert.equal(queries.assignments.safeParse({offset:'-1'}).success,false);
+ const result={courseVersionId:id,courseTitle:'Course',versionNo:1,limited:false,nextOffset:null,lessons:[]};
+ assert.equal(results.lessons.safeParse(result).success,true);
+ assert.equal(results.lessons.safeParse({...result,nextOffset:-1}).success,false);
+});

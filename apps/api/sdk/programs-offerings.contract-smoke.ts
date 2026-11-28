@@ -26,8 +26,8 @@ export async function checkProgramsOfferingsContract(client: BecomunaBrowserApi,
 
 export async function checkAuthoringContracts(client:BecomunaBrowserApi,id:string,hash:string){
  const course={courseVersionId:id};
- const lessons=await client.GET('/api/v1/course-versions/{courseVersionId}/draft-lessons',{params:{path:course}});
- if(lessons.data){const limited:boolean=lessons.data.limited;void limited;}
+ const lessons=await client.GET('/api/v1/course-versions/{courseVersionId}/draft-lessons',{params:{path:course,query:{offset:80}}});
+ if(lessons.data){const limited:boolean=lessons.data.limited;const next:number|null=lessons.data.nextOffset;void limited;void next;}
  await client.POST('/api/v1/course-versions/{courseVersionId}/draft-lessons/{lessonId}/revisions',{params:{path:{...course,lessonId:id}},body:{title:'Lesson title',objectives:['Learn a concept'],segments:[{title:'Introduction',minutes:20}],expectedRevision:hash}});
  await client.POST('/api/v1/course-versions/{courseVersionId}/draft-assignments',{params:{path:course},body:{assignmentKey:'assignment_1',title:'Assignment title',instructions:'Explain the concept',required:true}});
  await client.GET('/api/v1/course-versions/{courseVersionId}/draft-assignments',{params:{path:course,query:{offset:0}}});

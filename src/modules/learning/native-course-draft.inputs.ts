@@ -10,4 +10,5 @@ export const assignmentInput=z.object({
   instructions:z.string().trim().min(5).max(12000),
   required:z.boolean(),
 }).strict();
+export const draftLessonListInput=draftCourseInput.extend({offset:z.number().int().min(0).max(1000000).default(0)}).strict();
 export const draftAssignmentsInput=draftCourseInput.extend({offset:z.number().int().min(0).max(1000000).default(0)}).strict();

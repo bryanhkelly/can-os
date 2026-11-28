@@ -18,10 +18,11 @@ export class NativeCourseDraftController{
  @ApiOperation({operationId:'getNativeCourseDraftLessons',summary:'Read bounded appointed-author draft lessons; excludes hidden publisher metadata'})
  
  
+ @ApiQuery({name:'offset',required:false,schema:{type:'integer',minimum:0,maximum:1000000}})
  @ApiOkResponse({schema:c.docs.lessons})
  async getNativeCourseDraftLessons(@Req() req:FastifyRequest,@Param() params:unknown,@Query() query:unknown){
   const workflow=verifiedWorkflow(req),ids=validated(c.params.course,params);
-  const input={...ids,...validated(c.queries.empty,query)};
+  const input={...ids,...validated(c.queries.assignments,query)};
   return this.identity.runWorkflow(async()=>c.results.lessons.parse(await workflow.getNativeCourseDraftLessons(input)));
  }
 
