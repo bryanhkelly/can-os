@@ -52,3 +52,18 @@ export async function checkClassParticipationContract(client:BecomunaBrowserApi,
  // @ts-expect-error approval requests cannot specify a different learner
  await client.POST('/api/v1/class-approval-requests',{body:{classOfferingVersionId:id,requestId:id,learnerPersonId:id}});
 }
+
+export async function checkAdmissionsIntakeContract(client:BecomunaBrowserApi,id:string){
+ await client.GET('/api/v1/admission-intake-programs');
+ await client.GET('/api/v1/admission-existing-students',{params:{query:{programId:id,page:1,pageSize:40}}});
+ await client.GET('/api/v1/admission-stage-counts',{params:{query:{programId:id}}});
+ await client.GET('/api/v1/admission-household-search',{params:{query:{programId:id,search:'Example'}}});
+ await client.GET('/api/v1/admission-applications',{params:{query:{applicationId:id}}});
+ await client.POST('/api/v1/admission-inquiries',{body:{requestId:id,programId:id,existingStudent:{studentProfileId:id,guardianPersonId:id,householdId:id}}});
+ await client.POST('/api/v1/admission-stage-transitions',{body:{applicationId:id,decision:'application'}});
+ await client.POST('/api/v1/admission-guardian-verifications',{body:{applicationId:id,method:'in_person_id',evidenceNote:'Independent identity verification'}});
+ await client.POST('/api/v1/admission-guardian-accounts',{body:{applicationId:id}});
+ await client.POST('/api/v1/admission-guardian-invitations',{body:{applicationId:id}});
+ // @ts-expect-error the guardian is derived from the application, never selected by client
+ await client.POST('/api/v1/admission-guardian-accounts',{body:{applicationId:id,guardianPersonId:id}});
+}
