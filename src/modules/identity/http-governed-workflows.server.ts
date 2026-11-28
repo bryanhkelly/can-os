@@ -8,6 +8,12 @@ import {placeNativeDeploymentSiteService} from "@/modules/programs/native-deploy
 import {approveNativeOfferingAdoptionService} from "@/modules/programs/native-offering-adoption-command.server";
 import {enrollMyselfInNoncreditService} from "@/modules/enrollment/noncredit-self-registration.server";
 import {enrollInNativeClassService} from "@/modules/classes/native-class-enrollment-command.server";
+import {scheduleNativeClassSessionsService} from "@/modules/classes/native-class-sessions.server";
+import {changeNativeClassSessionScheduleService} from "@/modules/classes/native-class-sessions.server";
+import {openNativeClassSessionService} from "@/modules/classes/native-class-sessions.server";
+import {revokeNativeClassSessionService} from "@/modules/classes/native-class-sessions.server";
+import {transferNativeClassroomControlService} from "@/modules/classes/native-classroom-control.server";
+import {publishNativeClassSessionAgendaService} from "@/modules/classes/native-class-session-agenda.server";
 export type WorkflowMode="planning"|"canonical"|"can";
 /** Existing independent native reviewer credentials remain distinct from CAN.
  * No fallback, new role, token or grant is manufactured by this adapter. */
@@ -16,6 +22,12 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
  const context=await (mode==="planning"?getBlueprintPlanningContext(request):mode==="canonical"?getCanonicalCommandContext(request):getIdentityContext(request));
  if(!context.actorPersonId)throw new AuthorizationError("verified Person");
  return {
+  scheduleNativeClassSessions:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("class session context");return scheduleNativeClassSessionsService(request,raw);},
+  changeNativeClassSessionSchedule:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("class session context");return changeNativeClassSessionScheduleService(request,raw);},
+  openNativeClassSession:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("class session context");return openNativeClassSessionService(request,raw);},
+  revokeNativeClassSession:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("class session context");return revokeNativeClassSessionService(request,raw);},
+  transferNativeClassroomControl:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("class session context");return transferNativeClassroomControlService(request,raw);},
+  publishNativeClassSessionAgenda:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("class session context");return publishNativeClassSessionAgendaService(request,raw);},
   registerNoncredit:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("registration context");return enrollMyselfInNoncreditService(request,raw);},
   enrollNativeClass:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("enrollment context");return enrollInNativeClassService(request,raw);},
   readCanonicalBlueprintConfiguration:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="planning")throw new AuthorizationError("governed read context");return readCanonicalBlueprintConfigurationService(request,raw);},

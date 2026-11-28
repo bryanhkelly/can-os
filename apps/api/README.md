@@ -42,3 +42,6 @@ Blueprint configuration detail, exact version review, and bounded review history
 
 ## Participation
 POST /api/v1/noncredit-registrations and /api/v1/class-enrollments share the existing registration and enrollment transactions. Registration, Class Enrollment, Course Attempt, and actual attendance are distinct records; the existing noncredit workflow intentionally creates registration + placement atomically when required by the published release. The secure restricted learner cookie is forwarded as Set-Cookie, never JSON. Adult verified identity, consent, current published terms, capacity, repeat authorization and audit remain in domain services. No new signup shortcut or credential minting behavior. Runtime verification and discovery/recovery APIs remain pending.
+
+## Classroom lifecycle
+Six protected HTTP commands support native Class Session scheduling, schedule changes, opening, emergency revocation, control transfer and agenda publication. Each uses the existing assignment, Site scope, scheduling, restricted-session, published-content and transaction checks. The transport-neutral facilitator resolver is also shared with legacy RPC. No simulated time, fake classroom or test-only authorization. Room pairing, attendance, projector, presence and activity endpoints and positive runtime acceptance remain outstanding.

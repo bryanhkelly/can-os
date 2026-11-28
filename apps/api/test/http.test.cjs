@@ -211,3 +211,13 @@ test('participation APIs retain distinct receipts and never expose learner cooki
  assert.equal(registrationResult.safeParse({registrationId:id,courseAttemptId:id,alreadyEnrolled:false,classId:null,classEnrollmentId:null,cookie:'secret'}).success,false);
  assert.equal(enrollmentResult.safeParse({classEnrollmentId:id,courseAttemptId:id,alreadyEnrolled:false,registrationId:id}).success,false);
 });
+
+test('Classroom lifecycle commands document authority and remain disabled by default',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const p of ["/api/v1/class-session-schedules","/api/v1/class-session-schedule-changes","/api/v1/class-session-openings","/api/v1/class-session-revocations","/api/v1/classroom-control-transfers","/api/v1/class-session-agenda-revisions"]){
+   const op=document.paths[p].post;
+   assert.ok(op.security);assert.ok(op.responses['403']);assert.ok(op.requestBody);
+   assert.equal((await fetch(url+p,{method:'POST',headers:{Origin:url,'content-type':'application/json'},body:'{}'})).status,503);
+  }
+ });
+});
