@@ -31,7 +31,7 @@ export function campaignSenderReadiness(approved?:{sender_from:string;postal_add
 }
 export function campaignSender(){return campaignSenderReadiness().sender;}
 export async function readCampaignSenderReadiness(organizationId:string|null=null){
- const {readCampaignSenderRegistryState}=await import("./sender-registry.server");
+ const {readCampaignSenderRegistryState}=await import("./campaign-sender-state.server");
  const local=organizationId?await readCampaignSenderRegistryState(organizationId):null;
  const state=local?.configured?local:await readCampaignSenderRegistryState(null);
  if(state.configured&&!state.active)return {sender:null,issues:["Campaign sender approval has been revoked."]};

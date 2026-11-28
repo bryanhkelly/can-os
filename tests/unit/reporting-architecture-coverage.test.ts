@@ -40,7 +40,7 @@ describe("reporting event architecture",()=>{
       "src/modules/sites/site-publication.server.ts",
       "src/modules/sites/academic-program-publication.server.ts",
       "src/modules/programs/program-launch-service.ts",
-      "src/modules/communication/engagement-campaigns.server.ts",
+      "src/modules/communication/engagement-campaigns-service.server.ts",
     ];
     for(const path of paths){
       const src=read(path);

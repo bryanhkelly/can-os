@@ -17,7 +17,7 @@ describe("Go Link service boundary and privacy contracts",()=>{
   it("uses one transactional Go allocator and status transition while preserving exact ownership",()=>{
     const lifecycle=read("src/modules/engagement/go-link-lifecycle.server.ts");
     const direct=read("src/modules/engagement/site-go-links.functions.ts");
-    const engagement=read("src/modules/engagement/engagement-registry.server.ts");
+    const engagement=read("src/modules/engagement/engagement-registry-service.server.ts");
     expect(lifecycle.match(/randomBytes\(9\)/g)).toHaveLength(1);
     expect(lifecycle.match(/tx\.update\(siteGoLinks\)/g)).toHaveLength(1);
     expect(lifecycle).toContain('actor.delegationMode==="view"');
@@ -42,13 +42,13 @@ describe("Go Link service boundary and privacy contracts",()=>{
       expect(rpc).not.toMatch(/from\s+["'][^"']*\.server["']/);
       expect(rpc.match(/createServerFn\(/g)?.length).toBe(rpc.match(/await import\("\.\/[^"]+\.server"\)/g)?.length);
     }
-    const registry=read("src/modules/engagement/engagement-registry.server.ts");
+    const registry=read("src/modules/engagement/engagement-registry-service.server.ts");
     expect(registry).toContain("requireCurrentNetworkAgreement(reader,org.id)");
     expect(registry).toContain("assertWholeSiteProgramsInScope");
-    expect(read("src/modules/communication/engagement-campaigns.server.ts")).toContain("@/modules/engagement/engagement-registry.server");
+    expect(read("src/modules/communication/engagement-campaigns-service.server.ts")).toContain("@/modules/engagement/engagement-registry-service.server");
   });
   it("serializes engagement lifecycle mutations after exact ownership authorization",()=>{
-    const registry=read("src/modules/engagement/engagement-registry.server.ts");
+    const registry=read("src/modules/engagement/engagement-registry-service.server.ts");
     expect(registry.match(/authorizedDefinition\(data.engagementId,actor,true,tx,true\)/g)).toHaveLength(3);
     expect(registry).toContain('await lookup().for("update").limit(1)');
     expect(registry.indexOf("await authorizeEngagementOwner(ownerFromRow")).toBeLessThan(registry.indexOf('await lookup().for("update")'));
@@ -58,7 +58,7 @@ describe("Go Link service boundary and privacy contracts",()=>{
     expect(registry).toContain("locked.programId!==record.programId");
   });
   it("serializes campaign idempotency across different recipient lists",()=>{
-    const campaign=read("src/modules/communication/engagement-campaigns.server.ts");
+    const campaign=read("src/modules/communication/engagement-campaigns-service.server.ts");
     const queue=campaign.slice(campaign.indexOf("export const queueEngagementCampaign"),campaign.indexOf("export const cancelEngagementCampaign"));
     expect(queue).toContain('JSON.stringify(["engagement-campaign",s.ownerScope,data.requestId])');
     expect(queue.indexOf("pg_advisory_xact_lock")).toBeGreaterThan(-1);
