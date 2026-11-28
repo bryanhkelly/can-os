@@ -221,3 +221,17 @@ test('Classroom lifecycle commands document authority and remain disabled by def
   }
  });
 });
+
+test('Classroom Connect operations are independently documented and protected',async()=>{
+ await withServer('0',async(url,document)=>{
+  const id='00000000-0000-4000-8000-000000000001';
+  for(const [method,route] of [["POST","/api/v1/classroom-pairings"],["POST","/api/v1/classroom-departures"],["POST","/api/v1/classroom-pairing-renewals"],["POST","/api/v1/classroom-closures"],["POST","/api/v1/classroom-playback-events"],["POST","/api/v1/classroom-attestations"],["POST","/api/v1/classroom-projector-commands"],["POST","/api/v1/classroom-activities"],["POST","/api/v1/classroom-activity-closures"],["POST","/api/v1/classroom-responses"],["POST","/api/v1/classroom-presence-events"],["GET","/api/v1/me/classroom-course-choices"],["GET","/api/v1/classrooms/{facilitatedSessionId}/attendance"],["GET","/api/v1/classrooms/{facilitatedSessionId}/projector"],["GET","/api/v1/classrooms/{facilitatedSessionId}/attempts/{courseAttemptId}/activities"],["GET","/api/v1/classrooms/{facilitatedSessionId}/presentation"]]){
+   const op=document.paths[route][method.toLowerCase()];assert.ok(op.security);assert.ok(op.responses['403']);
+   const response=await fetch(url+route.replace(/\{[^}]+\}/g,id),method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);
+  }
+ });
+ const {results}=require('../dist/room.contracts');
+ assert.equal(results.presentationResult.safeParse({roomState:'live',current:null,note:'No private data',roster:[]}).success,false);
+ assert.equal(results.responseResult.safeParse({saved:true,duplicate:false,graded:true}).success,false);
+});

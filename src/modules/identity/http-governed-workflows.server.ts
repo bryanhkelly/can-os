@@ -14,14 +14,36 @@ import {openNativeClassSessionService} from "@/modules/classes/native-class-sess
 import {revokeNativeClassSessionService} from "@/modules/classes/native-class-sessions.server";
 import {transferNativeClassroomControlService} from "@/modules/classes/native-classroom-control.server";
 import {publishNativeClassSessionAgendaService} from "@/modules/classes/native-class-session-agenda.server";
-export type WorkflowMode="planning"|"canonical"|"can";
+import {pairWithFacilitatedRoomService,leaveFacilitatedRoomService,renewFacilitatedLearningPairingService,endFacilitatedLearningRoomService,recordFacilitatedPlaybackService} from "@/modules/learning/facilitated-learning.server";
+import {attestClassroomParticipationService,getClassroomAttendanceRosterService} from "@/modules/learning/classroom-attendance.server";
+import {issueClassroomProjectorCommandService,getClassroomProjectorCommandService} from "@/modules/learning/classroom-projector.server";
+import {releaseClassroomActivityService,closeClassroomActivityService,submitClassroomResponseService,recordClassroomPresenceService,getClassroomLearnerActivitiesService,getClassroomPresentationStateService} from "@/modules/learning/classroom-evidence.server";
+import {getClassroomConnectCourseChoicesService} from "@/modules/learning/classroom-connect.server";
+import {getInstructionalLearnerContext} from "./learning-command-context.server";
+export type WorkflowMode="planning"|"canonical"|"can"|"learner";
 /** Existing independent native reviewer credentials remain distinct from CAN.
  * No fallback, new role, token or grant is manufactured by this adapter. */
 export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode){
  if(request.method!=="POST"&&request.method!=="GET")throw new AuthorizationError("explicit HTTP method");
- const context=await (mode==="planning"?getBlueprintPlanningContext(request):mode==="canonical"?getCanonicalCommandContext(request):getIdentityContext(request));
+ const context=await (mode==="planning"?getBlueprintPlanningContext(request):mode==="canonical"?getCanonicalCommandContext(request):mode==="learner"?getInstructionalLearnerContext(request):getIdentityContext(request));
  if(!context.actorPersonId)throw new AuthorizationError("verified Person");
  return {
+  pairWithFacilitatedRoom:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="learner")throw new AuthorizationError("classroom operation context");return pairWithFacilitatedRoomService(request,raw);},
+  leaveFacilitatedRoom:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="learner")throw new AuthorizationError("classroom operation context");return leaveFacilitatedRoomService(request,raw);},
+  renewFacilitatedLearningPairing:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("classroom operation context");return renewFacilitatedLearningPairingService(request,raw);},
+  endFacilitatedLearningRoom:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("classroom operation context");return endFacilitatedLearningRoomService(request,raw);},
+  recordFacilitatedPlayback:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("classroom operation context");return recordFacilitatedPlaybackService(request,raw);},
+  attestClassroomParticipation:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("classroom operation context");return attestClassroomParticipationService(request,raw);},
+  issueClassroomProjectorCommand:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("classroom operation context");return issueClassroomProjectorCommandService(request,raw);},
+  releaseClassroomActivity:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("classroom operation context");return releaseClassroomActivityService(request,raw);},
+  closeClassroomActivity:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("classroom operation context");return closeClassroomActivityService(request,raw);},
+  submitClassroomResponse:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="learner")throw new AuthorizationError("classroom operation context");return submitClassroomResponseService(request,raw);},
+  recordClassroomPresence:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="learner")throw new AuthorizationError("classroom operation context");return recordClassroomPresenceService(request,raw);},
+  getClassroomConnectCourseChoices:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="learner")throw new AuthorizationError("classroom operation context");return getClassroomConnectCourseChoicesService(request,raw);},
+  getClassroomAttendanceRoster:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("classroom operation context");return getClassroomAttendanceRosterService(request,raw);},
+  getClassroomProjectorCommand:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("classroom operation context");return getClassroomProjectorCommandService(request,raw);},
+  getClassroomLearnerActivities:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="learner")throw new AuthorizationError("classroom operation context");return getClassroomLearnerActivitiesService(request,raw);},
+  getClassroomPresentationState:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("classroom operation context");return getClassroomPresentationStateService(request,raw);},
   scheduleNativeClassSessions:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("class session context");return scheduleNativeClassSessionsService(request,raw);},
   changeNativeClassSessionSchedule:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("class session context");return changeNativeClassSessionScheduleService(request,raw);},
   openNativeClassSession:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("class session context");return openNativeClassSessionService(request,raw);},

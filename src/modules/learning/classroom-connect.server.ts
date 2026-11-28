@@ -1,0 +1,108 @@
+import { and, desc, eq, inArray } from "drizzle-orm";
+import { db } from "@/db/client";
+import {
+  courses, courseVersions, enrollments, learnerCourseAttempts,
+  learnerProfiles, noncreditRegistrations, canonicalClassEnrollments, canonicalClasses,
+  canonicalEnrollmentSites,
+} from "@/db/canonical-v301";
+import { AuthorizationError } from "@/domain/command-context";
+import { DomainError } from "@/domain/errors";
+import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
+import { authorizeCanonicalCourseAttempt } from "@/modules/learning/canonical-course-participation.server";
+import { requireFacilitatedLearningEnabled } from "@/modules/learning/canonical-learning-release.server";
+
+/**
+ * Read-only companion to canonical pairing. The list is scoped to the signed-in
+ * learner's own Course attempts, never to rooms or a raw join code. The chosen
+ * attempt is independently reauthorized by pairWithFacilitatedRoom.
+ */
+export async function getClassroomConnectCourseChoicesService(request:Request,raw:unknown=undefined){
+
+
+    requireFacilitatedLearningEnabled();
+    const actor = await getInstructionalLearnerContext(request);
+    if (!actor.actorPersonId || !["student", "learner"].includes(actor.role ?? "")) {
+      throw new AuthorizationError("authenticated course learner");
+    }
+    const personId = actor.actorPersonId;
+    return db.transaction(async tx => {
+      const common = {
+        courseAttemptId: learnerCourseAttempts.id,
+        courseTitle: courses.title,
+        courseVersionId: learnerCourseAttempts.courseVersionId,
+      };
+      const school = await tx.select(common).from(learnerCourseAttempts)
+        .innerJoin(enrollments, eq(learnerCourseAttempts.enrollmentId, enrollments.id))
+        .innerJoin(learnerProfiles, eq(enrollments.learnerId, learnerProfiles.id))
+        .innerJoin(courseVersions, eq(learnerCourseAttempts.courseVersionId, courseVersions.id))
+        .innerJoin(courses, eq(courseVersions.courseId, courses.id))
+        .where(and(
+          eq(learnerProfiles.personId, personId),
+          eq(enrollments.status, "active"),
+          eq(learnerCourseAttempts.status, "active"),
+        ))
+        .orderBy(desc(learnerCourseAttempts.startedAt)).limit(30);
+      const noncredit = await tx.select(common).from(learnerCourseAttempts)
+        .innerJoin(noncreditRegistrations,
+          eq(learnerCourseAttempts.noncreditRegistrationId, noncreditRegistrations.id))
+        .innerJoin(courseVersions, eq(learnerCourseAttempts.courseVersionId, courseVersions.id))
+        .innerJoin(courses, eq(courseVersions.courseId, courses.id))
+        .where(and(
+          eq(noncreditRegistrations.participantPersonId, personId),
+          inArray(noncreditRegistrations.status, ["registered", "active"]),
+          eq(learnerCourseAttempts.status, "active"),
+        ))
+        .orderBy(desc(learnerCourseAttempts.startedAt)).limit(30);
+      // The personal Class Enrollment is the Course Attempt source. The
+      // presentation room will separately validate exact Class Session links
+      // before accepting the learner's pairing code.
+      const native = await tx.select({
+        ...common,
+        classId:canonicalClasses.id,
+        classTitle:canonicalClasses.title,
+        siteName:canonicalEnrollmentSites.name,
+      }).from(learnerCourseAttempts)
+        .innerJoin(canonicalClassEnrollments,and(
+          eq(canonicalClassEnrollments.id,learnerCourseAttempts.classEnrollmentId),
+          eq(canonicalClassEnrollments.courseAttemptId,learnerCourseAttempts.id),
+          eq(canonicalClassEnrollments.learnerPersonId,personId),
+          eq(canonicalClassEnrollments.status,"active"),
+        ))
+        .innerJoin(canonicalClasses,and(
+          eq(canonicalClasses.id,canonicalClassEnrollments.classId),
+          eq(canonicalClasses.state,"active"),
+          eq(canonicalClasses.courseVersionId,learnerCourseAttempts.courseVersionId),
+        ))
+        .leftJoin(canonicalEnrollmentSites,
+          eq(canonicalEnrollmentSites.id,canonicalClasses.siteId))
+        .innerJoin(courseVersions,eq(courseVersions.id,learnerCourseAttempts.courseVersionId))
+        .innerJoin(courses,eq(courses.id,courseVersions.courseId))
+        .where(eq(learnerCourseAttempts.status,"active"))
+        .orderBy(desc(learnerCourseAttempts.startedAt)).limit(30);
+      const choices = new Map<string, {
+        courseAttemptId:string;courseTitle:string;classId:string|null;
+      }>();
+      for (const candidate of [...school, ...noncredit, ...native]) {
+        if (choices.has(candidate.courseAttemptId)) continue;
+        try {
+          await authorizeCanonicalCourseAttempt(tx, actor, candidate.courseAttemptId);
+          if("classTitle" in candidate && "siteName" in candidate && "classId" in candidate){
+            choices.set(candidate.courseAttemptId,{
+              courseAttemptId:candidate.courseAttemptId,
+              courseTitle:`${candidate.classTitle} · ${candidate.siteName??"Online"} · ${candidate.courseTitle}`,
+              classId:candidate.classId as string,
+            });
+          }else{
+            choices.set(candidate.courseAttemptId,{
+              courseAttemptId:candidate.courseAttemptId,
+              courseTitle:candidate.courseTitle,
+              classId:null,
+            });
+          }
+        } catch (error) {
+          if (!(error instanceof AuthorizationError) && !(error instanceof DomainError)) throw error;
+        }
+      }
+      return { choices: [...choices.values()], notice: "Pairing never creates attendance or a completion record." };
+    });
+}
