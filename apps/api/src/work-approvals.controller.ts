@@ -182,4 +182,61 @@ export class WorkApprovalsController{
   const value=await this.identity.runWorkflow(()=>workflow.revokeCanonicalCredentialIssuerApproval(input));
   return c.results.revoked.parse(JSON.parse(JSON.stringify(value)));
  }
+ @Post('work/tasks')
+ @WorkOperation('POST')
+ @ApiOperation({operationId:'createOperationalTask',summary:'Create or replay a scoped operational task'})
+ 
+ 
+ @ApiBody({schema:c.manualBodyDocs.create})
+ @ApiOkResponse({schema:c.manualDocs.created})
+ async createOperationalTask(@Req() req:FastifyRequest,@Body() body:unknown){
+  const workflow=verifiedWorkflow(req);
+  const input={...validated(c.manualBodies.create,body)};
+  const value=await this.identity.runWorkflow(()=>workflow.createOperationalTask(input));
+  return c.manualResults.created.parse(JSON.parse(JSON.stringify(value)));
+ }
+
+ @Post('work/tasks/:id/escalations')
+ @WorkOperation('POST')
+ @ApiOperation({operationId:'escalateOperationalTask',summary:'Escalate a current manual task with reason and revision'})
+ @ApiParam({name:'id',type:String,format:'uuid',required:true})
+ 
+ @ApiBody({schema:c.manualBodyDocs.escalate})
+ @ApiOkResponse({schema:c.manualDocs.escalated})
+ async escalateOperationalTask(@Req() req:FastifyRequest,@Param() params:unknown,@Body() body:unknown){
+  const workflow=verifiedWorkflow(req);
+  const input={...validated(c.params.id,params),...validated(c.manualBodies.escalate,body)};
+  const value=await this.identity.runWorkflow(()=>workflow.escalateOperationalTask(input));
+  return c.manualResults.escalated.parse(JSON.parse(JSON.stringify(value)));
+ }
+
+ @Get('work/tasks')
+ @WorkOperation('GET')
+ @ApiOperation({operationId:'listOperationalTasks',summary:'Page through open manual tasks in authorized scope'})
+ 
+ @ApiQuery({name:'siteId',required:false,type:String,format:'uuid'})
+ @ApiQuery({name:'programId',required:false,type:String,format:'uuid'})
+ @ApiQuery({name:'afterId',required:false,type:String,format:'uuid'})
+ 
+ @ApiOkResponse({schema:c.manualDocs.page})
+ async listOperationalTasks(@Req() req:FastifyRequest,@Query() query:unknown){
+  const workflow=verifiedWorkflow(req);
+  const input={...validated(c.manualQueries.page,query)};
+  const value=await this.identity.runWorkflow(()=>workflow.listOperationalTasks(input));
+  return c.manualResults.page.parse(JSON.parse(JSON.stringify(value)));
+ }
+
+ @Get('work/inbox')
+ @WorkOperation('GET')
+ @ApiOperation({operationId:'getWorkInbox',summary:'Read authorized work sources without granting new authority'})
+ 
+ 
+ 
+ @ApiOkResponse({schema:c.manualDocs.inbox})
+ async getWorkInbox(@Req() req:FastifyRequest,@Query() query:unknown){
+  const workflow=verifiedWorkflow(req);
+  const input={...validated(c.manualQueries.inbox,query)};
+  const value=await this.identity.runWorkflow(()=>workflow.getWorkInbox(input));
+  return c.manualResults.inbox.parse(JSON.parse(JSON.stringify(value)));
+ }
 }
