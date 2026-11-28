@@ -16,7 +16,7 @@ import { DomainError } from "@/domain/errors";
 import { assertCurrentReviewedNativeLearner } from "@/modules/identity/reviewed-learning-evidence.server";
 import { probeCanonicalAuthReader } from "@/modules/identity/canonical-command-context.server";
 import {
-  resolveVerifiedAdultAccount, issueNativeLearnerSession,
+  resolveVerifiedAdultAccount, issueNativeLearnerSession, assertVerifiedAdultSessionForMutation,
 } from "@/modules/enrollment/noncredit-participant-identity.server";
 
 /**
@@ -32,6 +32,7 @@ export async function resumeLinkedNativeClassLearnerService(request:Request){
     if(!await probeCanonicalAuthReader())
       throw new AuthorizationError("restricted native learner reader unavailable");
     const {cookie}=await db.transaction(async tx=>{
+      await assertVerifiedAdultSessionForMutation(tx,request,owner);
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"native-identity:"+owner.accountId}))`);
       const [can]=await tx.select({
         email:accessAccounts.emailNormalized,verified:accessAccounts.emailVerifiedAt,
@@ -119,7 +120,7 @@ export async function resumeLinkedNativeClassLearnerService(request:Request){
       if(review&&home.length!==1)
         throw new DomainError("CANONICAL_LEARNER_ONBOARDING_REQUIRED");
       const grant=review?home[0]!:grants[0]!;
-      const issued=await issueNativeLearnerSession(tx,native.accountId,grant.id,now);
+      const issued=await issueNativeLearnerSession(tx,request,owner,native.accountId,grant.id,now);
       await writeCanonicalAudit(tx,{
         actorPersonId:link.canonicalPersonId,
         owningOrganizationId:grant.organizationId,
