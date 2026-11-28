@@ -13,6 +13,7 @@ const file = resolve(root, ".env.pilot-qa");
 const allowedBranch = "br-solitary-art-arun91gj";
 const secret = () => randomBytes(32).toString("hex");
 const modes = {
+  provision: ["node_modules/@playwright/test/cli.js", "test", "--config", "playwright.pilot-provision.config.ts"],
   prepare: ["scripts/dev.mjs","--host","localhost","--port","5183","--strictPort"],
   readiness: ["scripts/acceptance/diagnose-noncredit-pilot-qa.mjs"],
   executive: ["scripts/acceptance/diagnose-pilot-executive-readiness.mjs"],
@@ -77,7 +78,7 @@ function localConfiguration() {
 }
 try {
   const mode=process.argv[2];
-  if(process.argv.length!==3) fail("Use exactly one QA action: init, prepare, readiness, executive, schema, regression, keys, fixture, api, browser.");
+  if(process.argv.length!==3) fail("Use exactly one QA action: init, prepare, provision, readiness, executive, schema, regression, keys, fixture, api, browser.");
   if(mode==="init") init();
   else {
     if(!Object.hasOwn(modes,mode)) fail("Unknown QA action.");
@@ -90,7 +91,7 @@ try {
       const {neon}=await import("@neondatabase/serverless");
       for(const key of ["CAN_CANONICAL_AUTH_DATABASE_URL","CAN_CANONICAL_OPERATIONS_DATABASE_URL"]){
         if(!env[key]) {
-          if(key==="CAN_CANONICAL_AUTH_DATABASE_URL" && (mode==="prepare"||mode==="api"||mode==="browser")) fail(key+" is required for QA runtime.");
+          if(key==="CAN_CANONICAL_AUTH_DATABASE_URL" && (mode==="prepare"||mode==="provision"||mode==="api"||mode==="browser")) fail(key+" is required for QA runtime.");
           continue;
         }
         const expectedLogin=key==="CAN_CANONICAL_AUTH_DATABASE_URL"?"can_os_canonical_auth_app":"can_os_canonical_ops_app";
@@ -103,7 +104,7 @@ try {
     // Prepare the real application privately, before any fixture or sessions exist.
     // Use the existing isolated .test access-mail transport, never Resend.
     // Outbox holds single-use credentials: no artifact or Git persistence.
-    const outbox=mode==="prepare"?mkdtempSync(join(tmpdir(),"can-pilot-qa-mail-")):null;
+    const outbox=(mode==="prepare"||mode==="provision")?mkdtempSync(join(tmpdir(),"can-pilot-qa-mail-")):null;
     try {
       if(outbox){
         const {checkPilotMigrationParity}=await import("./check-pilot-migration-parity.mjs");
