@@ -17,6 +17,11 @@ const modules={
   activity:"/src/modules/learning/classroom-evidence.functions.ts",
   relationships:"/src/modules/reporting/bottom-up-reporting-relationships.functions.ts",
   report:"/src/modules/reporting/native-class-report.functions.ts",
+  familyHome:"/src/modules/family/family-home.functions.ts",
+  familyAcademics:"/src/modules/learning/guardian-academic-queries.functions.ts",
+  familyApplications:"/src/modules/enrollment/guardian-family-applications.functions.ts",
+  familyAttendance:"/src/modules/attendance/onsite-attendance-workflow.functions.ts",
+  familyNative:"/src/modules/classes/native-class-guardian-enrollment.functions.ts",
 } as const;
 export async function pilotRpcPage(context:BrowserContext):Promise<Page>{
   const page=await context.newPage();
