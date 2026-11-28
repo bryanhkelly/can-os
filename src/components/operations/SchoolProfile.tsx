@@ -1,3 +1,4 @@
+import {ContextualReportingRelationships} from "@/components/reporting/ContextualReportingRelationships";
 import type { ReactNode } from "react";
 import type { FriendlySiteIdentity } from "@/domain/friendly-site-urls";
 import { Link, type AnyRouter, type LinkComponentProps, type LinkOptions } from "@tanstack/react-router";
@@ -160,6 +161,7 @@ export function SchoolProfile({ data, tab = "overview", tabLink, friendlyIdentit
       </p>}
     </section>
 
+    {canManageSchool&&<ContextualReportingRelationships scopeKind="site" scopeId={site.id}/>}
     <section aria-labelledby="school-profile-programs" className="mt-9">
       <h2 id="school-profile-programs" className="text-lg font-semibold">Programs <span className="font-normal text-muted-foreground">({site.programs.length})</span></h2>
       {site.programs.length
