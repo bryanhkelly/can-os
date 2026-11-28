@@ -43,7 +43,7 @@ describe("V6.1 Site Brand component and service ownership",()=>{
     expect(identity).toContain("approvedSiteMediaUsage");
     expect(r2).toContain("approvedSiteDocumentMediaUsage");
     expect(r2).toContain("storageProvider");
-    const packageRenderer=source("src/modules/programs/site-marketing-artifacts.functions.ts");
+    const packageRenderer=source("src/modules/programs/site-marketing-artifacts.server.ts");
     expect(packageRenderer).toContain("readSavedBrandVersion");
     expect(packageRenderer).not.toContain("new SiteBrand");
   });

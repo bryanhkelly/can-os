@@ -32,3 +32,5 @@ const suggestionDoc=obj({content:marketingContentOpenApiSchema,sources:arr(str),
 const scope={siteId:uuid,packageId:uuid},revisionScope={...scope,expectedRevision:rev};
 export const inputs={createInput:obj({siteId:uuid,title:txt(2,120),purpose:en(purposes)}),saveInput:obj({...revisionScope,title:txt(2,120),content:marketingContentOpenApiSchema}),recordInput:obj(scope),archiveInput:obj({...revisionScope,archived:bool}),brandInput:obj({...revisionScope,brandVersionId:uuid}),revisionInput:obj(revisionScope)};
 export const docs={package:packageDoc,page:obj({items:arr(packageDoc,100),nextCursor:{...uuid,nullable:true}}),suggestions:obj(Object.fromEntries(purposes.map(p=>[p,suggestionDoc]))),deleted:obj({deleted:{...bool,enum:[true]},id:uuid})};
+
+export {content as marketingContentWireSchema,formats as marketingFormatWireIds};

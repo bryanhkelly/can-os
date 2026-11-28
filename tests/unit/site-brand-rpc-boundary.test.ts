@@ -59,7 +59,7 @@ describe("Site Brand client/server execution boundary", () => {
       "src/modules/sites/site-preview-sharing.functions.ts",
       "src/modules/sites/site-website-preview.functions.ts",
       "src/modules/enrollment/family-invitations.server.ts",
-      "src/modules/programs/site-marketing-artifacts.functions.ts",
+      "src/modules/programs/site-marketing-artifacts.server.ts",
       "src/routes/launch.site-preview.ts",
     ]) {
       const content = source(file);

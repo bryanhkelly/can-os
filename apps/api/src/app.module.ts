@@ -4,6 +4,7 @@ import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { healthOpenApiSchema, healthSchema, type Health } from './contracts';
 import { DefaultDenyGuard, PublicOperation } from './security';
 import {SitesController,OfferingReleaseController} from './platform-commands.controller';
+import {MarketingArtifactsController} from './marketing-artifacts.controller';
 import {MarketingPackagesController} from './marketing-packages.controller';
 import {EngagementController} from './engagement.controller';
 import {SenderAdminController} from './sender-admin.controller';
@@ -42,7 +43,7 @@ export class HealthController {
 }
 
 @Module({
-  controllers: [MarketingPackagesController, EngagementController, SenderAdminController, CampaignController, LaunchWorkspaceController, CatalogController, PreviewSharesController, WebsiteController, GoLinksController, SitePublishingController, SiteProfileController, BrandController, SitePlanningController, LaunchController, RoleWorkspacesController, ReportingController, ClassAdminController, RoomController, ClassroomController, ParticipationController, WorkflowController, AccessController, HealthController, IdentityController, LearningController, SitesController, OfferingReleaseController],
+  controllers: [MarketingArtifactsController, MarketingPackagesController, EngagementController, SenderAdminController, CampaignController, LaunchWorkspaceController, CatalogController, PreviewSharesController, WebsiteController, GoLinksController, SitePublishingController, SiteProfileController, BrandController, SitePlanningController, LaunchController, RoleWorkspacesController, ReportingController, ClassAdminController, RoomController, ClassroomController, ParticipationController, WorkflowController, AccessController, HealthController, IdentityController, LearningController, SitesController, OfferingReleaseController],
   providers: [
     CanonicalIdentityService,
     { provide: APP_GUARD, useClass: DefaultDenyGuard },

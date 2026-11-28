@@ -31,7 +31,7 @@ describe("reporting event architecture",()=>{
       "src/modules/programs/site-information-v61.functions.ts",
       "src/modules/programs/site-programs-audiences-v61.functions.ts",
       "src/modules/programs/site-marketing-packages-v61.server.ts",
-      "src/modules/programs/site-marketing-artifacts.functions.ts",
+      "src/modules/programs/site-marketing-artifacts.server.ts",
       "src/modules/enrollment/interest-events.server.ts",
       "src/modules/operations/site-rooms.server.ts",
       "src/modules/sites/site-content-package.server.ts",

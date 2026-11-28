@@ -595,3 +595,21 @@ test('marketing package routes preserve revision and Site boundaries',async()=>{
  assert.equal(c.pageQuery.safeParse({siteId:id,ownerPersonId:id}).success,false);
  assert.equal(c.pageQuery.parse({siteId:id,limit:'20'}).limit,20);
 });
+
+test('marketing artifact APIs distinguish preview, immutable release, output and withdrawal',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const [route,method] of [["/api/v1/site-marketing-artifact-previews","POST"],["/api/v1/site-marketing-package-releases","POST"],["/api/v1/site-marketing-package-releases","GET"],["/api/v1/site-marketing-artifact-releases","GET"],["/api/v1/site-marketing-artifact-output","GET"],["/api/v1/site-marketing-artifact-withdrawals","POST"]]){
+   const op=document.paths[route][method.toLowerCase()];
+   assert.ok(op.security);assert.ok(op.responses['403']);
+   const response=await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);
+  }
+  const schema=document.paths['/api/v1/site-marketing-package-releases'].post.requestBody.content['application/json'].schema;
+  assert.ok(schema.required.includes('requestId'));assert.ok(schema.required.includes('expectedPackageRevision'));
+ });
+ const c=require('../dist/marketing-artifacts.contracts');
+ const id='00000000-0000-4000-8000-000000000001';
+ assert.equal(c.release.safeParse({siteId:id,releaseId:id,actorPersonId:id}).success,false);
+ assert.equal(c.results.preview.safeParse({state:'missing-brand',body:'not distributable'}).success,false);
+ assert.equal(c.results.output.safeParse({format:'email',content:'x',mimeType:'text/html',fileName:'x.html',plainText:null}).success,true);
+});

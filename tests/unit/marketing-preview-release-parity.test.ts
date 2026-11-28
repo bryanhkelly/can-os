@@ -15,8 +15,8 @@ describe("Launch Studio preview and atomic release share preflight",()=>{
   });
 
   it("rejects the same unapproved copy in both preview and release",()=>{
-    const functions=source("src/modules/programs/site-marketing-artifacts.functions.ts");
-    expect(functions).toContain("title:z.string().trim().max(120)");
+    const functions=source("src/modules/programs/site-marketing-artifacts.server.ts");
+    expect(source("src/modules/programs/site-marketing-artifacts.inputs.ts")).toContain("title:z.string().trim().max(120)");
     expect(functions).toContain("marketingPackageClaimsRequireReview(data.title,data.content)");
     expect(functions).toContain("marketingPackageClaimsRequireReview(pkg.title,content)");
     expect(functions).toContain("Package changed. Review the current saved version");
@@ -24,7 +24,7 @@ describe("Launch Studio preview and atomic release share preflight",()=>{
   });
 
   it("releases all selected formats atomically rather than generating individual materials",()=>{
-    const functions=source("src/modules/programs/site-marketing-artifacts.functions.ts");
+    const functions=source("src/modules/programs/site-marketing-artifacts.server.ts");
     const page=source("src/components/launch-studio/MarketingPackagesV61.tsx");
     expect(functions).toContain("createSiteMarketingPackageRelease");
     expect(functions).toContain("await Promise.all(content.formats.map");
