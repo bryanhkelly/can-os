@@ -41,7 +41,7 @@ function AccessPage(){
    if(response.status===429){setStatus({text:"Too many sign-in requests right now. Please try again shortly.",isError:true});return;}
    if(response.status===503){setStatus({text:"Sign-in is temporarily unavailable. Please try again shortly.",isError:true});return;}
    if(!response.ok){setStatus({text:"Unable to send a link. Please check your email address or try again.",isError:true});return;}
-   setStatus({text:"If this email has a CAN OS account, a one-time access link has been sent.",isError:false});
+   setStatus({text:"If this email is eligible, we will attempt to send a secure sign-in link. If it does not arrive, check your junk folder and request another link after one minute. Your unfinished personal registration will be preserved.",isError:false});
   }catch{setStatus({text:"Sign-in is temporarily unavailable. Please try again shortly.",isError:true});}finally{setBusy(false);}
  }
  return <WorkspaceShell width="reading" eyebrow="CAN OS" title="Access CAN OS"
@@ -52,7 +52,7 @@ function AccessPage(){
    <fieldset disabled={!hydrated||(!isDemoEmail&&busy)} className="space-y-4">
     <Field label="Email" required><Input name="email" type="email" autoComplete="email" value={email} onChange={e=>updateEmail(e.target.value)}/></Field>
     {isDemoEmail&&<Field label="Access code" required><Input name="code" type="password" autoComplete="current-password" maxLength={43} value={code} onChange={e=>{setCode(e.target.value);setStatus({text:"",isError:false});}}/></Field>}
-    <Button disabled={!hydrated} loading={busy} loadingLabel={isDemoEmail?"Signing in…":"Sending access link…"} type="submit" className="w-full">{!hydrated?"Preparing sign-in…":isDemoEmail?"Sign in":"Email me an access link"}</Button>
+    <Button disabled={!hydrated} loading={busy} loadingLabel={isDemoEmail?"Signing in…":"Sending access link…"} type="submit" className="w-full">{!hydrated?"Preparing sign-in…":isDemoEmail?"Sign in":status?.text&&!status.isError?"Resend access link":"Email me an access link"}</Button>
    </fieldset>
   </form>
   {feedback?.text&&<WorkspaceNotice tone={feedback.isError?"danger":"info"} className="mt-4">{feedback.text}</WorkspaceNotice>}
