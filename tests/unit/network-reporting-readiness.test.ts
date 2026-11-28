@@ -8,11 +8,12 @@ const org={id:"network",type:"denomination"};
 describe("HQ network reporting setup readiness",()=>{
   it("reports missing setup without treating it as zero learning outcomes",()=>{
     const result=assessNetworkReportingReadiness(counts);
-    expect(result.executionAvailable).toBe(false);
-    expect(result.blockers).toHaveLength(4);
+    expect(result.classification).toBe("private_setup_inventory");
+    expect(result.blockers).toHaveLength(3);
+    expect(result).not.toHaveProperty("executionAvailable");
   });
-  it("does not authorize execution even with populated setup",()=>{
-    expect(assessNetworkReportingReadiness({configuredUnits:1,activeUnits:1,configuredMemberships:1,currentMemberships:1,configuredGrants:2,currentGrants:2,currentGrantHosts:1}).executionAvailable).toBe(false);
+  it("shows populated setup without a blanket availability switch",()=>{
+    expect(assessNetworkReportingReadiness({configuredUnits:1,activeUnits:1,configuredMemberships:1,currentMemberships:1,configuredGrants:2,currentGrants:2,currentGrantHosts:1}).blockers).toEqual([]);
     expect(()=>assessNetworkReportingReadiness({...counts,currentGrants:1})).toThrow("reconcile");
   });
   it("requires direct exact HQ authority",()=>{
