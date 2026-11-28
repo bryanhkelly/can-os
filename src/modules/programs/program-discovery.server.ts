@@ -1,3 +1,4 @@
+import {parseCommandInput} from "@/domain/command-input";
 import { isCanonicalSiteDiscoverable, isPrivateCanSitePlanningAllowed } from "@/domain/canonical-site-availability";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -40,7 +41,7 @@ export async function getAvailableOfferings(
 ) {
   if (!context.actorPersonId) throw new AuthorizationError("authenticated session");
   assertCapability(context, "program.launch.start");
-  const input = programDiscoveryInputSchema.parse(rawInput);
+  const input = parseCommandInput(programDiscoveryInputSchema,rawInput);
   // Fail closed before attempting purpose-specific PostgreSQL roles. The
   // canonical catalog must be explicitly provisioned before it can be exposed
   // through either native Blueprint planning or the legacy School Hub.

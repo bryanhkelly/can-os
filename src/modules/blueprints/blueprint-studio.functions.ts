@@ -1,9 +1,8 @@
+import {exploreCanonicalBlueprintReferencesService,discoverCanonicalBlueprintOfferingsService,readCanonicalBlueprintWorkspaceService,listCanonicalBlueprintReviewsService,listCanonicalBlueprintReviewEvidenceService} from "./blueprint-catalog-read.server";
 import {readCanonicalBlueprintHomeService,readCanonicalBlueprintConfigurationService,readCanonicalBlueprintReviewService,readCanonicalBlueprintReviewHistoryService,createCanonicalBlueprintConfigurationService,saveCanonicalBlueprintConfigurationService,submitCanonicalBlueprintConfigurationService,decideCanonicalBlueprintReviewService,executeCanonicalBlueprintConfigurationService} from "./blueprint-commands.server";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
-import { getBlueprintPlanningContext } from "./verified-site-planning.server";
 import {
   createBlueprintConfigurationInputSchema,
   saveBlueprintConfigurationInputSchema,
@@ -15,13 +14,10 @@ import {
   decideBlueprintReviewInputSchema,
 } from "@/domain/blueprint-review";
 import { programDiscoveryInputSchema } from "@/domain/program-discovery";
-import { getAvailableOfferings } from "@/modules/programs/program-discovery.server";
 import { blueprintReferenceCatalogInputSchema } from "@/domain/blueprint-reference-catalog";
-import { getBlueprintReferenceCatalog } from "./blueprint-reference-catalog.server";
 import { executeBlueprintConfigurationInputSchema } from "@/domain/blueprint-execution";
-import { blueprintWorkspaceInputSchema, getCanonicalBlueprintWorkspace } from "./blueprint-workspace.server";
-import { getCanonicalBlueprintReviewQueue } from "./blueprint-review-queue.server";
-import { blueprintReviewEvidenceInputSchema, listBlueprintReviewEvidence } from "./blueprint-review-evidence.server";
+import { blueprintWorkspaceInputSchema } from "./blueprint-workspace.server";
+import { blueprintReviewEvidenceInputSchema } from "./blueprint-review-evidence.server";
 
 function noStore() {
   setResponseHeader("Cache-Control", "private, no-store");
@@ -33,21 +29,21 @@ export const exploreCanonicalBlueprintReferences = createServerFn({ method: "GET
   .validator((value: unknown) => blueprintReferenceCatalogInputSchema.parse(value))
   .handler(async ({ data }) => {
     noStore();
-    return getBlueprintReferenceCatalog(await getBlueprintPlanningContext(getRequest()), data);
+    return exploreCanonicalBlueprintReferencesService(getRequest(),data);
   });
 
 export const discoverCanonicalBlueprintOfferings = createServerFn({ method: "GET" })
   .validator((value: unknown) => programDiscoveryInputSchema.parse(value))
   .handler(async ({ data }) => {
     noStore();
-    return getAvailableOfferings(await getBlueprintPlanningContext(getRequest()), data);
+    return discoverCanonicalBlueprintOfferingsService(getRequest(),data);
   });
 
 export const readCanonicalBlueprintWorkspace = createServerFn({ method: "GET" })
   .validator((value: unknown) => blueprintWorkspaceInputSchema.parse(value))
   .handler(async ({ data }) => {
     noStore();
-    return getCanonicalBlueprintWorkspace(await getBlueprintPlanningContext(getRequest()), data);
+    return readCanonicalBlueprintWorkspaceService(getRequest(),data);
   });
 
 export const readCanonicalBlueprintConfiguration=createServerFn({method:"GET"})
@@ -70,13 +66,13 @@ export const listCanonicalBlueprintReviewEvidence = createServerFn({ method: "GE
   .validator((value: unknown) => blueprintReviewEvidenceInputSchema.parse(value))
   .handler(async ({ data }) => {
     noStore();
-    return listBlueprintReviewEvidence(await getCanonicalCommandContext(getRequest()), data);
+    return listCanonicalBlueprintReviewEvidenceService(getRequest(),data);
   });
 
 export const listCanonicalBlueprintReviews = createServerFn({ method: "GET" })
   .handler(async () => {
     noStore();
-    return getCanonicalBlueprintReviewQueue(await getCanonicalCommandContext(getRequest()));
+    return listCanonicalBlueprintReviewsService(getRequest());
   });
 
 export const readCanonicalBlueprintReview = createServerFn({ method: "GET" })

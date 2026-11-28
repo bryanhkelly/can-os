@@ -1,3 +1,4 @@
+import {parseCommandInput} from "@/domain/command-input";
 import { and, desc, eq, gte, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
@@ -20,7 +21,7 @@ export async function listBlueprintReviewEvidence(
 ) {
   if (!context.actorPersonId) throw new AuthorizationError("authenticated session");
   assertCapability(context, "blueprint.review");
-  const { owningOrganizationId } = blueprintReviewEvidenceInputSchema.parse(rawInput);
+  const { owningOrganizationId } = parseCommandInput(blueprintReviewEvidenceInputSchema,rawInput);
   if (!context.scope.organizationIds?.includes(owningOrganizationId)) {
     throw new AuthorizationError("Blueprint review evidence Organization scope");
   }

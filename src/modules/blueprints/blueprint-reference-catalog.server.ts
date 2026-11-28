@@ -1,3 +1,4 @@
+import {parseCommandInput} from "@/domain/command-input";
 import { isCanonicalSiteDiscoverable, isPrivateCanSitePlanningAllowed } from "@/domain/canonical-site-availability";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -66,7 +67,7 @@ export async function getBlueprintReferenceCatalog(
 ): Promise<BlueprintReferenceCatalogItem[]> {
   if (!context.actorPersonId) throw new AuthorizationError("authenticated session");
   assertCapability(context, "program.launch.start");
-  const { siteId } = blueprintReferenceCatalogInputSchema.parse(rawInput);
+  const { siteId } = parseCommandInput(blueprintReferenceCatalogInputSchema,rawInput);
   if (!context.scope.siteIds?.includes(siteId)) {
     throw new AuthorizationError("Blueprint catalog Site scope");
   }

@@ -1,13 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { blueprintReferenceCatalogInputSchema } from "@/domain/blueprint-reference-catalog";
-import { getBlueprintPlanningContext } from "./verified-site-planning.server";
-import { getBlueprintReferenceCatalog } from "./blueprint-reference-catalog.server";
+import {exploreCanonicalBlueprintReferencesService} from "./blueprint-catalog-read.server";
 
 /** A private, read-only preview. No Blueprint records or programs are created. */
 export const exploreBlueprintReferenceCatalog = createServerFn({ method: "GET" })
   .validator((value: unknown) => blueprintReferenceCatalogInputSchema.parse(value))
   .handler(async ({ data }) => {
     setResponseHeader("Cache-Control", "private, no-store");
-    return getBlueprintReferenceCatalog(await getBlueprintPlanningContext(getRequest()), data);
+    return exploreCanonicalBlueprintReferencesService(getRequest(),data);
   });

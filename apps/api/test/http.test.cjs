@@ -437,3 +437,19 @@ test('frozen preview sharing has protected contracts and does not accept arbitra
  assert.equal(bodies.create.safeParse({requestId,expiresAfterDays:1}).success,false);
  assert.equal(results.create.safeParse({shareId:requestId,relativeUrl:'https://foreign.example',expiresAt:null,sourceRevision:1}).success,false);
 });
+
+test('catalog discovery is governed and cannot assert activation or expose private read-only plans',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const path of ["/api/v1/sites/{siteId}/program-references","/api/v1/sites/{siteId}/available-offerings","/api/v1/sites/{siteId}/solution-workspace","/api/v1/blueprint-review-queue","/api/v1/organizations/{organizationId}/blueprint-review-evidence"]){
+   assert.ok(document.paths[path].get.security);
+   assert.equal((await fetch(url+path.replace(/\{[^}]+\}/g,'00000000-0000-4000-8000-000000000001'))).status,401);
+  }
+ });
+ const {results,queries}=require('../dist/catalog.contracts');
+ const id='00000000-0000-4000-8000-000000000001';
+ assert.equal(queries.offerings.safeParse({deliveryContext:'remote',geographicAreaId:id}).success,false);
+ assert.equal(results.offerings.safeParse([{offering:{offeringId:id,offeringVersionId:id,code:'test',title:'Test',versionNo:1},availability:[],activationEligible:true}]).success,false);
+ const workspace={siteId:id,organizationId:id,canConfigure:false,canReview:false,canExecute:false,affiliations:[],operations:[],templates:[],configurations:[]};
+ assert.equal(results.workspace.safeParse(workspace).success,true);
+ assert.equal(results.workspace.safeParse({...workspace,operations:[{id,name:'private'}]}).success,false);
+});

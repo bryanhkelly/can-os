@@ -1,3 +1,4 @@
+import {parseCommandInput} from "@/domain/command-input";
 import { isCanonicalSiteDiscoverable, isPrivateCanSitePlanningAllowed } from "@/domain/canonical-site-availability";
 import { and, asc, desc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -45,7 +46,7 @@ export async function getCanonicalBlueprintWorkspace(
   // SQL role may write Site configuration versions, never Blueprint definitions.
   // Read-only publisher discovery must use its separately scoped catalog service.
   assertCapability(context, "blueprint.read");
-  const { siteId } = blueprintWorkspaceInputSchema.parse(rawInput);
+  const { siteId } = parseCommandInput(blueprintWorkspaceInputSchema,rawInput);
   // Read-only discovery must never require the ability to write Site plans.
   // The separate published-only path returns no private configurations.
   if(!context.capabilities.has("blueprint.configure"))

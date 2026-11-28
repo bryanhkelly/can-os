@@ -43,6 +43,7 @@ import {renameSitePublicIdentityService,reserveSitePublicationAddressService,set
 import {createSiteGoLinkService,listSiteGoLinksPageService,listAvailableGoDestinationsService,inspectSavedGoLinkService,setSiteGoLinkPausedService,revokeSiteGoLinkService} from "@/modules/engagement/site-go-link-management.server";
 import {getPartnerWebsitePreviewViewService,previewChurchWebsiteDraftService,saveSiteWebsiteAndBrandService,restoreChurchWebsiteContentService,prepareSchoolWebsiteService} from "@/modules/sites/site-website-commands.server";
 import {listSitePreviewSharesService,createSitePreviewShareService,setSitePreviewSharePausedService,revokeSitePreviewShareService} from "@/modules/sites/site-preview-sharing.server";
+import {exploreCanonicalBlueprintReferencesService,discoverCanonicalBlueprintOfferingsService,readCanonicalBlueprintWorkspaceService,listCanonicalBlueprintReviewsService,listCanonicalBlueprintReviewEvidenceService} from "@/modules/blueprints/blueprint-catalog-read.server";
 export type WorkflowMode="planning"|"canonical"|"can"|"learner";
 /** Existing independent native reviewer credentials remain distinct from CAN.
  * No fallback, new role, token or grant is manufactured by this adapter. */
@@ -51,6 +52,11 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
  const context=await (mode==="planning"?getBlueprintPlanningContext(request):mode==="canonical"?getCanonicalCommandContext(request):mode==="learner"?getInstructionalLearnerContext(request):getIdentityContext(request));
  if(!context.actorPersonId)throw new AuthorizationError("verified Person");
  return {
+  exploreCanonicalBlueprintReferences:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="planning")throw new AuthorizationError("catalog or reviewer context");return exploreCanonicalBlueprintReferencesService(request,raw);},
+  discoverCanonicalBlueprintOfferings:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="planning")throw new AuthorizationError("catalog or reviewer context");return discoverCanonicalBlueprintOfferingsService(request,raw);},
+  readCanonicalBlueprintWorkspace:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="planning")throw new AuthorizationError("catalog or reviewer context");return readCanonicalBlueprintWorkspaceService(request,raw);},
+  listCanonicalBlueprintReviews:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("catalog or reviewer context");return listCanonicalBlueprintReviewsService(request);},
+  listCanonicalBlueprintReviewEvidence:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("catalog or reviewer context");return listCanonicalBlueprintReviewEvidenceService(request,raw);},
   listSitePreviewShares:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Site preview sharing context");return listSitePreviewSharesService(request,raw);},
   createSitePreviewShare:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Site preview sharing context");return createSitePreviewShareService(request,raw);},
   setSitePreviewSharePaused:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Site preview sharing context");return setSitePreviewSharePausedService(request,raw);},
