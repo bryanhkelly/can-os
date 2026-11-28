@@ -80,3 +80,41 @@ describe("shared private object storage", () => {
     },
   );
 });
+
+describe("shared pilot QA storage namespace", () => {
+  const branch="br-solitary-art-arun91gj";
+  const enable=()=>{
+    vi.stubEnv("APP_ENV","test");
+    vi.stubEnv("NODE_ENV","test");
+    vi.stubEnv("CAN_TEST_DB_WRITES_ENABLED","true");
+    vi.stubEnv("CAN_PILOT_QA_BRANCH_ID",branch);
+    vi.stubEnv("CAN_R2_SESSION_TOKEN","test-scoped-session");
+  };
+  it("preserves production object paths and rejects caller-supplied QA prefixes",()=>{
+    vi.stubEnv("CAN_PILOT_QA_BRANCH_ID","");
+    vi.stubEnv("CAN_R2_SESSION_TOKEN","");
+    const url=new URL(signPrivateObjectUrl({method:"GET",key,keyPattern}));
+    expect(url.pathname).toBe("/test-private/"+key);
+    expect(url.searchParams.has("X-Amz-Security-Token")).toBe(false);
+    expect(()=>signPrivateObjectUrl({method:"GET",key:"qa/"+branch+"/"+key,keyPattern:/.*/})).toThrow("Invalid logical");
+  });
+  it.each(["PUT","GET","HEAD","DELETE"] as const)("maps %s to one stable physical QA prefix",method=>{
+    enable();
+    const url=new URL(signPrivateObjectUrl({method,key,keyPattern}));
+    expect(url.pathname).toBe("/test-private/qa/"+branch+"/"+key);
+    expect(url.searchParams.get("X-Amz-Security-Token")).toBe("test-scoped-session");
+  });
+  it("fails closed without scoped credentials or in production",()=>{
+    enable();
+    vi.stubEnv("CAN_R2_SESSION_TOKEN","");
+    expect(()=>signPrivateObjectUrl({method:"GET",key,keyPattern})).toThrow("scoped temporary");
+    vi.stubEnv("APP_ENV","production");
+    expect(()=>signPrivateObjectUrl({method:"GET",key,keyPattern})).toThrow("Invalid isolated");
+  });
+  it("does not allow namespace traversal or already namespaced input",()=>{
+    enable();
+    for(const bad of ["../other","safe/../other","safe/%2e%2e/other","safe//other","qa/other/path"]){
+      expect(()=>signPrivateObjectUrl({method:"GET",key:bad,keyPattern:/.*/})).toThrow("Invalid logical");
+    }
+  });
+});
