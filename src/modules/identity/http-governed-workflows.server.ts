@@ -1,3 +1,6 @@
+import * as work from "@/modules/operations/action-workspace.server";
+import * as actionDetail from "@/modules/actions/action-detail.server";
+import * as credentialApproval from "@/modules/identity/canonical-sensitive-approvals.server";
 import * as completionAdmin0 from "@/modules/learning/noncredit-completion-decisions.server";
 import * as completionAdmin1 from "@/modules/learning/noncredit-completion-policy.server";
 import * as completionAdmin2 from "@/modules/learning/noncredit-completion-review.server";
@@ -81,6 +84,18 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
  const context=await (mode==="operator-reporting"?(readCookie(request,accessSessionCookie)!==undefined?getIdentityContext(request):getCanonicalCommandContext(request)):mode==="planning"?getBlueprintPlanningContext(request):mode==="canonical"?getCanonicalCommandContext(request):mode==="learner"?getInstructionalLearnerContext(request):getIdentityContext(request));
  if(!context.actorPersonId)throw new AuthorizationError("verified Person");
  return {
+  getOperationsActions:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Work and approval context");return work.getOperationsActionsService(request,raw);},
+  getActionDetail:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Work and approval context");return actionDetail.getActionDetailService(request,raw);},
+  updateOperationsAction:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Work and approval context");return work.updateOperationsActionService(request,raw);},
+  assignOperationsAction:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Work and approval context");return work.assignOperationsActionService(request,raw);},
+  setOperationsActionDeadline:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Work and approval context");return work.setOperationsActionDeadlineService(request,raw);},
+  resolveOwnedSiteOperationalAction:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Work and approval context");return work.resolveOwnedSiteOperationalActionService(request,raw);},
+  requestCanonicalCredentialIssuerApproval:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Work and approval context");return credentialApproval.requestCanonicalCredentialIssuerApprovalService(request,raw);},
+  getMyCredentialIssuerApproval:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Work and approval context");return credentialApproval.getMyCredentialIssuerApprovalService(request);},
+  listActiveCredentialIssuerApprovals:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Work and approval context");return credentialApproval.listActiveCredentialIssuerApprovalsService(request);},
+  listPendingCredentialIssuerApprovals:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Work and approval context");return credentialApproval.listPendingCredentialIssuerApprovalsService(request);},
+  reviewCanonicalCredentialIssuerApproval:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Work and approval context");return credentialApproval.reviewCanonicalCredentialIssuerApprovalService(request,raw);},
+  revokeCanonicalCredentialIssuerApproval:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Work and approval context");return credentialApproval.revokeCanonicalCredentialIssuerApprovalService(request,raw);},
   decideNoncreditCompletion:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Completion administration context");return completionAdmin0.decideNoncreditCompletionService(request,raw);},
   getNoncreditCompletionPolicyCatalog:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Completion administration context");return completionAdmin1.getNoncreditCompletionPolicyCatalogService(request);},
   publishNoncreditCompletionPolicy:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Completion administration context");return completionAdmin1.publishNoncreditCompletionPolicyService(request,raw);},
