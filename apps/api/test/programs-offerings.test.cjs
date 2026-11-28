@@ -6,6 +6,7 @@ const { ProgramsOfferingsModule } = require('../dist/programs-offerings.module')
 const { NativeCourseDraftController } = require('../dist/native-course-draft.controller');
 const { PublisherPackController } = require('../dist/publisher-pack.controller');
 const { CurriculumMarketplaceController } = require('../dist/curriculum-marketplace.controller');
+const { InstructionalTrackAuthoringController } = require('../dist/instructional-track-authoring.controller');
 const { CatalogController } = require('../dist/catalog.controller');
 const { WorkflowController } = require('../dist/workflow.controller');
 const { OfferingReleaseController } = require('../dist/platform-commands.controller');
@@ -16,7 +17,7 @@ test('WS04 registers its controllers once and shares the configured identity ser
   try {
     const domain = app.select(ProgramsOfferingsModule);
     const identity = app.get(CanonicalIdentityService);
-    for (const Controller of [CatalogController, WorkflowController, OfferingReleaseController, NoncreditPublicationController, NativeCourseDraftController, PublisherPackController, CurriculumMarketplaceController]) {
+    for (const Controller of [CatalogController, WorkflowController, OfferingReleaseController, NoncreditPublicationController, NativeCourseDraftController, PublisherPackController, CurriculumMarketplaceController, InstructionalTrackAuthoringController]) {
       const instance = domain.get(Controller, { strict: true });
       assert.equal(instance.identity, identity);
     }
@@ -37,7 +38,8 @@ test('WS04 registers its controllers once and shares the configured identity ser
       'getNoncreditTrainingReadiness', 'publishNoncreditSelfEnrollment', 'closeNoncreditSelfEnrollment',
       'publishNoncreditAcrossAuthorizedSites',
       'getNativeCourseDraftLessons', 'saveNativeCourseLessonDraft', 'getNativeCourseReleaseReadiness', 'createNativeCourseAssignmentDraft', 'getNativeCourseAssignmentDrafts', 'getPublisherPackStudio', 'createAuthoredPublisherPack', 'startPublisherPackDraft', 'saveAuthoredPublisherPack', 'publishAuthoredPublisherPack',
-      'getCurriculumAdopterPrograms', 'getCurriculumJourneyReadiness', 'getCurriculumMarketplace', 'installCurriculumPack', 'adoptCurriculumPack', 'reviewAnnualCurriculumAdoption', 'rolloverAnnualCurriculumAdoption', 'rollbackAnnualCurriculumPackAdoption', 'addMarketplaceSupplement'
+      'getCurriculumAdopterPrograms', 'getCurriculumJourneyReadiness', 'getCurriculumMarketplace', 'installCurriculumPack', 'adoptCurriculumPack', 'reviewAnnualCurriculumAdoption', 'rolloverAnnualCurriculumAdoption', 'rollbackAnnualCurriculumPackAdoption', 'addMarketplaceSupplement',
+      'createRecordedInstructionDraft', 'saveRecordedInstructionDraft', 'submitRecordedInstructionDraft', 'decideRecordedInstructionReview', 'publishRecordedInstruction', 'withdrawRecordedInstruction', 'getCreatorRecordedInstructionDraft'
     ]) {
       assert.ok(ids.includes(id), 'Missing WS04 operation: ' + id);
     }
@@ -173,4 +175,35 @@ test('Marketplace contracts reject license bypass, forged scope and unsafe suppl
  assert.equal(results.eligibility.safeParse({eligible:false,reason:'no_year_adoption'}).success,true);
  assert.equal(results.eligibility.safeParse({eligible:true,reason:'invalid_or_expired',versionId:id}).success,false);
  assert.equal(results.eligibility.safeParse({eligible:true,reason:'active',versionId:id,activationEligible:true}).success,false);
+});
+
+test('Instructional Track routes expose governed authoring, review, publication and withdrawal',async()=>{
+ const {app,document}=await createApi(readConfig({API_DOCS:'0'}));
+ const id='00000000-0000-4000-8000-000000000001';
+ try{
+  await app.listen(0,'127.0.0.1');const url=await app.getUrl();
+  const base='/api/v1/instructional-track-versions/{trackVersionId}/';
+  const routes=[['/api/v1/course-versions/{courseVersionId}/instructional-track-drafts','POST'],...['revisions','submissions','reviews','publication','withdrawals'].map(s=>[base+s,'POST']),[base+'draft','GET']];
+  for(const [path,method] of routes){
+   const op=document.paths[path][method.toLowerCase()];
+   assert.ok(op.security);assert.ok(op.responses['403']);assert.ok(op.responses['409']);
+   const response=await fetch(url+path.replace(/\{[^}]+\}/g,id),method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);
+  }
+ }finally{await app.close();}
+});
+test('Instructional Track contracts reject private answer keys, authority injection and missing revision',()=>{
+ const {inputs,results}=require('../dist/instructional-track-authoring.contracts');
+ const id='00000000-0000-4000-8000-000000000001',expectedRevision='a'.repeat(64);
+ const review={requestId:id,expectedRevision,reviewKind:'rights',decision:'approved',rationale:'Current license reviewed',evidenceVersionId:id};
+ assert.equal(inputs.review.safeParse(review).success,true);
+ assert.equal(inputs.review.safeParse({...review,reviewerPersonId:id}).success,false);
+ assert.equal(inputs.review.safeParse({...review,expectedRevision:undefined}).success,false);
+ assert.equal(inputs.release.safeParse({requestId:id,expectedRevision,manifestApproved:true}).success,false);
+ const material={courseUnitId:id,assetVersionId:null,materialKind:'practice',activitySpec:{prompt:'Explain the concept'}};
+ const save={requestId:id,expectedRevision,materials:[material],presentations:[]};
+ assert.equal(inputs.save.safeParse(save).success,true);
+ assert.equal(inputs.save.safeParse({...save,materials:[{...material,activitySpec:{nested:[{correct_answer:'private'}]}}]}).success,false);
+ assert.equal(inputs.save.safeParse({...save,presentations:[{courseLessonId:id,assetVersionId:id,presentationKind:'primary',ordinal:1,accessibilityNotes:{solution:'private'}}]}).success,false);
+ assert.equal(results.published.safeParse({trackVersionId:id,manifestHash:expectedRevision,lifecycle:'published',studentAccessGranted:true}).success,false);
 });

@@ -60,3 +60,18 @@ export async function checkMarketplaceContracts(client:BecomunaBrowserApi,id:str
  // @ts-expect-error cannot set academic year implicitly or in an unrelated body
  await client.POST('/api/v1/programs/{programId}/curriculum-packs/{packId}/academic-years/{academicYearId}/adoption',{params:{path:{...program,packId:id}},body:{versionId:id}});
 }
+
+export async function checkInstructionalTrackContracts(client:BecomunaBrowserApi,id:string,hash:string){
+ const course={courseVersionId:id},track={trackVersionId:id},release={requestId:id,expectedRevision:hash};
+ await client.POST('/api/v1/course-versions/{courseVersionId}/instructional-track-drafts',{params:{path:course},body:{requestId:id,title:'Recorded instruction',trackKind:'primary'}});
+ await client.GET('/api/v1/instructional-track-versions/{trackVersionId}/draft',{params:{path:track}});
+ await client.POST('/api/v1/instructional-track-versions/{trackVersionId}/revisions',{params:{path:track},body:{...release,materials:[],presentations:[{courseLessonId:id,assetVersionId:id,presentationKind:'primary',ordinal:1}]}});
+ await client.POST('/api/v1/instructional-track-versions/{trackVersionId}/submissions',{params:{path:track},body:release});
+ await client.POST('/api/v1/instructional-track-versions/{trackVersionId}/reviews',{params:{path:track},body:{...release,reviewKind:'rights',decision:'approved',rationale:'Verified rights evidence',evidenceVersionId:id}});
+ await client.POST('/api/v1/instructional-track-versions/{trackVersionId}/publication',{params:{path:track},body:release});
+ await client.POST('/api/v1/instructional-track-versions/{trackVersionId}/withdrawals',{params:{path:track},body:{requestId:id,withdrawalKind:'urgent_rights',reason:'Rights withdrawn by owner',legacyAccessUntil:null}});
+ // @ts-expect-error review authority is derived from the authenticated Person
+ await client.POST('/api/v1/instructional-track-versions/{trackVersionId}/reviews',{params:{path:track},body:{...release,reviewKind:'academic',decision:'approved',rationale:'Independent review',reviewerPersonId:id}});
+ // @ts-expect-error publication requires the exact submitted manifest hash
+ await client.POST('/api/v1/instructional-track-versions/{trackVersionId}/publication',{params:{path:track},body:{requestId:id}});
+}
