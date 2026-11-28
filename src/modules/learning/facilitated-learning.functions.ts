@@ -318,7 +318,8 @@ export const recordFacilitatedPlayback = createServerFn({method:"POST"})
           eq(facilitatedLearningPlayback.requestId,data.requestId),
         )).limit(1);
       if(existing){
-        if(existing.kind!==data.kind||existing.lessonId!==data.lessonId||
+        if(existing.facilitatorPersonId!==host.actor.actorPersonId||
+          existing.kind!==data.kind||existing.lessonId!==data.lessonId||
           existing.assetVersionId!==data.assetVersionId||
           existing.positionSeconds!==data.positionSeconds)
           throw new Error("Conflicting facilitated playback retry");

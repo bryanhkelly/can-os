@@ -416,6 +416,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
         startsAt:canonicalDeliverySessions.startsAt,
         endsAt:canonicalDeliverySessions.endsAt,
         facilitatorPersonId:canonicalClassSessions.facilitatorPersonId,
+        currentFacilitatorPersonId:facilitatedLearningSessions.facilitatorPersonId,
       }).from(canonicalClassSessions)
         .innerJoin(facilitatedClassroomPlans,and(
           eq(facilitatedClassroomPlans.id,canonicalClassSessions.classroomPlanId),
@@ -453,7 +454,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
         state:row.state,
         startsAt:row.startsAt.toISOString(),
         endsAt:row.endsAt.toISOString(),
-        isMySession:row.facilitatorPersonId===actor.actorPersonId!,
+        isMySession:(row.currentFacilitatorPersonId??row.facilitatorPersonId)===actor.actorPersonId!,
         agendaRequired:requiresClassSessionAgenda({
           featureEnabled:sessionAgendasEnabled,
           mandatoryFrom:process.env.CAN_WS4_AGENDA_REQUIRED_FROM,

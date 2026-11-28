@@ -8,7 +8,7 @@ import {pilotRpcPage,pilotRpc as rpc,expectPilotDenial as deny} from "../helpers
 const uuid=z.string().uuid();
 const actor=z.object({email:z.string().email().refine(x=>x===x.toLowerCase()&&x.endsWith(".test")),grantId:uuid,organizationId:uuid}).strict();
 const fixture=z.object({manager:actor,primary:actor,backup:actor,foreign:actor,
-  classId:uuid,siteId:uuid,classSessionId:uuid,
+  classId:uuid,siteId:uuid,classSessionId:uuid,liveClassSessionId:uuid.optional(),
   replacement:z.object({requestId:uuid,startsAt:z.string().datetime({offset:true}),endsAt:z.string().datetime({offset:true}),lessonId:uuid,agendaRequestId:uuid}).strict()}).strict()
   .parse(JSON.parse(process.env.CAN_FACILITATOR_QA_JSON??"{}"));
 const branch="br-solitary-art-arun91gj";
@@ -76,6 +76,33 @@ test("exact Site manager cancellation and independently authenticated backup sch
     expect(rows).toHaveLength(2);
     expect(rows.find(row=>row.id===classSessionId)).toMatchObject({facilitator_person_id:p.grant.personId,state:"cancelled",facilitated_session_id:null});
     expect(rows.find(row=>row.id===next)).toMatchObject({facilitator_person_id:b.grant.personId,state:"scheduled",facilitated_session_id:null});
+    if(fixture.liveClassSessionId){
+      const sessionId=fixture.liveClassSessionId;
+      expect(sessionId).not.toBe(classSessionId);
+      const [live]=await sql`SELECT s.facilitator_person_id,p.facilitated_session_id,r.state
+        FROM public.class_sessions s JOIN public.facilitated_classroom_plans p ON p.id=s.classroom_plan_id
+        JOIN public.facilitated_learning_sessions r ON r.id=p.facilitated_session_id
+        WHERE s.id=${sessionId}::uuid AND s.class_id=${classId}::uuid`;
+      expect(live).toMatchObject({facilitator_person_id:p.grant.personId,state:"live"});
+      const roomId=uuid.parse(live?.facilitated_session_id);
+      const scope={facilitatedSessionId:roomId};
+      const transfer={classId,classSessionId:sessionId,requestId:randomUUID(),expectedFacilitatorPersonId:p.grant.personId,toPersonId:b.grant.personId,reason:"Synthetic QA live facilitator continuity"};
+      await deny(b.page,"roomControl","transferNativeClassroomControl",transfer);
+      await deny(f.page,"roomControl","transferNativeClassroomControl",transfer);
+      await deny(b.page,"room","renewFacilitatedLearningPairing",scope);
+      expect(await rpc(m.page,"roomControl","transferNativeClassroomControl",transfer)).toMatchObject({transferred:true,duplicate:false,facilitatedSessionId:roomId,currentFacilitatorPersonId:b.grant.personId});
+      expect(await rpc(m.page,"roomControl","transferNativeClassroomControl",transfer)).toMatchObject({transferred:true,duplicate:true});
+      await deny(m.page,"roomControl","transferNativeClassroomControl",{...transfer,requestId:randomUUID()});
+      await deny(p.page,"room","renewFacilitatedLearningPairing",scope);
+      await deny(p.page,"session","openNativeClassSession",{classId,classSessionId:sessionId});
+      expect(await rpc(b.page,"session","openNativeClassSession",{classId,classSessionId:sessionId})).toMatchObject({alreadyStarted:true,facilitatedSessionId:roomId});
+      expect(await rpc(b.page,"room","renewFacilitatedLearningPairing",scope)).toMatchObject(scope);
+      const [after]=await sql`SELECT s.facilitator_person_id AS original,r.facilitator_person_id AS controller,p.facilitated_session_id
+        FROM public.class_sessions s JOIN public.facilitated_classroom_plans p ON p.id=s.classroom_plan_id
+        JOIN public.facilitated_learning_sessions r ON r.id=p.facilitated_session_id WHERE s.id=${sessionId}::uuid`;
+      expect(after).toMatchObject({original:p.grant.personId,controller:b.grant.personId,facilitated_session_id:roomId});
+      expect(await rpc(b.page,"room","endFacilitatedLearningRoom",scope)).toMatchObject({ended:true});
+    }
     const workspace=await rpc<{rooms:Record<string,unknown>[]}>(b.page,"room","getFacilitatedHostWorkspace");
     for(const room of workspace.rooms)expect(room).not.toHaveProperty("pairingCodeDigest");
   }finally{await Promise.all(contexts.map(c=>c.close()));}

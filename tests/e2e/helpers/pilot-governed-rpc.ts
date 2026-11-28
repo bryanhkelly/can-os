@@ -16,6 +16,7 @@ const modules={
   onboarding:"/src/modules/classes/native-class-reviewed-onboarding.functions.ts",
   recovery:"/src/modules/classes/native-class-session-recovery.functions.ts",
   session:"/src/modules/classes/native-class-sessions.functions.ts",
+  roomControl:"/src/modules/classes/native-classroom-control.functions.ts",
   agenda:"/src/modules/classes/native-class-session-agenda.functions.ts",
   room:"/src/modules/learning/facilitated-learning.functions.ts",
   attendance:"/src/modules/learning/classroom-attendance.functions.ts",
