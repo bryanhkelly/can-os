@@ -41,9 +41,17 @@ describe("CAN V6.1 real/synthetic authorization parity",()=>{
   expect(()=>assertMembershipSwitchIdentity({accountId:"account",accountPersonId:"person",
     targetGrantId:"target",grants:[other],activePersonIds:["person"],
     demoAccountSwitching:false})).toThrow();
-  expect(assertMembershipSwitchIdentity({accountId:"account",accountPersonId:"person",
+  expect(()=>assertMembershipSwitchIdentity({accountId:"account",accountPersonId:"person",
     targetGrantId:"target",grants:[other],activePersonIds:[],
     demoAccountSwitching:true})).toThrow(AuthorizationError);
+ });
+ it("rechecks absence of delegation inside the membership-selection transaction",()=>{
+  const sourceCode=source("src/modules/identity/passwordless-access.server.ts");
+  const selection=sourceCode.slice(sourceCode.indexOf("export async function selectAccessGrant"),sourceCode.indexOf("export async function recordMeaningfulSessionActivity"));
+  expect(selection).toContain('.for("update")');
+  for(const field of ["delegatedGrantId","delegatedMode","delegatedUntil","delegatedReason"])
+    expect(selection.split("isNull(accessSessions."+field+")").length-1).toBe(2);
+  expect(selection).not.toContain("demoAccountSwitching?[]");
  });
  it("staff canonical authorization accepts the server-verified effective role",()=>{
   const actor={
