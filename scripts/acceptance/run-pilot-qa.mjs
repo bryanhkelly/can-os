@@ -13,6 +13,14 @@ const file = resolve(root, ".env.pilot-qa");
 const allowedBranch = "br-solitary-art-arun91gj";
 const secret = () => randomBytes(32).toString("hex");
 const modes = {
+  "nest-relationships": ["node_modules/@playwright/test/cli.js", "test", "--config", "playwright.nest-student-api.config.ts", "--fail-on-flaky-tests"],
+  "nest-identity": ["node_modules/@playwright/test/cli.js", "test", "--config", "playwright.nest-student-api.config.ts", "--fail-on-flaky-tests"],
+  "nest-db": ["scripts/acceptance/check-nest-restricted-database.mjs"],
+  "nest-roles": ["node_modules/@playwright/test/cli.js", "test", "--config", "playwright.nest-student-api.config.ts", "--fail-on-flaky-tests"],
+  "nest-pilot1": ["node_modules/@playwright/test/cli.js", "test", "--config", "playwright.nest-student-api.config.ts", "--fail-on-flaky-tests"],
+  "nest-pilot2": ["node_modules/@playwright/test/cli.js", "test", "--config", "playwright.nest-student-api.config.ts", "--fail-on-flaky-tests"],
+  "nest-reporting": ["node_modules/@playwright/test/cli.js", "test", "--config", "playwright.nest-student-api.config.ts", "--fail-on-flaky-tests"],
+  "nest-http": ["node_modules/@playwright/test/cli.js", "test", "--config", "playwright.nest-student-api.config.ts", "--fail-on-flaky-tests"],
   facilitator: ["node_modules/@playwright/test/cli.js", "test", "--config", "playwright.facilitator-api.config.ts"],
   student: ["node_modules/@playwright/test/cli.js", "test", "--config", "playwright.student-api.config.ts"],
   governed: ["node_modules/@playwright/test/cli.js", "test", "--config", "playwright.pilot-governed.config.ts"],
@@ -46,7 +54,8 @@ function init() {
     CAN_R2_ACCESS_KEY_ID: "", CAN_R2_SECRET_ACCESS_KEY: "", CAN_R2_SESSION_TOKEN: "",
     CAN_PILOT_QA_LEARNER_SESSION: "", CAN_PILOT_QA_OTHER_SESSION: "", CAN_PILOT_QA_PROVIDER_SESSION: "",
     CAN_PILOT_QA_FIXTURE_JSON: "", CAN_PILOT_QA_GOVERNED_JSON: "",
-    CAN_PILOT_QA_API_ACTORS_JSON: "", CAN_PILOT_QA_PLAN_JSON: "", CAN_PARENT_QA_JSON: "", CAN_STUDENT_QA_JSON: "", CAN_FACILITATOR_QA_JSON: "",
+    CAN_PILOT_QA_API_ACTORS_JSON: "", CAN_PILOT_QA_PLAN_JSON: "", CAN_PARENT_QA_JSON: "", CAN_STUDENT_QA_JSON: "", CAN_FACILITATOR_QA_JSON: "", CAN_NEST_SIGNUP_QA_JSON: "", CAN_NEST_REPORT_QA_JSON: "", CAN_NEST_PILOT1_QA_JSON: "", CAN_NEST_PILOT2_QA_JSON: "", CAN_NEST_ROLES_QA_JSON: "",
+    CAN_NEST_RELATIONSHIPS_QA_JSON: "",CAN_NEST_RELATIONSHIP_OWNER_CODE: "",CAN_NEST_RELATIONSHIP_RECIPIENT_CODE: "",CAN_NEST_RELATIONSHIP_FOREIGN_CODE: "",CAN_NEST_OWNER_QA_JSON: "",CAN_NEST_OWNER_QA_EMAIL: "",CAN_NEST_STAFF_QA_JSON: "",CAN_NEST_INSTITUTIONAL_QA_JSON: "",
   };
   writeFileSync(file, Object.entries(config).map(([k,v]) => k+"="+v).join("\n")+"\n", {flag:"wx",mode:0o600});
   console.log("Created ignored .env.pilot-qa with independent random secrets. Fill in isolated connections and approved sessions locally; no secrets printed.");
@@ -66,7 +75,8 @@ function localConfiguration() {
     "CAN_NONCREDIT_ASSESSMENT_KEY_HEX","CAN_NONCREDIT_AUTO_FINALIZATION_ENABLED",
     "CAN_R2_ACCOUNT_ID","CAN_R2_BUCKET","CAN_R2_ACCESS_KEY_ID","CAN_R2_SECRET_ACCESS_KEY","CAN_R2_SESSION_TOKEN",
     "CAN_PILOT_QA_LEARNER_SESSION","CAN_PILOT_QA_OTHER_SESSION","CAN_PILOT_QA_PROVIDER_SESSION","CAN_PILOT_QA_FIXTURE_JSON","CAN_PILOT_QA_GOVERNED_JSON",
-    "CAN_PILOT_QA_API_ACTORS_JSON","CAN_PILOT_QA_PLAN_JSON","CAN_PARENT_QA_JSON","CAN_STUDENT_QA_JSON","CAN_FACILITATOR_QA_JSON"
+    "CAN_PILOT_QA_API_ACTORS_JSON","CAN_PILOT_QA_PLAN_JSON","CAN_PARENT_QA_JSON","CAN_STUDENT_QA_JSON","CAN_FACILITATOR_QA_JSON","CAN_NEST_SIGNUP_QA_JSON","CAN_NEST_REPORT_QA_JSON","CAN_NEST_PILOT1_QA_JSON","CAN_NEST_PILOT2_QA_JSON","CAN_NEST_ROLES_QA_JSON",
+    "CAN_NEST_RELATIONSHIPS_QA_JSON","CAN_NEST_RELATIONSHIP_OWNER_CODE","CAN_NEST_RELATIONSHIP_RECIPIENT_CODE","CAN_NEST_RELATIONSHIP_FOREIGN_CODE","CAN_NEST_OWNER_QA_JSON","CAN_NEST_OWNER_QA_EMAIL","CAN_NEST_STAFF_QA_JSON","CAN_NEST_INSTITUTIONAL_QA_JSON"
   ]);
   if (Object.keys(config).some(k=>!permitted.has(k))) fail("QA configuration contains an unsupported setting.");
   if(config.APP_ENV!=="test" || config.NODE_ENV!=="test" || config.CAN_TEST_DB_WRITES_ENABLED!=="true" ||
@@ -87,11 +97,40 @@ function localConfiguration() {
 }
 try {
   const mode=process.argv[2];
-  if(process.argv.length!==3) fail("Use exactly one QA action: init, prepare, provision, governed, parent, parent-readiness, student, facilitator, readiness, executive, report, schema, regression, keys, fixture, api, browser, pilot1, pilot2, all.");
+  if(process.argv.length!==3) fail("Use exactly one QA action: init, prepare, provision, governed, parent, parent-readiness, student, nest-http, nest-reporting, nest-pilot1, nest-pilot2, nest-roles, nest-db, nest-relationships, nest-identity, facilitator, readiness, executive, report, schema, regression, keys, fixture, api, browser, pilot1, pilot2, all.");
   if(mode==="init") init();
   else {
     if(!Object.hasOwn(modes,mode)&&!["pilot1","pilot2","all"].includes(mode)) fail("Unknown QA action.");
     const env=localConfiguration();
+    if(mode==="nest-relationships"){
+      if(!env.CAN_NEST_RELATIONSHIPS_QA_JSON||!["OWNER","RECIPIENT","FOREIGN"].every(k=>/^[A-Za-z0-9_-]{43}$/.test(env["CAN_NEST_RELATIONSHIP_"+k+"_CODE"]??"")))fail("Reviewed relationship managers and individual private credentials required.");
+      env.CAN_NEST_QA_SUITE="relationships";
+    }
+    if(mode==="nest-identity"){
+      if(!["CAN_NEST_OWNER_QA_JSON","CAN_NEST_OWNER_QA_EMAIL","CAN_NEST_STAFF_QA_JSON","CAN_NEST_INSTITUTIONAL_QA_JSON"].every(k=>env[k]))fail("All reviewed identity fixtures required; no optional skipped acceptance.");
+      env.CAN_NEST_QA_SUITE="identity";
+    }
+    if(mode==="nest-roles"){
+      if(!env.CAN_NEST_ROLES_QA_JSON)fail("Reviewed synthetic role fixture required.");
+      env.CAN_NEST_QA_SUITE="roles";
+    }
+    if(mode==="nest-pilot1"||mode==="nest-pilot2"){
+      const key=mode==="nest-pilot1"?"CAN_NEST_PILOT1_QA_JSON":"CAN_NEST_PILOT2_QA_JSON";
+      if(!env[key])fail("Reviewed isolated pilot fixture required.");
+      env.CAN_NEST_QA_SUITE=mode==="nest-pilot1"?"pilot1":"pilot2";
+    }
+    if(mode==="nest-reporting"){
+      if(!env.CAN_NEST_REPORT_QA_JSON)fail("Reviewed two-site pilot report fixture required.");
+      env.CAN_NEST_QA_SUITE="reporting";
+    }
+    if(mode==="nest-http"){
+      // The release slice must not silently skip writes or fresh provisioning.
+      try {
+        const student=JSON.parse(env.CAN_STUDENT_QA_JSON||"null");
+        const signup=JSON.parse(env.CAN_NEST_SIGNUP_QA_JSON||"null");
+        if(!student?.write||signup?.attestation!=="fresh-synthetic-signups")throw Error();
+      } catch { fail("Nest HTTP acceptance requires reviewed two-student write and fresh signup fixtures."); }
+    }
     if(mode!=="readiness"){
       const {verifyAdmissionsNeonBranch}=await import("../verify-admissions-neon-branch.mjs");
       await verifyAdmissionsNeonBranch(env);
@@ -100,7 +139,7 @@ try {
       const {neon}=await import("@neondatabase/serverless");
       for(const key of ["CAN_CANONICAL_AUTH_DATABASE_URL","CAN_CANONICAL_OPERATIONS_DATABASE_URL"]){
         if(!env[key]) {
-          if(key==="CAN_CANONICAL_AUTH_DATABASE_URL" && (mode==="prepare"||mode==="provision"||mode==="governed"||mode==="parent"||mode==="student"||mode==="facilitator"||mode==="api"||mode==="browser"||["pilot1","pilot2","all"].includes(mode))) fail(key+" is required for QA runtime.");
+          if(key==="CAN_CANONICAL_AUTH_DATABASE_URL" && (mode==="prepare"||mode==="provision"||mode==="governed"||mode==="parent"||mode==="student"||mode==="nest-http"||mode==="nest-reporting"||mode==="nest-pilot1"||mode==="nest-pilot2"||mode==="nest-roles"||mode==="nest-relationships"||mode==="nest-identity"||mode==="facilitator"||mode==="api"||mode==="browser"||["pilot1","pilot2","all"].includes(mode))) fail(key+" is required for QA runtime.");
           continue;
         }
         const expectedLogin=key==="CAN_CANONICAL_AUTH_DATABASE_URL"?"can_os_canonical_auth_app":"can_os_canonical_ops_app";
@@ -110,17 +149,32 @@ try {
         if(identity?.project!=="sweet-hall-62441909"||identity?.branch!==allowedBranch||identity?.login!==expectedLogin) fail("Secondary QA database attestation failed: "+key);
       }
     }
+    if(mode.startsWith("nest-")&&mode!=="nest-db"){
+      // A clean source checkout alone does not attest ignored dist artifacts.
+      // Rebuild from the selected revision without forwarding database/mail keys.
+      if(process.versions.node.split(".")[0]!=="24")fail("Nest acceptance requires Node 24.");
+      if(!existsSync(join(root,"apps/api/package-lock.json")))fail("Committed API dependency lock required before Nest acceptance.");
+      const buildEnv=Object.fromEntries(Object.entries(env).filter(([k])=>/^(PATH|PATHEXT|SYSTEMROOT|WINDIR|COMSPEC|HOME|USERPROFILE|APPDATA|LOCALAPPDATA|TEMP|TMP|TMPDIR|LANG|LC_ALL|CI)$/i.test(k)));
+      const dist=join(root,"apps/api/dist");
+      if(existsSync(dist)&&(!lstatSync(dist).isDirectory()||lstatSync(dist).isSymbolicLink()))fail("Regular API output directory required.");
+      rmSync(dist,{recursive:true,force:true});
+      for(const task of ["build","build:canonical"]){
+        const built=spawnSync(process.platform==="win32"?"npm.cmd":"npm",["--prefix","apps/api","run",task],{cwd:root,env:buildEnv,stdio:"inherit"});
+        if(built.status!==0)fail("Exact-revision Nest build failed: "+task);
+      }
+      if(!existsSync(join(dist,"main.js"))||!existsSync(join(dist,"canonical.cjs")))fail("Complete Nest and canonical bridge artifacts required.");
+    }
     // Prepare the real application privately, before any fixture or sessions exist.
     // Use the existing isolated .test access-mail transport, never Resend.
     // Outbox holds single-use credentials: no artifact or Git persistence.
-    const outbox=(["prepare","provision","governed","parent","student","facilitator","api","pilot1","pilot2","all"].includes(mode))?mkdtempSync(join(tmpdir(),"can-pilot-qa-mail-")):null;
+    const outbox=(["prepare","provision","governed","parent","student","nest-http","nest-reporting","nest-pilot1","nest-pilot2","nest-roles","nest-relationships","nest-identity","facilitator","api","pilot1","pilot2","all"].includes(mode))?mkdtempSync(join(tmpdir(),"can-pilot-qa-mail-")):null;
     try {
       if(outbox){
         const {checkPilotMigrationParity}=await import("./check-pilot-migration-parity.mjs");
         if(!(await checkPilotMigrationParity(env)).ready) fail("Repair QA database parity before preparation.");
         if((env.CAN_ACCESS_TOKEN_PEPPER?.length??0)<32||(env.CAN_CANONICAL_ACCESS_TOKEN_PEPPER?.length??0)<32)
           fail("Independent QA session keys required.");
-        if(["facilitator","governed","pilot1","pilot2","all"].includes(mode) &&
+        if(["facilitator","governed","nest-pilot2","pilot1","pilot2","all"].includes(mode) &&
           (env.CAN_FACILITATED_PAIRING_PEPPER?.length??0)<32) fail("Independent QA pairing pepper required; preserve it across fixture runs.");
         Object.assign(env,{DATABASE_URL:env.TEST_DATABASE_URL,CAN_ACCESS_PUBLIC_ORIGIN:"https://app.can-os.test",
           CAN_ACCESS_MAIL_OUTBOX_DIR:outbox});

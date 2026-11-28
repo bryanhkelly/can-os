@@ -77,14 +77,21 @@ test("independent standard HTTP client validates both students and rejects forei
        const denied=await foreign.post(url,{...options,data});expect(denied.status()).toBe(403);
        expect((await denied.json()).code).toBe("FORBIDDEN");
      }
-     const completed=await own.post(lesson,{...options,data:{}});expect(completed.status()).toBe(200);
-     expect(await completed.json()).toEqual({recorded:true,alreadyCompleted:false});
+     const completed=await Promise.all([own.post(lesson,{...options,data:{}}),own.post(lesson,{...options,data:{}})]);
+     for(const r of completed)expect(r.status()).toBe(200);
+     const completions=await Promise.all(completed.map(r=>r.json()));
+     expect(completions.every(r=>r.recorded===true)).toBe(true);
+     expect(completions.map(r=>r.alreadyCompleted).sort()).toEqual([false,true]);
      const replay=await own.post(lesson,{...options,data:{}});expect(replay.status()).toBe(200);
      expect(await replay.json()).toEqual({recorded:true,alreadyCompleted:true});
      const after=await own.get(target+"/resume");expect(after.status()).toBe(200);
      expect(await after.json()).toMatchObject({completed:progress.completed+1,total:progress.total});
-     const submitted=await own.post(assignment,{...options,data:input});expect(submitted.status()).toBe(200);
-     const first=z.object({submissionId:uuid,alreadySubmitted:z.literal(false)}).parse(await submitted.json());
+     const submissions=await Promise.all([own.post(assignment,{...options,data:input}),own.post(assignment,{...options,data:input})]);
+     for(const r of submissions)expect(r.status()).toBe(200);
+     const receipts=await Promise.all(submissions.map(async r=>z.object({submissionId:uuid,alreadySubmitted:z.boolean()}).strict().parse(await r.json())));
+     expect(receipts.map(r=>r.alreadySubmitted).sort()).toEqual([false,true]);
+     expect(receipts[0]!.submissionId).toBe(receipts[1]!.submissionId);
+     const first=receipts[0]!;
      const duplicate=await own.post(assignment,{...options,data:input});expect(duplicate.status()).toBe(200);
      expect(await duplicate.json()).toEqual({submissionId:first.submissionId,alreadySubmitted:true});
      expect((await own.post(assignment,{...options,data:{responseText:"Different response must not overwrite"}})).status()).toBe(403);
