@@ -149,6 +149,21 @@ try {
         if(identity?.project!=="sweet-hall-62441909"||identity?.branch!==allowedBranch||identity?.login!==expectedLogin) fail("Secondary QA database attestation failed: "+key);
       }
     }
+    if(mode.startsWith("nest-")&&mode!=="nest-db"){
+      // A clean source checkout alone does not attest ignored dist artifacts.
+      // Rebuild from the selected revision without forwarding database/mail keys.
+      if(process.versions.node.split(".")[0]!=="24")fail("Nest acceptance requires Node 24.");
+      if(!existsSync(join(root,"apps/api/package-lock.json")))fail("Committed API dependency lock required before Nest acceptance.");
+      const buildEnv=Object.fromEntries(Object.entries(env).filter(([k])=>/^(PATH|PATHEXT|SYSTEMROOT|WINDIR|COMSPEC|HOME|USERPROFILE|APPDATA|LOCALAPPDATA|TEMP|TMP|TMPDIR|LANG|LC_ALL|CI)$/i.test(k)));
+      const dist=join(root,"apps/api/dist");
+      if(existsSync(dist)&&(!lstatSync(dist).isDirectory()||lstatSync(dist).isSymbolicLink()))fail("Regular API output directory required.");
+      rmSync(dist,{recursive:true,force:true});
+      for(const task of ["build","build:canonical"]){
+        const built=spawnSync(process.platform==="win32"?"npm.cmd":"npm",["--prefix","apps/api","run",task],{cwd:root,env:buildEnv,stdio:"inherit"});
+        if(built.status!==0)fail("Exact-revision Nest build failed: "+task);
+      }
+      if(!existsSync(join(dist,"main.js"))||!existsSync(join(dist,"canonical.cjs")))fail("Complete Nest and canonical bridge artifacts required.");
+    }
     // Prepare the real application privately, before any fixture or sessions exist.
     // Use the existing isolated .test access-mail transport, never Resend.
     // Outbox holds single-use credentials: no artifact or Git persistence.
