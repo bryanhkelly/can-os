@@ -5,7 +5,7 @@ import {Field} from "@/components/ui/field";
 import {Input} from "@/components/ui/input";
 import {Select} from "@/components/ui/select";
 import {EmailRecipientField} from "@/components/communication/EmailRecipientField";
-import {ActionFooter,EmptyState,QueryState,WorkspaceNotice,WorkspacePanel,StatusBadge,RecordFacts} from "@/components/workspace";
+import {ActionFooter,EmptyState,QueryState,WorkspaceNotice,WorkspacePanel,StatusBadge,RecordFacts,ActionStateIndicator} from "@/components/workspace";
 import {readEngagementCampaignWorkspace,saveCampaignRecipientList,queueEngagementCampaign,cancelEngagementCampaign} from "@/modules/communication/engagement-campaigns.functions";
 import {CampaignListMembers} from "./CampaignListMembers";
 import {parseCampaignRecipients,parseCampaignRecipientCsv} from "@/domain/campaign-policy";
@@ -45,6 +45,8 @@ function NativeCampaignSession({engagementId,linkId,invitationReady,recipientDra
  const valid=!!name.trim()&&directValid;
  const useDirect=!!raw.trim();
  const recipientReady=useDirect?directValid:!!data?.lists.some(item=>item.id===list&&item.recipients>0);
+ const listBlock=!data?"Wait for the campaign workspace to load.":!name.trim()?"Enter a list name to save reusable recipients.":!parsed.recipients.length?"Enter at least one valid email address.":parsed.invalid.length||parsed.tooMany?"Correct the recipient list.":source.trim().length<5?"Describe the consent source.":!attested?"Confirm documented permission.":null;
+ const queueBlock=!invitationReady?"Verify the invitation first.":!data?.senderReady?(data?.senderIssues?.join(" ")||"Configure an authorized sender and delivery settings."):!recipientReady?(useDirect?"Correct recipients and confirm documented permission.":"Enter recipients or select a nonempty saved list."):!confirmed?"Confirm the invitation and recipients.":null;
  return <WorkspacePanel headingLevel="h3" title="Send email" className="mt-4"><div className="space-y-4">
  {!data&&<QueryState loading={!error?"Loading campaigns…":undefined} error={error||undefined} onRetry={()=>setRefresh(v=>v+1)}/>}
  {!invitationReady&&<WorkspaceNotice tone="attention">The invitation must be verified before a campaign can be queued. You can still prepare and save consented recipient lists when the campaign workspace is available.</WorkspaceNotice>}
@@ -57,12 +59,14 @@ function NativeCampaignSession({engagementId,linkId,invitationReady,recipientDra
  {importError&&<WorkspaceNotice tone="danger">{importError}</WorkspaceNotice>}
  <Field label="Consent evidence" description="Describe where and how these recipients agreed to campaign emails."><Input value={source} maxLength={500} disabled={busy} onChange={e=>{setSource(e.target.value);setAttested(false);setConfirmed(false);}}/></Field>
  <label className="flex items-start gap-2 text-sm"><Checkbox checked={attested} disabled={busy||importing} onChange={e=>setAttested(e.target.checked)}/>I have documented permission from every listed recipient for these campaign emails. Existing opt-outs will not be overridden.</label>
+ {name.trim()&&listBlock&&!busy&&!importing&&<ActionStateIndicator state={{kind:"blocked",detail:listBlock}}/>}
  <ActionFooter layout="inline"><Button type="button" disabled={!data||!valid||busy||importing} onClick={()=>void run(async()=>{const saved=await saveCampaignRecipientList({data:{...scope,name,raw,consentSource:source,attested:true}});setList(saved.id);setRaw("");setAttested(false);setConfirmed(false);setNotice("Recipient list saved. No messages sent.");})}>Save or add to list</Button></ActionFooter>
  {data&&<>
- <Field label="Or use a saved recipient list"><Select value={list} disabled={busy} onChange={e=>{setList(e.target.value);if(e.target.value){setRaw("");setAttested(false);}setManageList(false);setConfirmed(false);requestId.current=null;}}><option value="">Select a list</option>{data.lists.map(l=><option key={l.id} value={l.id}>{l.name} ({l.recipients})</option>)}</Select></Field>
+ <Field label="Or use a saved recipient list"><Select value={list} disabled={busy} onChange={e=>{setList(e.target.value);if(e.target.value){setRaw("");setAttested(false);}setManageList(false);setConfirmed(false);}}><option value="">Select a list</option>{data.lists.map(l=><option key={l.id} value={l.id}>{l.name} ({l.recipients})</option>)}</Select></Field>
  {list&&<><Button type="button" variant="outline" disabled={busy} onClick={()=>setManageList(v=>!v)}>{manageList?"Close recipient management":"Manage saved recipients"}</Button>{manageList&&<CampaignListMembers key={list} engagementId={engagementId} linkId={linkId} listId={list} onChange={()=>{setConfirmed(false);setRefresh(v=>v+1);}}/>}</>}
- <Field label="Schedule (local time)" description="Leave empty to send now. Scheduled processing is periodic, not an exact minute guarantee."><Input type="datetime-local" value={when} disabled={busy} onChange={e=>{setWhen(e.target.value);setConfirmed(false);requestId.current=null;}}/></Field>
+ <Field label="Schedule (local time)" description="Leave empty to send now. Scheduled processing is periodic, not an exact minute guarantee."><Input type="datetime-local" value={when} disabled={busy} onChange={e=>{setWhen(e.target.value);setConfirmed(false);}}/></Field>
  <label className="flex items-start gap-2 text-sm"><Checkbox checked={confirmed} disabled={!invitationReady||busy} onChange={e=>setConfirmed(e.target.checked)}/>Send the displayed invitation to the selected recipients. Recipients with opt-outs will be suppressed.</label>
+ {queueBlock&&!busy&&!importing&&<ActionStateIndicator state={{kind:"blocked",detail:queueBlock}}/>}
  <ActionFooter layout="inline"><Button type="button" disabled={!invitationReady||!data.senderReady||!recipientReady||!confirmed||busy||importing} onClick={()=>void run(async()=>{const fingerprint=JSON.stringify([useDirect?parsed.recipients.slice().sort():list,useDirect?source.trim():null,when]);if(requestId.current&&requestId.current.fingerprint!==fingerprint)throw new Error("Previous send outcome is uncertain. Review campaign history before starting another send.");requestId.current??={id:crypto.randomUUID(),scheduledAt:when?new Date(when).toISOString():new Date().toISOString(),fingerprint};await queueEngagementCampaign({data:{...scope,...(useDirect?{raw,consentSource:source,attested:true as const}:{listId:list}),requestId:requestId.current.id,scheduledAt:requestId.current.scheduledAt,confirmed:true}});requestId.current=null;setConfirmed(false);setNotice(when?"Email scheduled.":"Email submitted for delivery. Check campaign history for provider acceptance and delivery.");})}>{when?"Schedule email":"Send email"}</Button></ActionFooter>
  <WorkspacePanel headingLevel="h4" title="Campaign history" actions={<Button type="button" size="sm" variant="outline" disabled={busy} onClick={()=>setRefresh(v=>v+1)}>Refresh</Button>}><div className="space-y-3">
  {data.campaigns.length===0&&<EmptyState title="No campaigns yet."/>}
