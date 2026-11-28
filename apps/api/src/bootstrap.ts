@@ -4,6 +4,7 @@ import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { z } from 'zod';
+import { completePlatformContract } from './platform-contract';
 import { AppModule } from './app.module';
 import { CanonicalIdentityService } from './identity.service';
 
@@ -41,7 +42,8 @@ export async function createApi(config: ReturnType<typeof readConfig>) {
   configSchema.parse(config);
   if(config.canonicalWrites==='1')assertIsolatedWriteEnvironment(process.env);
   const adapter = new FastifyAdapter({
-    bodyLimit: 1024 * 1024, requestTimeout: 30000, trustProxy: false,
+    bodyLimit: 1024 * 1024, requestTimeout: 30000, connectionTimeout: 65000,
+    keepAliveTimeout: 5000, trustProxy: false,
     requestIdHeader: false, genReqId: () => randomUUID(),
   });
   const app = await NestFactory.create<NestFastifyApplication>(AppModule, adapter, { logger: ['error', 'warn'] });
@@ -51,11 +53,13 @@ export async function createApi(config: ReturnType<typeof readConfig>) {
     reply.header('X-Content-Type-Options', 'nosniff');
     reply.header('Referrer-Policy', 'no-referrer');
     reply.header('Cache-Control', 'no-store');
+    reply.header('X-Frame-Options', 'DENY');
   });
   app.setGlobalPrefix('api/v1');
   const document = SwaggerModule.createDocument(app, new DocumentBuilder()
     .setTitle('Becomuna API').setDescription('Migration proof of concept; canonical reads disabled by default.')
     .setVersion('1.0.0').addCookieAuth('__Host-can_os_session', {type:'apiKey',in:'cookie'}, 'session').addCookieAuth('__Host-can_os_v3_session',{type:'apiKey',in:'cookie'},'nativeSession').build());
+  completePlatformContract(document);
   if (config.docs === '1') {
     SwaggerModule.setup('api/docs', app, document, {
       jsonDocumentUrl: '/api/openapi.json', ui: true,
