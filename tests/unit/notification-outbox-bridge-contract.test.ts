@@ -6,7 +6,7 @@ const source = (path: string) => readFileSync(resolve(process.cwd(), path), "utf
 
 describe("notification outbox source boundaries", () => {
   it("commits the canonical completion and CAN notification event together", () => {
-    const command = source("src/modules/learning/noncredit-completion-decisions.functions.ts");
+    const command = source("src/modules/learning/noncredit-completion-decisions.server.ts");
     expect(command).toContain("return db.transaction(async tx=>{");
     expect(command).toContain("tx.insert(noncreditCompletionDecisions)");
     expect(command).toContain("tx.insert(domainEvents)");

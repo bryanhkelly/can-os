@@ -1,3 +1,7 @@
+import * as completionAdmin0 from "@/modules/learning/noncredit-completion-decisions.server";
+import * as completionAdmin1 from "@/modules/learning/noncredit-completion-policy.server";
+import * as completionAdmin2 from "@/modules/learning/noncredit-completion-review.server";
+import * as completionAdmin3 from "@/modules/learning/noncredit-completion-corrections.server";
 import * as noncreditPublication from "@/modules/enrollment/noncredit-enrollment-publication.server";
 import * as knowledgeCheck from "@/modules/learning/noncredit-assessment-http.server";
 import {getNoncreditCompletionReadinessService} from "@/modules/learning/noncredit-completion.server";
@@ -77,6 +81,12 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
  const context=await (mode==="operator-reporting"?(readCookie(request,accessSessionCookie)!==undefined?getIdentityContext(request):getCanonicalCommandContext(request)):mode==="planning"?getBlueprintPlanningContext(request):mode==="canonical"?getCanonicalCommandContext(request):mode==="learner"?getInstructionalLearnerContext(request):getIdentityContext(request));
  if(!context.actorPersonId)throw new AuthorizationError("verified Person");
  return {
+  decideNoncreditCompletion:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Completion administration context");return completionAdmin0.decideNoncreditCompletionService(request,raw);},
+  getNoncreditCompletionPolicyCatalog:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Completion administration context");return completionAdmin1.getNoncreditCompletionPolicyCatalogService(request);},
+  publishNoncreditCompletionPolicy:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Completion administration context");return completionAdmin1.publishNoncreditCompletionPolicyService(request,raw);},
+  getNoncreditCompletionReview:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Completion administration context");return completionAdmin2.getNoncreditCompletionReviewService(request,raw);},
+  getNoncreditCompletionQueue:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Completion administration context");return completionAdmin2.getNoncreditCompletionQueueService(request,raw);},
+  correctNoncreditCompletion:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Completion administration context");return completionAdmin3.correctNoncreditCompletionService(request,raw);},
   getNoncreditEnrollmentPublisher:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Enrollment publication context");return (async()=>{const result=await noncreditPublication.getNoncreditEnrollmentPublisherService(request);return {...result,published:result.published.map(row=>({...row,opensAt:row.opensAt.toISOString(),closesAt:row.closesAt.toISOString()}))};})();},
   getNoncreditTrainingReadiness:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Enrollment publication context");return noncreditPublication.getNoncreditTrainingReadinessService(request,raw);},
   publishNoncreditSelfEnrollment:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Enrollment publication context");return noncreditPublication.publishNoncreditSelfEnrollmentService(request,raw);},

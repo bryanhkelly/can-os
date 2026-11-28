@@ -6,7 +6,7 @@ const pin=readFileSync("database/canonical/v3.0.1/patch-noncredit-locked-policy.
 const auto=readFileSync("database/canonical/v3.0.1/patch-noncredit-automatic-completion.sql","utf8");
 const baseline=readFileSync("database/canonical/v3.0.1/patch-noncredit-baseline-diagnostic.sql","utf8");
 const reader=readFileSync("src/modules/learning/noncredit-completion.server.ts","utf8");
-const policyApi=readFileSync("src/modules/learning/noncredit-completion-policy.functions.ts","utf8");
+const policyApi=readFileSync("src/modules/learning/noncredit-completion-policy.server.ts","utf8");
 const outcomes=readFileSync("src/modules/learning/noncredit-pilot-outcomes.server.ts","utf8");
 
 describe("canonical noncredit automatic completion and frozen policy boundaries",()=>{
@@ -25,7 +25,7 @@ describe("canonical noncredit automatic completion and frozen policy boundaries"
   expect(auto).toContain("decided_by_person_id");
   expect(schema).toContain("NEW.decision_source='automatic'");
   expect(schema).toContain("pol.approved_by_person_id");
-  expect(policyApi).toContain('completionMode:z.enum(["provider_review","automatic"])');
+  expect(readFileSync("src/modules/learning/noncredit-completion-policy.inputs.ts","utf8")).toContain('completionMode:z.enum(["provider_review","automatic"])');
   expect(policyApi).toContain("future_registrations");
  });
  it("requires independently verified evidence and current result for automated completion",()=>{

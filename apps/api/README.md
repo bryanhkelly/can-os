@@ -133,3 +133,6 @@ Seven APIs reuse existing canonical grants, objective scoring, provider finaliza
 
 ## Noncredit release publication
 Five APIs expose provider discovery, training readiness, single-Site publication, multi-Site facilitated publication and terminal closure. Both transports share the original provider capability checks, exact Site and Deployment authority, transaction-local staff revalidation, publication lock, consent terms and idempotent release matching. Existing 100/200 discovery bounds remain. Authenticated execution is pending.
+
+## Noncredit provider completion administration
+Six APIs expose current decision and correction commands, immutable future-registration policy publication, policy catalog, exact-Site queue and history review. The original database gates, evidence binding, independent approval and same-transaction audit/outbox remain authoritative. Completion decisions now fail closed for ambiguous histories and revalidate staff before returning a retry receipt; stale policy writes map to conflict. Positive runtime verification remains open.

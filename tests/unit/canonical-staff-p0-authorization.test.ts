@@ -113,11 +113,11 @@ describe("canonical single-login P0 authorization boundaries", () => {
     expect(rpc).not.toContain('from "@/modules/operations/canonical-capability-lab-access.server"');
     expect(rpc).toContain('await import("./noncredit-cohort-operations.server")');
     const decisions=source(
-      "src/modules/learning/noncredit-completion-decisions.functions.ts");
+      "src/modules/learning/noncredit-completion-decisions.server.ts");
     const policy=source(
-      "src/modules/learning/noncredit-completion-policy.functions.ts");
-    expect(decisions).toContain("assertCurrentCanonicalStaffForMutation(tx,getRequest(),actor)");
-    expect(policy).toContain("assertCurrentCanonicalStaffForMutation(tx,getRequest(),actor)");
+      "src/modules/learning/noncredit-completion-policy.server.ts");
+    expect(decisions).toContain("assertCurrentCanonicalStaffForMutation(tx,request,actor)");
+    expect(policy).toContain("assertCurrentCanonicalStaffForMutation(tx,request,actor)");
   });
 
   it("derives staff roles only from the original current CAN grant",()=>{

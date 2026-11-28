@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const source=(path:string)=>readFileSync(path,"utf8");
-const operatorRead=source("src/modules/learning/noncredit-completion-review.functions.ts");
+const operatorRead=source("src/modules/learning/noncredit-completion-review.server.ts");
 const operatorPanel=source("src/components/learning/NoncreditCompletionReviewPanel.tsx");
 const queuePanel=source("src/components/learning/NoncreditCompletionQueuePanel.tsx");
 const noncreditRoute=source("src/routes/canonical_.noncredit-review-queue.tsx");

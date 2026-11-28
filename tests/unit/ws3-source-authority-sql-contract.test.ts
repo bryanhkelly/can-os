@@ -7,9 +7,9 @@ const classSql=file("database/canonical/v3.0.1/patch-ws3-class-completion-policy
 const credentialSql=file("database/canonical/v3.0.1/patch-achievement-credentials-hardening.sql");
 const readerSql=file("database/canonical/v3.0.1/patch-credential-learner-reader.sql");
 const sourceGuard=file("src/modules/learning/verified-completion-evidence.server.ts");
-const corrections=file("src/modules/learning/noncredit-completion-corrections.functions.ts");
+const corrections=file("src/modules/learning/noncredit-completion-corrections.server.ts");
 const revocations=file("src/modules/learning/credential-revocation.functions.ts");
-const operatorRead=file("src/modules/learning/noncredit-completion-review.functions.ts");
+const operatorRead=file("src/modules/learning/noncredit-completion-review.server.ts");
 const learnerRead=file("src/modules/learning/learner-credentials.functions.ts");
 
 describe("WS3 completion evidence source and credential-current contracts",()=>{
