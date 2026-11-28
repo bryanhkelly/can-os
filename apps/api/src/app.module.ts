@@ -1,3 +1,4 @@
+import {WorkApprovalsController} from './work-approvals.controller';
 import { Controller, Get, Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -48,7 +49,7 @@ export class HealthController {
 }
 
 @Module({
-  controllers: [CompletionAdminController, NoncreditPublicationController, KnowledgeCheckController, OutcomesController, SurveysController, MarketingArtifactsController, MarketingPackagesController, EngagementController, SenderAdminController, CampaignController, LaunchWorkspaceController, CatalogController, PreviewSharesController, WebsiteController, GoLinksController, SitePublishingController, SiteProfileController, BrandController, SitePlanningController, LaunchController, RoleWorkspacesController, ReportingController, ClassAdminController, RoomController, ClassroomController, ParticipationController, WorkflowController, AccessController, HealthController, IdentityController, LearningController, SitesController, OfferingReleaseController],
+  controllers: [WorkApprovalsController, CompletionAdminController, NoncreditPublicationController, KnowledgeCheckController, OutcomesController, SurveysController, MarketingArtifactsController, MarketingPackagesController, EngagementController, SenderAdminController, CampaignController, LaunchWorkspaceController, CatalogController, PreviewSharesController, WebsiteController, GoLinksController, SitePublishingController, SiteProfileController, BrandController, SitePlanningController, LaunchController, RoleWorkspacesController, ReportingController, ClassAdminController, RoomController, ClassroomController, ParticipationController, WorkflowController, AccessController, HealthController, IdentityController, LearningController, SitesController, OfferingReleaseController],
   providers: [
     CanonicalIdentityService,
     { provide: APP_GUARD, useClass: DefaultDenyGuard },
