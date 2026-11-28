@@ -48,7 +48,7 @@ export async function finishSiteMediaFolderUpload(
   actor:AccessContext,raw:z.input<typeof siteMediaUploadSchema>&{key:string},
 ){
   assertEnabled();
-  const input=siteMediaUploadSchema.parse(raw);
+  const input=siteMediaUploadSchema.extend({key:z.string().regex(siteMediaKeyPattern)}).parse(raw);
   if(!siteMediaKeyPattern.test(raw.key)||
     !raw.key.startsWith(`school-site-media/${input.siteId}/`))
     throw new AuthorizationError("Canonical Site media upload key");

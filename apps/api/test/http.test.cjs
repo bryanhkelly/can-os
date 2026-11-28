@@ -740,3 +740,23 @@ test('WS03 private content channels require explicit publication and exact revis
  assert.equal(bodies.publish.safeParse({expectedRevision:1,openEnrollment:true}).success,false);
  assert.equal(results.published.safeParse({siteId,publishedRevision:1,changed:true,approved:true}).success,false);
 });
+
+
+test('WS03 media separates private upload, finalization, rights review and revocation',async()=>{
+ const siteId='00000000-0000-4000-8000-000000000001';
+ await withServer('0',async(url,document)=>{
+  for(const [method,path] of [["POST","/api/v1/sites/{siteId}/media-upload-intents"],["POST","/api/v1/sites/{siteId}/media-upload-completions"],["GET","/api/v1/sites/{siteId}/media"],["POST","/api/v1/sites/{siteId}/media-reviews"],["POST","/api/v1/sites/{siteId}/media-revocations"]]){
+   assert.ok(document.paths[path][method.toLowerCase()].security);
+   const response=await fetch(url+path.replace('{siteId}',siteId),method==='POST'?{method,headers:{origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);
+  }
+ });
+ const {bodies,results}=require('../dist/site-media.contracts');
+ const upload={fileName:'photo.png',mimeType:'image/png',size:1000,width:320,height:240};
+ assert.equal(bodies.upload.safeParse(upload).success,true);
+ assert.equal(bodies.finish.safeParse({...upload,key:'school-site-media/'+siteId+'/'+siteId}).success,true);
+ assert.equal(bodies.finish.safeParse({...upload,key:'arbitrary/key'}).success,false);
+ assert.equal(bodies.upload.safeParse({...upload,siteId}).success,false);
+ assert.equal(bodies.review.safeParse({documentIds:[siteId],rightsConfirmed:true,confirmEachFileCovered:false,subjectRelease:'all_identifiable_people_cleared',reason:'Reviewed media'}).success,false);
+ assert.equal(results.list.safeParse([{documentId:siteId,fileName:'x.png',tags:[],reviewStatus:'pending',width:320,height:240,storageKey:'private'}]).success,false);
+});

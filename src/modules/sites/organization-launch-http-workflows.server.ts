@@ -26,9 +26,18 @@ import {siteContentBlockSchema} from "@/domain/site-content-channels";
 const channelsScope=z.object({siteId:z.string().uuid()}).strict();
 const channelPublication=channelsScope.extend({expectedRevision:z.number().int().min(0).max(2147483647)});
 const channelSave=channelPublication.extend({blocks:z.array(siteContentBlockSchema).max(12).refine(xs=>new Set(xs.map(x=>x.id)).size===xs.length)});
+import {getCommandContext} from "@/modules/identity/command-context.server";
+import {siteMediaUploadSchema,siteMediaReviewSchema,siteMediaRevokeSchema} from "@/domain/site-media-folder";
+import {beginSiteMediaFolderUpload,finishSiteMediaFolderUpload,listSiteMediaFolder,reviewSiteMediaFolder,revokeSiteMediaFolder,siteMediaKeyPattern} from "@/modules/sites/site-media-folder.server";
+const mediaFinish=siteMediaUploadSchema.extend({key:z.string().regex(siteMediaKeyPattern)});
 const geographyInput=z.object({siteId:z.string().uuid()}).strict();
 export function organizationLaunchWorkflows(request:Request,mode:string){
  return {
+  beginSchoolSiteMediaUpload:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Site media context");const data=parseCommandInput(siteMediaUploadSchema,raw);return beginSiteMediaFolderUpload(await getCommandContext(request),data);},
+  finishSchoolSiteMediaUpload:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Site media context");const data=parseCommandInput(mediaFinish,raw);return finishSiteMediaFolderUpload(await getCommandContext(request),data);},
+  listSchoolSiteMedia:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Site media context");const data=parseCommandInput(geographyInput,raw);return listSiteMediaFolder(await getCommandContext(request),data.siteId);},
+  approveSchoolSiteMediaFolder:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Site media context");const data=parseCommandInput(siteMediaReviewSchema,raw);return reviewSiteMediaFolder(await getCommandContext(request),data);},
+  revokeSchoolSiteMediaFolder:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Site media context");const data=parseCommandInput(siteMediaRevokeSchema,raw);return revokeSiteMediaFolder(await getCommandContext(request),data);},
   getSiteContentChannels:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Content channels context");return readAuthorizedSiteContentChannels(request,parseCommandInput(channelsScope,raw).siteId);},
   saveSiteContentChannels:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Content channels context");return saveAuthorizedSiteContentChannels(request,parseCommandInput(channelSave,raw));},
   publishSiteContentChannels:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Content channels context");return publishAuthorizedSiteContentChannels(request,parseCommandInput(channelPublication,raw));},

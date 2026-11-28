@@ -13,5 +13,6 @@ import {SiteGeographyController} from './site-geography.controller';
 import {OrganizationSiteDirectoryController} from './organization-site-directory.controller';
 import {LaunchFacilitiesController} from './launch-facilities.controller';
 import {SiteContentChannelsController} from './site-content-channels.controller';
-@Module({imports:[CanonicalIdentityModule],controllers:[SitesController,LaunchWorkspaceController,PreviewSharesController,WebsiteController,SitePublishingController,SiteProfileController,BrandController,SitePlanningController,LaunchController,SiteGeographyController,OrganizationSiteDirectoryController,LaunchFacilitiesController,SiteContentChannelsController]})
+import {SiteMediaController} from './site-media.controller';
+@Module({imports:[CanonicalIdentityModule],controllers:[SitesController,LaunchWorkspaceController,PreviewSharesController,WebsiteController,SitePublishingController,SiteProfileController,BrandController,SitePlanningController,LaunchController,SiteGeographyController,OrganizationSiteDirectoryController,LaunchFacilitiesController,SiteContentChannelsController,SiteMediaController]})
 export class OrganizationLaunchModule {}

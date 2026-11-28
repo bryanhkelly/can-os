@@ -50,5 +50,10 @@ export type OrganizationLaunchOperation =
   | 'saveLaunchClassPhysicalPlanV61'
   | 'getSiteContentChannels'
   | 'saveSiteContentChannels'
-  | 'publishSiteContentChannels';
+  | 'publishSiteContentChannels'
+  | 'beginSchoolSiteMediaUpload'
+  | 'finishSchoolSiteMediaUpload'
+  | 'listSchoolSiteMedia'
+  | 'approveSchoolSiteMediaFolder'
+  | 'revokeSchoolSiteMediaFolder';
 export type OrganizationLaunchWorkflow=Record<OrganizationLaunchOperation,(input:unknown)=>Promise<unknown>>;

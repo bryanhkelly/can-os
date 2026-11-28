@@ -21,3 +21,7 @@ Five REST operations for Site room inventory, room creation, room revisions, Cla
 ## Website content channels increment
 
 Three protected REST operations distinguish private layout reads, revision writes, and publication of the saved layout. The existing content-channel service accepts an explicit authenticated Request; both transports reuse it. Existing source-bound layout, independent publish authorization, transaction locks, source snapshots, and audit records are unchanged. Stale or unsaved publication is explicitly classified as conflict. Canonical editorial policy remains enforced by the domain parser (including protected institutional claims). No website or enrollment activation is implied.
+
+## Media increment
+
+Five protected media management routes reuse the canonical Document and private R2 upload services. Finalization now parses the extended strict upload schema including the key, correcting an existing defect where the strict base schema rejected the required key. Signed URL is issued only for a short-lived authorized upload; inventory excludes object keys and signed URLs. Review explicitly requires copyright and subject-release coverage; revocation remains governed. Public image proxy and browser cutover are unchanged. Tests added, not run.
