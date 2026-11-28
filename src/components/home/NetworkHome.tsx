@@ -1,3 +1,4 @@
+import {ReportDocumentView} from "@/components/workspace/report-document";
 import {NetworkReportingReadinessPanel} from "@/components/reports/NetworkReportingReadinessPanel";
 import { UniversalEngagementPublisher } from "@/components/launch-studio/UniversalEngagementPublisher";
 import { SiteEngagementLibrary } from "@/components/launch-studio/SiteEngagementLibrary";
@@ -76,12 +77,26 @@ function NetworkSites({ data }: { data: NetworkData }) {
   return <DashboardHome eyebrow={data.organization.name}
     subtitle="Denomination HQ can establish and manage its own locations. This does not grant access to school academic records or enroll students."
     shortcuts={<>
+      <DashboardShortcut title="Executive reporting" description="Current network operations and reporting relationships" icon={<Building2 className="size-5" />}><a href="#network-executive" /></DashboardShortcut>
       <DashboardShortcut title="Affiliations" description={`${data.affiliations.filter(entry=>entry.status==="pending").length} requests pending review`} icon={<ClipboardList className="size-5" />}><a href="#network-affiliations" /></DashboardShortcut>
       <DashboardShortcut title="Locations" description={`${data.sites.length} directly operated locations`} icon={<Building2 className="size-5" />}><a href="#network-locations" /></DashboardShortcut>
       <DashboardShortcut title="Calendar" description="Your authorized schedule" icon={<CalendarDays className="size-5" />}><Link to="/calendar" /></DashboardShortcut>
       <DashboardShortcut title="Messages" description="Partner conversations" icon={<MessageCircle className="size-5" />}><Link to="/messages" /></DashboardShortcut>
     </>}
     actions={<><a href="#network-create">Add an HQ-operated location →</a><Link to="/profiles">My profile →</Link></>}>
+    <WorkspacePanel id="network-executive" title="Network executive dashboard"
+      description="Live operating measures from your authorized headquarters workspace.">
+      <ReportDocumentView report={{version:1,definitionId:"network-operations-overview-v1",
+        title:"Network operations",scopeLabel:data.organization.name,
+        basis:"Current authorized HQ locations and Site affiliation records. These are institutional counts, not learning outcomes.",
+        blocks:[{id:"operations",kind:"metrics",items:[
+          {id:"hq-locations",label:"Directly operated locations",value:data.sites.length,hint:"Sites owned by headquarters"},
+          {id:"affiliated-sites",label:"Approved Site affiliations",value:data.affiliations.filter(entry=>entry.status==="approved").length,hint:"Approved affiliation records; not reporting consent"},
+          {id:"pending-affiliations",label:"Pending affiliation requests",value:data.affiliations.filter(entry=>entry.status==="pending").length,hint:"Requests awaiting decision"},
+          {id:"affiliate-organizations",label:"Affiliated organizations",value:new Set(data.affiliations.filter(entry=>entry.status==="approved").map(entry=>entry.siteOrganizationId)).size,hint:"Distinct organizations with approved Site affiliations"},
+        ]}]}}/>
+    </WorkspacePanel>
+    <NetworkReportingReadinessPanel/>
     <WorkspacePanel id="network-affiliations" title="School affiliation requests">
       <p className="mt-2 text-sm text-muted-foreground">Schools retain their own organizations and academic permissions. Approving a link does not give HQ access to students, families, courses or admissions.</p>
       <div className="mt-4 space-y-3">
@@ -112,7 +127,6 @@ function NetworkSites({ data }: { data: NetworkData }) {
         {data.affiliations.length === 0 && <EmptyState title="No school affiliation requests yet."/>}
       </div>
     </WorkspacePanel>
-    <NetworkReportingReadinessPanel/>
     <section id="network-engagement" className="mt-8 space-y-4">
       <h2 className="font-serif text-2xl">Network invitations and distribution</h2>
       <p className="text-sm text-muted-foreground">Publish an HQ invitation and distribute a Go Link without transferring ownership of independent affiliates. Training registration requires a currently authorized HQ-operated delivery Site.</p>
