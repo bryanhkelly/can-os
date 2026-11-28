@@ -162,3 +162,41 @@ export const familyDocs={
  revoked:obj({revoked:bool}),restored:obj({restored:bool}),
  workspace:obj({programs:anyList(obj({id,name:str,siteId:nullableId,schoolYears:anyList(familyYearDoc)})),applications:listDoc(familyApplicationDoc),households:listDoc(familyYearDoc),students:anyList(obj({studentProfileId:id,studentPersonId:id,studentFirstName:str,studentLastName:str,gradeLevel:str,householdId:id})),transferRequests:listDoc(obj({id,studentProfileId:id,originProgramId:nullableId,originSchoolName:str,destinationSchoolName:str,destinationFamilyStartRequestId:nullableText,destinationFamilyStartProgramId:nullableText,originExited:bool}))}),
 };
+
+export const publicInterestQuery=z.object({cursor:z.string().max(80).optional(),interestId:uuid.optional(),siteId:uuid.optional(),programId:uuid.optional()}).strict();
+export const interestAssignmentInput=z.object({interestId:uuid,programId:uuid}).strict();
+export const interestInvitationInput=z.object({interestId:uuid}).strict();
+export const interestStatusInput=z.object({interestId:uuid,status:z.enum(['contacted','closed'])}).strict();
+export const guardianOffersQuery=z.object({studentPersonId:uuid.optional()}).strict();
+export const interestAssignmentReceipt=z.object({changed:z.boolean(),interestId:uuid,programId:uuid}).strict();
+export const interestInvitationReceipt=z.object({requestId:uuid,created:z.boolean()}).strict();
+export const interestStatusReceipt=z.object({changed:z.boolean()}).strict();
+const interestNextStates=['closed','follow_up','await_admissions','invite_to_apply','await_email_verification','await_application','review_application','await_guardian_offer','activate_enrollment','assign_class','student_access','first_day_preparation','authorization_unavailable'] as const;
+const interestNextOwners=['registrar','guardian','school'] as const;
+const authorizationStates=['authorized','not_authorized','temporarily_unavailable'] as const;
+const interestNextStep=z.object({state:z.enum(interestNextStates),owner:z.enum(interestNextOwners),message:z.string()}).strict();
+const interestItem=z.object({
+ id:uuid,siteId:uuid,programId:nilId,programName:nullableString,firstName:z.string(),lastName:z.string(),email:z.string(),message:z.string(),status:z.string(),source:z.string(),invitationBatchId:nilId,invitationRecipientKey:nilId,
+ consentAt:date.nullable(),familyStartRequestId:nilId,emailVerifiedAt:date.nullable(),applicationLinkExpiresAt:date.nullable(),applicationStage:nullableString,studentProfileId:nilId,applicationSubmittedAt:date.nullable(),applicationId:nilId,convertedAt:date.nullable(),createdAt:date,contactedAt:date.nullable(),
+ activeEnrollment:z.boolean(),placedInClass:z.boolean(),studentAccessStatus:nullableString,latestOfferStatus:nullableString,latestOfferIssuedAt:date.nullable(),latestOfferRespondedAt:date.nullable(),canSendApplicationInvitation:z.boolean(),admissionsAuthorized:z.boolean(),admissionsAuthorizationStatus:z.enum(authorizationStates),nextStep:interestNextStep,
+}).strict();
+export const publicInterestPageResult=z.object({items:z.array(interestItem).max(50),nextCursor:z.string().max(80).nullable()}).strict();
+const offerProgressStates=['enrolled','awaiting_classes','declined','revoked','expired','not_available','application_unavailable','requirements_pending','awaiting_activation','awaiting_response'] as const;
+const offerProgress=z.object({state:z.enum(offerProgressStates),message:z.string(),canAccept:z.boolean()}).strict();
+const guardianOffer=z.object({id:uuid,status:z.string(),expiresAt:date.nullable(),schoolYearId:uuid,schoolYearName:z.string(),enrollmentActive:z.boolean(),sectionCount:z.number().int().nonnegative(),progress:offerProgress}).strict();
+const offerBlocker=z.object({id:uuid,title:z.string(),status:z.string()}).strict();
+const guardianOfferApplication=z.object({applicationId:uuid,studentPersonId:uuid,studentName:z.string(),program:z.string(),applicationStage:z.string(),waitlisted:z.boolean(),transferOriginExited:z.boolean().nullable(),blockers:z.array(offerBlocker),offers:z.array(guardianOffer).max(150)}).strict();
+export const guardianOffersResult=z.array(guardianOfferApplication);
+const interestNullableDate={...dateDoc,nullable:true};
+const interestItemDoc=obj({
+ id,siteId:id,programId:nullableId,programName:nullableText,firstName:str,lastName:str,email:str,message:str,status:str,source:str,invitationBatchId:nullableId,invitationRecipientKey:nullableId,
+ consentAt:interestNullableDate,familyStartRequestId:nullableId,emailVerifiedAt:interestNullableDate,applicationLinkExpiresAt:interestNullableDate,applicationStage:nullableText,studentProfileId:nullableId,applicationSubmittedAt:interestNullableDate,applicationId:nullableId,convertedAt:interestNullableDate,createdAt:dateDoc,contactedAt:interestNullableDate,
+ activeEnrollment:bool,placedInClass:bool,studentAccessStatus:nullableText,latestOfferStatus:nullableText,latestOfferIssuedAt:interestNullableDate,latestOfferRespondedAt:interestNullableDate,canSendApplicationInvitation:bool,admissionsAuthorized:bool,admissionsAuthorizationStatus:{...str,enum:[...authorizationStates]},nextStep:obj({state:{...str,enum:[...interestNextStates]},owner:{...str,enum:[...interestNextOwners]},message:str}),
+});
+const guardianOfferDoc=obj({id,status:str,expiresAt:interestNullableDate,schoolYearId:id,schoolYearName:str,enrollmentActive:bool,sectionCount:{type:'integer',minimum:0},progress:obj({state:{...str,enum:[...offerProgressStates]},message:str,canAccept:bool})});
+export const interestDocs={
+ assign:obj({interestId:id,programId:id}),invite:obj({interestId:id}),status:obj({interestId:id,status:{...str,enum:['contacted','closed']}}),
+ assigned:obj({changed:bool,interestId:id,programId:id}),invited:obj({requestId:id,created:bool}),changed:obj({changed:bool}),
+ page:obj({items:{type:'array' as const,maxItems:50,items:interestItemDoc},nextCursor:{...nullableText,maxLength:80}}),
+ guardianOffers:anyList(obj({applicationId:id,studentPersonId:id,studentName:str,program:str,applicationStage:str,waitlisted:bool,transferOriginExited:{...bool,nullable:true},blockers:anyList(obj({id,title:str,status:str})),offers:{type:'array' as const,maxItems:150,items:guardianOfferDoc}})),
+};
