@@ -11,13 +11,13 @@ import {
   facilitatedRoomPresenceEvents,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
-import {assignedClassroomRelease,attemptInAssignedClassroomRelease} from "./classroom-release-boundary.server";
+import {assignedClassroomRelease} from "./classroom-release-boundary.server";
 import { facilitatedRoomOperationalState } from "@/domain/facilitated-learning";
 import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
 import { authorizeCanonicalCourseAttempt } from "./canonical-course-participation.server";
 import { requireCanonicalFacilitator } from "./canonical-facilitator-access.server";
 import {
-  ownedRoom, roomHostIsCurrent, schoolAttemptIsPlacedAtSite,
+  ownedRoom, currentRoomParticipantPermitted,
 } from "./facilitated-learning-operations.server";
 import { requireFacilitatedLearningEnabled } from "./canonical-learning-release.server";
 import { nativeClassForRoom } from "@/modules/classes/native-class-room-boundary.server";
@@ -56,14 +56,8 @@ async function learnerRoom(tx: Tx, courseAttemptId: string, roomId: string) {
       room.courseVersionId !== access.courseVersionId)
     throw new AuthorizationError("registered classroom participant");
   assertLive(room, now);
-  if (!await roomHostIsCurrent(tx, room, now))
-    throw new AuthorizationError("current classroom hosting authority");
-  if (access.source === "school" && !await schoolAttemptIsPlacedAtSite(
-    tx, access.courseAttemptId, room.deploymentId, room.siteId, now,
-  )) throw new AuthorizationError("current school Site placement");
-  if(!await attemptInAssignedClassroomRelease(
-    tx,room,access.courseAttemptId,actor.actorPersonId,
-  ))throw new AuthorizationError("registered learner in assigned classroom release");
+  if(!await currentRoomParticipantPermitted(tx,room,access,actor.actorPersonId,now))
+    throw new AuthorizationError("current registered classroom participant");
   return { room, personId: actor.actorPersonId };
 }
 
