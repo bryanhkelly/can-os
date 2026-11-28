@@ -132,6 +132,10 @@ async function loadBundle(tx:Tx,offeringVersionId:string,lock:boolean) {
   ]);
   if(units.length>1000||lessons.length>2000||assignments.length>2000||deliveryRows.rows.length>2000||gradingPolicies.rows.length>500)
     invalid("The Course composition exceeds the review snapshot limit.");
+  // Normalize raw database result values (timestamps, numeric strings, JSON)
+  // into the same serializable snapshot format used by the review endpoint.
+  const deliveryAssignments=JSON.parse(JSON.stringify(deliveryRows.rows)) as JsonObject[];
+  const gradingPolicyRows=JSON.parse(JSON.stringify(gradingPolicies.rows)) as JsonObject[];
   const unitIds=new Set(units.map(unit=>unit.id));
   for(const row of rows){
     if(!units.some(unit=>unit.courseVersionId===row.courseVersionId)||
@@ -152,11 +156,11 @@ async function loadBundle(tx:Tx,offeringVersionId:string,lock:boolean) {
       ...(assignments.some(a=>a.courseVersionId===row.courseVersionId)?{
         assignments:assignments.filter(a=>a.courseVersionId===row.courseVersionId),
       }:{}),
-      ...(deliveryRows.rows.some(a=>a.course_version_id===row.courseVersionId)?{
-        deliveryAssignments:deliveryRows.rows.filter(a=>a.course_version_id===row.courseVersionId),
+      ...(deliveryAssignments.some(a=>a.course_version_id===row.courseVersionId)?{
+        deliveryAssignments:deliveryAssignments.filter(a=>a.course_version_id===row.courseVersionId),
       }:{}),
-      ...(gradingPolicies.rows.some(a=>a.course_version_id===row.courseVersionId)?{
-        gradingPolicies:gradingPolicies.rows.filter(a=>a.course_version_id===row.courseVersionId),
+      ...(gradingPolicyRows.some(a=>a.course_version_id===row.courseVersionId)?{
+        gradingPolicies:gradingPolicyRows.filter(a=>a.course_version_id===row.courseVersionId),
       }:{}),
       units:units.filter(unit=>unit.courseVersionId===row.courseVersionId)
         .map(unit=>({
@@ -164,7 +168,7 @@ async function loadBundle(tx:Tx,offeringVersionId:string,lock:boolean) {
         })),
     })), // Lifecycle changes do not alter content.
   });
-  return {offering,version,courses:rows,units,lessons,assignments,deliveryAssignments:deliveryRows.rows,gradingPolicies:gradingPolicies.rows,hash,unitCount:units.length,lessonCount:lessons.length};
+  return {offering,version,courses:rows,units,lessons,assignments,deliveryAssignments,gradingPolicies:gradingPolicyRows,hash,unitCount:units.length,lessonCount:lessons.length};
 }
 
 async function requireAppointments(tx:Tx,actor:Actor,
