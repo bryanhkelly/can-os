@@ -8,6 +8,7 @@ describe("Valor native teacher and student knowledge checks",()=>{
   const workspace=read("src/modules/classes/native-class-workspace.functions.ts");
   const home=read("src/modules/classes/native-class-teacher-home.functions.ts");
   const review=read("src/modules/classes/native-class-teacher-homework.functions.ts");
+  const teacherAuthority=read("src/modules/classes/native-class-teacher-authority.server.ts");
   const quiz=read("src/modules/learning/noncredit-assessment.server.ts");
   const scope=read("src/modules/learning/native-class-assessment-scope.server.ts");
   const readiness=read("src/modules/classes/native-class-knowledge-check-availability.functions.ts");
@@ -39,9 +40,10 @@ describe("Valor native teacher and student knowledge checks",()=>{
   });
 
   it("shows bounded homework only for exact verified Class and Course Attempt",()=>{
-    expect(review).toContain('assertCapability(actor,"teacher:read")');
-    expect(review).toContain('eq(canonicalClassStaffAssignments.state,"approved")');
-    expect(review).toContain('await currentClassAuthority(tx,cls.id,now)');
+    expect(teacherAuthority).toContain('assertCapability(actor,"teacher:read")');
+    expect(teacherAuthority).toContain('eq(canonicalClassStaffAssignments.state,"approved")');
+    expect(teacherAuthority).toContain('await currentClassAuthority(tx,cls.id,now)');
+    expect(review).toContain("assertNativeClassTeacher(tx,actor,classId)");
     expect(review).toContain("ce.course_attempt_id=ca.id");
     expect(review).toContain("ca.section_id IS NULL");
     expect(review).toContain("LIMIT 101");
