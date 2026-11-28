@@ -8,7 +8,7 @@ import { resolve } from "node:path";
 
 const root = fileURLToPath(new URL("../..", import.meta.url));
 const file = resolve(root, ".env.pilot-qa");
-const allowedBranch = "br-spring-frog-arnmih9w";
+const allowedBranch = "br-solitary-art-arun91gj";
 const secret = () => randomBytes(32).toString("hex");
 const modes = {
   readiness: ["scripts/acceptance/diagnose-noncredit-pilot-qa.mjs"],
