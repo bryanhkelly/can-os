@@ -6,7 +6,7 @@ import {neon} from "@neondatabase/serverless";
 import {z} from "zod";
 import {join} from "node:path";
 import {acceptanceFingerprint,openPilotLedger} from "./pilot-run-ledger.mjs";
-import {preflightPilot2} from "./pilot-acceptance-preflight.mjs";
+import {preflightPilot2,resolvePreparedClass} from "./pilot-acceptance-preflight.mjs";
 
 const uuid=z.string().uuid();
 const day=z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -14,9 +14,11 @@ const actor=z.object({email:z.string().email().refine(v=>v===v.toLowerCase()&&(v
  grantId:uuid,organizationId:uuid,privateAccessCode:z.string().regex(/^[A-Za-z0-9_-]{43}$/).optional()}).strict()
  .refine(a=>a.email.endsWith(".demo")===Boolean(a.privateAccessCode),"Existing individual demo credential or ordinary email link required");
 const meeting=z.object({requestId:uuid,agendaRequestId:uuid,startsAt:z.string().datetime({offset:true}),endsAt:z.string().datetime({offset:true}),lessonId:uuid,assetVersionId:uuid,prompt:z.string().min(5).max(1000),choices:z.array(z.string().min(1).max(200)).min(2).max(8)}).strict();
-const site=z.object({host:actor,manager:actor,classId:uuid,siteId:uuid,classOfferingVersionId:uuid,
+const preparation=z.object({offeringVersionId:uuid,courseVersionId:uuid,deploymentId:uuid,title:z.string().trim().min(3).max(200),
+ capacity:z.number().int().min(2).max(100),consentVersion:z.string().trim().min(3).max(80),consentText:z.string().trim().min(25).max(10000)}).strict();
+const site=z.object({host:actor,manager:actor,classId:uuid.optional(),siteId:uuid,classOfferingVersionId:uuid.optional(),preparation:preparation.optional(),
  learners:z.array(z.object({actor,paired:z.boolean(),present:z.boolean().optional()}).strict()).min(2).max(20),
- meetings:z.array(meeting).length(4)}).strict();
+ meetings:z.array(meeting).length(4)}).strict().refine(s=>s.preparation?(!s.classId&&!s.classOfferingVersionId&&s.preparation.capacity>=s.learners.length):Boolean(s.classId&&s.classOfferingVersionId),"Select either existing published Class IDs or governed Class preparation");
 const planSchema=z.object({pilot2:z.object({sites:z.array(site).length(2),from:day,to:day,
  relationship:z.object({owner:actor,recipient:actor,foreign:actor,siteId:uuid,metrics:z.array(z.object({metricKey:z.enum(["class.registrations","class.uniquePeople","noncredit.registrations","noncredit.distinctLearners"]),definitionVersion:z.string().min(1).max(64)}).strict()).min(1).max(4)}).strict()
 }).strict().optional()}).strict();
@@ -26,9 +28,8 @@ export function parsePlan(raw){
  if(p.pilot2){
   const {sites,from,to,relationship}=p.pilot2;
   if(!(Date.parse(from)<Date.parse(to))||Date.parse(to)-Date.parse(from)>366*86400000)throw Error("Valid report window required");
-  for(const key of ["classId","siteId","classOfferingVersionId"]){
-   if(new Set(sites.map(s=>s[key])).size!==2)throw Error("Distinct Site and Class scopes required");
-  }
+  if(new Set(sites.map(s=>s.siteId)).size!==2)throw Error("Distinct Site scopes required");
+  for(const key of ["classId","classOfferingVersionId"]){const values=sites.map(s=>s[key]).filter(Boolean);if(new Set(values).size!==values.length)throw Error("Distinct Class scopes required");}
   if(new Set(sites.map(s=>s.host.organizationId)).size!==2)throw Error("Independent Site organizations required");
   const learners=sites.flatMap(s=>s.learners.map(l=>l.actor.email));
   if(new Set(learners).size!==learners.length)throw Error("Distinct cohort actors required");
@@ -82,12 +83,24 @@ export async function runPilotAcceptance({mode,env,root,modes}){
   run("fresh provisioning and authentication","provision");
   if(mode!=="pilot2")run("Pilot 1 complete API journey","api");
   if(mode!=="pilot1"){
-   const {sites,relationship,from,to}=plan.pilot2;
+   const {relationship,from,to}=plan.pilot2;
    const sql=neon(env.TEST_DATABASE_URL);
    // Preflight read-only: no existing enrollments or scheduled Sessions are
    // allowed. A failed run is retained as evidence, not silently replayed.
    // Recheck current state after Pilot 1 and before starting Pilot 2.
    await preflightPilot2(plan.pilot2,env,ledger);
+   const sites=[];
+   for(const [i,s] of plan.pilot2.sites.entries()){
+    if(!s.preparation){sites.push(s);continue;}
+    const name="Pilot 2 Site "+(i+1)+" prepare Class";
+    governed(name,{stage:"prepare-class",operator:s.manager,siteId:s.siteId,deliveryMode:"facilitated",...s.preparation});
+    // The standard create/publish commands returned these identifiers and the
+    // stage independently verified them. Resolve that exact fresh resource,
+    // including its immutable enrollment terms, rather than accepting arbitrary IDs.
+    const target=await resolvePreparedClass(sql,s);
+    sites.push({...s,...target});
+   }
+   await preflightPilot2({...plan.pilot2,sites},env,ledger);
    governed("Pilot 2 enroll both Sites",{stage:"enroll-cohort",sites:sites.map(s=>({classId:s.classId,siteId:s.siteId,ownerOrganizationId:s.host.organizationId,classOfferingVersionId:s.classOfferingVersionId,creditMode:"not_applicable",learners:s.learners.map(l=>l.actor)}))});
    governed("Pilot 2 schedule both Sites",{stage:"schedule",sites:sites.map(s=>({host:s.host,classId:s.classId,siteId:s.siteId,meetings:s.meetings.map(({requestId,agendaRequestId,startsAt,endsAt,lessonId})=>({requestId,agendaRequestId,startsAt,endsAt,lessonId}))}))});
    const cohorts=[];
