@@ -659,3 +659,28 @@ test('knowledge checks and completion require verified learner or provider autho
 test('noncredit enrollment publication protects provider scope and explicit Site selection',async()=>{await withServer('0',async(url,document)=>{for(const [route,method] of [["/api/v1/noncredit-enrollment-publisher","GET"],["/api/v1/noncredit-training-readiness","GET"],["/api/v1/noncredit-enrollment-releases","POST"],["/api/v1/noncredit-enrollment-closures","POST"],["/api/v1/noncredit-multisite-releases","POST"]]){assert.ok(document.paths[route][method.toLowerCase()].security);assert.equal((await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined)).status,method==='POST'?503:401);}assert.ok(document.paths['/api/v1/noncredit-enrollment-releases'].post.requestBody.content['application/json'].schema.required.includes('siteId'));});});
 
 test('completion administration requires canonical provider credentials and distinguishes decisions from corrections',async()=>{await withServer('0',async(url,document)=>{for(const [route,method] of [["/api/v1/noncredit-completion-decisions","POST"],["/api/v1/noncredit-completion-policy-catalog","GET"],["/api/v1/noncredit-completion-policies","POST"],["/api/v1/noncredit-completion-review","GET"],["/api/v1/noncredit-completion-queue","GET"],["/api/v1/noncredit-completion-corrections","POST"]]){assert.ok(document.paths[route][method.toLowerCase()].security);assert.equal((await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined)).status,method==='POST'?503:401);}});const c=require('../dist/completion-admin.contracts');assert.equal(c.queueQuery.safeParse({page:'101'}).success,false);assert.equal(c.queueQuery.parse({page:'2'}).page,2);});
+
+test('EngagementModule registers controllers with one shared canonical identity provider', async () => {
+ const {CanonicalIdentityService}=require('../dist/identity.service');
+ const {EngagementModule}=require('../dist/engagement.module');
+ const {CampaignController}=require('../dist/campaign.controller');
+ const {GoLinksController}=require('../dist/go-links.controller');
+ const {app,document}=await createApi(readConfig({API_DOCS:'0'}));
+ try{
+  const providers=app.get(CanonicalIdentityService,{each:true});
+  assert.equal(providers.length,1);
+  const engagement=app.select(EngagementModule);
+  const campaigns=engagement.get(CampaignController,{strict:true});
+  const links=engagement.get(GoLinksController,{strict:true});
+  assert.equal(campaigns.identity,providers[0]);
+  assert.equal(links.identity,providers[0]);
+  assert.equal(document.paths['/api/v1/engagement-campaigns'].post.operationId,'queueEngagementCampaign');
+  assert.equal(document.paths['/api/v1/sites/{siteId}/go-links'].get.operationId,'listSiteGoLinksPage');
+  await app.listen(0,'127.0.0.1');
+  const url=await app.getUrl();
+  const denied=await fetch(url+'/api/v1/engagement-campaigns/workspace',{headers:{'x-role':'platform_owner'}});
+  assert.equal(denied.status,401);
+  const deniedWrite=await fetch(url+'/api/v1/engagement-campaigns',{method:'POST',headers:{'content-type':'application/json',Origin:url},body:'{}'});
+  assert.equal(deniedWrite.status,503);
+ }finally{await app.close();}
+});
