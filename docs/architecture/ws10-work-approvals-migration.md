@@ -23,3 +23,9 @@ Explicit strict request and response contracts; current cookie-based identity, d
 - Remaining WS10: inventory all Action creation paths and other domain review/approval queues; design federated authorized inbox and explicit escalation policies without inventing authority; implement remaining resource-specific APIs, pagination, stale-write handling and acceptance journeys.
 
 Do not promote or merge for release solely on these source changes.
+
+## Migration scope correction and jurisdiction parity
+
+The optional new manual task, escalation, inbox and dependency functionality has been preserved on features/ws10-universal-work-deferred. The migration PR restores the original 12 operations and adds only existing jurisdiction profile lifecycle reads, draft edit, independent verification and publication (five operations). Existing screen handlers share the extracted services; publication still requires independent evidence matching the current draft. No new approval engine, roles, tables, workflows or UI are introduced. Existing review output retains its JSON-encoded profile/evidence fields for compatibility.
+
+Source migration only: 17 REST operations. Runtime compilation, generated SDK validation, authenticated positive/negative acceptance, RLS and browser cutover remain pending. Reporting relationship APIs are coordinated with WS09 to avoid duplicating domain services. Any product extension requires separate explicit approval.
