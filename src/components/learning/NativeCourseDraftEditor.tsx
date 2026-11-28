@@ -12,7 +12,7 @@ import { NativeOfferingReleaseCheckpoints } from
 import { nativeCourseLessonEditableSchema } from "@/domain/native-course-lesson-draft";
 import {
   getNativeCourseDraftLessons,getNativeCourseReleaseReadiness,
-  saveNativeCourseLessonDraft,
+  saveNativeCourseLessonDraft,createNativeCourseAssignmentDraft,getNativeCourseAssignmentDrafts,
 } from "@/modules/learning/native-course-draft.functions";
 import {
   getNativeOfferingReleaseOverview,submitNativeOfferingRelease,
@@ -91,6 +91,60 @@ function DraftLessonForm({courseVersionId,lesson}:{
     <MutationFeedback state={feedback}
       pendingMessage="Checking current Course ownership and saving the draft…"/>
   </form>;
+}
+
+function NativeAssignmentDraftEditor({courseVersionId}:{courseVersionId:string}){
+  const client=useQueryClient();
+  const [offset,setOffset]=useState(0);
+  const [assignmentKey,setKey]=useState("");
+  const [title,setTitle]=useState("");
+  const [instructions,setInstructions]=useState("");
+  const [required,setRequired]=useState(true);
+  const list=useQuery({queryKey:["native-course-assignment-drafts",courseVersionId,offset],
+    queryFn:()=>getNativeCourseAssignmentDrafts({data:{courseVersionId,offset}}),retry:false});
+  const feedback=useMutationFeedback(async()=>{
+    await Promise.all([
+      client.invalidateQueries({queryKey:["native-course-assignment-drafts",courseVersionId]}),
+      client.invalidateQueries({queryKey:["native-offering-release-overview"]}),
+      client.invalidateQueries({queryKey:["native-course-release-readiness",courseVersionId]}),
+    ]);
+  });
+  const valid=/^[a-z][a-z0-9_-]{2,79}$/.test(assignmentKey.trim())&&title.trim().length>=3&&instructions.trim().length>=5;
+  async function create(event:FormEvent){
+    event.preventDefault();
+    if(!valid||feedback.pending||feedback.refreshFailed)return;
+    await feedback.run(()=>createNativeCourseAssignmentDraft({data:{courseVersionId,assignmentKey:assignmentKey.trim(),
+      title:title.trim(),instructions:instructions.trim(),required}}),{
+      successMessage:result=>result.created?"Assignment added to the unpublished Course. Independent review is required.":"This exact draft already exists.",
+      commandErrorMessage:"Could not save assignment. Verify the draft Course appointment and assignment key.",
+      refreshErrorMessage:"Assignment saved; refresh the draft before another change.",
+    });
+  }
+  return <section className="mt-5 space-y-4 border-t border-border pt-5" aria-label="Written assignment drafts">
+    <h3 className="font-semibold">Written assignments</h3>
+    <p className="text-sm text-muted-foreground">Create versioned Course requirements before publication. No live Class deadlines, scores or grading permissions are assigned here.</p>
+    {list.isPending&&<p role="status" className="text-sm">Loading assignment definitions…</p>}
+    {list.isError&&<WorkspaceNotice tone="danger">Assignment definitions could not be loaded.</WorkspaceNotice>}
+    {list.data&&<>
+      {list.data.items.length===0&&<p className="text-sm text-muted-foreground">No assignment definitions on this page.</p>}
+      <ul className="divide-y divide-border">{list.data.items.map(item=><li key={item.id} className="py-3 text-sm">
+        <p className="font-semibold">{item.title}</p><p className="text-xs text-muted-foreground">{item.assignmentKey} · {item.required?"Required":"Optional"}</p>
+        {item.instructions&&<p className="mt-2 whitespace-pre-wrap">{item.instructions}</p>}
+      </li>)}</ul>
+      <div className="flex gap-2">
+        <Button type="button" variant="outline" size="sm" disabled={offset===0||list.isFetching} onClick={()=>setOffset(n=>Math.max(0,n-100))}>Previous</Button>
+        <Button type="button" variant="outline" size="sm" disabled={list.data.nextOffset===null||list.isFetching} onClick={()=>setOffset(n=>n+100)}>Next</Button>
+      </div>
+    </>}
+    <form className="space-y-3" onSubmit={event=>void create(event)}>
+      <Field label="Assignment key" required><Input value={assignmentKey} maxLength={80} onChange={e=>setKey(e.target.value)} placeholder="written-reflection"/></Field>
+      <Field label="Assignment title" required><Input value={title} maxLength={200} onChange={e=>setTitle(e.target.value)}/></Field>
+      <Field label="Learner instructions" required><Textarea value={instructions} maxLength={12000} rows={5} onChange={e=>setInstructions(e.target.value)}/></Field>
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={required} onChange={e=>setRequired(e.target.checked)}/>Required Course assignment</label>
+      <Button type="submit" disabled={!valid||feedback.pending||feedback.refreshFailed}>Add assignment draft</Button>
+      <MutationFeedback state={feedback} pendingMessage="Saving governed assignment draft…"/>
+    </form>
+  </section>;
 }
 
 function NativeOfferingSubmission({offeringVersionId}:{offeringVersionId:string}){
@@ -286,6 +340,7 @@ export function NativeCourseDraftEditor({versions}:{versions:readonly DraftVersi
     {outline.isSuccess&&!lessons.length&&<p className="mt-4 text-sm text-muted-foreground">
       This Course version contains no native lessons.
     </p>}
+    {selectedVersion&&<NativeAssignmentDraftEditor key={selectedVersion} courseVersionId={selectedVersion}/>}
     {selectedVersion&&<section className="mt-5 border-t border-border pt-5"
       aria-label="Native Course release prerequisites">
       <h3 className="font-semibold">Release prerequisites</h3>
