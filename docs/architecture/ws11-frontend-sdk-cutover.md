@@ -36,3 +36,15 @@ Use npm run dev:api-first or npm run build:api-first after dependency installati
 - Run both pilot journeys and V6.1 visual/accessibility checks before release.
 
 Status: initial source cutover; no deployment or runtime parity claim.
+
+## Second increment: authenticated frontend foundation
+
+- Shared SDK commands for membership selection, explicit session activity and logout (including shared-device idle sign-out). No RPC fallback.
+- HTTP status classification reuses existing client error codes/messages; never display remote problem titles or arbitrary exception details. Only an explicit 401 triggers expiry recovery for activity.
+- Verified workspace cache keys include Person, grant, role, organization, Site, Program and owner delegation. Pending queries are cancelled and caches cleared when the session changes; membership switching still performs a full document navigation. These keys are available for new domain query consumers, not yet used by every existing screen.
+- Prevent cross-tab handoff listeners from rebroadcasting the same event. Do not record idle activity from polling, focus or synthetic browser events.
+- Full workspace session read remains on its original reader because the current REST session projection omits names, Sites, Programs, activeContext and student preferences. Device registration and HTML verification/return recovery also remain pending. Coordinate with WS02 rather than weakening or duplicating the contract.
+- Unit tests: `npx vitest run tests/unit/frontend-sdk-session.test.ts` after dependency installation. Run source cutover tests, API SDK type checking and actual browser session tests before merge.
+- Shared-device sign-out still requires server revocation; network failures cannot establish that a server session is revoked. Test failed revocation and cross-tab races before release.
+
+This increment changes frontend code only. No changes to production, authorization policy, database schema or integration branch. Runtime verification remains outstanding.
