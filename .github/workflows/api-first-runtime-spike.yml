@@ -30,4 +30,16 @@ jobs:
           if-no-files-found: error
       - run: npm ci
       - run: npm test
+      - name: Install existing locked root dependencies
+        working-directory: .
+        run: npm ci
+      - name: Inventory existing server functions
+        working-directory: .
+        run: node scripts/architecture/inventory-business-api.mjs > apps/api/rpc-inventory.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rpc-inventory
+          path: apps/api/rpc-inventory.json
+      - name: Build canonical bridge and reject frontend dependencies
+        run: npm run build:canonical
       - run: npm audit --omit=dev --audit-level=high
