@@ -1,3 +1,5 @@
+import * as sender from "@/modules/communication/sender-registry-service.server";
+import * as senderInput from "@/modules/communication/sender-registry.inputs";
 import {parseCommandInput} from "@/domain/command-input";
 import * as campaign from "@/modules/communication/engagement-campaigns-service.server";
 import * as campaignInput from "@/modules/communication/engagement-campaigns.inputs";
@@ -57,6 +59,10 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
  const context=await (mode==="planning"?getBlueprintPlanningContext(request):mode==="canonical"?getCanonicalCommandContext(request):mode==="learner"?getInstructionalLearnerContext(request):getIdentityContext(request));
  if(!context.actorPersonId)throw new AuthorizationError("verified Person");
  return {
+  readSenderAdministration:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Sender administration context");return sender.readSenderAdministration(request,parseCommandInput(senderInput.scopeInput,raw).organizationId);},
+  listSenderOrganizationsPage:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Sender administration context");return sender.listSenderOrganizationsPage(request,parseCommandInput(senderInput.pageInput,raw));},
+  changeSenderAdministration:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Sender administration context");return sender.changeSenderAdministration(request,parseCommandInput(senderInput.changeInput,raw));},
+  revokeSenderAdministration:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Sender administration context");return sender.revokeSenderAdministration(request,parseCommandInput(senderInput.revokeInput,raw));},
   readEngagementCampaignWorkspace:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Campaign read context");const result=await campaign.readEngagementCampaignWorkspace(request,parseCommandInput(campaignInput.readEngagementCampaignWorkspaceInput,raw));return {...result,campaigns:result.campaigns.map(row=>({...row,scheduled_at:new Date(row.scheduled_at).toISOString(),cancelled_at:row.cancelled_at===null?null:new Date(row.cancelled_at).toISOString()}))};},
   saveCampaignRecipientList:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Campaign command context");const result=await campaign.saveCampaignRecipientList(request,parseCommandInput(campaignInput.saveCampaignRecipientListInput,raw));return result;},
   queueEngagementCampaign:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Campaign command context");const result=await campaign.queueEngagementCampaign(request,parseCommandInput(campaignInput.queueEngagementCampaignInput,raw));return result;},

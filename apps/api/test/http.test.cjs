@@ -538,3 +538,24 @@ test('campaign management contracts keep recipient consent and provider credenti
  assert.equal(c.membersQuery.safeParse({engagementId:id,linkId:id,listId:id,offset:'0',ownerScope:'forged'}).success,false);
  assert.equal(c.results.workspace.safeParse({lists:[],campaigns:[],senderReady:true,senderIssues:[],senderLabel:'Organization',apiKey:'forbidden'}).success,false);
 });
+
+test('sender administration retains explicit owner authorization and bounded discovery',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const [route,method] of [["/api/v1/communication-senders/current","GET"],["/api/v1/communication-senders/organizations","GET"],["/api/v1/communication-sender-approvals","POST"],["/api/v1/communication-sender-revocations","POST"]]){
+   const op=document.paths[route][method.toLowerCase()];
+   assert.ok(op.security);assert.ok(op.responses['403']);assert.ok(op.responses['409']);
+   const response=await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);
+  }
+ });
+ const c=require('../dist/sender-admin.contracts');
+ const id='00000000-0000-4000-8000-000000000001';
+ assert.deepEqual(c.scopeQuery.parse({}),{organizationId:null});
+ assert.equal(c.scopeQuery.safeParse({organizationId:'null'}).success,false);
+ assert.equal(c.scopeQuery.safeParse({actorPersonId:id}).success,false);
+ assert.equal(c.pageQuery.parse({}).limit,50);
+ assert.equal(c.pageQuery.safeParse({limit:'101'}).success,false);
+ assert.equal(c.pageQuery.safeParse({afterId:id}).success,false);
+ assert.equal(c.pageQuery.safeParse({afterId:id,afterName:'Example'}).success,true);
+ assert.equal(c.results.current.safeParse({id,sender_from:'sender@example.test',postal_address:'address',verification_reference:'reference',apiKey:'secret'}).success,false);
+});
