@@ -13,6 +13,7 @@
     "sdk:export": "node scripts/export-openapi.cjs",
     "sdk:generate": "npm run build && npm run sdk:export && openapi-typescript sdk/generated/browser-openapi.json -o sdk/generated/schema.ts",
     "sdk:check": "tsc -p sdk/tsconfig.json",
+    "sdk:check:workspaces": "tsc -p sdk/tsconfig.workspaces.json",
     "sdk:test": "node --test sdk/transport.test.mjs sdk/engagement-api.test.cjs scripts/browser-sdk-document.test.cjs"
   },
   "dependencies": {
