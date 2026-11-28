@@ -746,3 +746,11 @@ test('native Class phase is explicit, backwards compatible and cannot be arbitra
  assert.equal(c.nativeProvision.safeParse({classEnrollmentId:id,phase:'baseline'}).success,true);
  assert.equal(c.nativeProvision.safeParse({classEnrollmentId:id,phase:'official'}).success,false);
 });
+
+test('credential issuance is not published before restricted-role acceptance',async()=>{
+ await withServer('0',async(url,document)=>{
+  assert.equal(Object.values(document.paths).some(path=>Object.values(path).some(op=>op?.operationId==='issueNoncreditAchievement')),false);
+  const response=await fetch(url+'/api/v1/credential-issuances',{method:'POST',headers:{Origin:url,'content-type':'application/json'},body:'{}'});
+  assert.equal(response.status,404);
+ });
+});

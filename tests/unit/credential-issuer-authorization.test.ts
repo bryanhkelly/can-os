@@ -13,12 +13,12 @@ describe("P0 independent credential issuer authorization",()=>{
       expect(canonicalRoleCapabilities[role]).toContain("credential.preview");
       expect(canonicalRoleCapabilities[role]).not.toContain("credential.issue");
     }
-    const issuance=file("src/modules/learning/credential-issuance.functions.ts");
+    const issuance=file("src/modules/learning/credential-issuance.server.ts");
     expect(issuance).toContain('process.env.CAN_CREDENTIAL_ISSUANCE_ENABLED !== "true"');
-    expect(issuance).toContain("assertCurrentCredentialIssuer(tx, getRequest(), actor)");
+    expect(issuance).toContain("assertCurrentCredentialIssuer(tx, request, actor)");
     expect(issuance).toContain("assertNoncreditCompletionSiteScope(tx, actor, registration)");
     expect(issuance).toContain("registration.participantPersonId === actor.actorPersonId");
-    expect(issuance.indexOf("assertCurrentCredentialIssuer(tx, getRequest(), actor)"))
+    expect(issuance.indexOf("assertCurrentCredentialIssuer(tx, request, actor)"))
       .toBeLessThan(issuance.indexOf("if (existing?.issuanceId)"));
     expect(issuance.indexOf("assertNoncreditCompletionSiteScope(tx, actor, registration)"))
       .toBeLessThan(issuance.indexOf("if (existing?.issuanceId)"));
