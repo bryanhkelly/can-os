@@ -18,7 +18,30 @@ visit(module,n=>{if(ts.isPropertyAssignment(n)&&n.name.getText()==='controllers'
 const resolver=bridge.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='resolveGovernedWorkflow');
 const returned=resolver?.body?.statements.find(n=>ts.isReturnStatement(n))?.expression;
 if(!returned||!ts.isObjectLiteralExpression(returned))errors.push('Governed bridge return object missing');
-else for(const p of returned.properties)if(ts.isPropertyAssignment(p)){const name=p.name.getText();if(implementation.has(name))errors.push('Duplicate bridge operation '+name);implementation.add(name);}
+else {
+ // Only statically imported named factories are supported; unknown spreads fail closed.
+ async function collect(source,object,seen=new Set()){
+  for(const p of object.properties){
+   if(ts.isPropertyAssignment(p)){
+    const name=p.name.getText();
+    if(implementation.has(name))errors.push('Duplicate bridge operation '+name);
+    implementation.add(name);
+   }else if(ts.isSpreadAssignment(p)&&ts.isCallExpression(p.expression)&&ts.isIdentifier(p.expression.expression)){
+    const name=p.expression.expression.text;
+    const declaration=source.statements.find(n=>ts.isImportDeclaration(n)&&n.importClause?.namedBindings&&ts.isNamedImports(n.importClause.namedBindings)&&n.importClause.namedBindings.elements.some(e=>e.name.text===name));
+    const specifier=literal(declaration?.moduleSpecifier);
+    if(!specifier?.startsWith('@/')||seen.has(specifier+'#'+name)){errors.push('Unresolved or cyclic workflow factory '+name);continue;}
+    const imported=declaration.importClause.namedBindings.elements.find(e=>e.name.text===name);
+    const target=await read('src/'+specifier.slice(2)+'.ts');
+    const factory=target.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text===(imported.propertyName?.text??name));
+    const value=factory?.body?.statements.find(n=>ts.isReturnStatement(n))?.expression;
+    if(!value||!ts.isObjectLiteralExpression(value)){errors.push('Workflow factory return object missing '+name);continue;}
+    await collect(target,value,new Set([...seen,specifier+'#'+name]));
+   }else errors.push('Unsupported workflow registration '+p.getText());
+  }
+ }
+ await collect(bridge,returned);
+}
 const workflow=identity.statements.find(n=>ts.isTypeAliasDeclaration(n)&&n.name.text==='Workflow');
 const keyType=workflow?.type?.typeArguments?.[0];
 if(!keyType||!ts.isUnionTypeNode(keyType))errors.push('Workflow key union missing');
