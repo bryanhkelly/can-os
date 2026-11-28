@@ -11,7 +11,7 @@ const studentGrant = {
   organizationId: LOCAL_DEMO_ADMIN.organizationId, siteId: LOCAL_DEMO_ADMIN.siteId,
 };
 const adminGrant = {
-  ...LOCAL_DEMO_ADMIN, id: LOCAL_DEMO_ADMIN.grantId, role: "site_admin", active: true,
+  ...LOCAL_DEMO_ADMIN, accountPersonId:LOCAL_DEMO_ADMIN.personId, id: LOCAL_DEMO_ADMIN.grantId, role: "site_admin", active: true,
 };
 beforeEach(() => {
   state.rows = [];
@@ -51,13 +51,13 @@ describe("public demo session isolation", () => {
       grants:[primary,facilitator],demoAccountSwitching:false,
     });
   });
-  it("never accepts an unauthorized replacement of Riley's second grant",async()=>{
+  it("accepts a current canonical replacement grant for the same Person and approved Site",async()=>{
     const grant={
       ...LOCAL_DEMO_RILEY_FACILITATOR,accountPersonId:LOCAL_DEMO_RILEY_FACILITATOR.personId,id:"replacement-grant",
       role:"room_facilitator",active:true,
     };
     state.rows=[[grant]];
-    expect((await readSessionGrants(grant.accountId,grant.email)).grants).toEqual([]);
+    expect((await readSessionGrants(grant.accountId,grant.email)).grants).toEqual([grant]);
   });
   it("gives Sally only her own room-facilitator workspace, not demo-admin switching", async () => {
     state.rows = [[facilitatorGrant]];
@@ -65,20 +65,20 @@ describe("public demo session isolation", () => {
       grants: [facilitatorGrant], demoAccountSwitching: false,
     });
   });
-  it.each([{ role: "site_admin" }, { role: "teacher" }, { siteId: "foreign" },
+  it.each([{ role: "platform_owner" }, { role: "can_network_steward" }, { siteId: "foreign" },
     { organizationId: "foreign" }, { personId: "foreign" }, { accountId: "foreign" }])(
     "denies changed Valor facilitator identity %j", async change => {
       state.rows = [[{ ...facilitatorGrant, ...change }]];
       expect((await readSessionGrants(facilitatorGrant.accountId, facilitatorGrant.email)).grants).toEqual([]);
     },
   );
-  it("includes a currently verified Riley facilitator in Admin switching", async () => {
+  it("never includes a different Person in Admin switching", async () => {
     const riley={...LOCAL_DEMO_RILEY_FACILITATOR, accountPersonId:LOCAL_DEMO_RILEY_FACILITATOR.personId,
       id:LOCAL_DEMO_RILEY_FACILITATOR.grantId,
       role:"room_facilitator",active:true};
     state.rows=[[adminGrant],[riley]];
     expect((await readSessionGrants(adminGrant.accountId,adminGrant.email)).grants)
-      .toEqual([adminGrant,riley]);
+      .toEqual([adminGrant]);
   });
   const school = {
     domain: "newschool.demo", organizationId: "new-organization", siteId: "new-site",
@@ -91,16 +91,16 @@ describe("public demo session isolation", () => {
     email: "admin.demo@newschool.demo",
   };
   it("resolves a newly provisioned demo administrator without enabling Valor delegation", async () => {
-    state.rows = [[newGrant], [school], [], [{domain:school.domain}]];
+    state.rows = [[newGrant], [{domain:school.domain}]];
     expect(await readSessionGrants(newGrant.accountId, newGrant.email)).toEqual({
       grants: [newGrant], demoAccountSwitching: false, launchSiteId: school.siteId,
     });
   });
   it.each([
     { accountId: "foreign-account" }, { personId: "foreign-person" },
-    { role: "registrar" }, { organizationId: "foreign-school" }, { siteId: "foreign-site" },
+    { role: "platform_owner" }, { organizationId: "foreign-school" }, { siteId: "foreign-site" },
   ])("denies a newly issued demo session after identity changes %j", async change => {
-    state.rows = [[{ ...newGrant, ...change }], [school]];
+    state.rows = [[{ ...newGrant, ...change }], []];
     expect((await readSessionGrants(newGrant.accountId, newGrant.email)).grants).toEqual([]);
   });
   it.each([
@@ -111,13 +111,13 @@ describe("public demo session isolation", () => {
   });
   it.each([
     { accountId: "another-account" }, { personId: "another-person" },
-    { role: "registrar" }, { organizationId: "another-organization" },
+    { role: "app_admin" }, { organizationId: "another-organization" },
     { siteId: "another-site" },
   ])("excludes a changed canonical student binding %j", async change => {
     state.rows = [[{ ...studentGrant, ...change }]];
     expect((await readSessionGrants(student.accountId, student.email)).grants).toEqual([]);
   });
-  it("enumerates current existing Site users for Admin switch without a fixed roster", async () => {
+  it("keeps the administrator on their own canonical grant", async () => {
     const newStaff = {
       ...studentGrant, id:"new-person-grant", accountId:"new-person-account",
       personId:"new-person", accountPersonId:"new-person", role:"student",email:"student@valorschool.demo",
@@ -125,8 +125,8 @@ describe("public demo session isolation", () => {
     state.rows = [[adminGrant],[studentGrant,newStaff]];
     const result=await readSessionGrants(LOCAL_DEMO_ADMIN.accountId,LOCAL_DEMO_ADMIN.email);
     expect(result).toEqual({
-      grants:[adminGrant,studentGrant,newStaff],
-      demoAccountSwitching:true,
+      grants:[adminGrant],
+      demoAccountSwitching:false,
       launchSiteId:LOCAL_DEMO_ADMIN.siteId,
     });
   });
@@ -172,7 +172,7 @@ describe("public demo session isolation", () => {
     const real = { ...studentGrant, id:"real-grant", accountId:"real-account",
       personId:"real-person", accountPersonId:"real-person", email:"person@example.org", emailVerifiedAt:new Date() };
     state.rows = [[adminGrant], [real, studentGrant]];
-    expect((await readSessionGrants(adminGrant.accountId,adminGrant.email)).grants).toEqual([adminGrant,studentGrant]);
+    expect((await readSessionGrants(adminGrant.accountId,adminGrant.email)).grants).toEqual([adminGrant]);
   });
   it("allows a correctly scoped synthetic Valor demo Person without an email mailbox", async () => {
     const newStudent = {
@@ -189,14 +189,14 @@ describe("public demo session isolation", () => {
     const personal={id:"personal-grant",accountId:"personal-account",personId:"personal-person",
       accountPersonId:"personal-person",email:"adult@newschool.demo",role:"account_holder",
       organizationId:null,siteId:null,active:true};
-    state.rows=[[personal],[],[],[{organizationId:school.organizationId,siteId:school.siteId}],[{id:"consumed-signup"}]];
+    state.rows=[[personal],[{organizationId:school.organizationId,siteId:school.siteId}],[{id:"consumed-signup"}]];
     expect(await readSessionGrants(personal.accountId,personal.email)).toEqual({grants:[personal],demoAccountSwitching:false});
   });
   it("rejects account-only demo sign-in without approval evidence",async()=>{
     const personal={id:"personal-grant",accountId:"personal-account",personId:"personal-person",
       accountPersonId:"personal-person",email:"adult@newschool.demo",role:"account_holder",
       organizationId:null,siteId:null,active:true};
-    state.rows=[[personal],[],[],[{organizationId:school.organizationId,siteId:school.siteId}],[]];
+    state.rows=[[personal],[{organizationId:school.organizationId,siteId:school.siteId}],[]];
     expect((await readSessionGrants(personal.accountId,personal.email)).grants).toEqual([]);
   });
   it("rejects wrong-Site, wrong-organization and changed-email demo memberships", async () => {
