@@ -72,6 +72,7 @@ import {listSitePreviewSharesService,createSitePreviewShareService,setSitePrevie
 import {exploreCanonicalBlueprintReferencesService,discoverCanonicalBlueprintOfferingsService,readCanonicalBlueprintWorkspaceService,listCanonicalBlueprintReviewsService,listCanonicalBlueprintReviewEvidenceService} from "@/modules/blueprints/blueprint-catalog-read.server";
 import {getStaffLaunchWorkspaceService,getLaunchStudioDraftService,saveLaunchStudioDraftService} from "@/modules/programs/launch-drafts.server";
 import {listLaunchOptionsService,getLaunchEntryService} from "@/modules/programs/launch-discovery.server";
+import { getNativeCourseDraftLessonsService, saveNativeCourseLessonDraftService, getNativeCourseReleaseReadinessService, createNativeCourseAssignmentDraftService, getNativeCourseAssignmentDraftsService } from "@/modules/learning/native-course-draft.server";
 export type WorkflowMode="planning"|"canonical"|"can"|"learner"|"operator-reporting";
 /** Existing independent native reviewer credentials remain distinct from CAN.
  * No fallback, new role, token or grant is manufactured by this adapter. */
@@ -81,6 +82,11 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
  const context=await (mode==="operator-reporting"?(readCookie(request,accessSessionCookie)!==undefined?getIdentityContext(request):getCanonicalCommandContext(request)):mode==="planning"?getBlueprintPlanningContext(request):mode==="canonical"?getCanonicalCommandContext(request):mode==="learner"?getInstructionalLearnerContext(request):getIdentityContext(request));
  if(!context.actorPersonId)throw new AuthorizationError("verified Person");
  return {
+  getNativeCourseDraftLessons:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Native Course authoring context");return getNativeCourseDraftLessonsService(request,raw);},
+  saveNativeCourseLessonDraft:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Native Course authoring context");return saveNativeCourseLessonDraftService(request,raw);},
+  getNativeCourseReleaseReadiness:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Native Course authoring context");return getNativeCourseReleaseReadinessService(request,raw);},
+  createNativeCourseAssignmentDraft:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Native Course authoring context");return createNativeCourseAssignmentDraftService(request,raw);},
+  getNativeCourseAssignmentDrafts:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Native Course authoring context");return getNativeCourseAssignmentDraftsService(request,raw);},
   decideNoncreditCompletion:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Completion administration context");return completionAdmin0.decideNoncreditCompletionService(request,raw);},
   getNoncreditCompletionPolicyCatalog:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Completion administration context");return completionAdmin1.getNoncreditCompletionPolicyCatalogService(request);},
   publishNoncreditCompletionPolicy:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Completion administration context");return completionAdmin1.publishNoncreditCompletionPolicyService(request,raw);},

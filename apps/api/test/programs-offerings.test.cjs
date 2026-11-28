@@ -72,3 +72,28 @@ test('WS04 configuration and review GETs reject caller-supplied authority or une
     await app.close();
   }
 });
+
+test('native curriculum routes remain authenticated and expose restricted draft contracts',async()=>{
+ const { app,document }=await createApi(readConfig({API_DOCS:'0'}));
+ const id='00000000-0000-4000-8000-000000000001';
+ try{
+  await app.listen(0,'127.0.0.1');const url=await app.getUrl();
+  for(const [path,method] of [["/api/v1/course-versions/{courseVersionId}/draft-lessons","GET"],["/api/v1/course-versions/{courseVersionId}/draft-lessons/{lessonId}/revisions","POST"],["/api/v1/course-versions/{courseVersionId}/release-readiness","GET"],["/api/v1/course-versions/{courseVersionId}/draft-assignments","POST"],["/api/v1/course-versions/{courseVersionId}/draft-assignments","GET"]]){
+   const op=document.paths[path][method.toLowerCase()];
+   assert.ok(op.security);assert.ok(op.responses['403']);
+   const response=await fetch(url+path.replace(/\{[^}]+\}/g,id),method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);
+  }
+ }finally{await app.close();}
+});
+test('native lesson boundary denies hidden fields, invalid duration and caller authority',()=>{
+ const {inputs,results}=require('../dist/native-course-draft.contracts');
+ const lesson={title:'Lesson title',objectives:['Learn the topic'],segments:[{title:'Introduction',minutes:30}],expectedRevision:'a'.repeat(64)};
+ assert.equal(inputs.lesson.safeParse(lesson).success,true);
+ assert.equal(inputs.lesson.safeParse({...lesson,actorPersonId:'forged'}).success,false);
+ assert.equal(inputs.lesson.safeParse({...lesson,answers:['secret']}).success,false);
+ assert.equal(inputs.lesson.safeParse({...lesson,segments:Array(3).fill({title:'Long section',minutes:90})}).success,false);
+ assert.equal(inputs.lesson.safeParse({...lesson,expectedRevision:'bad'}).success,false);
+ assert.equal(inputs.assignment.safeParse({assignmentKey:'assignment_1',title:'Assignment',instructions:'Write an answer',required:true,sectionId:'forged'}).success,false);
+ assert.equal(results.saved.safeParse({revision:'a'.repeat(64),changed:true,published:true}).success,false);
+});

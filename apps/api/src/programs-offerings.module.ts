@@ -1,3 +1,4 @@
+import { NativeCourseDraftController } from './native-course-draft.controller';
 import { Module } from '@nestjs/common';
 import { CanonicalIdentityModule } from './canonical-identity.module';
 import { CatalogController } from './catalog.controller';
@@ -11,6 +12,7 @@ import { NoncreditPublicationController } from './noncredit-publication.controll
 @Module({
   imports: [CanonicalIdentityModule],
   controllers: [
+    NativeCourseDraftController,
     CatalogController,
     WorkflowController,
     OfferingReleaseController,
