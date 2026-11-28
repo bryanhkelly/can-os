@@ -193,11 +193,12 @@ export async function readLegacyCredentialGrants(
       isApprovedDemoGrant(grant, normalizedEmail),
     );
     if (!adminGrant) throw new AuthorizationError("active demo administrator membership");
-    const grants = await listDemoSourceGrants(reader);
+    // An administrator signs in as their own Person, never as the whole fixture.
+    // Cross-Person access belongs to the independently authenticated owner service.
     return {
-      grants: [adminGrant, ...grants],
-      demoAccountSwitching: true,
-      launchSiteId: LOCAL_DEMO_ADMIN.siteId,
+      grants: [adminGrant],
+      demoAccountSwitching: false,
+      launchSiteId: adminGrant.siteId ?? undefined,
     };
   }
 
