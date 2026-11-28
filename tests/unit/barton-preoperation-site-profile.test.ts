@@ -49,7 +49,7 @@ describe("Barton and other unapproved Site Profile edits",()=>{
     expect(info).toContain("await onSaveAndExit()");
     expect(programs).toContain("await onSaveAndExit()");
     expect(website).toContain("await signOutOfWorkspace()");
-    expect(logout).toContain('fetch("/access/logout"');
+    expect(logout).toContain("await logoutApiSession()");
     expect(logout).toContain('window.location.assign("/access")');
   });
 });
