@@ -1,3 +1,4 @@
+import {EventTypes} from "@/domain/event-types";
 import {and,asc,eq,inArray,sql} from "drizzle-orm";
 import {alias} from "drizzle-orm/pg-core";
 import {db} from "@/db/client";
@@ -87,7 +88,7 @@ export async function changeOperationalTaskDependencyService(request:Request,raw
   await tx.update(actions).set({updatedAt}).where(eq(actions.id,task.id));
   const scope={organizationId:org,siteId:task.siteId,programId:task.programId};
   await writeAudit(tx,actor,{action:"action.dependency."+input.operation,entityType:"action",entityId:task.id,scope,after:{blockedByActionId:prerequisite.id,reason:input.reason}});
-  await emitEvent(tx,{eventType:"ActionDependencyChanged",aggregateType:"action",aggregateId:task.id,actorPersonId:actor.actorPersonId,...scope,payload:{operation:input.operation,blockedByActionId:prerequisite.id}});
+  await emitEvent(tx,{eventType:EventTypes.ActionDependencyChanged,aggregateType:"action",aggregateId:task.id,actorPersonId:actor.actorPersonId,...scope,payload:{operation:input.operation,blockedByActionId:prerequisite.id}});
   return {changed:true,updatedAt:updatedAt.toISOString()};
  });
 }
