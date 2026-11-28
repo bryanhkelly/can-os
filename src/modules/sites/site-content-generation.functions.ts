@@ -3,24 +3,11 @@ import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
 import {z} from "zod";
 import {requireReportingPlatformAdministrator} from "@/modules/identity/reporting-platform-authority.server";
 import {testGlooConnection} from "./gloo-content-provider.server";
-import {getCommandContext} from "@/modules/identity/command-context.server";
-import {siteGenerationOptionsSchema} from "@/domain/site-content-generation";
-import {previewSitePackage,processSitePackage,readStoredSitePackage,listLegacyGlooFailures,authorizeLegacyGlooRetry} from "./site-content-package.server";
-const siteInput=z.object({siteId:z.string().uuid(),consumer:z.enum(["website","outreach"])}).strict();
-const request=siteInput.extend({options:siteGenerationOptionsSchema});
-export const readSiteIntelligenceContent=createServerFn({method:"GET"}).validator((v:unknown)=>siteInput.parse(v)).handler(async({data})=>{
- setResponseHeader("Cache-Control","private, no-store");
- return readStoredSitePackage(await getCommandContext(getRequest()),data.siteId,data.consumer);
-});
-export const previewSiteIntelligence=createServerFn({method:"POST"}).validator((v:unknown)=>request.parse(v)).handler(async({data})=>{
- setResponseHeader("Cache-Control","private, no-store");
- return previewSitePackage(await getCommandContext(getRequest()),data);
-});
-export const processSiteIntelligence=createServerFn({method:"POST"}).validator((v:unknown)=>request.extend({digest:z.string().regex(/^[a-f0-9]{64}$/),externalProcessingConfirmed:z.literal(true)}).parse(v)).handler(async({data})=>{
- setResponseHeader("Cache-Control","private, no-store");
- const request=getRequest();
- return processSitePackage(await getCommandContext(request),data,()=>getCommandContext(request));
-});
+import {listLegacyGlooFailures,authorizeLegacyGlooRetry} from "./site-content-package.server";
+import {siteInput,previewInput,processInput,readSiteIntelligenceContentService,previewSiteIntelligenceService,processSiteIntelligenceService} from "./site-content-generation-http.server";
+export const readSiteIntelligenceContent=createServerFn({method:"GET"}).validator((v:unknown)=>siteInput.parse(v)).handler(({data})=>{setResponseHeader("Cache-Control","private, no-store");return readSiteIntelligenceContentService(getRequest(),data);});
+export const previewSiteIntelligence=createServerFn({method:"POST"}).validator((v:unknown)=>previewInput.parse(v)).handler(({data})=>{setResponseHeader("Cache-Control","private, no-store");return previewSiteIntelligenceService(getRequest(),data);});
+export const processSiteIntelligence=createServerFn({method:"POST"}).validator((v:unknown)=>processInput.parse(v)).handler(({data})=>{setResponseHeader("Cache-Control","private, no-store");return processSiteIntelligenceService(getRequest(),data);});
 
 /** Independent synthetic connection probe, restricted to verified platform administration. */
 export const checkGlooConnection=createServerFn({method:"POST"}).handler(async()=>{

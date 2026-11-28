@@ -25,3 +25,7 @@ Three protected REST operations distinguish private layout reads, revision write
 ## Media increment
 
 Five protected media management routes reuse the canonical Document and private R2 upload services. Finalization now parses the extended strict upload schema including the key, correcting an existing defect where the strict base schema rejected the required key. Signed URL is issued only for a short-lived authorized upload; inventory excludes object keys and signed URLs. Review explicitly requires copyright and subject-release coverage; revocation remains governed. Public image proxy and browser cutover are unchanged. Tests added, not run.
+
+## Site Intelligence increment
+
+Three governed REST operations for stored consumer-specific content, exact provider-input preview and explicit generation. The original services remain authoritative for consent, digest, lease, retry, reauthorization and output integrity; client cannot supply replacement provider input. The existing Website & Brand-only generation restriction is reflected in the REST write schema. Administrative diagnostics, raw private brief and provider runtime validation remain outstanding. No external provider call was made.

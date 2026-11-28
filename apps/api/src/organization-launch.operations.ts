@@ -55,5 +55,8 @@ export type OrganizationLaunchOperation =
   | 'finishSchoolSiteMediaUpload'
   | 'listSchoolSiteMedia'
   | 'approveSchoolSiteMediaFolder'
-  | 'revokeSchoolSiteMediaFolder';
+  | 'revokeSchoolSiteMediaFolder'
+  | 'readSiteIntelligenceContent'
+  | 'previewSiteIntelligence'
+  | 'processSiteIntelligence';
 export type OrganizationLaunchWorkflow=Record<OrganizationLaunchOperation,(input:unknown)=>Promise<unknown>>;

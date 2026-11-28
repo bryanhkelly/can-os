@@ -760,3 +760,24 @@ test('WS03 media separates private upload, finalization, rights review and revoc
  assert.equal(bodies.review.safeParse({documentIds:[siteId],rightsConfirmed:true,confirmEachFileCovered:false,subjectRelease:'all_identifiable_people_cleared',reason:'Reviewed media'}).success,false);
  assert.equal(results.list.safeParse([{documentId:siteId,fileName:'x.png',tags:[],reviewStatus:'pending',width:320,height:240,storageKey:'private'}]).success,false);
 });
+
+
+test('WS03 Site Intelligence requires exact preview digest and consent to external processing',async()=>{
+ const siteId='00000000-0000-4000-8000-000000000001';
+ await withServer('0',async(url,document)=>{
+  for(const [method,path] of [["GET","/api/v1/sites/{siteId}/intelligence-content"],["POST","/api/v1/sites/{siteId}/intelligence-previews"],["POST","/api/v1/sites/{siteId}/intelligence-generations"]]){
+   assert.ok(document.paths[path][method.toLowerCase()].security);
+   const response=await fetch(url+path.replace('{siteId}',siteId),method==='POST'?{method,headers:{origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);
+  }
+ });
+ const {bodies,results}=require('../dist/site-intelligence.contracts');
+ const request={consumer:'website',options:{},digest:'a'.repeat(64),externalProcessingConfirmed:true};
+ assert.equal(bodies.process.safeParse(request).success,true);
+ assert.equal(bodies.process.safeParse({...request,externalProcessingConfirmed:false}).success,false);
+ assert.equal(bodies.process.safeParse({...request,consumer:'outreach'}).success,false);
+ assert.equal(bodies.process.safeParse({...request,digest:'invalid'}).success,false);
+ assert.equal(bodies.process.safeParse({...request,input:{}}).success,false);
+ assert.equal(results.stored.safeParse({status:'consent-required',generation:null,package:null}).success,true);
+ assert.equal(results.process.safeParse({status:'ready',approved:true}).success,false);
+});

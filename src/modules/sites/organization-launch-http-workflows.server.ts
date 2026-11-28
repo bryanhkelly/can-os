@@ -30,9 +30,13 @@ import {getCommandContext} from "@/modules/identity/command-context.server";
 import {siteMediaUploadSchema,siteMediaReviewSchema,siteMediaRevokeSchema} from "@/domain/site-media-folder";
 import {beginSiteMediaFolderUpload,finishSiteMediaFolderUpload,listSiteMediaFolder,reviewSiteMediaFolder,revokeSiteMediaFolder,siteMediaKeyPattern} from "@/modules/sites/site-media-folder.server";
 const mediaFinish=siteMediaUploadSchema.extend({key:z.string().regex(siteMediaKeyPattern)});
+import {readSiteIntelligenceContentService,previewSiteIntelligenceService,processSiteIntelligenceService} from "@/modules/sites/site-content-generation-http.server";
 const geographyInput=z.object({siteId:z.string().uuid()}).strict();
 export function organizationLaunchWorkflows(request:Request,mode:string){
  return {
+  readSiteIntelligenceContent:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Site Intelligence context");return readSiteIntelligenceContentService(request,raw);},
+  previewSiteIntelligence:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Site Intelligence context");return previewSiteIntelligenceService(request,raw);},
+  processSiteIntelligence:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Site Intelligence context");return processSiteIntelligenceService(request,raw);},
   beginSchoolSiteMediaUpload:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Site media context");const data=parseCommandInput(siteMediaUploadSchema,raw);return beginSiteMediaFolderUpload(await getCommandContext(request),data);},
   finishSchoolSiteMediaUpload:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Site media context");const data=parseCommandInput(mediaFinish,raw);return finishSiteMediaFolderUpload(await getCommandContext(request),data);},
   listSchoolSiteMedia:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Site media context");const data=parseCommandInput(geographyInput,raw);return listSiteMediaFolder(await getCommandContext(request),data.siteId);},
