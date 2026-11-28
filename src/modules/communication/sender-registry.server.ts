@@ -6,3 +6,5 @@ export function readSenderAdministration(organizationId:string|null=null){return
 export function listSenderOrganizations(){return service.listSenderOrganizations(getRequest());}
 export function changeSenderAdministration(data:Parameters<typeof service.changeSenderAdministration>[1]){return service.changeSenderAdministration(getRequest(),data);}
 export function revokeSenderAdministration(data:Parameters<typeof service.revokeSenderAdministration>[1]){return service.revokeSenderAdministration(getRequest(),data);}
+
+export function listSenderOrganizationsPage(data:Parameters<typeof service.listSenderOrganizationsPage>[1]){return service.listSenderOrganizationsPage(getRequest(),data);}
