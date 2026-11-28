@@ -39,3 +39,16 @@ export async function checkAdmissionsContract(client:BecomunaBrowserApi, applica
  // @ts-expect-error acceptance never returns a newly activated enrollment
  if(response.data){const enrollmentId=response.data.enrollmentId;void enrollmentId;}
 }
+
+export async function checkClassParticipationContract(client:BecomunaBrowserApi,id:string){
+ await client.POST('/api/v1/class-approval-requests',{body:{classOfferingVersionId:id,requestId:id}});
+ await client.POST('/api/v1/class-approval-decisions',{body:{approvalRequestId:id,decision:'approved',reason:'eligible'}});
+ await client.GET('/api/v1/me/class-approvals');
+ await client.GET('/api/v1/class-approval-queue',{params:{query:{classId:id}}});
+ await client.POST('/api/v1/class-invitations',{body:{classOfferingVersionId:id,learnerPersonId:id,requestId:id,creditMode:'audit'}});
+ await client.GET('/api/v1/me/class-invitations');
+ await client.POST('/api/v1/class-invitation-declines',{body:{invitationId:id}});
+ await client.POST('/api/v1/class-enrollment-assignments',{body:{classId:id,learnerPersonId:id,creditMode:'audit'}});
+ // @ts-expect-error approval requests cannot specify a different learner
+ await client.POST('/api/v1/class-approval-requests',{body:{classOfferingVersionId:id,requestId:id,learnerPersonId:id}});
+}
