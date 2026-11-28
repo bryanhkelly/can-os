@@ -1,3 +1,4 @@
+import {assertManualPrerequisitesSatisfied} from "./work-dependencies.server";
 import {assertManualTaskOwner,assertManualTaskResource} from "./manual-work.server";
 import {assertCurrentCANGrantForMutation} from "@/modules/identity/current-can-grant-transaction.server";
 import {manualTaskType} from "./manual-work-policy.server";
@@ -141,6 +142,7 @@ export async function updateOperationsActionService(request:Request,raw:unknown)
       record.resolutionNote===data.resolutionNote?.trim())return {saved:true};
    if(record.status==="cancelled"||record.status==="resolved")throw new DomainError("CONFLICT","Action is closed");
    if(record.status===data.status)return {saved:true};
+   if(data.status==="in_progress"||data.status==="resolved")await assertManualPrerequisitesSatisfied(tx,record);
    const now=nextManualRevision(record);
    await tx.update(actions).set({status:data.status,resolvedAt:data.status==="resolved"?now:null,resolutionNote:data.status==="resolved"?data.resolutionNote?.trim():record.resolutionNote,updatedAt:now}).where(eq(actions.id,record.id));
    await writeAudit(tx,actor,{action:"action.status.change",entityType:"action",entityId:record.id,scope:{siteId:record.siteId,programId:record.programId},before:{status:record.status},after:{status:data.status}});
