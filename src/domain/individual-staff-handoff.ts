@@ -30,3 +30,14 @@ export function individualStaffTargetEligible(account: {
       existingPersonId === account.personId
     : existingPersonId === undefined;
 }
+
+/** Credential selection only: a registered synthetic Site defaults to the
+ * shared code. An existing private credential is never silently downgraded.
+ * Out-of-scope non-deliverable identities still require independent approval. */
+export function requiresIndividualStaffCredential(input:{
+  demoIdentity:boolean; approvedSharedScope:boolean;
+  existingPrivateCredential:boolean; confirmationProvided:boolean;
+}):boolean {
+  return input.demoIdentity && input.confirmationProvided &&
+    (input.existingPrivateCredential || !input.approvedSharedScope);
+}
