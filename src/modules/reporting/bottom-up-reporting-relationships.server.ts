@@ -19,12 +19,12 @@ type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
 const uuid=z.string().uuid();
 const iso=z.coerce.date().transform(value=>value.toISOString());
 const rowSchema=relationshipProposalSchema.extend({
-  id:uuid,ownerOrganizationId:uuid,proposedByPersonId:uuid,proposedAt:iso,
+  id:uuid,dataPopulation:z.enum(["real","synthetic","unknown"]),ownerOrganizationId:uuid,proposedByPersonId:uuid,proposedAt:iso,
   validThrough:iso.nullable(),coverageFrom:iso.nullable(),
   status:z.enum(["pending","accepted","declined","withdrawn","revoked"]),
   acceptedAt:iso.nullable(),acceptedByPersonId:uuid.nullable(),
 });
-const columns=sql`id,owner_organization_id AS "ownerOrganizationId",
+const columns=sql`id,data_population AS "dataPopulation",owner_organization_id AS "ownerOrganizationId",
   recipient_organization_id AS "recipientOrganizationId",scope_kind AS "scopeKind",
   scope_id AS "scopeId",relationship_kind AS "relationshipKind",metrics,
   coverage_mode AS "coverageMode",coverage_from AS "coverageFrom",supersedes_id AS "supersedesId",
@@ -137,17 +137,19 @@ export async function proposeReportingRelationship(request:Request,input:unknown
       throw new AuthorizationError("Site initiation can propose a tag only; reporting requires independent owner authorization");
     await requireEligibleRecipient(tx,ownerId,candidate.recipientOrganizationId);
     const person=assertRelationshipActor(actor,scope.ownerOrganizationId,canAuthorize?"relationships.propose":"relationships.initiate",scope.siteId);
+    const population=relationshipPopulation(await ownerDomain(tx,ownerId));
+    if(!population)throw new AuthorizationError("classified relationship owner");
     const proposal=validateRelationshipProposal(candidate,scope,buildCurrentReportingMetricRegistry(),relationshipProposalMetrics(candidate.scopeKind),new Date());
     const result=await tx.execute(sql`
       INSERT INTO public.reporting_relationship_agreements
         (owner_organization_id,recipient_organization_id,scope_kind,site_id,program_id,offering_id,class_id,
-         relationship_kind,metrics,valid_through,coverage_mode,coverage_from,supersedes_id,proposed_by_person_id,last_action_by_person_id,last_action_organization_id)
+         relationship_kind,metrics,data_population,valid_through,coverage_mode,coverage_from,supersedes_id,proposed_by_person_id,last_action_by_person_id,last_action_organization_id)
       VALUES (${scope.ownerOrganizationId}::uuid,${proposal.recipientOrganizationId}::uuid,${proposal.scopeKind},
         ${proposal.scopeKind==="site"?proposal.scopeId:null}::uuid,
         ${proposal.scopeKind==="program"?proposal.scopeId:null}::uuid,
         ${proposal.scopeKind==="offering"?proposal.scopeId:null}::uuid,
         ${proposal.scopeKind==="class"?proposal.scopeId:null}::uuid,
-        ${proposal.relationshipKind},${JSON.stringify(proposal.metrics)}::jsonb,${proposal.validThrough}::timestamptz,
+        ${proposal.relationshipKind},${JSON.stringify(proposal.metrics)}::jsonb,${population},${proposal.validThrough}::timestamptz,
         ${proposal.coverageMode??"prospective"},${proposal.coverageFrom??null}::timestamptz,${proposal.supersedesId??null}::uuid,
         ${person}::uuid,${person}::uuid,${scope.ownerOrganizationId}::uuid)
       RETURNING ${columns}`);
@@ -187,6 +189,9 @@ export async function decideReportingRelationship(request:Request,input:unknown)
         scopeId:current.scopeId,siteId:null};
     }
     if(action==="accept"){
+      if(current.dataPopulation!==relationshipPopulation(await ownerDomain(tx,current.ownerOrganizationId))||
+        current.dataPopulation!==relationshipPopulation(await ownerDomain(tx,current.recipientOrganizationId)))
+        throw new AuthorizationError("unchanged relationship population");
       await requireEligibleRecipient(tx,current.ownerOrganizationId,current.recipientOrganizationId);
       await requireEligibleRecipient(tx,current.recipientOrganizationId,current.ownerOrganizationId);
       const {recipientOrganizationId,scopeKind,scopeId,relationshipKind,metrics,validThrough,coverageMode,coverageFrom,supersedesId}=current;
