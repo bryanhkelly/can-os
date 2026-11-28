@@ -76,6 +76,7 @@ import { getNativeCourseDraftLessonsService, saveNativeCourseLessonDraftService,
 import * as publisherPack from "@/modules/learning/publisher-pack-authoring-http.server";
 import * as marketplace from "@/modules/learning/curriculum-marketplace-http.server";
 import * as trackAuthoring from "@/modules/learning/instructional-track-authoring-http.server";
+import * as curriculumAuthoring from "@/modules/learning/curriculum-authoring-http.server";
 export type WorkflowMode="planning"|"canonical"|"can"|"learner"|"operator-reporting";
 /** Existing independent native reviewer credentials remain distinct from CAN.
  * No fallback, new role, token or grant is manufactured by this adapter. */
@@ -85,6 +86,13 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
  const context=await (mode==="operator-reporting"?(readCookie(request,accessSessionCookie)!==undefined?getIdentityContext(request):getCanonicalCommandContext(request)):mode==="planning"?getBlueprintPlanningContext(request):mode==="canonical"?getCanonicalCommandContext(request):mode==="learner"?getInstructionalLearnerContext(request):getIdentityContext(request));
  if(!context.actorPersonId)throw new AuthorizationError("verified Person");
  return {
+  getCurriculumPrograms:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Legacy curriculum publisher context");return curriculumAuthoring.getCurriculumProgramsService(request,raw);},
+  getCurriculumStudio:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Legacy curriculum publisher context");return curriculumAuthoring.getCurriculumStudioService(request,raw);},
+  createAuthoredCourse:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Legacy curriculum publisher context");return curriculumAuthoring.createAuthoredCourseService(request,raw);},
+  startCurriculumDraft:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Legacy curriculum publisher context");return curriculumAuthoring.startCurriculumDraftService(request,raw);},
+  saveAuthoredCurriculum:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Legacy curriculum publisher context");return curriculumAuthoring.saveAuthoredCurriculumService(request,raw);},
+  saveAuthoredLesson:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Legacy curriculum publisher context");return curriculumAuthoring.saveAuthoredLessonService(request,raw);},
+  publishAuthoredCurriculum:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Legacy curriculum publisher context");return curriculumAuthoring.publishAuthoredCurriculumService(request,raw);},
   getRecordedInstructionReview:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Instructional Track reviewer context");return trackAuthoring.getRecordedInstructionReviewService(request,raw);},
   createRecordedInstructionDraft:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Instructional Track authoring context");return trackAuthoring.createRecordedInstructionDraftService(request,raw);},
   saveRecordedInstructionDraft:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Instructional Track authoring context");return trackAuthoring.saveRecordedInstructionDraftService(request,raw);},
