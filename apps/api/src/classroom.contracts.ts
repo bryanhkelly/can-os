@@ -29,3 +29,9 @@ export const outputDocs={
  transfer:obj({transferred:truth,duplicate:bool,facilitatedSessionId:id,currentFacilitatorPersonId:id}),
  agenda:obj({classSessionId:id,revisionNo:{...integer,minimum:1},duplicate:bool}),
 };
+
+const titleItem=z.object({id:uuid,title:z.string()}).strict();
+export const agendaParams=z.object({classId:uuid,classSessionId:uuid}).strict();
+export const agendaResult=z.object({classId:uuid,classSessionId:uuid,courseVersionId:uuid,revisionNo:count,publishedAt:z.string().datetime({offset:true}).nullable(),startsAt:z.string().datetime({offset:true}),items:z.array(z.object({kind:z.enum(['study','watch','practice','assignment','assessment']),referenceId:uuid,title:z.string()}).strict()).max(24),canEdit:z.boolean(),options:z.object({lessons:z.array(titleItem).max(500),assignments:z.array(titleItem).max(500),assessments:z.array(titleItem).max(500)}).strict().nullable(),note:z.string()}).strict();
+const titleDoc=obj({id,title:str});
+export const agendaDoc=obj({...target,courseVersionId:id,revisionNo:integer,publishedAt:{...date,nullable:true},startsAt:date,items:arr(obj({kind:{...str,enum:['study','watch','practice','assignment','assessment']},referenceId:id,title:str}),undefined,24),canEdit:bool,options:{...obj({lessons:arr(titleDoc,undefined,500),assignments:arr(titleDoc,undefined,500),assessments:arr(titleDoc,undefined,500)}),nullable:true},note:str});

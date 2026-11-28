@@ -3,8 +3,9 @@ import {ApiTags,ApiCookieAuth,ApiOperation,ApiBody,ApiOkResponse,ApiHeader,ApiRe
 import type {FastifyRequest,FastifyReply} from 'fastify';
 import {GovernedWorkflowOperation,verifiedWorkflow} from './security';
 import {CanonicalIdentityService,type WorkflowMode} from './identity.service';
+import {validated} from './learning.contracts';
 import {problemOpenApiSchema} from './contracts';
-import {docs,registrationReceipt,enrollmentResult} from './participation.contracts';
+import {docs,registrationReceipt,enrollmentResult,readyReceipt,emptyCommand,readyDoc,emptyDoc} from './participation.contracts';
 function Command(mode:WorkflowMode){
  return applyDecorators(GovernedWorkflowOperation(mode),HttpCode(200),ApiHeader({name:'Origin',required:true}),ApiCookieAuth('session'),
  ...[400,401,403,409,415,500,503].map(status=>ApiResponse({status,content:{'application/problem+json':{schema:problemOpenApiSchema}}})));
@@ -33,5 +34,29 @@ export class ParticipationController{
  enroll(@Req() req:FastifyRequest,@Body() body:unknown){
   const workflow=verifiedWorkflow(req);
   return this.identity.runWorkflow(async()=>enrollmentResult.parse(await workflow.enrollNativeClass(body)));
+ }
+ @Post('me/learning-session/resume')
+ @Command('can')
+ @ApiOperation({operationId:'resumeLinkedNativeClassLearner',summary:'Resume previously verified learner binding; no new enrollment'})
+ @ApiBody({schema:emptyDoc})
+ @ApiOkResponse({schema:readyDoc})
+ async resumeLinkedNativeClassLearner(@Req() req:FastifyRequest,@Res({passthrough:true}) reply:FastifyReply,@Body() body:unknown){
+  validated(emptyCommand,body);
+  const workflow=verifiedWorkflow(req);
+  const receipt=await this.identity.runWorkflow(async()=>readyReceipt.parse(await workflow.resumeLinkedNativeClassLearner(undefined)));
+  reply.header('Set-Cookie',receipt.cookie);reply.header('Referrer-Policy','no-referrer');
+  return receipt.result;
+ }
+ @Post('me/learning-session/activate')
+ @Command('can')
+ @ApiOperation({operationId:'activateReviewedNativeClassLearner',summary:'Consume existing independent adult review; no new enrollment'})
+ @ApiBody({schema:emptyDoc})
+ @ApiOkResponse({schema:readyDoc})
+ async activateReviewedNativeClassLearner(@Req() req:FastifyRequest,@Res({passthrough:true}) reply:FastifyReply,@Body() body:unknown){
+  validated(emptyCommand,body);
+  const workflow=verifiedWorkflow(req);
+  const receipt=await this.identity.runWorkflow(async()=>readyReceipt.parse(await workflow.activateReviewedNativeClassLearner(undefined)));
+  reply.header('Set-Cookie',receipt.cookie);reply.header('Referrer-Policy','no-referrer');
+  return receipt.result;
  }
 }

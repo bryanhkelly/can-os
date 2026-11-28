@@ -5,7 +5,7 @@ import {GovernedWorkflowOperation,verifiedWorkflow} from './security';
 import {CanonicalIdentityService,type WorkflowMode} from './identity.service';
 import {problemOpenApiSchema} from './contracts';
 import {validated} from './learning.contracts';
-import {inputs,results,docs,roomParams,learnerParams} from './room.contracts';
+import {inputs,results,docs,roomParams,learnerParams,attemptParams,mediaResults,mediaDocs} from './room.contracts';
 function RoomOperation(mode:WorkflowMode,method:'GET'|'POST'){
  return applyDecorators(GovernedWorkflowOperation(mode,method),ApiCookieAuth('session'),
  ...(method==='POST'?[HttpCode(200),ApiHeader({name:'Origin',required:true})]:[]),
@@ -175,5 +175,32 @@ export class RoomController{
   const workflow=verifiedWorkflow(req);
   const body=validated(roomParams,params);
   return this.identity.runWorkflow(async()=>results.presentationResult.parse(await workflow.getClassroomPresentationState(body)));
+ }
+ @Get('classrooms/:facilitatedSessionId/media')
+ @RoomOperation('canonical','GET')
+ @ApiParam({name:'facilitatedSessionId',type:String,format:'uuid',required:true})
+ @ApiOperation({operationId:'getFacilitatedRoomMedia',summary:'List only current authorized audience recordings'})
+ @ApiOkResponse({schema:mediaDocs.list})
+ media(@Req() req:FastifyRequest,@Param() params:unknown){
+  const input=validated(roomParams,params),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>mediaResults.list.parse(await workflow.getFacilitatedRoomMedia(input)));
+ }
+ @Post('classroom-media-access')
+ @RoomOperation('canonical','POST')
+ @ApiOperation({operationId:'getFacilitatedRoomMediaAccess',summary:'Authorize short-lived media access for current room audience'})
+ @ApiBody({schema:mediaDocs.request})
+ @ApiOkResponse({schema:mediaDocs.access})
+ mediaAccess(@Req() req:FastifyRequest,@Body() body:unknown){
+  const workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>mediaResults.access.parse(await workflow.getFacilitatedRoomMediaAccess(body)));
+ }
+ @Get('me/course-attempts/:courseAttemptId/classrooms')
+ @RoomOperation('learner','GET')
+ @ApiParam({name:'courseAttemptId',type:String,format:'uuid',required:true})
+ @ApiOperation({operationId:'getLearnerFacilitatedRoom',summary:'Read only currently permitted joined rooms and playback intent'})
+ @ApiOkResponse({schema:mediaDocs.joined})
+ joined(@Req() req:FastifyRequest,@Param() params:unknown){
+  const input=validated(attemptParams,params),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>mediaResults.joined.parse(await workflow.getLearnerFacilitatedRoom(input)));
  }
 }

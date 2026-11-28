@@ -57,3 +57,17 @@ export const docs={
  activitiesResult:obj({activities:arr(obj({...activity,closed:b,releasedAt:dt,responded:b}),40),truncated:b,notice:s}),
  presentationResult:obj({roomState:s,current:{...obj(activity),nullable:true},note:s})
 };
+
+export const attemptParams=z.object({courseAttemptId:uuid}).strict();
+const playback=z.object({roomId:uuid,kind:z.enum(['opened','played','paused','ended']),lessonId:uuid,assetVersionId:uuid,positionSeconds:count.nullable(),occurredAt:date}).strict();
+export const mediaResults={
+ list:z.object({facilitatedSessionId:uuid,media:z.array(z.object({lessonId:uuid,lessonTitle:str,assetVersionId:uuid,trackVersionId:uuid}).strict()).max(25),truncated:bool,note:str}).strict(),
+ access:z.object({downloadUrl:z.string().url().refine(v=>v.startsWith('https://')),expiresInSeconds:z.union([z.literal(0),z.literal(30)])}).strict(),
+ joined:z.object({rooms:z.array(z.object({facilitatedSessionId:uuid,siteId:uuid,startedAt:date,latestPlayback:playback.nullable()}).strict()).max(5),notice:str}).strict(),
+};
+export const mediaDocs={
+ list:obj({...room,media:arr(obj({lessonId:id,lessonTitle:s,assetVersionId:id,trackVersionId:id}),25),truncated:b,note:s}),
+ request:obj({...room,lessonId:id,assetVersionId:id}),
+ access:obj({downloadUrl:{...s,format:'uri'},expiresInSeconds:{...n,enum:[0,30]}}),
+ joined:obj({rooms:arr(obj({...room,siteId:id,startedAt:dt,latestPlayback:{...obj({roomId:id,kind:en(['opened','played','paused','ended']),lessonId:id,assetVersionId:id,positionSeconds:{...n,nullable:true},occurredAt:dt}),nullable:true}}),5),notice:s})
+};

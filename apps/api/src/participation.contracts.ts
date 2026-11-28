@@ -11,3 +11,8 @@ export const docs={
  enrollment:obj({classOfferingVersionId:id,creditMode:{...str,enum:['for_credit','audit','not_applicable']},adultAttested:yes,consentAccepted:yes,invitationId:id,approvalRequestId:id,networkMembershipId:id},['classOfferingVersionId','creditMode','adultAttested','consentAccepted']),
  enrollmentResult:obj({classEnrollmentId:id,courseAttemptId:id,alreadyEnrolled:bool}),
 };
+
+export const readyReceipt=z.object({cookie:z.string().regex(/^__Host-can_os_v3_session=[A-Za-z0-9_-]{40,}; Path=\/; HttpOnly; Secure; SameSite=Lax; Max-Age=\d+$/),result:z.object({ready:z.literal(true)}).strict()}).strict();
+export const emptyCommand=z.object({}).strict();
+export const readyDoc=obj({ready:yes});
+export const emptyDoc=obj({});

@@ -1,10 +1,11 @@
-import {Controller,Post,Body,Req,HttpCode,applyDecorators} from '@nestjs/common';
-import {ApiTags,ApiCookieAuth,ApiOperation,ApiBody,ApiOkResponse,ApiHeader,ApiResponse} from '@nestjs/swagger';
+import {Controller,Get,Post,Body,Param,Req,HttpCode,applyDecorators} from '@nestjs/common';
+import {ApiTags,ApiCookieAuth,ApiOperation,ApiBody,ApiOkResponse,ApiHeader,ApiResponse,ApiParam} from '@nestjs/swagger';
 import type {FastifyRequest} from 'fastify';
 import {GovernedWorkflowOperation,verifiedWorkflow} from './security';
 import {CanonicalIdentityService} from './identity.service';
+import {validated} from './learning.contracts';
 import {problemOpenApiSchema} from './contracts';
-import {inputs,results,outputDocs} from './classroom.contracts';
+import {inputs,results,outputDocs,agendaParams,agendaResult,agendaDoc} from './classroom.contracts';
 function ClassroomCommand(){
  return applyDecorators(GovernedWorkflowOperation('canonical'),HttpCode(200),ApiHeader({name:'Origin',required:true}),ApiCookieAuth('session'),
  ...[400,401,403,409,415,500,503].map(status=>ApiResponse({status,content:{'application/problem+json':{schema:problemOpenApiSchema}}})));
@@ -66,5 +67,18 @@ export class ClassroomController{
  publishNativeClassSessionAgenda(@Req() req:FastifyRequest,@Body() body:unknown){
   const workflow=verifiedWorkflow(req);
   return this.identity.runWorkflow(async()=>results.agenda.parse(await workflow.publishNativeClassSessionAgenda(body)));
+ }
+ @Get('classes/:classId/sessions/:classSessionId/agenda')
+ @GovernedWorkflowOperation('canonical','GET')
+ @ApiCookieAuth('session')
+ @ApiParam({name:'classId',type:String,format:'uuid',required:true})
+ @ApiParam({name:'classSessionId',type:String,format:'uuid',required:true})
+ @ApiOperation({operationId:'getNativeClassSessionAgenda',summary:'Read exact authorized Session agenda and current editable options'})
+ @ApiOkResponse({schema:agendaDoc})
+ @ApiResponse({status:401,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:403,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ agenda(@Req() req:FastifyRequest,@Param() params:unknown){
+  const input=validated(agendaParams,params),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>agendaResult.parse(await workflow.getNativeClassSessionAgenda(input)));
  }
 }

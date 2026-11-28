@@ -235,3 +235,18 @@ test('Classroom Connect operations are independently documented and protected',a
  assert.equal(results.presentationResult.safeParse({roomState:'live',current:null,note:'No private data',roster:[]}).success,false);
  assert.equal(results.responseResult.safeParse({saved:true,duplicate:false,graded:true}).success,false);
 });
+
+test('learner recovery and media access do not expose session secrets in response schemas',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const route of ['/api/v1/me/learning-session/resume','/api/v1/me/learning-session/activate','/api/v1/classroom-media-access']){
+   assert.ok(document.paths[route].post.security);
+   assert.equal((await fetch(url+route,{method:'POST',headers:{Origin:url,'content-type':'application/json'},body:'{}'})).status,503);
+  }
+  for(const route of ['/api/v1/classrooms/{facilitatedSessionId}/media','/api/v1/me/course-attempts/{courseAttemptId}/classrooms','/api/v1/classes/{classId}/sessions/{classSessionId}/agenda']){
+   assert.ok(document.paths[route].get.security);
+   assert.equal((await fetch(url+route.replace(/\{[^}]+\}/g,'00000000-0000-4000-8000-000000000001'))).status,401);
+  }
+ });
+ const {readyDoc}=require('../dist/participation.contracts');
+ assert.deepEqual(Object.keys(readyDoc.properties),['ready']);
+});
