@@ -1,11 +1,19 @@
 import {defineConfig} from "@playwright/test";
 import provision from "./playwright.pilot-provision.config";
 const env=process.env;
-const reporting=env.CAN_NEST_QA_SUITE==="reporting";
-if(reporting?!env.CAN_NEST_REPORT_QA_JSON:!env.CAN_STUDENT_QA_JSON)throw Error("Reviewed isolated QA fixture required");
+const suites={
+ student:{fixture:"CAN_STUDENT_QA_JSON",files:["nest-student-http.spec.ts","nest-access-provisioning-http.spec.ts"]},
+ reporting:{fixture:"CAN_NEST_REPORT_QA_JSON",files:["nest-pilot-report-readback.spec.ts"]},
+ pilot1:{fixture:"CAN_NEST_PILOT1_QA_JSON",files:["nest-pilot1-learning.spec.ts"]},
+ pilot2:{fixture:"CAN_NEST_PILOT2_QA_JSON",files:["nest-pilot2-session.spec.ts"]},
+} as const;
+const selected=env.CAN_NEST_QA_SUITE??"student";
+if(!Object.hasOwn(suites,selected))throw Error("Unknown Nest QA suite");
+const suite=suites[selected as keyof typeof suites];
+if(!env[suite.fixture])throw Error("Reviewed isolated QA fixture required");
 if(!provision.webServer||Array.isArray(provision.webServer))throw Error("Existing isolated QA server configuration required");
 export default defineConfig({
-  ...provision,use:{...provision.use,baseURL:"http://localhost:3001"},testMatch:reporting?["nest-pilot-report-readback.spec.ts"]:["nest-student-http.spec.ts","nest-access-provisioning-http.spec.ts"],projects:[{name:"http-only"}],
+  ...provision,use:{...provision.use,baseURL:"http://localhost:3001"},testMatch:[...suite.files],timeout:600000,projects:[{name:"http-only"}],
   webServer:[{
     command:"npm --prefix apps/api start",
     url:"http://127.0.0.1:3001/api/v1/health/live",reuseExistingServer:false,timeout:30000,
