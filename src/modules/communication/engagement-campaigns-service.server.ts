@@ -17,7 +17,7 @@ import {db} from "@/db/client";
 import {accessAccounts,organizations} from "@/db/schema";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {authorizeEngagementEmailLink,readAuthorizedEngagementInvitation} from "@/modules/engagement/engagement-registry-service.server";
-import {campaignOwnerScope,parseCampaignRecipients,campaignRecipientLimit} from "@/domain/campaign-policy";
+import {campaignOwnerScope,parseCampaignRecipients,campaignRecipientLimit,campaignReplayMatchesRecipientSource} from "@/domain/campaign-policy";
 import {campaignRows,readCampaignSenderReadiness,processEngagementCampaignDeliveries} from "./campaign-store.server";
 async function scope(request:Request,engagementId:string,linkId:string){
  const actor=await getCommandContext(request);
@@ -84,9 +84,8 @@ export const queueEngagementCampaign = async (request:Request,data: z.output<typ
  const [existing]=await campaignRows<{id:string;list_id:string;list_name:string;link_id:string;engagement_id:string;scheduled_at:string|Date}>(tx,sql`SELECT c.id,c.list_id,l.name AS list_name,c.link_id,c.engagement_id,c.scheduled_at FROM public.engagement_campaigns c JOIN public.campaign_recipient_lists l ON l.id=c.list_id AND l.owner_scope=c.owner_scope WHERE c.owner_scope=${s.ownerScope} AND c.request_id=${data.requestId}`);
  if(existing){
   if(existing.link_id!==data.linkId||existing.engagement_id!==data.engagementId||new Date(existing.scheduled_at).getTime()!==scheduledAt.getTime())throw new DomainError("CONFLICT","Request already used.");
-  if("listId" in data){if(existing.list_id!==data.listId||existing.list_name.startsWith("__direct__"))throw new DomainError("CONFLICT","Request already used.");}
-  else{
-   if(existing.list_name!=="__direct__"+data.requestId)throw new DomainError("CONFLICT","Request already used.");
+  if(!campaignReplayMatchesRecipientSource(existing,data))throw new DomainError("CONFLICT","Request already used.");
+  if(!("listId" in data)){
    const members=await campaignRows<{email:string}>(tx,sql`SELECT email FROM public.campaign_deliveries WHERE campaign_id=${existing.id} ORDER BY email`);
    if(JSON.stringify(members.map(m=>m.email).sort())!==JSON.stringify([...direct!.recipients].sort()))throw new DomainError("CONFLICT","Request already used.");
   }
