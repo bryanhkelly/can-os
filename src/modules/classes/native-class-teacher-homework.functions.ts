@@ -2,14 +2,18 @@ import {readHistoricalClassWork} from "./historical-class-work.server";
 import { projectSubmissionRevisionPage } from "@/domain/submission-revisions";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, eq, gt, isNull, lte, or, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { canonicalClasses, canonicalClassStaffAssignments } from "@/db/canonical-v301";
+import { actions } from "@/db/schema";
+import { canonicalClassEnrollments } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { nativeClassWorkRows,nativeOverdueWorkPredicate } from "./native-class-work-query.server";
-import { currentClassAuthority } from "./native-class-authority.server";
+import { assertNativeClassTeacher } from "./native-class-teacher-authority.server";
+import { existingMissingWorkFollowUpResponse } from "@/domain/missing-work-follow-up-ownership";
+import { EventTypes } from "@/domain/event-types";
+import { emitEvent,notify,writeAudit } from "@/platform/mutation";
 import { writeCanonicalAudit } from "@/platform/canonical-mutation.server";
 
 const input=z.object({classId:z.string().uuid()}).strict();
@@ -29,30 +33,7 @@ type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
  * current Class publication and matched Site/Organization. */
 async function authorizedTeacher(tx:Tx,classId:string){
   const actor=await getCanonicalCommandContext(getRequest());
-  if(actor.role!=="teacher"||!actor.actorPersonId||
-      actor.scope.siteIds?.length!==1||
-      actor.scope.organizationIds?.length!==1)
-     throw new AuthorizationError("exact CAN academic teacher membership");
-  assertCapability(actor,"teacher:read");
-  const [cls]=await tx.select().from(canonicalClasses)
-       .where(eq(canonicalClasses.id,classId)).limit(1);
-     const now=new Date();
-     if(!cls||cls.state!=="active"||
-        cls.siteId!==actor.scope.siteIds[0]||
-        cls.operatingOrganizationId!==actor.scope.organizationIds[0])
-       throw new AuthorizationError("own active teaching Site and Class");
-     const [assignment]=await tx.select({id:canonicalClassStaffAssignments.id})
-       .from(canonicalClassStaffAssignments).where(and(
-         eq(canonicalClassStaffAssignments.classId,cls.id),
-         eq(canonicalClassStaffAssignments.personId,actor.actorPersonId),
-         eq(canonicalClassStaffAssignments.roleCode,"teacher"),
-         eq(canonicalClassStaffAssignments.state,"approved"),
-         lte(canonicalClassStaffAssignments.beginsAt,now),
-         or(isNull(canonicalClassStaffAssignments.endsAt),
-            gt(canonicalClassStaffAssignments.endsAt,now)),
-       )).limit(1);
-     if(!assignment)throw new AuthorizationError("current specific Class teacher appointment");
-  await currentClassAuthority(tx,cls.id,now);
+  const cls=await assertNativeClassTeacher(tx,actor,classId);
   return { cls, actor };
 }
 
@@ -125,16 +106,27 @@ export const getNativeClassTeacherMissingWork=createServerFn({method:"GET"})
    setResponseHeader("Cache-Control","private, no-store");
    setResponseHeader("Referrer-Policy","no-referrer");
    return db.transaction(async tx=>{
-     const {cls}=await authorizedTeacher(tx,data.classId);
+     const {cls,actor}=await authorizedTeacher(tx,data.classId);
      const result=await tx.execute(sql`
        WITH work AS (
          ${nativeClassWorkRows([cls.id])}
        )
        SELECT w.enrollment_id,w.assignment_id,w.title,w.due_at,
          coalesce(w.submission_status,'not_started') AS status,
-         p.preferred_name,p.legal_first_name,p.legal_last_name
+         p.preferred_name,p.legal_first_name,p.legal_last_name,
+         follow_up.id AS follow_up_id,follow_up.owner_person_id AS follow_up_owner
        FROM work w
        JOIN public.people p ON p.id=w.learner_person_id
+       LEFT JOIN LATERAL (
+         SELECT a.id,a.owner_person_id FROM public.actions a
+         WHERE a.subject_type='class_enrollment' AND a.subject_id=w.enrollment_id
+           AND a.type='missing_work_follow_up' AND a.status IN ('open','in_progress','waiting')
+           AND a.organization_id=${cls.operatingOrganizationId}::uuid AND a.site_id=${cls.siteId}::uuid
+           AND a.program_id IS NULL AND a.section_id IS NULL
+           AND a.metadata->>'classId'=${cls.id} AND a.metadata->>'assignmentId'=w.assignment_id::text
+           AND a.metadata->>'source'='native_class_missing_work'
+         ORDER BY a.created_at,a.id LIMIT 1
+       ) follow_up ON true
        WHERE ${nativeOverdueWorkPredicate}
        ORDER BY w.due_at,w.enrollment_id,w.assignment_id
        LIMIT 101 OFFSET ${data.offset}
@@ -142,12 +134,74 @@ export const getNativeClassTeacherMissingWork=createServerFn({method:"GET"})
      const rows=result.rows as Array<{
        enrollment_id:string;assignment_id:string;title:string;due_at:Date|string;
        status:string;preferred_name:string|null;legal_first_name:string|null;legal_last_name:string|null;
+       follow_up_id:string|null;follow_up_owner:string|null;
      }>;
      return {items:rows.slice(0,100).map(row=>({
        classEnrollmentId:row.enrollment_id,assignmentId:row.assignment_id,
        assignmentTitle:row.title,dueAt:new Date(row.due_at).toISOString(),status:row.status,
+       followUpActionId:row.follow_up_owner===actor.actorPersonId?row.follow_up_id:null,
+       assignedToAnotherTeacher:!!row.follow_up_id&&row.follow_up_owner!==actor.actorPersonId,
        studentName:row.preferred_name??([row.legal_first_name,row.legal_last_name].filter(Boolean).join(" ")||"Learner"),
      })),nextOffset:rows.length>100?data.offset+100:null};
+   });
+ });
+
+/** Open one canonical Action per enrollment/assignment while the work is overdue.
+ * Lock enrollment before rechecking work, matching the learner submission lock.
+ * Audit, event and private in-app notice are committed with the Action. */
+export const createNativeClassMissingWorkFollowUp=createServerFn({method:"POST"})
+ .validator((raw:unknown)=>input.extend({
+   classEnrollmentId:z.string().uuid(),assignmentId:z.string().uuid(),
+ }).strict().parse(raw))
+ .handler(async({data})=>{
+   setResponseHeader("Cache-Control","private, no-store");
+   return db.transaction(async tx=>{
+     const {cls,actor}=await authorizedTeacher(tx,data.classId);
+     assertCapability(actor,"action.create");
+     const [enrollment]=await tx.select().from(canonicalClassEnrollments)
+       .where(and(eq(canonicalClassEnrollments.id,data.classEnrollmentId),
+         eq(canonicalClassEnrollments.classId,cls.id),eq(canonicalClassEnrollments.status,"active")))
+       .for("update").limit(1);
+     if(!enrollment)throw new AuthorizationError("current exact Class Enrollment");
+     const key="native-missing-work:"+enrollment.id+":"+data.assignmentId;
+     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${key}))`);
+     const result=await tx.execute(sql`
+       SELECT title,submission_status FROM (${nativeClassWorkRows([cls.id])}) work
+       WHERE enrollment_id=${enrollment.id}::uuid AND assignment_id=${data.assignmentId}::uuid
+         AND ${nativeOverdueWorkPredicate}
+       LIMIT 1
+     `);
+     const work=result.rows[0] as {title:string;submission_status:string|null}|undefined;
+     if(!work)throw new AuthorizationError("current overdue Class assignment");
+     const [existing]=await tx.select({id:actions.id,ownerPersonId:actions.ownerPersonId})
+       .from(actions).where(and(eq(actions.type,"missing_work_follow_up"),
+         eq(actions.subjectType,"class_enrollment"),eq(actions.subjectId,enrollment.id),
+         eq(actions.organizationId,cls.operatingOrganizationId),eq(actions.siteId,cls.siteId!),
+         inArray(actions.status,["open","in_progress","waiting"]),
+         sql`${actions.programId} IS NULL AND ${actions.sectionId} IS NULL`,
+         sql`${actions.metadata}->>'source'='native_class_missing_work'`,
+         sql`${actions.metadata}->>'classId'=${cls.id} AND ${actions.metadata}->>'assignmentId'=${data.assignmentId}`))
+       .limit(1);
+     if(existing)return existingMissingWorkFollowUpResponse(existing,actor.actorPersonId!);
+     const [action]=await tx.insert(actions).values({
+       type:"missing_work_follow_up",status:"open",priority:"normal",
+       title:"Missing Class work follow-up",description:"Review the assigned Class work and record the outcome.",
+       organizationId:cls.operatingOrganizationId,siteId:cls.siteId,
+       ownerPersonId:actor.actorPersonId!,subjectType:"class_enrollment",subjectId:enrollment.id,
+       dueAt:new Date(),metadata:{source:"native_class_missing_work",classId:cls.id,assignmentId:data.assignmentId},
+     }).returning({id:actions.id});
+     if(!action)throw new Error("Unable to create follow-up");
+     await notify(tx,{recipientPersonId:enrollment.learnerPersonId,type:"missing_work_follow_up",
+       title:"Teacher follow-up on Class work",
+       body:"Your teacher flagged overdue work. Open your Class assignments to review the work and any feedback.",
+       resourceType:"action",resourceId:action.id});
+     await emitEvent(tx,{eventType:EventTypes.ActionCreated,aggregateType:"action",aggregateId:action.id,
+       actorPersonId:actor.actorPersonId!,organizationId:cls.operatingOrganizationId,siteId:cls.siteId,
+       payload:{subjectType:"class_enrollment",subjectId:enrollment.id,classId:cls.id,assignmentId:data.assignmentId}});
+     await writeAudit(tx,actor,{action:"missing_work.follow_up",entityType:"action",entityId:action.id,
+       scope:{organizationId:cls.operatingOrganizationId,siteId:cls.siteId},
+       after:{classId:cls.id,classEnrollmentId:enrollment.id,assignmentId:data.assignmentId}});
+     return {actionId:action.id,created:true,assignedToAnotherTeacher:false};
    });
  });
 
