@@ -6,6 +6,7 @@ import {
   curriculumPacks, curriculumPackVersions, programs,
 } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
+import { DomainError } from "@/domain/errors";
 import type { Actor } from "@/modules/identity/actors.server";
 import { hasInstitutionalProgramCapability } from "@/modules/identity/institutional-capability.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
@@ -30,8 +31,8 @@ export function packCompositionRevision(versionId:string, courseVersionIds:strin
 }
 
 export function validatePackCourseSelection(ids:string[]):void {
-  if(ids.length<1||ids.length>200)throw new Error("Select between 1 and 200 published publisher-owned course releases.");
-  if(new Set(ids).size!==ids.length)throw new Error("Do not include the same course release twice.");
+  if(ids.length<1||ids.length>200)throw new DomainError("VALIDATION_FAILED","Select between 1 and 200 published publisher-owned course releases.");
+  if(new Set(ids).size!==ids.length)throw new DomainError("VALIDATION_FAILED","Do not include the same course release twice.");
 }
 
 async function ownedPack(tx:Pick<Transaction,"select">, packId:string, orgId:string){
@@ -43,7 +44,7 @@ async function ownedPack(tx:Pick<Transaction,"select">, packId:string, orgId:str
 async function packVersion(tx:Pick<Transaction,"select">, versionId:string, orgId:string){
   const [release]=await tx.select().from(curriculumPackVersions)
     .where(eq(curriculumPackVersions.id,versionId)).limit(1);
-  if(!release)throw new Error("Publisher pack version not found.");
+  if(!release)throw new AuthorizationError("publisher owns this pack version");
   await ownedPack(tx,release.packId,orgId);
   return release;
 }
@@ -103,8 +104,9 @@ export async function createPublisherPack(actor:Actor,input:{
       eq(curriculumPacks.publisherOrganizationId,program.organizationId),
       eq(curriculumPacks.slug,input.slug))).limit(1);
     if(existing){
-      if(existing.metadata.authoringRequestId!==input.requestId)
-        throw new Error("This publisher already uses that pack slug.");
+      if(existing.metadata.authoringRequestId!==input.requestId || existing.name!==input.name ||
+        existing.description!==input.description || existing.visibility!==input.visibility || existing.licenseCode!==input.licenseCode)
+        throw new DomainError("CONFLICT","This publisher already uses that pack slug.");
       const [draft]=await tx.select().from(curriculumPackVersions).where(and(
         eq(curriculumPackVersions.packId,existing.id),eq(curriculumPackVersions.version,1))).limit(1);
       if(!draft)throw new Error("Publisher pack must have a first release.");
@@ -141,9 +143,9 @@ export async function createPublisherPackDraft(actor:Actor,input:{
       .orderBy(desc(curriculumPackVersions.version));
     const retry=releases.find(v=>v.metadata.authoringRequestId===input.requestId);
     if(retry)return {versionId:retry.id,created:false};
-    if(releases.some(v=>v.status==="draft"))throw new Error("This pack already has an editable draft.");
+    if(releases.some(v=>v.status==="draft"))throw new DomainError("CONFLICT","This pack already has an editable draft.");
     const published=releases.find(v=>v.status==="published");
-    if(!published)throw new Error("First publish an initial release.");
+    if(!published)throw new DomainError("CONFLICT","First publish an initial release.");
     const [draft]=await tx.insert(curriculumPackVersions).values({
       packId:pack.id,version:releases[0]!.version+1,status:"draft",
       metadata:{sourceVersionId:published.id,authoringRequestId:input.requestId},
@@ -171,10 +173,10 @@ export async function savePublisherPackDraft(actor:Actor,input:{
     const version=await packVersion(tx,input.versionId,program.organizationId);
     const [locked]=await tx.select().from(curriculumPackVersions)
       .where(eq(curriculumPackVersions.id,version.id)).for("update").limit(1);
-    if(!locked||locked.status!=="draft")throw new Error("Published pack releases are immutable.");
+    if(!locked||locked.status!=="draft")throw new DomainError("CONFLICT","Published pack releases are immutable.");
     const previousIds=await courseIds(tx,version.id);
     const current=packCompositionRevision(version.id,previousIds);
-    if(current!==input.expectedRevision)throw new Error("This publisher pack draft changed. Reload before saving.");
+    if(current!==input.expectedRevision)throw new DomainError("CONFLICT","This publisher pack draft changed. Reload before saving.");
     const permitted=await tx.select({id:courseTemplateVersions.id,courseId:courseTemplates.id})
       .from(courseTemplateVersions)
       .innerJoin(courseTemplates,eq(courseTemplates.id,courseTemplateVersions.courseTemplateId))
@@ -184,7 +186,7 @@ export async function savePublisherPackDraft(actor:Actor,input:{
     if(permitted.length!==input.courseVersionIds.length)
       throw new AuthorizationError("all pack courses must be published and owned by this publisher");
     if(new Set(permitted.map(row=>row.courseId)).size!==permitted.length)
-      throw new Error("A pack may contain only one published release of each course.");
+      throw new DomainError("VALIDATION_FAILED","A pack may contain only one published release of each course.");
     if(JSON.stringify(previousIds)===JSON.stringify(input.courseVersionIds))return {revision:current,changed:false};
     await tx.delete(curriculumPackItems).where(eq(curriculumPackItems.packVersionId,version.id));
     await tx.insert(curriculumPackItems).values(input.courseVersionIds.map((id,i)=>({
@@ -207,20 +209,20 @@ export async function publishPublisherPack(actor:Actor,input:{
     const version=await packVersion(tx,input.versionId,program.organizationId);
     const [locked]=await tx.select().from(curriculumPackVersions)
       .where(eq(curriculumPackVersions.id,version.id)).for("update").limit(1);
-    if(!locked||locked.status!=="draft")throw new Error("Only draft pack versions can be published.");
+    if(!locked||locked.status!=="draft")throw new DomainError("CONFLICT","Only draft pack versions can be published.");
     const ids=await courseIds(tx,version.id);
     validatePackCourseSelection(ids);
     if(input.expectedRevision!==packCompositionRevision(version.id,ids))
-      throw new Error("This pack composition changed. Reload before publishing.");
+      throw new DomainError("CONFLICT","This pack composition changed. Reload before publishing.");
     const valid=await tx.select({id:courseTemplateVersions.id,courseId:courseTemplates.id})
       .from(courseTemplateVersions)
       .innerJoin(courseTemplates,eq(courseTemplates.id,courseTemplateVersions.courseTemplateId))
       .where(and(inArray(courseTemplateVersions.id,ids),
         eq(courseTemplates.owningOrganizationId,program.organizationId),
         eq(courseTemplateVersions.status,"published")));
-    if(valid.length!==ids.length)throw new Error("Some selected course versions are no longer eligible.");
+    if(valid.length!==ids.length)throw new DomainError("CONFLICT","Some selected course versions are no longer eligible.");
     if(new Set(valid.map(row=>row.courseId)).size!==valid.length)
-      throw new Error("A pack cannot publish two versions of the same course.");
+      throw new DomainError("VALIDATION_FAILED","A pack cannot publish two versions of the same course.");
     await tx.update(curriculumPackVersions).set({status:"published",publishedAt:new Date(),updatedAt:new Date()})
       .where(eq(curriculumPackVersions.id,version.id));
     await writeAudit(tx,actor,{action:"curriculum.pack.publish",entityType:"curriculum_pack_version",

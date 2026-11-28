@@ -1,4 +1,5 @@
 import { NativeCourseDraftController } from './native-course-draft.controller';
+import { PublisherPackController } from './publisher-pack.controller';
 import { Module } from '@nestjs/common';
 import { CanonicalIdentityModule } from './canonical-identity.module';
 import { CatalogController } from './catalog.controller';
@@ -13,6 +14,7 @@ import { NoncreditPublicationController } from './noncredit-publication.controll
   imports: [CanonicalIdentityModule],
   controllers: [
     NativeCourseDraftController,
+    PublisherPackController,
     CatalogController,
     WorkflowController,
     OfferingReleaseController,

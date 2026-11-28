@@ -73,6 +73,7 @@ import {exploreCanonicalBlueprintReferencesService,discoverCanonicalBlueprintOff
 import {getStaffLaunchWorkspaceService,getLaunchStudioDraftService,saveLaunchStudioDraftService} from "@/modules/programs/launch-drafts.server";
 import {listLaunchOptionsService,getLaunchEntryService} from "@/modules/programs/launch-discovery.server";
 import { getNativeCourseDraftLessonsService, saveNativeCourseLessonDraftService, getNativeCourseReleaseReadinessService, createNativeCourseAssignmentDraftService, getNativeCourseAssignmentDraftsService } from "@/modules/learning/native-course-draft.server";
+import * as publisherPack from "@/modules/learning/publisher-pack-authoring-http.server";
 export type WorkflowMode="planning"|"canonical"|"can"|"learner"|"operator-reporting";
 /** Existing independent native reviewer credentials remain distinct from CAN.
  * No fallback, new role, token or grant is manufactured by this adapter. */
@@ -82,6 +83,11 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
  const context=await (mode==="operator-reporting"?(readCookie(request,accessSessionCookie)!==undefined?getIdentityContext(request):getCanonicalCommandContext(request)):mode==="planning"?getBlueprintPlanningContext(request):mode==="canonical"?getCanonicalCommandContext(request):mode==="learner"?getInstructionalLearnerContext(request):getIdentityContext(request));
  if(!context.actorPersonId)throw new AuthorizationError("verified Person");
  return {
+  getPublisherPackStudio:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Publisher Pack context");return publisherPack.getPublisherPackStudioService(request,raw);},
+  createAuthoredPublisherPack:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Publisher Pack context");return publisherPack.createAuthoredPublisherPackService(request,raw);},
+  startPublisherPackDraft:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Publisher Pack context");return publisherPack.startPublisherPackDraftService(request,raw);},
+  saveAuthoredPublisherPack:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Publisher Pack context");return publisherPack.saveAuthoredPublisherPackService(request,raw);},
+  publishAuthoredPublisherPack:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Publisher Pack context");return publisherPack.publishAuthoredPublisherPackService(request,raw);},
   getNativeCourseDraftLessons:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Native Course authoring context");return getNativeCourseDraftLessonsService(request,raw);},
   saveNativeCourseLessonDraft:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Native Course authoring context");return saveNativeCourseLessonDraftService(request,raw);},
   getNativeCourseReleaseReadiness:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Native Course authoring context");return getNativeCourseReleaseReadinessService(request,raw);},
