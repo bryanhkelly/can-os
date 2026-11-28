@@ -13,6 +13,7 @@ const file = resolve(root, ".env.pilot-qa");
 const allowedBranch = "br-solitary-art-arun91gj";
 const secret = () => randomBytes(32).toString("hex");
 const modes = {
+  "nest-db": ["scripts/acceptance/check-nest-restricted-database.mjs"],
   "nest-roles": ["node_modules/@playwright/test/cli.js", "test", "--config", "playwright.nest-student-api.config.ts", "--fail-on-flaky-tests"],
   "nest-pilot1": ["node_modules/@playwright/test/cli.js", "test", "--config", "playwright.nest-student-api.config.ts", "--fail-on-flaky-tests"],
   "nest-pilot2": ["node_modules/@playwright/test/cli.js", "test", "--config", "playwright.nest-student-api.config.ts", "--fail-on-flaky-tests"],
@@ -92,7 +93,7 @@ function localConfiguration() {
 }
 try {
   const mode=process.argv[2];
-  if(process.argv.length!==3) fail("Use exactly one QA action: init, prepare, provision, governed, parent, parent-readiness, student, nest-http, nest-reporting, nest-pilot1, nest-pilot2, nest-roles, facilitator, readiness, executive, report, schema, regression, keys, fixture, api, browser, pilot1, pilot2, all.");
+  if(process.argv.length!==3) fail("Use exactly one QA action: init, prepare, provision, governed, parent, parent-readiness, student, nest-http, nest-reporting, nest-pilot1, nest-pilot2, nest-roles, nest-db, facilitator, readiness, executive, report, schema, regression, keys, fixture, api, browser, pilot1, pilot2, all.");
   if(mode==="init") init();
   else {
     if(!Object.hasOwn(modes,mode)&&!["pilot1","pilot2","all"].includes(mode)) fail("Unknown QA action.");
