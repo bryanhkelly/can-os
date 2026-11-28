@@ -783,3 +783,30 @@ test('guardian family application and grant restoration are distinct governed op
  assert.equal(c.guardianRestoreReceipt.safeParse({restored:true,sessionId:id}).success,false);
  assert.equal(c.familyWorkspaceResult.safeParse({programs:[],applications:[],households:[],students:[],transferRequests:[]}).success,true);
 });
+
+test('admissions interest, guardian offer visibility and transfer start use protected distinct APIs',async()=>{
+ const id='00000000-0000-4000-8000-000000000001';
+ await withServer('0',async(url,document)=>{
+  for(const [method,path] of [['GET','/api/v1/admission-interests'],['POST','/api/v1/admission-interest-assignments'],['POST','/api/v1/admission-interest-invitations'],['POST','/api/v1/admission-interest-status-changes'],['GET','/api/v1/me/admission-offers'],['GET','/api/v1/me/transfer-destinations'],['POST','/api/v1/transfer-destination-family-starts']]){
+   const op=document.paths[path][method.toLowerCase()];
+   assert.ok(op.security);assert.ok(op.responses['403']);
+   if(method==='POST')assert.ok(op.requestBody);
+   const res=await fetch(url+path,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(res.status,method==='POST'?503:401);
+  }
+ });
+ const c=require('../dist/participation.contracts');
+ assert.equal(c.publicInterestQuery.safeParse({programId:id,cursor:'x'.repeat(81)}).success,false);
+ assert.equal(c.publicInterestPageResult.safeParse({items:[],nextCursor:null}).success,true);
+ assert.equal(c.interestAssignmentInput.safeParse({interestId:id,programId:id,applicationId:id}).success,false);
+ assert.equal(c.interestStatusInput.safeParse({interestId:id,status:'converted'}).success,false);
+ assert.equal(c.interestInvitationInput.safeParse({interestId:id,contactConsent:true}).success,false);
+ assert.equal(c.interestInvitationReceipt.safeParse({requestId:id,created:true,delivered:true}).success,false);
+ assert.equal(c.guardianOffersQuery.safeParse({studentPersonId:id,guardianPersonId:id}).success,false);
+ assert.equal(c.guardianOffersResult.safeParse([]).success,true);
+ const transfer={originTransferActionId:id,destinationProgramId:id,requestId:id,confirmedDestination:true};
+ assert.equal(c.transferDestinationInput.safeParse(transfer).success,true);
+ assert.equal(c.transferDestinationInput.safeParse({...transfer,confirmedDestination:false}).success,false);
+ assert.equal(c.transferDestinationInput.safeParse({...transfer,studentPersonId:id}).success,false);
+ assert.equal(c.transferDestinationReceipt.safeParse({requested:true,alreadyHasAccess:false,destinationName:'School',enrollmentId:id}).success,false);
+});
