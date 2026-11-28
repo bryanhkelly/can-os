@@ -1,3 +1,4 @@
+import {parseCommandInput} from "@/domain/command-input";
 import {readHistoricalClassWork} from "./historical-class-work.server";
 import { projectSubmissionRevisionPage } from "@/domain/submission-revisions";
 import { and, eq, inArray, sql } from "drizzle-orm";
@@ -41,7 +42,7 @@ async function authorizedTeacher(request:Request,tx:Tx,classId:string){
  */
 export const getNativeClassTeacherHomeworkInput=pageInput;
 export async function getNativeClassTeacherHomeworkService(request:Request,raw:unknown=undefined){
- const data=getNativeClassTeacherHomeworkInput.parse(raw);
+ const data=parseCommandInput(getNativeClassTeacherHomeworkInput,raw);
    return db.transaction(async tx=>{
      const {cls}=await authorizedTeacher(request,tx,data.classId);
      const result=await tx.execute(sql`
@@ -98,7 +99,7 @@ export async function getNativeClassTeacherHomeworkService(request:Request,raw:u
  * predicate as Teacher Today. This is a read, not an intervention or grade. */
 export const getNativeClassTeacherMissingWorkInput=pageInput;
 export async function getNativeClassTeacherMissingWorkService(request:Request,raw:unknown=undefined){
- const data=getNativeClassTeacherMissingWorkInput.parse(raw);
+ const data=parseCommandInput(getNativeClassTeacherMissingWorkInput,raw);
    return db.transaction(async tx=>{
      const {cls,actor}=await authorizedTeacher(request,tx,data.classId);
      const result=await tx.execute(sql`
@@ -144,7 +145,7 @@ export async function getNativeClassTeacherMissingWorkService(request:Request,ra
  * This uses the same current Class population without requiring overdue status. */
 export const getNativeClassTeacherOpenFollowUpsInput=pageInput;
 export async function getNativeClassTeacherOpenFollowUpsService(request:Request,raw:unknown=undefined){
- const data=getNativeClassTeacherOpenFollowUpsInput.parse(raw);
+ const data=parseCommandInput(getNativeClassTeacherOpenFollowUpsInput,raw);
    return db.transaction(async tx=>{
      const {cls,actor}=await authorizedTeacher(request,tx,data.classId);
      assertCapability(actor,"action.resolve");
@@ -176,7 +177,7 @@ export const createNativeClassMissingWorkFollowUpInput=input.extend({
    classEnrollmentId:z.string().uuid(),assignmentId:z.string().uuid(),
  }).strict();
 export async function createNativeClassMissingWorkFollowUpService(request:Request,raw:unknown=undefined){
- const data=createNativeClassMissingWorkFollowUpInput.parse(raw);
+ const data=parseCommandInput(createNativeClassMissingWorkFollowUpInput,raw);
    return db.transaction(async tx=>{
      const {cls,actor}=await authorizedTeacher(request,tx,data.classId);
      assertCapability(actor,"action.create");
@@ -233,7 +234,7 @@ export const getNativeClassTeacherHomeworkHistoryInput=input.extend({
    submissionId:z.string().uuid(),beforeRevision:z.number().int().positive().optional(),
  }).strict();
 export async function getNativeClassTeacherHomeworkHistoryService(request:Request,raw:unknown=undefined){
- const data=getNativeClassTeacherHomeworkHistoryInput.parse(raw);
+ const data=parseCommandInput(getNativeClassTeacherHomeworkHistoryInput,raw);
    return db.transaction(async tx=>{
      const {cls}=await authorizedTeacher(request,tx,data.classId);
      const result=await tx.execute(sql`
@@ -270,7 +271,7 @@ const practiceFeedbackInput=input.extend({
  */
 export const returnNativeClassPracticeFeedbackInput=practiceFeedbackInput;
 export async function returnNativeClassPracticeFeedbackService(request:Request,raw:unknown=undefined){
- const data=returnNativeClassPracticeFeedbackInput.parse(raw);
+ const data=parseCommandInput(returnNativeClassPracticeFeedbackInput,raw);
    return db.transaction(async tx=>{
      const {cls,actor}=await authorizedTeacher(request,tx,data.classId);
 
@@ -330,7 +331,7 @@ export async function returnNativeClassPracticeFeedbackService(request:Request,r
  * attempts and official grading appointments are not exposed here. */
 export const getNativeClassTeacherAssessmentsInput=input;
 export async function getNativeClassTeacherAssessmentsService(request:Request,raw:unknown=undefined){
- const data=getNativeClassTeacherAssessmentsInput.parse(raw);
+ const data=parseCommandInput(getNativeClassTeacherAssessmentsInput,raw);
    return db.transaction(async tx=>{
      const {cls}=await authorizedTeacher(request,tx,data.classId);
      const result=await tx.execute(sql`
@@ -365,7 +366,7 @@ export async function getNativeClassTeacherAssessmentsService(request:Request,ra
 /** Teachers may inspect submitted school work for current learners in their exact Class. */
 export const getNativeClassTeacherHistoricalWorkInput=input.extend({beforeId:z.string().uuid().optional()}).strict();
 export async function getNativeClassTeacherHistoricalWorkService(request:Request,raw:unknown=undefined){
- const data=getNativeClassTeacherHistoricalWorkInput.parse(raw);
+ const data=parseCommandInput(getNativeClassTeacherHistoricalWorkInput,raw);
   return db.transaction(async tx=>{
    const {cls}=await authorizedTeacher(request,tx,data.classId);
    return readHistoricalClassWork(tx,{classId:cls.id,classEnrollmentId:null,beforeId:data.beforeId});

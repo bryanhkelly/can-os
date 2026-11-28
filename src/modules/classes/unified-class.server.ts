@@ -1,3 +1,4 @@
+import {parseCommandInput} from "@/domain/command-input";
 import { and, asc, desc, eq, exists, gt, ilike, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
@@ -57,7 +58,7 @@ async function requireClassOperator(request:Request): Promise<ClassOperator> {
  * a marketing or self-registration listing. */
 export const createUnifiedClassDraftInput=z.object({definition:classDefinitionSchema,terms:classOfferingTermsSchema.nullable().optional().transform(v=>v??null)}).strict();
 export async function createUnifiedClassDraftService(request:Request,raw:unknown=undefined){
- const data=createUnifiedClassDraftInput.parse(raw);
+ const data=parseCommandInput(createUnifiedClassDraftInput,raw);
     const operator=await requireClassOperator(request);
     return db.transaction(async tx=>{
       await validateClassAuthority(tx,operator,data.definition);
@@ -108,7 +109,7 @@ export async function createUnifiedClassDraftService(request:Request,raw:unknown
  * publisher/Course/adoption/Site authorization is independently rechecked. */
 export const activateUnifiedClassInput=z.object({classId:z.string().uuid()}).strict();
 export async function activateUnifiedClassService(request:Request,raw:unknown=undefined){
- const data=activateUnifiedClassInput.parse(raw);
+ const data=parseCommandInput(activateUnifiedClassInput,raw);
     const operator=await requireClassOperator(request);
     return db.transaction(async tx=>{
       const [instance]=await tx.select().from(canonicalClasses)
@@ -151,7 +152,7 @@ export const getMyUnifiedClassDraftsInput=z.object({
     siteId:z.string().uuid().optional(),
   }).strict();
 export async function getMyUnifiedClassDraftsService(request:Request,raw:unknown=undefined){
- const data=getMyUnifiedClassDraftsInput.parse(raw);
+ const data=parseCommandInput(getMyUnifiedClassDraftsInput,raw);
     const operator=await requireClassOperator(request);
     // A caller-supplied filter may narrow a verified Site grant, never widen it.
     if(data.siteId&&!operator.siteIds.includes(data.siteId))
@@ -197,7 +198,7 @@ const manageOfferingInput = z.object({
  */
 export const publishUnifiedClassOfferingInput=manageOfferingInput;
 export async function publishUnifiedClassOfferingService(request:Request,raw:unknown=undefined){
- const data=publishUnifiedClassOfferingInput.parse(raw);
+ const data=parseCommandInput(publishUnifiedClassOfferingInput,raw);
     const operator=await requireClassOperator(request);
     return db.transaction(async tx=>{
       const [instance]=await tx.select().from(canonicalClasses)
@@ -297,7 +298,7 @@ export async function publishUnifiedClassOfferingService(request:Request,raw:unk
 /** Stop registration while preserving learners and class history. */
 export const closeUnifiedClassOfferingInput=manageOfferingInput;
 export async function closeUnifiedClassOfferingService(request:Request,raw:unknown=undefined){
- const data=closeUnifiedClassOfferingInput.parse(raw);
+ const data=parseCommandInput(closeUnifiedClassOfferingInput,raw);
     const operator=await requireClassOperator(request);
     return db.transaction(async tx=>{
       const [instance]=await tx.select().from(canonicalClasses)
@@ -339,7 +340,7 @@ export const createNextUnifiedClassOfferingVersionInput=z.object({
     classId:z.string().uuid(),terms:classOfferingTermsSchema,
   }).strict();
 export async function createNextUnifiedClassOfferingVersionService(request:Request,raw:unknown=undefined){
- const data=createNextUnifiedClassOfferingVersionInput.parse(raw);
+ const data=parseCommandInput(createNextUnifiedClassOfferingVersionInput,raw);
     const operator=await requireClassOperator(request);
     return db.transaction(async tx=>{
       const [instance]=await tx.select().from(canonicalClasses)
@@ -451,7 +452,7 @@ export const getUnifiedClassCourseOptionsInput=z.object({
     siteId:z.string().uuid().optional(),
   }).strict();
 export async function getUnifiedClassCourseOptionsService(request:Request,raw:unknown=undefined){
- const data=getUnifiedClassCourseOptionsInput.parse(raw);
+ const data=parseCommandInput(getUnifiedClassCourseOptionsInput,raw);
     const operator=await requireClassOperator(request);
     if(data.siteId&&!operator.siteIds.includes(data.siteId))
       throw new AuthorizationError("current Site scope for Course discovery");

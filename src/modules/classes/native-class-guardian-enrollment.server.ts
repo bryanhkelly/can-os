@@ -1,3 +1,4 @@
+import {parseCommandInput} from "@/domain/command-input";
 import { nativeClassConsentDigest } from "./native-class-consent.server";
 import {and,asc,desc,eq,gt,isNull,lte,or} from "drizzle-orm";
 import {z} from "zod";
@@ -69,7 +70,7 @@ export async function getMyNativeGuardianLearnersService(request:Request,raw:unk
 /** Guardian requests review for a verified minor through a CAN login. */
 export const requestNativeGuardianClassApprovalInput=requestSchema;
 export async function requestNativeGuardianClassApprovalService(request:Request,raw:unknown=undefined){
- const data=requestNativeGuardianClassApprovalInput.parse(raw);
+ const data=parseCommandInput(requestNativeGuardianClassApprovalInput,raw);
 
   const now=new Date();
   const guardian=await requireNativeGuardian(request,now);
@@ -196,7 +197,7 @@ export async function getMyNativeGuardianClassApprovalsService(request:Request,r
  */
 export const acceptNativeGuardianClassApprovalInput=acceptanceSchema;
 export async function acceptNativeGuardianClassApprovalService(request:Request,raw:unknown=undefined){
- const data=acceptNativeGuardianClassApprovalInput.parse(raw);
+ const data=parseCommandInput(acceptNativeGuardianClassApprovalInput,raw);
 
   const now=new Date();
   const guardian=await requireNativeGuardian(request,now);
@@ -312,7 +313,7 @@ export async function acceptNativeGuardianClassApprovalService(request:Request,r
  */
 export const withdrawMyGuardianNativeClassEnrollmentInput=withdrawSchema;
 export async function withdrawMyGuardianNativeClassEnrollmentService(request:Request,raw:unknown=undefined){
- const data=withdrawMyGuardianNativeClassEnrollmentInput.parse(raw);
+ const data=parseCommandInput(withdrawMyGuardianNativeClassEnrollmentInput,raw);
 
   const now=new Date(),guardian=await requireNativeGuardian(request,now);
   return db.transaction(async tx=>{

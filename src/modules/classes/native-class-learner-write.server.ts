@@ -1,3 +1,4 @@
+import {parseCommandInput} from "@/domain/command-input";
 import {and,eq,sql} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
@@ -13,7 +14,7 @@ export const homeworkSubmissionInput=z.object({classEnrollmentId:uuid,assignment
 
 /** Both transports use the same transaction, resource authority and evidence. */
 export async function completeNativeClassLesson(actor:CommandContext,raw:unknown){
-  const data=lessonCompletionInput.parse(raw);
+  const data=parseCommandInput(lessonCompletionInput,raw);
     return db.transaction(async tx=>{
       const {cls,access}=await authorizeNativeLearnerClass(tx,actor,data.classEnrollmentId,"active_write");
       const [lesson]=await tx.select({id:courseLessons.id})
@@ -54,7 +55,7 @@ export async function completeNativeClassLesson(actor:CommandContext,raw:unknown
 }
 
 export async function submitNativeClassHomeworkCommand(actor:CommandContext,raw:unknown){
-  const data=homeworkSubmissionInput.parse(raw);
+  const data=parseCommandInput(homeworkSubmissionInput,raw);
     if(!(actor.role==="student"&&actor.capabilities.has("assignments:submit") ||
          actor.role==="learner"&&actor.capabilities.has("learning.participate")))
       throw new AuthorizationError("own homework submission capability");

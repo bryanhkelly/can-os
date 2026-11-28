@@ -1,3 +1,4 @@
+import {parseCommandInput} from "@/domain/command-input";
 import { and, asc, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
@@ -116,7 +117,7 @@ async function latestAgenda(tx:Tx,classSessionId:string) {
 /** Permissions rechecked on every read. Being paired to a classroom is NOT
  * sufficient; learners must own an authorized native Class Course Attempt. */
 export async function getNativeClassSessionAgendaService(request:Request,raw:unknown){
- const data=readInput.parse(raw);
+ const data=parseCommandInput(readInput,raw);
 
     requireAgendaFeature();
     const actor=await getCanonicalCommandContext(request);
@@ -204,7 +205,7 @@ export async function getNativeClassSessionAgendaService(request:Request,raw:unk
 /** Versioned, local-only planning. Exactly the assigned facilitator may
  * append a revision before the existing scheduled delivery window starts. */
 export async function publishNativeClassSessionAgendaService(request:Request,raw:unknown){
- const data=publishInput.parse(raw);
+ const data=parseCommandInput(publishInput,raw);
 
     requireAgendaFeature();
     requireFacilitatedLearningEnabled();

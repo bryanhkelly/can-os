@@ -1,3 +1,4 @@
+import {parseCommandInput} from "@/domain/command-input";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
@@ -23,7 +24,7 @@ export const transferInput=z.object({
  * all learner evidence remain attached to the existing room. Physical
  * coverage and attendance permission are not transferred by this command. */
 export async function transferNativeClassroomControlService(request:Request,raw:unknown){
- const data=transferInput.parse(raw);
+ const data=parseCommandInput(transferInput,raw);
 
     requireFacilitatedLearningEnabled();
     const actor=await getCanonicalCommandContext(request);

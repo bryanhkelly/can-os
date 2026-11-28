@@ -1,3 +1,4 @@
+import {parseCommandInput} from "@/domain/command-input";
 import { and, eq, isNull } from "drizzle-orm";
 import { classSessionAgendaRevisions } from "@/db/canonical-v301/class-session-agendas";
 import { requiresClassSessionAgenda } from "@/domain/native-class-session-agenda";
@@ -45,7 +46,7 @@ export const nativeClassSessionScheduleSchema=z.object({
  * Course material, or confer room pairing or private-media rights.
  */
 export async function scheduleNativeClassSessionsService(request:Request,raw:unknown){
- const data=nativeClassSessionScheduleSchema.parse(raw);
+ const data=parseCommandInput(nativeClassSessionScheduleSchema,raw);
 
     requireFacilitatedLearningEnabled();
     const host=await resolveCanonicalFacilitator(request);
@@ -141,7 +142,7 @@ export const nativeClassSessionChangeSchema=z.object({
 }).strict();
 
 export async function changeNativeClassSessionScheduleService(request:Request,raw:unknown){
- const data=nativeClassSessionChangeSchema.parse(raw);
+ const data=parseCommandInput(nativeClassSessionChangeSchema,raw);
 
     requireFacilitatedLearningEnabled();
     const host=await resolveCanonicalFacilitator(request);
@@ -290,7 +291,7 @@ export const openInput=z.object({classId:uuid,classSessionId:uuid}).strict();
  * must already exist and every pairing/media command checks it again.
  */
 export async function openNativeClassSessionService(request:Request,raw:unknown){
- const data=openInput.parse(raw);
+ const data=parseCommandInput(openInput,raw);
 
     requireFacilitatedLearningEnabled();
     const host=await resolveCanonicalFacilitator(request);
@@ -413,7 +414,7 @@ export const revokeInput=z.object({classId:uuid,classSessionId:uuid,
   reason:z.string().trim().min(15).max(500)}).strict();
 
 export async function revokeNativeClassSessionService(request:Request,raw:unknown){
- const data=revokeInput.parse(raw);
+ const data=parseCommandInput(revokeInput,raw);
 
     // Emergency revocation must remain available after native scheduling
     // or ordinary facilitated-learning commands have been disabled. A room

@@ -306,3 +306,13 @@ test('teacher and guardian workspace operations retain explicit authorization an
  assert.equal(queries.page.safeParse({offset:'1000001'}).success,false);
  assert.equal(results.followUp.safeParse({actionId:null,created:false,assignedToAnotherTeacher:true}).success,true);
 });
+
+test('explicit domain input errors map to 400 while local response schema failures remain internal',async()=>{
+ const {CanonicalIdentityService}=require('../dist/identity.service');
+ const {z}=require('zod');
+ const service=new CanonicalIdentityService();
+ service.configure(true);
+ service.bridge={classifyHttpDomainError:error=>error?.code==='VALIDATION_FAILED'?'validation':'unexpected'};
+ await assert.rejects(()=>service.runWorkflow(async()=>{throw Object.assign(new Error('private value'),{code:'VALIDATION_FAILED'});}),e=>e.getStatus()===400&&!e.message.includes('private value'));
+ await assert.rejects(()=>service.runWorkflow(async()=>z.string().parse(123)),e=>e.name==='ZodError');
+});
