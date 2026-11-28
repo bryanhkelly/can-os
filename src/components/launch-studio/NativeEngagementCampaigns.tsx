@@ -6,15 +6,17 @@ import {Input} from "@/components/ui/input";
 import {Select} from "@/components/ui/select";
 import {EmailRecipientField} from "@/components/communication/EmailRecipientField";
 import {ActionFooter,EmptyState,QueryState,WorkspaceNotice,WorkspacePanel,StatusBadge,RecordFacts,ActionStateIndicator} from "@/components/workspace";
-import {readEngagementCampaignWorkspace,saveCampaignRecipientList,queueEngagementCampaign,cancelEngagementCampaign} from "@/modules/communication/engagement-campaigns.functions";
+import {legacyCampaignTransport} from "@/modules/communication/campaign-workspace-transport";
+import type {CampaignTransport,CampaignWorkspace} from "@/domain/campaign-workspace-api";
 import {CampaignListMembers} from "./CampaignListMembers";
 import {parseCampaignRecipients,parseCampaignRecipientCsv} from "@/domain/campaign-policy";
-type Workspace=Awaited<ReturnType<typeof readEngagementCampaignWorkspace>>;
-type CampaignProps={engagementId:string;linkId:string;invitationReady:boolean;recipientDraft?:string;onRecipientDraftChange?:(value:string)=>void};
+type Workspace=CampaignWorkspace;
+type CampaignProps={transport?:CampaignTransport;engagementId:string;linkId:string;invitationReady:boolean;recipientDraft?:string;onRecipientDraftChange?:(value:string)=>void};
 export function NativeEngagementCampaigns(props:CampaignProps){
- return <NativeCampaignSession key={JSON.stringify([props.engagementId,props.linkId])} {...props}/>;
+ return <NativeCampaignSession key={JSON.stringify([props.engagementId,props.linkId,props.transport?.kind??'legacy'])} {...props}/>;
 }
-function NativeCampaignSession({engagementId,linkId,invitationReady,recipientDraft,onRecipientDraftChange}:CampaignProps){
+function NativeCampaignSession({engagementId,linkId,invitationReady,recipientDraft,onRecipientDraftChange,transport=legacyCampaignTransport}:CampaignProps){
+ const {readEngagementCampaignWorkspace,saveCampaignRecipientList,queueEngagementCampaign,cancelEngagementCampaign}=transport.api;
  const [data,setData]=useState<Workspace|null>(null),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const [name,setName]=useState(""),[localRaw,setLocalRaw]=useState(""),[source,setSource]=useState(""),[attested,setAttested]=useState(false);
  const raw=recipientDraft??localRaw;
@@ -37,7 +39,7 @@ function NativeCampaignSession({engagementId,linkId,invitationReady,recipientDra
  }
  const requestId=useRef<{id:string;scheduledAt:string;fingerprint:string}|null>(null),pending=useRef(false);
  const scope={engagementId,linkId};
- useEffect(()=>{let active=true;setData(null);setError("");readEngagementCampaignWorkspace({data:{engagementId,linkId}}).then(v=>{if(active)setData(v);}).catch(()=>{if(active){setData(null);setError("Native campaign workspace unavailable.");}});return()=>{active=false;};},[engagementId,linkId,refresh]);
+ useEffect(()=>{let active=true;setData(null);setError("");readEngagementCampaignWorkspace({data:{engagementId,linkId}}).then(v=>{if(active)setData(v);}).catch(()=>{if(active){setData(null);setError("Native campaign workspace unavailable.");}});return()=>{active=false;};},[engagementId,linkId,refresh,readEngagementCampaignWorkspace]);
  async function run(action:()=>Promise<void>){if(pending.current||importPending.current)return;pending.current=true;setBusy(true);setError("");setNotice("");try{await action();setRefresh(v=>v+1);}catch{setError("The operation could not be confirmed. Review the saved state and try again.");}finally{pending.current=false;setBusy(false);}}
  useEffect(()=>{if(!invitationReady){setConfirmed(false);}},[invitationReady]);
  const parsed=parseCampaignRecipients(raw);
@@ -63,7 +65,7 @@ function NativeCampaignSession({engagementId,linkId,invitationReady,recipientDra
  <ActionFooter layout="inline"><Button type="button" disabled={!data||!valid||busy||importing} onClick={()=>void run(async()=>{const saved=await saveCampaignRecipientList({data:{...scope,name,raw,consentSource:source,attested:true}});setList(saved.id);setRaw("");setAttested(false);setConfirmed(false);setNotice("Recipient list saved. No messages sent.");})}>Save or add to list</Button></ActionFooter>
  {data&&<>
  <Field label="Or use a saved recipient list"><Select value={list} disabled={busy} onChange={e=>{setList(e.target.value);if(e.target.value){setRaw("");setAttested(false);}setManageList(false);setConfirmed(false);}}><option value="">Select a list</option>{data.lists.map(l=><option key={l.id} value={l.id}>{l.name} ({l.recipients})</option>)}</Select></Field>
- {list&&<><Button type="button" variant="outline" disabled={busy} onClick={()=>setManageList(v=>!v)}>{manageList?"Close recipient management":"Manage saved recipients"}</Button>{manageList&&<CampaignListMembers key={list} engagementId={engagementId} linkId={linkId} listId={list} onChange={()=>{setConfirmed(false);setRefresh(v=>v+1);}}/>}</>}
+ {list&&<><Button type="button" variant="outline" disabled={busy} onClick={()=>setManageList(v=>!v)}>{manageList?"Close recipient management":"Manage saved recipients"}</Button>{manageList&&<CampaignListMembers transport={transport} key={list} engagementId={engagementId} linkId={linkId} listId={list} onChange={()=>{setConfirmed(false);setRefresh(v=>v+1);}}/>}</>}
  <Field label="Schedule (local time)" description="Leave empty to send now. Scheduled processing is periodic, not an exact minute guarantee."><Input type="datetime-local" value={when} disabled={busy} onChange={e=>{setWhen(e.target.value);setConfirmed(false);}}/></Field>
  <label className="flex items-start gap-2 text-sm"><Checkbox checked={confirmed} disabled={!invitationReady||busy} onChange={e=>setConfirmed(e.target.checked)}/>Send the displayed invitation to the selected recipients. Recipients with opt-outs will be suppressed.</label>
  {queueBlock&&!busy&&!importing&&<ActionStateIndicator state={{kind:"blocked",detail:queueBlock}}/>}
