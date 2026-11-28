@@ -8,13 +8,10 @@ import { isEligiblePrivilegedMailbox } from "@/domain/domain-classification";
 import { hasValidAccessGrantScope } from "@/domain/access-grant-scope";
 import { EventTypes } from "@/domain/event-types";
 import { matchesVerifiedExternalSandboxInvitation } from "@/domain/sandbox-external-invitation";
-import { matchesDemoSchoolAdministrator } from "@/domain/school-setup";
+import { localStaffInviteRoles } from "@/domain/staff-onboarding-policy";
 import { hasApprovedDemoPersonalCredential, matchesDemoCredentialScope, readDemoSchoolForAccount } from "./demo-school-tenants.server";
-import { readDemoStaffBindings, matchesDemoStaffBinding } from "./demo-staff-access.server";
-import { AuthorizationError } from "@/domain/command-context";
 import {
   isDemoAccountEmail,
-  isApprovedDemoGrant,
   LOCAL_DEMO_ACCOUNTS,
   LOCAL_DEMO_ADMIN,
   DEMO_ACCOUNT_DOMAIN,
@@ -105,34 +102,29 @@ export async function readLegacyCredentialGrants(
   const adminAccount = accountId === LOCAL_DEMO_ADMIN.accountId || normalizedEmail === LOCAL_DEMO_ADMIN.email;
   // A private account must never fall back to the legacy credential reader.
   if (ownGrants.some(grant=>grant.privateCredential)) return {grants:[],demoAccountSwitching:false};
-  if (demoAccount && !adminAccount) {
-    // All non-switching credentials use the same current Person and active
-    // grants. Credential approval limits the reachable institution, not
-    // the permitted business capabilities of a valid role.
-    const fixedIdentity = LOCAL_DEMO_ACCOUNTS.find(candidate=>candidate.accountId===accountId ||
-      candidate.email===normalizedEmail);
-    if (fixedIdentity && (fixedIdentity.accountId!==accountId || fixedIdentity.email!==normalizedEmail))
-      return {grants:[],demoAccountSwitching:false};
-    if (fixedIdentity) return {grants:ownGrants.filter(grant=>grant.email===normalizedEmail &&
-      grant.accountPersonId===grant.personId && isApprovedDemoGrant(grant,normalizedEmail)),demoAccountSwitching:false};
-    const school = await readDemoSchoolForAccount(accountId, reader);
-    const bindings = await readDemoStaffBindings(accountId, reader);
+  if (demoAccount || adminAccount) {
+    if (!isDemoAccountEmail(normalizedEmail)) return {grants:[],demoAccountSwitching:false};
+    // The public credential may authenticate only a current Account Person
+    // inside its approved synthetic Site. Canonical grants determine roles;
+    // fixture names, original roles and grant IDs do not grant permissions.
     const grants:typeof ownGrants=[];
     for (const grant of ownGrants) {
-      if (grant.email!==normalizedEmail || grant.accountPersonId!==grant.personId) continue;
+      if (!grant.active || grant.accountId!==accountId ||
+          grant.email!==normalizedEmail || !grant.accountPersonId ||
+          grant.accountPersonId!==grant.personId) continue;
       if (grant.role==="account_holder" && !grant.organizationId && !grant.siteId) {
         if (await hasApprovedDemoPersonalCredential(accountId,normalizedEmail,reader)) grants.push(grant);
         continue;
       }
-      if (!await matchesDemoCredentialScope(normalizedEmail,grant.organizationId,grant.siteId,reader)) continue;
-      // Privileged roles are never acquired from a shared personal credential.
-      if (grant.role==="guardian" || grant.role==="student" ||
-          (school && matchesDemoSchoolAdministrator(school,grant,normalizedEmail)) ||
-          bindings.some(binding=>matchesDemoStaffBinding(binding,grant,normalizedEmail)) ||
-          (normalizedEmail.endsWith("@"+DEMO_ACCOUNT_DOMAIN) && grant.role!=="platform_owner" && grant.role!=="app_admin"))
+      // Platform, network, provider-review and independent institutional
+      // authority cannot be established using a publicly known credential.
+      const localRole=grant.role==="site_admin" || grant.role==="guardian" ||
+        grant.role==="student" || localStaffInviteRoles.some(role=>role===grant.role);
+      if (localRole && await matchesDemoCredentialScope(normalizedEmail,grant.organizationId,grant.siteId,reader))
         grants.push(grant);
     }
-    return {grants,demoAccountSwitching:false,...(school&&grants.some(g=>g.id===school.adminGrantId)?{launchSiteId:school.siteId}:{})};
+    const administrator=grants.find(grant=>grant.role==="site_admin" && grant.siteId);
+    return {grants,demoAccountSwitching:false,...(administrator?.siteId?{launchSiteId:administrator.siteId}:{})};
   }
 
   if (!adminAccount && !demoAccount) {
@@ -184,24 +176,5 @@ export async function readLegacyCredentialGrants(
     return { grants, demoAccountSwitching: false };
   }
 
-  if (adminAccount) {
-    if (accountId !== LOCAL_DEMO_ADMIN.accountId || normalizedEmail !== LOCAL_DEMO_ADMIN.email) {
-      throw new AuthorizationError("active demo administrator membership");
-    }
-    const adminGrant = ownGrants.find(grant =>
-      grant.id === LOCAL_DEMO_ADMIN.grantId &&
-      isApprovedDemoGrant(grant, normalizedEmail),
-    );
-    if (!adminGrant) throw new AuthorizationError("active demo administrator membership");
-    // An administrator signs in as their own Person, never as the whole fixture.
-    // Cross-Person access belongs to the independently authenticated owner service.
-    return {
-      grants: [adminGrant],
-      demoAccountSwitching: false,
-      launchSiteId: adminGrant.siteId ?? undefined,
-    };
-  }
-
   return {grants:[],demoAccountSwitching:false};
 }
-
