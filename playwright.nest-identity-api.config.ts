@@ -3,7 +3,7 @@ import provision from "./playwright.pilot-provision.config";
 const env=process.env;
 if(!provision.webServer||Array.isArray(provision.webServer))throw Error("Existing isolated QA server configuration required");
 export default defineConfig({
-  ...provision,use:{...provision.use,baseURL:"http://localhost:3001"},testMatch:["nest-access-provisioning-http.spec.ts","nest-owner-control-http.spec.ts"],projects:[{name:"http-only"}],
+  ...provision,use:{...provision.use,baseURL:"http://localhost:3001"},testMatch:["nest-access-provisioning-http.spec.ts","nest-owner-control-http.spec.ts","nest-staff-admin-http.spec.ts"],projects:[{name:"http-only"}],
   webServer:[{
     command:"npm --prefix apps/api start",
     url:"http://127.0.0.1:3001/api/v1/health/live",reuseExistingServer:false,timeout:30000,
