@@ -78,3 +78,14 @@ export const manualDocs={
  page:o({items:a(o({id:i,title:t,status:t,priority:choice('normal','high','urgent'),siteId:ni,programId:ni,ownerPersonId:ni,dueAt:nd,updatedAt:date}),50),nextAfterId:ni}),
  inbox:o({sources:a(o({source:choice('operations','credential_request','credential_review'),items:a(o({id:i,title:t,status:t,priority:choice('critical','high','normal'),siteId:ni,programId:ni,dueAt:nd,createdAt:date,href:t}),250),possiblyTruncated:bool,limit:integer,href:t}),3)})
 };
+
+export const dependencyBody=obj({blockedByActionId:id,operation:z.enum(['add','remove']),expectedUpdatedAt:dt,reason:s.trim().min(5).max(500)});
+export const dependencyResults={
+ read:obj({actionId:id,updatedAt:dt,blocked:b,prerequisites:z.array(obj({id,title:s,status:s,satisfied:b})).max(100)}),
+ changed:obj({changed:b,updatedAt:dt})
+};
+export const dependencyBodyDoc=o({blockedByActionId:i,operation:choice('add','remove'),expectedUpdatedAt:date,reason:{...t,minLength:5,maxLength:500}});
+export const dependencyDocs={
+ read:o({actionId:i,updatedAt:date,blocked:bool,prerequisites:a(o({id:i,title:t,status:t,satisfied:bool}),100)}),
+ changed:o({changed:bool,updatedAt:date})
+};
