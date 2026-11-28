@@ -2,19 +2,21 @@ import { compactUuidUrlValue } from "@/domain/opaque-url-id";
 import { useEffect, useState } from "react";
 import { Eye, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { previewSiteMarketingArtifact } from "@/modules/programs/site-marketing-artifacts.functions";
+import {legacyMarketingTransport,type MarketingWorkspaceTransport,type MarketingWorkspaceApi} from "@/modules/programs/marketing-workspace-transport";
 import { marketingFormatOptions, type MarketingFormat, type MarketingPackageContent } from "@/domain/marketing-package-v61";
 
-type MaterialPreview = Awaited<ReturnType<typeof previewSiteMarketingArtifact>>;
+type MaterialPreview = Awaited<ReturnType<MarketingWorkspaceApi['previewSiteMarketingArtifact']>>;
 
 /** Read-only preview. The server uses the exact renderer that creates immutable releases. */
-export function MarketingMaterialPreviewV61({siteId,title,brandVersionId,format,content}:{
+export function MarketingMaterialPreviewV61({siteId,title,brandVersionId,format,content,transport=legacyMarketingTransport}:{
+  transport?:MarketingWorkspaceTransport;
   siteId:string;
   title:string;
   brandVersionId:string|null;
   format:MarketingFormat;
   content:MarketingPackageContent;
 }) {
+  const {previewSiteMarketingArtifact}=transport.api;
   const [preview,setPreview]=useState<MaterialPreview|null>(null);
   const [pending,setPending]=useState(true);
   const [error,setError]=useState("");
@@ -40,7 +42,7 @@ export function MarketingMaterialPreviewV61({siteId,title,brandVersionId,format,
         });
     },350);
     return ()=>{live=false;window.clearTimeout(timer);};
-  },[siteId,title,brandVersionId,format,content,retry]);
+  },[siteId,title,brandVersionId,format,content,retry,previewSiteMarketingArtifact]);
 
   const label=marketingFormatOptions.find(option=>option.id===format)?.label??format;
   const isEmail=preview?.state==="ready"&&preview.mimeType==="text/html";
