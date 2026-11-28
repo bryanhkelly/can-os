@@ -50,7 +50,14 @@ export class CanonicalIdentityService {
     const bridge = this.load();
     let identity: Identity;
     try { identity = await bridge.resolveHttpIdentity(new Request((mode==='write'?this.writeOrigin!:'http://127.0.0.1')+'/api/v1/identity', {method:request.method,headers:{cookie,...(mode==='write'?{origin:this.writeOrigin!}:{})}})); }
-    catch(error) { throw this.translate(bridge,error); }
+    catch(error) {
+      // Failure to establish a GET session is authentication failure; business
+      // authorization denials after successful authentication stay 403.
+      // Preserve existing write-mode delegation denials rather than treating
+      // them as expired credentials.
+      if(mode==='read'&&bridge.classifyHttpDomainError(error)==='authorization')throw new UnauthorizedException();
+      throw this.translate(bridge,error);
+    }
     return identity;
   }
   async run<T>(identity: Identity, work: (identity: Identity)=>Promise<T>): Promise<T> {

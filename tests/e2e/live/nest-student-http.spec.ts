@@ -25,14 +25,14 @@ test("independent standard HTTP client validates both students and rejects forei
    for(const student of fixture.students){
      const http=await client(), context={request:http};
      clients.set(student.personId,http);
-     const session=await authenticateQaActor(context,student.email);
+     const session=await authenticateQaActor(context,student.email,undefined,"nest");
      expect(session.grants.find(g=>g.id===student.grantId)).toMatchObject({role:"student",personId:student.personId,siteId:student.siteId,organizationId:student.organizationId});
      expect((await http.post(api+"/me/session/membership",{headers:{Origin:origin},data:{grantId:student.grantId}})).status()).toBe(204);
      expect((await http.post(api+"/me/session/activity",{headers:{Origin:origin},data:{}})).status()).toBe(204);
      expect((await http.post(api+"/me/session/activity",{headers:{Origin:"https://foreign.example"},data:{}})).status()).toBe(403);
      expect((await http.post(api+"/me/session/activity",{data:{}})).status()).toBe(403);
      expect((await http.post(api+"/me/session/membership",{headers:{Origin:origin},data:{grantId:student.grantId,personId:student.personId}})).status()).toBe(400);
-     expect((await qaSession(context)).activeGrantId).toBe(student.grantId);
+     expect((await qaSession(context,"nest")).activeGrantId).toBe(student.grantId);
      const me=await http.get(api+"/me");expect(me.status()).toBe(200);
      expect(await me.json()).toMatchObject({personId:student.personId,grantId:student.grantId,role:"student",siteIds:[student.siteId],organizationIds:[student.organizationId]});
      const response=await http.get(api+"/me/student/classes");expect(response.status()).toBe(200);
@@ -48,7 +48,7 @@ test("independent standard HTTP client validates both students and rejects forei
      }
      for(const foreign of fixture.students.filter(s=>s.personId!==student.personId)){
        expect((await http.post(api+"/me/session/membership",{headers:{Origin:origin},data:{grantId:foreign.grantId}})).status()).toBe(403);
-       expect((await qaSession(context)).activeGrantId).toBe(student.grantId);
+       expect((await qaSession(context,"nest")).activeGrantId).toBe(student.grantId);
        for(const e of foreign.enrollments){
          expect(own.classes.some(c=>c.classId===e.classId||c.enrollmentId===e.classEnrollmentId)).toBe(false);
          for(const resource of ["resume","assignments"]){
@@ -90,6 +90,12 @@ test("independent standard HTTP client validates both students and rejects forei
      expect((await own.post(assignment,{...options,data:{responseText:"Different response must not overwrite"}})).status()).toBe(403);
      const latest=await own.get(target+"/assignments");expect(latest.status()).toBe(200);
      expect(homework.parse(await latest.json()).assignments.find(a=>a.id===w.assignmentId)?.status).toBe("submitted");
+   }
+   for(const http of clients.values()){
+     const logout=await http.post(api+"/access/logout",{headers:{Origin:origin},data:{}});
+     expect(logout.status()).toBe(204);
+     expect((await http.get(api+"/access/session")).status()).toBe(401);
+     expect((await http.get(api+"/me")).status()).toBe(401);
    }
  } finally {await Promise.all(contexts.map(c=>c.dispose()));}
 });

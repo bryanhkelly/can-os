@@ -164,3 +164,12 @@ test('anonymous access endpoints are not an ungated public bypass',async()=>{
   assert.equal((await fetch(url+'/api/v1/access/session')).status,401);
  });
 });
+
+test('access wire contracts forbid ambiguous credentials and caller-selected identities',()=>{
+ const c=require('../dist/access.contracts');
+ const token='a'.repeat(43),email='qa@example.test';
+ assert.equal(c.verificationBody.safeParse({token}).success,true);
+ assert.equal(c.verificationBody.safeParse({token,email,code:'000000'}).success,false);
+ assert.equal(c.requestBody.safeParse({email,role:'platform_owner'}).success,false);
+ assert.equal(c.registerBody.safeParse({email,firstName:'QA',lastName:'User',adultConfirmed:false}).success,false);
+});

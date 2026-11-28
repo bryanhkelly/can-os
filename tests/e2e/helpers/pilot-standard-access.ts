@@ -4,7 +4,14 @@ import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { z } from "zod";
 
-const origin="http://localhost:5183";
+const origins={legacy:"http://localhost:5183",nest:"http://localhost:3001"} as const;
+type Transport=keyof typeof origins;
+function accessPaths(transport:Transport){
+ const origin=origins[transport],prefix=transport==="nest"?"/api/v1":"";
+ return {origin,request:prefix+"/access/request",verify:prefix+"/access/verify",
+   session:prefix+"/access/session",register:prefix+"/access/register",
+   site:transport==="nest"?prefix+"/access/site-signups":"/site/new"};
+}
 const messageSchema=z.object({to:z.string(),accessUrl:z.string().url()});
 const emailSchema=z.string().email().refine(v=>v===v.toLowerCase()&&v.endsWith(".test"));
 const sessionSchema=z.object({
@@ -47,8 +54,9 @@ async function tokenFor(email:string):Promise<string>{
   throw Error("QA one-time access message was not delivered");
 }
 
-export async function qaSession(context:Pick<BrowserContext,"request">):Promise<QaSession>{
-  const response=await context.request.get(origin+"/access/session");
+export async function qaSession(context:Pick<BrowserContext,"request">,transport:Transport="legacy"):Promise<QaSession>{
+  const paths=accessPaths(transport);
+  const response=await context.request.get(paths.origin+paths.session);
   if(!response.ok())throw Error("Standard session lookup failed: "+response.status());
   // Never attach or print response bodies, cookies or access links.
   return sessionSchema.parse(await response.json());
@@ -56,22 +64,23 @@ export async function qaSession(context:Pick<BrowserContext,"request">):Promise<
 
 export async function authenticateQaActor(context:Pick<BrowserContext,"request">,email:string,signup?:
   {kind:"person";firstName:string;lastName:string}|
-  {kind:"site";firstName:string;lastName:string;name:string;organizationName:string;organizationType:"church"|"other_partner"}){
+  {kind:"site";firstName:string;lastName:string;name:string;organizationName:string;organizationType:"church"|"other_partner"|"denomination"|"consortium"},transport:Transport="legacy"){
   guard(email);
-  const path=signup?.kind==="person"?"/access/register":signup?.kind==="site"?"/site/new":"/access/request";
+  const paths=accessPaths(transport),origin=paths.origin;
+  const path=signup?.kind==="person"?paths.register:signup?.kind==="site"?paths.site:paths.request;
   const payload=signup?.kind==="person"?{email,firstName:signup.firstName,lastName:signup.lastName,adultConfirmed:true}:
     signup?.kind==="site"?{email,firstName:signup.firstName,lastName:signup.lastName,
       name:signup.name,organizationName:signup.organizationName,organizationType:signup.organizationType,
       organizationDomain:email.split("@")[1]}:{email};
   const request=await context.request.post(origin+path,{headers:{Origin:origin},data:payload});
   if(!request.ok())throw Error("Standard access request failed: "+request.status());
-  expect((await context.request.get(origin+"/access/session")).status()).toBe(401);
+  expect((await context.request.get(origin+paths.session)).status()).toBe(401);
   const token=await tokenFor(email);
-  const verified=await context.request.post(origin+"/access/verify",{headers:{Origin:origin},data:{token}});
+  const verified=await context.request.post(origin+paths.verify,{headers:{Origin:origin},data:{token}});
   if(!verified.ok())throw Error("One-time access verification failed: "+verified.status());
-  const session=await qaSession(context);
-  if(signup){
-    const replay=await context.request.post(origin+"/access/verify",{headers:{Origin:origin},data:{token}});
+  const session=await qaSession(context,transport);
+  if(signup||transport==="nest"){
+    const replay=await context.request.post(origin+paths.verify,{headers:{Origin:origin},data:{token}});
     expect(replay.status()).toBe(401);
   }
   return session;
