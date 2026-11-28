@@ -47,3 +47,13 @@ export const Incoming:Story={args:common,render:()=> <AcceptancePreview/>,play:a
   await userEvent.click(canvas.getByRole("button",{name:/^Confirm$/}));
   await expect(canvas.getByText("accepted",{exact:true})).toBeVisible();
 }};
+
+export const TagOnly:Story={args:common,render:()=> <ProposalPreview/>,play:async({canvasElement})=>{
+  const canvas=within(canvasElement);
+  const submit=canvas.getByRole("button",{name:"Request relationship"});
+  await expect(submit).toBeDisabled();
+  await userEvent.selectOptions(canvas.getByRole("combobox",{name:/^Organization\s*\(required\)$/}),recipient.id);
+  await expect(submit).toBeEnabled();
+  await userEvent.click(submit);
+  await expect(canvas.getByText("Preview request submitted. No live data changed.")).toBeVisible();
+}};
