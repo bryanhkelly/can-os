@@ -37,12 +37,35 @@ try{
  if(client){try{await client.query("ROLLBACK");}finally{client.release();}}
  await authPool.end();
 }
+const standard=env.CAN_PILOT_QA_STANDARD_ACCESS==="true";
+let identities;
+if(standard){
+ const {z}=await import("zod");
+ const actor=z.object({email:z.string().email().refine(v=>v===v.toLowerCase()&&v.endsWith(".test")),grantId:z.string().uuid()}).strict();
+ const input=z.object({learner:actor,other:actor,provider:actor}).strict().parse(JSON.parse(env.CAN_PILOT_QA_API_ACTORS_JSON??"{}"));
+ const actors=[input.learner,input.other,input.provider];
+ identities=await sql`
+ SELECT supplied.actor_index::int AS actor_index,a.id AS account_id,p.id AS person_id,g.role,g.organization_id,g.site_id,
+  EXISTS(SELECT 1 FROM public.access_adult_learning_reviews review
+    WHERE review.access_account_id=a.id AND review.access_person_id=p.id
+      AND review.status='approved' AND review.consumed_at IS NULL
+      AND review.reviewed_by_account_id<>a.id AND review.reviewed_at<=now()
+      AND review.reviewed_at>now()-interval '365 days') AS fresh_adult_review
+ FROM unnest(${actors.map(a=>a.email)}::text[],${actors.map(a=>a.grantId)}::uuid[]) WITH ORDINALITY supplied(email,grant_id,actor_index)
+ JOIN public.access_accounts a ON a.email_normalized=supplied.email
+ JOIN public.people p ON p.id=a.person_id
+ JOIN public.account_person_grants g ON g.id=supplied.grant_id AND g.account_id=a.id AND g.person_id=p.id
+ WHERE a.email_verified_at IS NOT NULL AND a.private_access_code_hash IS NULL AND NOT a.disabled AND p.active AND g.active
+  AND NOT EXISTS(SELECT 1 FROM public.account_person_grants other WHERE other.account_id=a.id AND other.active AND other.person_id<>p.id)
+  AND p.metadata->>'qa_only'='true' AND p.metadata->>'intended_branch'=${branch}
+ `;
+}else{
 const sessionDigests=["LEARNER","OTHER","PROVIDER"].map(role=>{
  const token=env["CAN_PILOT_QA_"+role+"_SESSION"];
  assert.ok(/^[A-Za-z0-9_-]{40,}$/.test(token??""),"Isolated session required");
  return createHash("sha256").update(env.CAN_ACCESS_TOKEN_PEPPER).update(":").update(token).digest("hex");
 });
-const identities=await sql`
+identities=await sql`
  SELECT supplied.actor_index::int AS actor_index,a.id AS account_id,p.id AS person_id,g.role,
   g.organization_id,g.site_id,
   EXISTS(SELECT 1 FROM public.access_adult_learning_reviews review
@@ -63,6 +86,7 @@ const identities=await sql`
   AND NOT EXISTS(SELECT 1 FROM public.account_person_grants other WHERE other.account_id=a.id AND other.active AND other.person_id<>p.id)
   AND p.metadata->>'qa_only'='true' AND p.metadata->>'intended_branch'=${branch}
 `;
+}
 assert.ok(identities.length===3&&new Set(identities.map(r=>r.person_id)).size===3,"Three distinct branch-tagged current QA identities required");
 const learner=identities.find(r=>r.actor_index===1);
 const other=identities.find(r=>r.actor_index===2);

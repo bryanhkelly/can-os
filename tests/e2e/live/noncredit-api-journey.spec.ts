@@ -1,9 +1,11 @@
 import { test, expect, type Page, type Browser } from "@playwright/test";
 import { neon } from "@neondatabase/serverless";
 import { z } from "zod";
+import {authenticateQaActor,qaSession} from "../helpers/pilot-standard-access";
+import {assertPersistedPilotJourney} from "../helpers/pilot-persisted-journey";
 
 // Run the actual Vite-transformed server function clients over HTTP, using
-// the existing authenticated cookies. No mocked handler, direct scoring,
+// fresh ordinary email-link sessions. No mocked handler, direct scoring,
 // or SQL-created enrollment/assessment/completion evidence. The inert page
 // isolates API acceptance from UI rendering; browser/media acceptance is separate.
 const origin="http://localhost:5183";
@@ -34,12 +36,21 @@ async function rpc<T>(page:Page,module:keyof typeof modules,name:string,data:unk
    return await command({data});
  },{url:modules[module],name,data}) as Promise<T>;
 }
-async function actor(browser:Browser,key?:string){
+const selection=z.object({email:z.string().email().refine(v=>v===v.toLowerCase()&&v.endsWith(".test")),grantId:uuid}).strict();
+const actors=z.object({learner:selection,other:selection,provider:selection}).strict()
+ .parse(JSON.parse(process.env.CAN_PILOT_QA_API_ACTORS_JSON??"{}"));
+async function actor(browser:Browser,key?:keyof typeof actors){
  const context=await browser.newContext({baseURL:origin});
  try{
    if(key){
-     const value=process.env[key];if(!value)throw Error("Missing isolated verified session");
-     await context.addCookies([{name:"__Host-can_os_session",value,url:origin,secure:true,httpOnly:true,sameSite:"Lax"}]);
+     const selected=actors[key];
+     const initial=await authenticateQaActor(context,selected.email);
+     if(!initial.grants.some(g=>g.id===selected.grantId))throw Error("Expected direct grant unavailable");
+     if(initial.activeGrantId!==selected.grantId){
+       const result=await context.request.post(origin+"/access/session",{headers:{Origin:origin},data:{grantId:selected.grantId}});
+       if(!result.ok())throw Error("Standard grant selection failed");
+     }
+     expect((await qaSession(context)).activeGrantId).toBe(selected.grantId);
    }
    const page=await context.newPage();
    await page.route(origin+"/__pilot_api_test_context",route=>route.fulfill({status:200,contentType:"text/html",body:"<!doctype html><html><title>Local API acceptance</title></html>"}));
@@ -70,9 +81,9 @@ async function knowledge(page:Page,courseAttemptId:string,phase:"baseline"|"fina
 }
 test("actual application RPC and canonical evidence: independent pilot",async({browser})=>{
  const visitor=await actor(browser);
- const learner=await actor(browser,"CAN_PILOT_QA_LEARNER_SESSION");
- const other=await actor(browser,"CAN_PILOT_QA_OTHER_SESSION");
- const provider=await actor(browser,"CAN_PILOT_QA_PROVIDER_SESSION");
+ const learner=await actor(browser,"learner");
+ const other=await actor(browser,"other");
+ const provider=await actor(browser,"provider");
  try{
    // The test requires an actual direct adult-training Go destination.
    const go=await visitor.context.request.get("/go/"+fixture.goCode,{maxRedirects:0});
@@ -155,6 +166,7 @@ test("actual application RPC and canonical evidence: independent pilot",async({b
       (SELECT count(*)::int FROM public.participation_attributions a WHERE a.noncredit_registration_id=${first.registrationId}::uuid) AS attributions
    `;
    expect(evidence).toEqual({claims:1,total_claims:1,lessons:fixture.lessons.length,completions:1,answers:5,attributions:1});
+   await assertPersistedPilotJourney(fixture);
  }finally{
    await Promise.all([visitor.context.close(),learner.context.close(),other.context.close(),provider.context.close()]);
  }

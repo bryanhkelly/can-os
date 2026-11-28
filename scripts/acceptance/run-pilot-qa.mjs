@@ -41,6 +41,7 @@ function init() {
     CAN_R2_ACCESS_KEY_ID: "", CAN_R2_SECRET_ACCESS_KEY: "", CAN_R2_SESSION_TOKEN: "",
     CAN_PILOT_QA_LEARNER_SESSION: "", CAN_PILOT_QA_OTHER_SESSION: "", CAN_PILOT_QA_PROVIDER_SESSION: "",
     CAN_PILOT_QA_FIXTURE_JSON: "", CAN_PILOT_QA_GOVERNED_JSON: "",
+    CAN_PILOT_QA_API_ACTORS_JSON: "", CAN_PILOT_QA_PLAN_JSON: "",
   };
   writeFileSync(file, Object.entries(config).map(([k,v]) => k+"="+v).join("\n")+"\n", {flag:"wx",mode:0o600});
   console.log("Created ignored .env.pilot-qa with independent random secrets. Fill in isolated connections and approved sessions locally; no secrets printed.");
@@ -59,7 +60,8 @@ function localConfiguration() {
     "CAN_CANONICAL_OPERATIONS_DATABASE_URL","CAN_ACCESS_TOKEN_PEPPER","CAN_CANONICAL_ACCESS_TOKEN_PEPPER",
     "CAN_NONCREDIT_ASSESSMENT_KEY_HEX","CAN_NONCREDIT_AUTO_FINALIZATION_ENABLED",
     "CAN_R2_ACCOUNT_ID","CAN_R2_BUCKET","CAN_R2_ACCESS_KEY_ID","CAN_R2_SECRET_ACCESS_KEY","CAN_R2_SESSION_TOKEN",
-    "CAN_PILOT_QA_LEARNER_SESSION","CAN_PILOT_QA_OTHER_SESSION","CAN_PILOT_QA_PROVIDER_SESSION","CAN_PILOT_QA_FIXTURE_JSON","CAN_PILOT_QA_GOVERNED_JSON"
+    "CAN_PILOT_QA_LEARNER_SESSION","CAN_PILOT_QA_OTHER_SESSION","CAN_PILOT_QA_PROVIDER_SESSION","CAN_PILOT_QA_FIXTURE_JSON","CAN_PILOT_QA_GOVERNED_JSON",
+    "CAN_PILOT_QA_API_ACTORS_JSON","CAN_PILOT_QA_PLAN_JSON"
   ]);
   if (Object.keys(config).some(k=>!permitted.has(k))) fail("QA configuration contains an unsupported setting.");
   if(config.APP_ENV!=="test" || config.NODE_ENV!=="test" || config.CAN_TEST_DB_WRITES_ENABLED!=="true" ||
@@ -80,10 +82,10 @@ function localConfiguration() {
 }
 try {
   const mode=process.argv[2];
-  if(process.argv.length!==3) fail("Use exactly one QA action: init, prepare, provision, governed, readiness, executive, report, schema, regression, keys, fixture, api, browser.");
+  if(process.argv.length!==3) fail("Use exactly one QA action: init, prepare, provision, governed, readiness, executive, report, schema, regression, keys, fixture, api, browser, pilot1, pilot2, all.");
   if(mode==="init") init();
   else {
-    if(!Object.hasOwn(modes,mode)) fail("Unknown QA action.");
+    if(!Object.hasOwn(modes,mode)&&!["pilot1","pilot2","all"].includes(mode)) fail("Unknown QA action.");
     const env=localConfiguration();
     if(mode!=="readiness"){
       const {verifyAdmissionsNeonBranch}=await import("../verify-admissions-neon-branch.mjs");
@@ -93,7 +95,7 @@ try {
       const {neon}=await import("@neondatabase/serverless");
       for(const key of ["CAN_CANONICAL_AUTH_DATABASE_URL","CAN_CANONICAL_OPERATIONS_DATABASE_URL"]){
         if(!env[key]) {
-          if(key==="CAN_CANONICAL_AUTH_DATABASE_URL" && (mode==="prepare"||mode==="provision"||mode==="governed"||mode==="api"||mode==="browser")) fail(key+" is required for QA runtime.");
+          if(key==="CAN_CANONICAL_AUTH_DATABASE_URL" && (mode==="prepare"||mode==="provision"||mode==="governed"||mode==="api"||mode==="browser"||["pilot1","pilot2","all"].includes(mode))) fail(key+" is required for QA runtime.");
           continue;
         }
         const expectedLogin=key==="CAN_CANONICAL_AUTH_DATABASE_URL"?"can_os_canonical_auth_app":"can_os_canonical_ops_app";
@@ -106,7 +108,7 @@ try {
     // Prepare the real application privately, before any fixture or sessions exist.
     // Use the existing isolated .test access-mail transport, never Resend.
     // Outbox holds single-use credentials: no artifact or Git persistence.
-    const outbox=(mode==="prepare"||mode==="provision"||mode==="governed")?mkdtempSync(join(tmpdir(),"can-pilot-qa-mail-")):null;
+    const outbox=(["prepare","provision","governed","api","pilot1","pilot2","all"].includes(mode))?mkdtempSync(join(tmpdir(),"can-pilot-qa-mail-")):null;
     try {
       if(outbox){
         const {checkPilotMigrationParity}=await import("./check-pilot-migration-parity.mjs");
@@ -118,8 +120,13 @@ try {
         console.log("Private preparation: http://localhost:5183");
         console.log("Temporary local test-mail outbox (contains short-lived secrets; do not share): "+outbox);
       }
-      const result=spawnSync(process.execPath,modes[mode],{cwd:root,env,stdio:"inherit"});
-      process.exitCode=result.status??1;
+      if(["pilot1","pilot2","all"].includes(mode)){
+        const {runPilotAcceptance}=await import("./run-pilot-acceptance-plan.mjs");
+        process.exitCode=await runPilotAcceptance({mode,env,root,modes});
+      }else{
+        const result=spawnSync(process.execPath,modes[mode],{cwd:root,env,stdio:"inherit"});
+        process.exitCode=result.status??1;
+      }
     }finally{
       if(outbox)rmSync(outbox,{recursive:true,force:true});
     }
