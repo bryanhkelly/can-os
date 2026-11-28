@@ -408,3 +408,16 @@ test('Go Link management is Site scoped and rejects arbitrary redirect destinati
  assert.equal(bodies.create.safeParse({destination:{kind:'site-page',page:'home'}}).success,false);
  assert.equal(queries.page.safeParse({limit:'51'}).success,false);
 });
+
+test('private Website and Brand workflow keeps publication distinct and requires both revisions',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const [method,path] of [["GET","/api/v1/sites/{siteId}/website-preview"],["POST","/api/v1/sites/{siteId}/website-preview"],["POST","/api/v1/sites/{siteId}/website-and-brand-versions"],["POST","/api/v1/sites/{siteId}/website-restorations"],["POST","/api/v1/sites/{siteId}/website-preparations"]]){
+   assert.ok(document.paths[path][method.toLowerCase()].security);
+   const response=await fetch(url+path.replace('{siteId}','00000000-0000-4000-8000-000000000001'),method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);
+  }
+ });
+ const {bodies}=require('../dist/website.contracts');
+ assert.equal(bodies.restore.safeParse({expectedRevision:1,restoreRevision:1,publish:true}).success,false);
+ assert.equal(bodies.save.safeParse({operation:'save',expectedRevision:1}).success,false);
+});
