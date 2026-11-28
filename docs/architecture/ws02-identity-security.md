@@ -111,6 +111,65 @@ This is a narrower fail-closed session boundary, not full native cookie
 retirement. Existing legacy reviewer sessions and historical native adult
 learning-session references still require a separately verified migration.
 
+## Native credential lifecycle and retirement evidence (2026-11-28)
+
+Browser logout now atomically revokes both individually presented bearer
+credentials by their own hashed secrets, writes security audit evidence, and
+clears both secure HttpOnly cookies. Neither bearer establishes business
+authority during logout. Duplicate cookie names fail closed before writes.
+The native session cookie is a compatibility credential, not a second
+interactive login. A failure rolls back both revocations and does not report
+success. The Nest transport accepts exactly the expected two clearance
+headers on logout and exactly one canonical CAN cookie on ordinary login.
+
+The four remaining native issuance paths (linked Class recovery, reviewed
+Class activation, noncredit self-registration and Course session renewal)
+revalidate the direct current CAN grant within the write transaction.
+The common issuer additionally locks the exact native learner account/grant
+and original shared Account/Person linkage. Native activity refresh uses
+the same current CAN transaction guard. No new Person is created.
+
+Read-only database evidence from `pilot-acceptance-20261127`
+(`br-solitary-art-arun91gj`), 2026-11-28:
+
+- 20 shared Accounts, 313 shared session records, 21 active shared grants.
+- Zero native Accounts, Persons, grants, sessions, noncredit links, consumed
+  adult reviews with a native account, or self-enrollment claims with a
+  native account. Zero active shared grant Person-anchor mismatches and
+  zero mismatched Site ownership among grants joined to existing Sites.
+- Eleven inspected identity tables enable and force RLS; none grant direct
+  SELECT, INSERT, UPDATE or DELETE to authenticated. Actual read-only
+  SET LOCAL ROLE authenticated probes denied direct reads of accounts,
+  sessions, grants, people and the native session relation (SQLSTATE 42501).
+- Dedicated login can_os_canonical_auth_app successfully entered the
+  NOLOGIN/NOBYPASSRLS restricted reader role and executed both
+  v301_can_staff_session_context and v301_canonical_session_context for
+  an invalid digest, each returning zero records. This confirms negative
+  reader behavior, not positive authenticated session or tenant RLS parity.
+- Six remaining foreign keys target native accounts/grants, including
+  three public dependencies: access_account_noncredit_principals,
+  access_adult_learning_reviews, noncredit_self_enrollment_claims.
+- Eight SQL routines still reference native account/grant/session tables:
+  v301_assert_assessment_actor_session, v301_assess_approval_authority,
+  v301_canonical_session_context, v301_create_objective_assessment_draft,
+  v301_validate_achievement_award, v301_validate_credential_issuance,
+  v301_validate_credential_revocation, v301_validate_noncredit_self_enrollment_claim.
+
+Retirement order: first replace live native account links with independently
+verified public Account/Person ownership; migrate learning claims and
+review consumption without inventing identity evidence; migrate restricted
+reviewer/assessment authority and the eight SQL dependencies; verify the
+historical attribution model; then remove native minting, recovery, activity
+and cookie paths after ordinary API acceptance. Retire empty compatibility
+tables only after an explicit migration preflight and evidence-preserving
+dependency check on the actual deployment database. Do not drop them merely
+because this isolated branch has zero rows.
+
+The main retirement script now inspects the real extracted service paths,
+not outdated transport wrappers, and obtains count/dependency/security
+evidence in a read-only repeatable-read snapshot. Production was not queried
+or modified. Tests are authored, not executed in this source increment.
+
 ## Verification
 
 With the existing reviewed isolated checkout and Node 24 dependencies installed:
