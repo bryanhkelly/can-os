@@ -5,6 +5,7 @@ import { db } from "@/db/client";
 import { canonicalClasses, canonicalClassStaffAssignments } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { getIdentityContext } from "@/modules/identity/command-context.server";
+import { nativeClassWorkRows,nativeOverdueWorkPredicate } from "./native-class-work-query.server";
 import { currentClassAuthority } from "./native-class-authority.server";
 
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -90,35 +91,18 @@ export const getNativeTeacherToday=createServerFn({method:"GET"})
       if(!classes.length)return {kind:"teacher" as const,classes:[]};
       const ids=sql.join(classes.map(item=>sql`${item.classId}::uuid`),sql`, `);
       const result=await tx.execute(sql`
-        WITH active_attempts AS (
-          SELECT ce.id AS enrollment_id,ce.class_id,ca.id AS attempt_id,ca.course_version_id
-          FROM public.class_enrollments ce
-          JOIN public.classes c ON c.id=ce.class_id
-          JOIN public.learner_course_attempts ca
-            ON ca.class_enrollment_id=ce.id AND ca.id=ce.course_attempt_id
-           AND ca.course_version_id=c.course_version_id
-           AND ca.deployment_id=c.deployment_id AND ca.adoption_id=c.adoption_id
-           AND ca.offering_version_id=c.offering_version_id
-          WHERE ce.class_id IN (${ids}) AND ce.status='active'
-            AND ca.status='active' AND ca.section_id IS NULL
+        WITH class_work AS (
+          ${nativeClassWorkRows(classes.map(item=>item.classId))}
         ), rosters AS (
           SELECT class_id,count(*)::int AS enrollment_count
           FROM public.class_enrollments
           WHERE class_id IN (${ids}) AND status='active'
           GROUP BY class_id
         ), work AS (
-          SELECT aa.class_id,
-            count(*) FILTER (WHERE s.status='submitted')::int AS review_count,
-            count(*) FILTER (WHERE a.due_at<now()
-              AND (s.id IS NULL OR s.status::text='assigned' OR s.status='returned'))::int AS overdue_count
-          FROM active_attempts aa
-          JOIN public.graded_assignments a ON a.course_version_id=aa.course_version_id
-            AND a.section_id IS NULL
-          JOIN public.official_course_assignment_versions o ON o.id=a.official_assignment_version_id
-            AND o.course_version_id=a.course_version_id
-          LEFT JOIN public.graded_submissions s ON s.assignment_id=a.id
-            AND s.course_attempt_id=aa.attempt_id AND s.course_version_id=aa.course_version_id
-          GROUP BY aa.class_id
+          SELECT class_id,
+            count(*) FILTER (WHERE submission_status='submitted')::int AS review_count,
+            count(*) FILTER (WHERE ${nativeOverdueWorkPredicate})::int AS overdue_count
+          FROM class_work GROUP BY class_id
         )
         SELECT r.class_id,r.enrollment_count,
           coalesce(w.review_count,0) AS review_count,coalesce(w.overdue_count,0) AS overdue_count
