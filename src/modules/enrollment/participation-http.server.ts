@@ -11,12 +11,19 @@ import * as assignment from "@/modules/classes/native-class-assignment.server";
 import * as intake from "./admissions-intake.server";
 import * as family from "./guardian-family-applications.server";
 import * as access from "./guardian-access-revocation.server";
+import * as interest from "./public-admissions-interest-http.server";
+import * as guardianOffers from "./guardian-admission-offers-http.server";
 const readInput=z.object({cursor:waitlistCursor.nullable(),releaseId:z.string().uuid().optional()}).strict();
 export function participationWorkflow(request:Request,mode:string){
  const authorize=(method:"GET"|"POST",expectedMode="can")=>{
   if(request.method!==method||mode!==expectedMode)throw new AuthorizationError("verified participation context");
  };
  return {
+  listPublicAdmissionsInterests:async(raw:unknown)=>{authorize("GET");return interest.listPublicAdmissionsInterestsService(request,parseCommandInput(interest.listPublicAdmissionsInterestsInput,raw));},
+  assignPublicSiteInterestToProgram:async(raw:unknown)=>{authorize("POST");return interest.assignPublicSiteInterestToProgramService(request,parseCommandInput(interest.assignPublicSiteInterestToProgramInput,raw));},
+  invitePublicAdmissionsInterestToApply:async(raw:unknown)=>{authorize("POST");return interest.invitePublicAdmissionsInterestToApplyService(request,parseCommandInput(interest.invitePublicAdmissionsInterestToApplyInput,raw));},
+  setPublicAdmissionsInterestStatus:async(raw:unknown)=>{authorize("POST");return interest.setPublicAdmissionsInterestStatusService(request,parseCommandInput(interest.setPublicAdmissionsInterestStatusInput,raw));},
+  getGuardianAdmissionOffers:async(raw:unknown)=>{authorize("GET");return guardianOffers.getGuardianAdmissionOffersService(request,parseCommandInput(guardianOffers.getGuardianAdmissionOffersInput,raw));},
   getGuardianFamilyApplicationWorkspace:async(raw:unknown)=>{authorize("GET");parseCommandInput(z.object({}).strict(),raw);return family.getGuardianFamilyApplicationWorkspaceService(request);},
   startGuardianFamilyApplication:async(raw:unknown)=>{authorize("POST");return family.startGuardianFamilyApplicationService(request,parseCommandInput(family.applicationInput,raw));},
   revokeAdmissionsGuardianAccess:async(raw:unknown)=>{authorize("POST");return access.revokeAdmissionsGuardianAccessService(request,parseCommandInput(access.revocationInput,raw));},
