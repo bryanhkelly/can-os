@@ -7,7 +7,7 @@ const uuid=(x:string)=>x+"11111111-1111-4111-8111-111111111111".slice(x.length);
 
 describe("Platform Owner pilot staffing controls",()=>{
   it("keeps the first-wave owner roles closed and explicitly scoped",()=>{
-    expect(ownerPilotRoles).toEqual(["academic_content_creator","academic_content_reviewer",
+    expect(ownerPilotRoles).toEqual(["academic_content_creator","academic_content_reviewer","deployment_readiness_reviewer",
       "registrar","site_admin","room_facilitator"]);
     expect(ownerGrantRequiresSite("registrar")).toBe(true);
     expect(ownerGrantRequiresSite("site_admin")).toBe(true);

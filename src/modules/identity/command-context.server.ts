@@ -136,7 +136,7 @@ export async function getIdentityContext(request: Request): Promise<AccessContex
  // A relationship manager has consent-workflow authority only, not implicit
  // Site, Program or learner-record access. Resource choices are resolved by
  // the dedicated relationship service; ordinary academic scopes stay empty.
- if(context.role==="reporting_relationship_manager"){
+ if(context.role==="reporting_relationship_manager"||context.role==="deployment_readiness_reviewer"){
   if(context.grantSiteId!==null||context.scope.organizationIds?.length!==1)
    throw new AuthorizationError("organization-wide reporting relationship appointment");
   context.scope.siteIds=[];

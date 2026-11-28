@@ -44,6 +44,7 @@ const baseRoleCapabilities = {
  platform_owner: ["platform.admin", "catalog.platform.manage", "blueprint.template.manage", "platform.owner", "platform.delegation.manage"],
  // Course-content roles are provider scoped and receive no learner-record powers.
  academic_content_creator: ["instructional_track.author"],
+ deployment_readiness_reviewer: ["deployment.readiness.review"],
  academic_content_reviewer: ["instructional_track.review", "instructional_track.publish", "instructional_track.withdraw"],
  // Network partners govern affiliation and their own sites; never student or school operations.
  can_network_steward: ["network.agreements.verify", "network.admins.provision", "jurisdiction.profile.manage", "site.identity.review"],

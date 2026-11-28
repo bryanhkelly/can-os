@@ -11,6 +11,7 @@ export function hasValidAccessGrantScope(grant: {
   if (["account_holder", "app_admin", "platform_owner"].includes(grant.role)) {
     return grant.organizationId === null && grant.siteId === null;
   }
+  if (grant.role === "deployment_readiness_reviewer" && grant.siteId !== null) return false;
   return typeof grant.organizationId === "string" &&
     grant.organizationId.trim().length > 0 &&
     (grant.siteId === null ||

@@ -6,6 +6,7 @@ import { roleCapabilities } from "./access-context";
 export const protectedOwnerActRoles = [
   "account_holder", "student", "guardian",
   "academic_content_reviewer",
+  "deployment_readiness_reviewer",
   "can_credential_reviewer",
   "can_jurisdiction_reviewer",
   "can_network_steward",
