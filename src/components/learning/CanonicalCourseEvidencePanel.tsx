@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { useEffect, useState } from "react";
-import { getCanonicalCourseEvidence } from "@/modules/learning/canonical-course-evidence.functions";
+import { useEffect, useRef, useState } from "react";
+import { getCanonicalCourseEvidence } from "@/lib/api/browser-assessments-outcomes";
 
 type Evidence = Awaited<ReturnType<typeof getCanonicalCourseEvidence>>;
 const eventLabels: Record<string, string> = {
@@ -27,16 +27,21 @@ function CanonicalEvidenceSession({courseAttemptId}:{courseAttemptId:string}) {
   const [error,setError]=useState(false);
   const [open,setOpen]=useState(false);
   const [loading,setLoading]=useState(false);
-  useEffect(()=>{ setEvidence(null);setOpen(false);setError(false); },[courseAttemptId]);
+  const activeRequest=useRef<AbortController|null>(null);
+  useEffect(()=>()=>activeRequest.current?.abort(),[]);
 
   async function refresh() {
-    setLoading(true);setError(false);
+    activeRequest.current?.abort();
+    const controller=new AbortController();
+    activeRequest.current=controller;
+    setLoading(true);setError(false);setEvidence(null);
     try {
-      setEvidence(await getCanonicalCourseEvidence({data:{courseAttemptId}}));
+      const result=await getCanonicalCourseEvidence(courseAttemptId,controller.signal);
+      if(!controller.signal.aborted)setEvidence(result);
     } catch {
-      setError(true);
+      if(!controller.signal.aborted)setError(true);
     } finally {
-      setLoading(false);
+      if(!controller.signal.aborted)setLoading(false);
     }
   }
 
@@ -53,6 +58,7 @@ function CanonicalEvidenceSession({courseAttemptId}:{courseAttemptId:string}) {
         aria-expanded={open} onClick={()=>{
           setOpen(value=>!value);
           if(!open)void refresh();
+          else {activeRequest.current?.abort();setEvidence(null);setLoading(false);setError(false);}
         }}>{open?"Hide details":"View evidence"}</Button>
     </div>
     {open&&<div className="mt-4 space-y-4">
