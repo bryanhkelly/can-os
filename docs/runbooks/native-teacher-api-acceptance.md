@@ -14,7 +14,7 @@ Set CAN_TEACHER_QA_API_FIXTURE_JSON to a reviewed JSON object containing:
 - classId: the teacher's active approved native Class.
 - otherClassId: a different active Class not assigned to the teacher, preferably in another Site.
 - classEnrollmentId: the student's active Class Enrollment in classId with creditMode not_applicable and current Course Attempt.
-- assignmentId: official native assignment visible in the learner homework API, not yet submitted, or returned for revision.
+- assignmentId: official native assignment visible in the learner homework API, past due and not yet submitted or returned for revision, with no open follow-up.
 - expectedClassIds: all current native Classes assigned to the teacher's active grant.
 
 Provision these records with standard governed application services. A reviewed,
@@ -37,7 +37,7 @@ The API test uses ordinary email-link authentication and the same transformed
 application RPCs as the UI. Its assertions cover exact Class directory,
 dashboard population, unauthorized learner/visitor/other teacher reads,
 cross-Class denial, submission and review count reconciliation, missing-work
-pagination, practice feedback, duplicate feedback retry and student revision.
+pagination, practice feedback, duplicate feedback retry and student revision. It also creates a canonical missing-work Action, retries creation, verifies owner-only detail and resolution, retains the open Action after submission, resolves it, and verifies the idempotent resolution retry.
 
 The new query contract test compiles parameterized SQL without a database;
 it is not evidence of SQL execution or runtime authorization.
@@ -47,9 +47,12 @@ Do not claim end-to-end acceptance based solely on committed test files.
 
 ## Outstanding
 
-- Native missing-work Action creation/resolution: the shared academic Action
-  policy still requires a Section and student profile. Migrate that policy and
-  all Action consumers together; do not invent a second work management system.
+- Native missing-work creation, owner resolution and detail now use the existing
+  Action table with a Class Enrollment subject and validated Class/assignment metadata.
+  The teacher queue is connected. Runtime evidence is pending. Generic operator
+  edits/reassignment are denied until Class-specific authority is migrated; broader
+  academic interventions, transfer/withdrawal handling, student notification deep
+  links, guardian access and all remaining Action projections require reconciliation.
 - Official assignment authoring, grading and release require the independent
   academic authority and immutable evidence contracts; practice feedback is not a grade.
 - Native Class discussions still filter on synthetic Valor fixture metadata.
