@@ -761,3 +761,25 @@ test('admissions intake and guardian onboarding routes fail closed and expose st
  assert.equal(c.guardianProvisionReceipt.safeParse({created:true,email:'guardian@example.org',accountId:id,privateCredential:false}).success,true);
  assert.equal(c.guardianProvisionReceipt.safeParse({created:true,email:'guardian@example.org',accountId:id,privateCredential:false,sessionToken:'secret'}).success,false);
 });
+
+test('guardian family application and grant restoration are distinct governed operations',async()=>{
+ const id='00000000-0000-4000-8000-000000000001';
+ await withServer('0',async(url,document)=>{
+  for(const [method,path] of [['GET','/api/v1/me/family-application-workspace'],['POST','/api/v1/family-applications'],['POST','/api/v1/admission-guardian-access-revocations'],['POST','/api/v1/admission-guardian-access-restorations']]){
+   const op=document.paths[path][method.toLowerCase()];
+   assert.ok(op.security);assert.ok(op.responses['403']);
+   const res=await fetch(url+path,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(res.status,method==='POST'?503:401);
+  }
+ });
+ const c=require('../dist/participation.contracts');
+ const family={requestId:id,programId:id,studentFirstName:'Student',studentLastName:'Example',gradeLevel:'6'};
+ assert.equal(c.familyApplicationInput.safeParse(family).success,true);
+ assert.equal(c.familyApplicationInput.safeParse({...family,guardianPersonId:id}).success,false);
+ assert.equal(c.familyApplicationInput.safeParse({...family,guardianVerified:true}).success,false);
+ assert.equal(c.guardianAccessChangeInput.safeParse({grantId:id,reason:'Verified authorization change'}).success,true);
+ assert.equal(c.guardianAccessChangeInput.safeParse({grantId:id,reason:'short'}).success,false);
+ assert.equal(c.guardianAccessChangeInput.safeParse({grantId:id,reason:'Verified authorization change',restoreSessions:true}).success,false);
+ assert.equal(c.guardianRestoreReceipt.safeParse({restored:true,sessionId:id}).success,false);
+ assert.equal(c.familyWorkspaceResult.safeParse({programs:[],applications:[],households:[],students:[],transferRequests:[]}).success,true);
+});
