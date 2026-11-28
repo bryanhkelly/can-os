@@ -11,12 +11,9 @@ import { ActionDialog, ActionFooter, EmptyState, QueryState, StatusBadge, Worksp
 import { buildUrlDestination } from "@/domain/url-destinations";
 import { goDestinationLabels, goDestinationSelectionKey, type GoDestination } from "@/domain/site-go-links";
 import { resolveGoTargetInput } from "@/domain/go-target-input";
-import {
-  createSiteGoLink, listSiteGoLinksPage, revokeSiteGoLink,
-  listAvailableGoDestinations, inspectSavedGoLink, setSiteGoLinkPaused,
-} from "@/modules/engagement/site-go-links.functions";
+import {legacyGoLinkTransport,type GoLinkWorkspaceTransport,type GoLinkWorkspaceApi} from "@/modules/engagement/go-link-workspace-transport";
 
-type GoLink=Awaited<ReturnType<typeof listSiteGoLinksPage>>["items"][number];
+type GoLink=Awaited<ReturnType<GoLinkWorkspaceApi['listSiteGoLinksPage']>>["items"][number];
 type Kind=GoDestination["kind"];
 const labels=goDestinationLabels;
 const channelChoices=["email","flyer","qr","social","partner","other"] as const;
@@ -49,11 +46,12 @@ function advancedDestination(kind:Kind,value:string):GoDestination|null {
 /** Three separate responsibilities share the same canonical Site-owned link:
  * selection/management, publication-aware routing, read-only outcome evidence.
  */
-type GoLinkWorkspaceProps={siteId:string;packageId?:string};
+type GoLinkWorkspaceProps={transport?:GoLinkWorkspaceTransport;siteId:string;packageId?:string};
 export function GoLinkWorkspace(props:GoLinkWorkspaceProps){
-  return <GoLinkWorkspaceSession key={JSON.stringify([props.siteId,props.packageId])} {...props}/>;
+  return <GoLinkWorkspaceSession key={JSON.stringify([props.siteId,props.packageId,props.transport?.kind??'legacy'])} {...props}/>;
 }
-function GoLinkWorkspaceSession({siteId,packageId}:GoLinkWorkspaceProps){
+function GoLinkWorkspaceSession({siteId,packageId,transport=legacyGoLinkTransport}:GoLinkWorkspaceProps){
+  const {createSiteGoLink,listSiteGoLinksPage,revokeSiteGoLink,listAvailableGoDestinations,inspectSavedGoLink,setSiteGoLinkPaused}=transport.api;
   const [links,setLinks]=useState<GoLink[]>([]);
   const [linkTerm,setLinkTerm]=useState("");
   const [destinationTerm,setDestinationTerm]=useState("");
@@ -87,10 +85,10 @@ function GoLinkWorkspaceSession({siteId,packageId}:GoLinkWorkspaceProps){
       .then(page=>{if(live){setLinks(page.items);setNextCursor(page.nextCursor);setReadState("ready");}})
       .catch(()=>{if(live)setReadState("error");});
     return ()=>{live=false;};
-  },[siteId,packageId,retry,listTerm]);
+  },[siteId,packageId,retry,listTerm,listSiteGoLinksPage]);
 
   const catalog=useGoDestinationChoices(
-    ["site",siteId,packageId??null,kind,choiceTerm],
+    ["site",transport.kind,siteId,packageId??null,kind,choiceTerm],
     ()=>listAvailableGoDestinations({data:{siteId,packageId,kind,term:choiceTerm}}),
   );
   const searchPending=choiceTerm!==destinationTerm.trim();
@@ -99,7 +97,7 @@ function GoLinkWorkspaceSession({siteId,packageId}:GoLinkWorkspaceProps){
   const chosen=selected?choices.find(item=>goDestinationSelectionKey(item.destination)===goDestinationSelectionKey(selected)):undefined;
   const destination=advanced?advancedDestination(kind,target):chosen?.destination??null;
   async function create(){
-    if(!destination || busy || readState!=="ready")return;
+    if(!destination || destination.kind==="website-preview" || busy || readState!=="ready")return;
     setBusy(true);setError("");setNotice("");
     try{
       const linkName=(name.trim()||chosen?.title||"Shared link").slice(0,120);
