@@ -1,5 +1,7 @@
 import 'reflect-metadata';
 import { randomUUID } from 'node:crypto';
+import { Logger } from '@nestjs/common';
+import { requestSummary } from './request-telemetry';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -14,6 +16,7 @@ const configSchema = z.object({
   canonicalWrites: z.enum(['0','1']).default('0'),
   canonicalReads: z.enum(['0', '1']).default('0'),
   docs: z.enum(['0', '1']).default('0'),
+  requestLogs: z.enum(['0', '1']).default('0'),
   environment: z.string().default('development'),
 }).superRefine((config, context) => {
   if(config.canonicalWrites==='1' && (config.canonicalReads!=='1'||config.environment!=='test'||config.host!=='127.0.0.1')){
@@ -36,17 +39,17 @@ export function assertIsolatedWriteEnvironment(env:NodeJS.ProcessEnv){
 }
 export function readConfig(env: NodeJS.ProcessEnv = process.env) {
   if(env.API_CANONICAL_WRITES==='1')assertIsolatedWriteEnvironment(env);
-  return configSchema.parse({ host: env.API_HOST, port: env.API_PORT, docs: env.API_DOCS, canonicalReads: env.API_CANONICAL_READS, canonicalWrites:env.API_CANONICAL_WRITES, environment: env.NODE_ENV });
+  return configSchema.parse({ host: env.API_HOST, port: env.API_PORT, docs: env.API_DOCS, requestLogs: env.API_REQUEST_LOGS, canonicalReads: env.API_CANONICAL_READS, canonicalWrites:env.API_CANONICAL_WRITES, environment: env.NODE_ENV });
 }
 export async function createApi(config: ReturnType<typeof readConfig>) {
-  configSchema.parse(config);
+  config = configSchema.parse(config);
   if(config.canonicalWrites==='1')assertIsolatedWriteEnvironment(process.env);
   const adapter = new FastifyAdapter({
     bodyLimit: 1024 * 1024, requestTimeout: 30000, connectionTimeout: 65000,
     keepAliveTimeout: 5000, trustProxy: false,
     requestIdHeader: false, genReqId: () => randomUUID(),
   });
-  const app = await NestFactory.create<NestFastifyApplication>(AppModule, adapter, { logger: ['error', 'warn'] });
+  const app = await NestFactory.create<NestFastifyApplication>(AppModule, adapter, { logger: config.requestLogs === '1' ? ['error', 'warn', 'log'] : ['error', 'warn'] });
   app.get(CanonicalIdentityService).configure(config.canonicalReads === '1', config.canonicalWrites==='1'?'http://localhost:'+config.port:null);
   adapter.getInstance().addHook('onRequest', async (request, reply) => {
     reply.header('X-Request-Id', request.id);
@@ -55,6 +58,12 @@ export async function createApi(config: ReturnType<typeof readConfig>) {
     reply.header('Cache-Control', 'no-store');
     reply.header('X-Frame-Options', 'DENY');
   });
+  if (config.requestLogs === '1') {
+    const logger = new Logger('ApiRequest');
+    adapter.getInstance().addHook('onResponse', async (request, reply) => {
+      logger.log(requestSummary(request, reply));
+    });
+  }
   app.setGlobalPrefix('api/v1');
   const document = SwaggerModule.createDocument(app, new DocumentBuilder()
     .setTitle('Becomuna API').setDescription('Migration proof of concept; canonical reads disabled by default.')
