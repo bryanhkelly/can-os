@@ -1,3 +1,5 @@
+import * as learnerCredentials from "@/modules/learning/learner-credentials.server";
+import {previewNoncreditCredentialService} from "@/modules/learning/credential-preview.server";
 import * as completionAdmin0 from "@/modules/learning/noncredit-completion-decisions.server";
 import * as completionAdmin1 from "@/modules/learning/noncredit-completion-policy.server";
 import * as completionAdmin2 from "@/modules/learning/noncredit-completion-review.server";
@@ -81,6 +83,9 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
  const context=await (mode==="operator-reporting"?(readCookie(request,accessSessionCookie)!==undefined?getIdentityContext(request):getCanonicalCommandContext(request)):mode==="planning"?getBlueprintPlanningContext(request):mode==="canonical"?getCanonicalCommandContext(request):mode==="learner"?getInstructionalLearnerContext(request):getIdentityContext(request));
  if(!context.actorPersonId)throw new AuthorizationError("verified Person");
  return {
+  listMyNoncreditCredentials:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Credential reader context");const rows=await learnerCredentials.listMyNoncreditCredentialsService(request);return rows.map(row=>({...row,issuedAt:new Date(row.issuedAt).toISOString(),expiresAt:row.expiresAt===null?null:new Date(row.expiresAt).toISOString()}));},
+  downloadMyNoncreditCredential:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Credential reader context");return learnerCredentials.downloadMyNoncreditCredentialService(request,raw);},
+  previewNoncreditCredential:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Credential preview context");return previewNoncreditCredentialService(request,raw);},
   decideNoncreditCompletion:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Completion administration context");return completionAdmin0.decideNoncreditCompletionService(request,raw);},
   getNoncreditCompletionPolicyCatalog:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Completion administration context");return completionAdmin1.getNoncreditCompletionPolicyCatalogService(request);},
   publishNoncreditCompletionPolicy:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Completion administration context");return completionAdmin1.publishNoncreditCompletionPolicyService(request,raw);},

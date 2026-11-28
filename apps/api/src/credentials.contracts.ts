@@ -1,0 +1,12 @@
+import {z} from 'zod';
+const id=z.string().uuid(),format=z.enum(['pdf','badge_svg','badge_json']),kind=z.enum(['completion_certificate','digital_badge']),media=z.enum(['application/pdf','image/svg+xml','application/json']);
+export const empty=z.object({}).strict();
+export const download=z.object({issuanceId:id,format}).strict();
+export const preview=z.object({trainingVersionId:id,format}).strict();
+const date=z.string().datetime({offset:true});
+export const listResult=z.array(z.object({id,title:z.string(),kind,credentialReference:z.string(),issuedAt:date,expiresAt:date.nullable(),current:z.boolean()}).strict());
+export const artifactResult=z.object({filename:z.string(),mediaType:media,base64:z.string().regex(/^[A-Za-z0-9+/]+={0,2}$/)}).strict();
+const str={type:'string' as const},uuid={...str,format:'uuid'},dt={...str,format:'date-time'},bool={type:'boolean' as const};
+const en=(values:readonly string[])=>({...str,enum:[...values]});
+const obj=(properties:Record<string,any>)=>({type:'object' as const,properties,required:Object.keys(properties),additionalProperties:false});
+export const docs={download:obj({issuanceId:uuid,format:en(format.options)}),preview:obj({trainingVersionId:uuid,format:en(format.options)}),list:{type:'array' as const,items:obj({id:uuid,title:str,kind:en(kind.options),credentialReference:str,issuedAt:dt,expiresAt:{...dt,nullable:true},current:bool})},artifact:obj({filename:str,mediaType:en(media.options),base64:{...str,format:'byte'}})};

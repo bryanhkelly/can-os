@@ -659,3 +659,21 @@ test('knowledge checks and completion require verified learner or provider autho
 test('noncredit enrollment publication protects provider scope and explicit Site selection',async()=>{await withServer('0',async(url,document)=>{for(const [route,method] of [["/api/v1/noncredit-enrollment-publisher","GET"],["/api/v1/noncredit-training-readiness","GET"],["/api/v1/noncredit-enrollment-releases","POST"],["/api/v1/noncredit-enrollment-closures","POST"],["/api/v1/noncredit-multisite-releases","POST"]]){assert.ok(document.paths[route][method.toLowerCase()].security);assert.equal((await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined)).status,method==='POST'?503:401);}assert.ok(document.paths['/api/v1/noncredit-enrollment-releases'].post.requestBody.content['application/json'].schema.required.includes('siteId'));});});
 
 test('completion administration requires canonical provider credentials and distinguishes decisions from corrections',async()=>{await withServer('0',async(url,document)=>{for(const [route,method] of [["/api/v1/noncredit-completion-decisions","POST"],["/api/v1/noncredit-completion-policy-catalog","GET"],["/api/v1/noncredit-completion-policies","POST"],["/api/v1/noncredit-completion-review","GET"],["/api/v1/noncredit-completion-queue","GET"],["/api/v1/noncredit-completion-corrections","POST"]]){assert.ok(document.paths[route][method.toLowerCase()].security);assert.equal((await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined)).status,method==='POST'?503:401);}});const c=require('../dist/completion-admin.contracts');assert.equal(c.queueQuery.safeParse({page:'101'}).success,false);assert.equal(c.queueQuery.parse({page:'2'}).page,2);});
+
+
+test('credential reader and sample preview are private, fail closed and never issue awards',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const [route,method] of [['/api/v1/me/credentials','GET'],['/api/v1/me/credential-downloads','POST'],['/api/v1/credential-previews','POST']]){
+   const operation=document.paths[route][method.toLowerCase()];assert.ok(operation.security);
+   const response=await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json','x-role':'platform_owner'},body:'{}'}:{headers:{'x-role':'platform_owner'}});
+   assert.equal(response.status,method==='POST'?503:401);assert.equal(response.headers.get('cache-control'),'no-store');
+  }
+  assert.equal(document.paths['/api/v1/credential-issuances'],undefined);
+ });
+ const c=require('../dist/credentials.contracts');const id='00000000-0000-4000-8000-000000000001';
+ assert.equal(c.download.safeParse({issuanceId:id,format:'pdf'}).success,true);
+ assert.equal(c.download.safeParse({issuanceId:id,format:'pdf',personId:id}).success,false);
+ assert.equal(c.preview.safeParse({trainingVersionId:id,format:'html'}).success,false);
+ assert.equal(c.preview.safeParse({trainingVersionId:id,format:'pdf',recipientName:'forged'}).success,false);
+ assert.equal(c.artifactResult.safeParse({filename:'sample.pdf',mediaType:'application/pdf',base64:'YWJj',issued:true}).success,false);
+});
