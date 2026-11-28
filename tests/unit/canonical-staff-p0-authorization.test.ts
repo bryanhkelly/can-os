@@ -105,7 +105,7 @@ describe("canonical single-login P0 authorization boundaries", () => {
     expect(publication).toContain(
       "inArray(noncreditSelfEnrollmentReleases.siteId,provider.siteIds)");
     expect(publication).not.toContain('import { requireCanonicalLabProvider } from');
-    expect(publication).toContain('await import("@/modules/operations/canonical-capability-lab-access.server")');
+    expect(publication).toContain('await import("@/modules/operations/canonical-provider-access.server")');
     const cohorts=source("src/modules/enrollment/noncredit-cohort-operations.server.ts");
     const rpc=source("src/modules/enrollment/noncredit-cohort-operations.functions.ts");
     expect(cohorts).toContain(

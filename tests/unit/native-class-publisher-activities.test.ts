@@ -35,11 +35,11 @@ describe("publisher Course Activities recover the original UX without a parallel
     expect(ddl).toContain("FORCE ROW LEVEL SECURITY");
   });
   it("requires an independently authorized local operator for campaign association",()=>{
-    const link=source("src/modules/classes/native-class-survey-link.functions.ts");
+    const link=source("src/modules/classes/native-class-survey-link.server.ts");
     const manager=source("src/components/learning/NativeClassSurveyCampaignPanel.tsx");
     expect(link).toContain('assertCapability(actor,"class.manage")');
     expect(link).toContain("await validateClassAuthority(tx");
-    expect(link).toContain("await assertCurrentCanonicalStaffForMutation(tx,getRequest(),actor)");
+    expect(link).toContain("await assertCurrentCanonicalStaffForMutation(tx,request,actor)");
     expect(link).toContain('eq(surveyCampaigns.deploymentId,deploymentId)');
     expect(link).toContain("current verified identified-survey permission");
     expect(link).toContain("link the Class before inviting survey participants");

@@ -104,14 +104,14 @@ describe("Release 3 independent facilitator and assisted activity evidence",()=>
 
 describe("Release 3 governed survey delivery",()=>{
   it("only connects consented, personally invited, published identified surveys",()=>{
-    const api=read("src/modules/learning/classroom-surveys.functions.ts");
+    const api=read("src/modules/learning/classroom-surveys.server.ts");
     const companion=read("src/routes/classroom.companion.tsx");
     expect(api).toContain('eq(surveyCampaigns.responseMode,"identified")');
     expect(api).toContain('eq(surveyVersions.lifecycle,"published")');
     expect(api).toContain('isNotNull(evidenceDocumentVersions.verifiedByPersonId)');
-    expect(api).toContain("eq(surveyInvitations.invitedPersonId,actor.actorPersonId)");
+    expect(api).toContain("eq(surveyInvitations.invitedPersonId,personId)");
     expect(api).toContain('access.source!=="noncredit"');
-    expect(api).toContain('roomHostIsCurrent(tx,room,new Date())');
+    expect(api).toContain('currentRoomParticipantPermitted(tx,room,access,personId,new Date())');
     expect(api).toContain('if(link.stage==="exit"&&roomState==="live"&&!pair.leftAt)continue');
     expect(api).not.toContain("tx.insert(surveyResponses)");
     expect(api).not.toContain("tx.insert(surveyAnswers)");

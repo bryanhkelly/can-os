@@ -48,7 +48,7 @@ const governed = [
     "src/modules/enrollment/noncredit-self-enrollment.functions.ts",
     "src/modules/enrollment/noncredit-self-enrollment-withdraw.functions.ts",
     "src/modules/enrollment/noncredit-self-enrollment-resume.functions.ts",
-    "src/modules/enrollment/noncredit-enrollment-publication.functions.ts",
+    "src/modules/enrollment/noncredit-enrollment-publication.server.ts",
     "src/modules/classes/native-class-assignment.functions.ts",
     "src/modules/classes/native-class-invitations.functions.ts",
     "src/modules/classes/native-class-lifecycle.functions.ts",
