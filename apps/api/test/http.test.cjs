@@ -745,3 +745,31 @@ test('staff wire contracts deny arbitrary roles and caller-selected actor/Person
  assert.equal(c.grantState.safeParse({grantId:id,active:false,actorId:id}).success,false);
  assert.equal(c.query.safeParse({query:'test',organizationId:id}).success,false);
 });
+
+test('institutional identity operations are protected and documented',async()=>{
+ await withServer('0',async(url,document)=>{
+  const routes=[['credential-issuer/mine','GET'],['credential-issuer/pending','GET'],['credential-issuer/approved','GET'],['credential-issuer/requests','POST'],['credential-issuer/decisions','POST'],['credential-issuer/revocations','POST'],['academic-staff/delegations','GET'],['academic-staff/delegations','POST'],['academic-staff/revocations','POST']];
+  for(const [path,method] of routes){
+   const route='/api/v1/identity/'+path,op=document.paths[route][method.toLowerCase()];
+   assert.ok(op.security);assert.ok(op.responses['403']);
+   if(method==='POST')assert.ok(op.requestBody);
+   const res=await fetch(url+route,{method,headers:{'x-role':'can_network_steward',...(method==='POST'?{Origin:url,'content-type':'application/json'}:{})},...(method==='POST'?{body:'{}'}:{})});
+   assert.equal(res.status,method==='POST'?503:401);
+  }
+ });
+});
+test('institutional identity contracts prevent caller-selected reviewer and broad grants',()=>{
+ const issuer=require('../dist/issuer-approval.contracts'),staff=require('../dist/academic-staff.contracts');
+ const id='00000000-0000-4000-8000-000000000001',evidenceReference='Independently verified secure reference';
+ const review={approvalId:id,decision:'approve',evidenceReference};
+ assert.equal(issuer.reviewBody.safeParse(review).success,false);
+ assert.equal(issuer.reviewBody.safeParse({...review,expiresAt:'2027-01-01T00:00:00Z'}).success,true);
+ assert.equal(issuer.reviewBody.safeParse({...review,expiresAt:'2027-01-01T00:00:00Z',reviewerAccountId:id}).success,false);
+ assert.equal(issuer.requestBody.safeParse({evidenceReference,grantId:id}).success,false);
+ assert.equal(issuer.revokeBody.safeParse({approvalId:id,reason:evidenceReference,organizationId:id}).success,false);
+ const grant={programId:id,personId:id,role:'registrar',reason:'Exact Program assignment'};
+ assert.equal(staff.grant.safeParse(grant).success,true);
+ for(const role of ['site_admin','platform_owner','can_network_steward','can_credential_reviewer'])assert.equal(staff.grant.safeParse({...grant,role}).success,false);
+ assert.equal(staff.grant.safeParse({...grant,siteId:id}).success,false);
+ assert.equal(staff.grant.safeParse({...grant,capabilities:['credential.issue']}).success,false);
+});
