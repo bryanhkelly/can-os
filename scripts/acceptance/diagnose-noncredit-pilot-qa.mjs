@@ -22,10 +22,16 @@ const checks = {
   CAN_CANONICAL_ACCESS_TOKEN_PEPPER: (env.CAN_CANONICAL_ACCESS_TOKEN_PEPPER?.length ?? 0) >= 32,
   CAN_NONCREDIT_ASSESSMENT_KEY_HEX: /^[a-f0-9]{64}$/i.test(env.CAN_NONCREDIT_ASSESSMENT_KEY_HEX ?? ""),
 };
-const sessionKeys = ["LEARNER","OTHER","PROVIDER"].map(role => "CAN_PILOT_QA_"+role+"_SESSION");
-for (const key of sessionKeys) checks[key] = /^[A-Za-z0-9_-]{40,}$/.test(env[key] ?? "");
-checks.distinct_session_values = sessionKeys.every(key => checks[key]) &&
-  new Set(sessionKeys.map(key => env[key])).size === 3;
+// API acceptance acquires fresh email-link sessions. Only the legacy browser
+// command requires preexisting cookies. Never make readiness depend on a
+// credential the standard API runner deliberately no longer consumes.
+try {
+ const {z}=await import("zod");
+ const actor=z.object({email:z.string().email().refine(v=>v===v.toLowerCase()&&v.endsWith(".test")),grantId:z.string().uuid()}).strict();
+ const a=z.object({learner:actor,other:actor,provider:actor}).strict().parse(JSON.parse(env.CAN_PILOT_QA_API_ACTORS_JSON??"{}"));
+ checks.CAN_PILOT_QA_API_ACTORS_JSON = new Set(Object.values(a).map(v=>v.email)).size===3 &&
+   new Set(Object.values(a).map(v=>v.grantId)).size===3;
+} catch { checks.CAN_PILOT_QA_API_ACTORS_JSON=false; }
 try {
   const f = JSON.parse(env.CAN_PILOT_QA_FIXTURE_JSON ?? "{}");
   checks.CAN_PILOT_QA_FIXTURE_JSON = Boolean(
@@ -98,7 +104,7 @@ if (dbKeys.every(key => checks[key])) {
       r.course_state==="published" && r.lessons>0 && r.published_primary_coverage===r.lessons &&
       r.sealed_items>=5 && r.open_administrations>=2 && r.current_policies>=1 && r.active_campaigns>=1 &&
       r.active_classes===1 && r.open_releases>=1 && r.registrations===0);
-    inventoryReady = candidates.length>0 && identities.verified_accounts>=3 && identities.accounts_with_current_sessions>=3;
+    inventoryReady = candidates.length>0 && identities.verified_accounts>=3;
   } catch {
     console.error("BLOCKED: isolated database attestation or inventory query failed. Check branch, connection and schema; no credentials printed.");
   }
@@ -109,5 +115,5 @@ if (!Object.values(checks).every(Boolean) || !inventoryReady || !migrationReady)
   console.log("BLOCKED: runtime configuration, exact migration parity or candidate inventory incomplete.");
   process.exitCode = 1;
 } else {
-  console.log("CANDIDATE ONLY: run the strict fixture preflight and HTTP/browser tests; this inventory is not acceptance.");
+  console.log("CANDIDATE ONLY: run the strict fixture preflight and standard HTTP API tests; this inventory is not acceptance.");
 }

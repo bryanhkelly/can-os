@@ -7,7 +7,9 @@ import {z} from "zod";
 
 const uuid=z.string().uuid();
 const day=z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
-const actor=z.object({email:z.string().email(),grantId:uuid,organizationId:uuid,privateAccessCode:z.string().optional()}).strict();
+const actor=z.object({email:z.string().email().refine(v=>v===v.toLowerCase()&&(v.endsWith(".test")||v.endsWith(".demo"))),
+ grantId:uuid,organizationId:uuid,privateAccessCode:z.string().regex(/^[A-Za-z0-9_-]{43}$/).optional()}).strict()
+ .refine(a=>a.email.endsWith(".demo")===Boolean(a.privateAccessCode),"Existing individual demo credential or ordinary email link required");
 const meeting=z.object({requestId:uuid,agendaRequestId:uuid,startsAt:z.string().datetime({offset:true}),endsAt:z.string().datetime({offset:true}),lessonId:uuid,assetVersionId:uuid,prompt:z.string().min(5).max(1000),choices:z.array(z.string().min(1).max(200)).min(2).max(8)}).strict();
 const site=z.object({host:actor,manager:actor,classId:uuid,siteId:uuid,classOfferingVersionId:uuid,
  learners:z.array(z.object({actor,paired:z.boolean()}).strict()).min(2).max(20),
@@ -38,11 +40,13 @@ export function parsePlan(raw){
    }
   }
   if(!sites.some(s=>s.siteId===relationship.siteId&&s.host.organizationId===relationship.owner.organizationId))throw Error("Relationship must cover a pilot Site");
+  const parties=[relationship.owner,relationship.recipient,relationship.foreign];
+  if(parties.some(a=>!a.privateAccessCode)||new Set(parties.map(a=>a.organizationId)).size!==3)throw Error("Three independent authorized synthetic relationship managers required");
  }
  return p;
 }
 export async function runPilotAcceptance({mode,env,root,modes}){
- const summary={mode,revision:env.CAN_RELEASE_SOURCE_SHA,stages:[],status:"blocked",nationalDisclosure:"not tested"};
+ const summary={mode,revision:env.CAN_RELEASE_SOURCE_SHA,stages:[],status:"blocked",nationalDisclosure:"not tested",blocker:null};
  const run=(name,command,extra={})=>{
   console.log("START "+name);
   const start=Date.now();
@@ -53,7 +57,7 @@ export async function runPilotAcceptance({mode,env,root,modes}){
  };
  const governed=(name,payload)=>run(name,"governed",{CAN_PILOT_QA_GOVERNED_JSON:JSON.stringify(payload)});
  try{
-  const plan=parsePlan(env.CAN_PILOT_QA_PLAN_JSON||"{}");
+  const plan=mode==="pilot1"?{}:parsePlan(env.CAN_PILOT_QA_PLAN_JSON||"{}");
   if(mode!=="pilot1"&&!plan.pilot2)throw Error("Reviewed Pilot 2 plan required");
   if(mode!=="pilot2"&&(!env.CAN_PILOT_QA_FIXTURE_JSON||!env.CAN_PILOT_QA_API_ACTORS_JSON))throw Error("Reviewed Pilot 1 fixture and email-link actors required");
   run("schema","schema");
@@ -104,6 +108,7 @@ export async function runPilotAcceptance({mode,env,root,modes}){
   summary.status="passed";
  }catch(error){
   // Zod input and driver errors may embed private fixture values. Never echo them.
+  summary.blocker=summary.stages.find(s=>s.status==="failed")?.name??"Plan validation or prerequisite reconciliation";
   console.error("Acceptance stopped; inspect the failed stage and reviewed prerequisites. No business bypass attempted.");
  }finally{
   console.log(JSON.stringify(summary,null,2));
