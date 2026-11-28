@@ -48,3 +48,12 @@ test('independent HTTP transport faults use safe problem responses and documente
     }
   } finally { await app.close(); }
 });
+
+test('request telemetry records only safe route template and fixed metadata', () => {
+  const { requestSummary } = require('../dist/request-telemetry');
+  const request = { id: 'server-id', method: 'GET', routeOptions: { url: '/api/v1/sites/:id' },
+    url: '/api/v1/sites/private-id?token=secret', headers: { cookie: 'secret' }, body: { private: true } };
+  const reply = { statusCode: 403, elapsedTime: 42.3 };
+  assert.deepEqual(requestSummary(request, reply), { event: 'api.http.completed', requestId: 'server-id',
+    method: 'GET', route: '/api/v1/sites/:id', status: 403, durationMs: 42 });
+});
