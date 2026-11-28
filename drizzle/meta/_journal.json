@@ -939,6 +939,20 @@
       "when": 1795462027000,
       "tag": "0133_restricted_staff_credential_parity",
       "breakpoints": true
+    },
+    {
+      "idx": 134,
+      "version": "7",
+      "when": 1795462028000,
+      "tag": "0134_communication_sender_registry",
+      "breakpoints": true
+    },
+    {
+      "idx": 135,
+      "version": "7",
+      "when": 1795462029000,
+      "tag": "0135_organization_sender_identities",
+      "breakpoints": true
     }
   ]
 }

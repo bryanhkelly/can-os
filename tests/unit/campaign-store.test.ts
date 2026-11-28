@@ -2,9 +2,10 @@ import {afterEach,beforeEach,describe,expect,it,vi} from "vitest";
 const mocked=vi.hoisted(()=>({
  execute:vi.fn(),txExecute:vi.fn(),transaction:vi.fn(),resolve:vi.fn(),
 }));
+vi.mock("@/modules/communication/sender-registry.server",()=>({readCampaignSenderRegistryState:vi.fn(async()=>({configured:false,active:null}))}));
 vi.mock("@/db/client",()=>({db:{execute:mocked.execute,transaction:mocked.transaction}}));
 vi.mock("@/modules/engagement/engagement-go.server",()=>({resolveGoExperience:mocked.resolve}));
-import {processEngagementCampaignDeliveries} from "@/modules/communication/campaign-store.server";
+import {processEngagementCampaignDeliveries,campaignSenderReadiness,readCampaignSenderReadiness} from "@/modules/communication/campaign-store.server";
 
 const work={id:"11111111-1111-4111-8111-111111111111",lease_id:"22222222-2222-4222-8222-222222222222",email:"synthetic@real.org",
  unsubscribe_token:"33333333-3333-4333-8333-333333333333",attempts:1,outcome_unconfirmed:false,first_attempt_at:new Date().toISOString(),
@@ -84,5 +85,46 @@ describe("campaign worker fenced delivery",()=>{
   expect(await processEngagementCampaignDeliveries(1)).toEqual({
    accepted: 0, failed: 1, suppressed: 0, retry: 0, unconfirmed: 0,
   });
+ });
+});
+
+describe("campaign sender readiness",()=>{
+ it("uses the existing provider configuration and reports no secrets",()=>{
+  expect(campaignSenderReadiness().issues).toEqual([]);
+  vi.stubEnv("CAN_CAMPAIGN_POSTAL_ADDRESS","");
+  const result=campaignSenderReadiness();
+  expect(result.sender).toBeNull();
+  expect(result.issues).toEqual(["A valid campaign postal address is required."]);
+  expect(JSON.stringify(result)).not.toContain("mock-only");
+ });
+ it("requires signed delivery events and an approved origin",()=>{
+  vi.stubEnv("RESEND_WEBHOOK_SECRET","");
+  vi.stubEnv("CAN_ACCESS_PUBLIC_ORIGIN","http://example.org/path");
+  expect(campaignSenderReadiness().issues).toHaveLength(2);
+  expect(campaignSenderReadiness().sender).toBeNull();
+ });
+});
+
+it("prefers a governed sender and postal address over legacy deployment defaults",()=>{
+ const result=campaignSenderReadiness({sender_from:"approved@real.org",postal_address:"Approved mailing address"});
+ expect(result.sender?.from).toBe("approved@real.org");
+ expect(result.sender?.address).toBe("Approved mailing address");
+ expect(result.issues).toEqual([]);
+});
+
+describe("organization sender resolution",()=>{
+ it("uses the approved organization sender and blocks revoked identities without fallback",async()=>{
+  const {readCampaignSenderRegistryState}=await import("@/modules/communication/sender-registry.server");
+  const registry=vi.mocked(readCampaignSenderRegistryState);
+  const active={id:"approved-version",sender_from:"partner@real.org",postal_address:"Partner mailing address",verification_reference:"verified"};
+  registry.mockResolvedValueOnce({configured:true,active});
+  expect((await readCampaignSenderReadiness("org-a")).sender?.versionId).toBe(active.id);
+  registry.mockResolvedValueOnce({configured:true,active:null});
+  expect((await readCampaignSenderReadiness("org-a")).sender).toBeNull();
+ });
+ it("inherits platform identity only when organization has never been configured",async()=>{
+  const {readCampaignSenderRegistryState}=await import("@/modules/communication/sender-registry.server");
+  vi.mocked(readCampaignSenderRegistryState).mockResolvedValueOnce({configured:false,active:null}).mockResolvedValueOnce({configured:true,active:{id:"platform-version",sender_from:"platform@real.org",postal_address:"Platform address",verification_reference:"verified"}});
+  expect((await readCampaignSenderReadiness("org-a")).sender?.versionId).toBe("platform-version");
  });
 });

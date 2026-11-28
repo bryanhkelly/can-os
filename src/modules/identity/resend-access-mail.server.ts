@@ -1,3 +1,4 @@
+import {readEmailConfiguration} from "@/modules/communication/email-configuration.server";
 import { readOptionalEmailBrand } from "@/modules/communication/email-brand.server";
 import { submitResendEmail } from "@/modules/communication/resend-email-transport.server";
 /**
@@ -56,11 +57,10 @@ export const sendAccessLinkViaResend: AccessEmailSender = async message => {
  if(suppressDemoEmailDelivery(to))throw new Error("Demo email destination suppressed");
  const url=new URL(accessUrl);
  if(url.protocol!=="https:" || !url.hostname) throw new Error("Access link must use HTTPS");
- const allowedOrigin=process.env.CAN_ACCESS_PUBLIC_ORIGIN;
+ const allowedOrigin=readEmailConfiguration("access").publicOrigin;
  if(!allowedOrigin || url.origin!==new URL(allowedOrigin).origin) throw new Error("Invalid access link origin");
  if(await writeTestAccessMail(message))return;
- const apiKey=process.env.RESEND_API_KEY;
- const from=process.env.CAN_ACCESS_FROM_EMAIL;
+ const {apiKey,from}=readEmailConfiguration("access");
  if(!apiKey || !from) throw new Error("Resend access mail is not configured");
  const brand = await readOptionalEmailBrand(message.siteId, "access-email");
  const name=brand?.name??"CAN OS";

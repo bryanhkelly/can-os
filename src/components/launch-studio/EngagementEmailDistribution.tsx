@@ -2,8 +2,6 @@ import {useEffect,useRef,useState} from "react";
 import {NativeEngagementCampaigns} from "./NativeEngagementCampaigns";
 import {Button} from "@/components/ui/button";
 import {Checkbox} from "@/components/ui/choice";
-import {Field} from "@/components/ui/field";
-import {Textarea} from "@/components/ui/textarea";
 import {ActionFooter, QueryState, WorkspaceNotice, WorkspacePanel} from "@/components/workspace";
 import {prepareEngagementEmailDraft} from "@/modules/engagement/engagement-registry.functions";
 import {buildInvitationMailto,parseInvitationRecipients,type EngagementInvitation} from "@/domain/engagement-distribution";
@@ -18,6 +16,7 @@ function EmailDistributionSession({engagementId,linkId,onClose}:DistributionProp
   const [draft,setDraft]=useState<EngagementInvitation|null>(null);
   const [recipients,setRecipients]=useState("");
   const [authorized,setAuthorized]=useState(false);
+  const [external,setExternal]=useState(false);
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
   const [busy,setBusy]=useState(false);
@@ -59,16 +58,16 @@ function EmailDistributionSession({engagementId,linkId,onClose}:DistributionProp
     finally{pending.current=false;if(active.current)setCopying(false);}
   }
   return <WorkspacePanel headingLevel="h3" title="Prepare email invitation" className="mt-4" actions={<Button type="button" variant="ghost" size="sm" onClick={onClose}>Close</Button>}>
-    <WorkspaceNotice className="mt-3">For a small external email draft, recipients stay in your browser and are placed in BCC. Native campaign sending below uses saved consented lists and separate provider receipts.</WorkspaceNotice>
+    <WorkspaceNotice className="mt-3">Send through the platform using the recipient form below. You may also copy the invitation or open an external email draft.</WorkspaceNotice>
     {draft&&<WorkspacePanel headingLevel="h4" title={draft.subject} className="mt-3"><p className="whitespace-pre-wrap [overflow-wrap:anywhere] text-sm">{draft.body}</p></WorkspacePanel>}
     {!draft&&<QueryState loading={!error?"Verifying saved invitation…":undefined} error={error||undefined} onRetry={()=>setRevision(v=>v+1)}/>}
-      <Field className="mt-3" label="Recipient email addresses (up to 20)" description={`${parsed.recipients.length} unique addresses.`}
-        error={parsed.invalid.length?"Remove invalid or synthetic addresses.":parsed.tooMany?"Limit is 20 addresses.":undefined}>
-        <Textarea value={recipients} maxLength={6000} rows={3} disabled={busy||copying} placeholder="Enter one address per line" onChange={e=>{setRecipients(e.target.value);setAuthorized(false);}}/>
-      </Field>
-      <label className="mt-3 flex items-start gap-2 text-sm"><Checkbox disabled={busy||copying} checked={authorized} onChange={e=>setAuthorized(e.target.checked)}/>I have permission to contact these recipients for this invitation and will honor their communication preferences.</label>
-      <ActionFooter layout="inline"><Button type="button" disabled={!ready||busy||copying} loading={busy} onClick={()=>void handoff()}>Open email draft</Button><Button type="button" variant="outline" disabled={!draft||busy||copying} loading={copying} onClick={()=>void copy()}>Copy invitation</Button></ActionFooter>
-    <NativeEngagementCampaigns engagementId={engagementId} linkId={linkId} invitationReady={!!draft}/>
+    <NativeEngagementCampaigns engagementId={engagementId} linkId={linkId} invitationReady={!!draft} recipientDraft={recipients} onRecipientDraftChange={value=>{setRecipients(value);setAuthorized(false);}}/>
+    <ActionFooter layout="inline"><Button type="button" variant="outline" disabled={!draft||busy||copying} loading={copying} onClick={()=>void copy()}>Copy invitation</Button><Button type="button" variant="outline" disabled={busy||copying} onClick={()=>setExternal(v=>!v)}>{external?"Hide external draft":"More: external email draft"}</Button></ActionFooter>
+    {external&&<div className="space-y-3 mt-3">
+      <p className="text-sm text-muted-foreground">Uses the same entered addresses (up to 20) in BCC. Your email application handles delivery; the platform cannot verify it.</p>
+      <label className="flex items-start gap-2 text-sm"><Checkbox disabled={busy||copying} checked={authorized} onChange={e=>setAuthorized(e.target.checked)}/>I have permission to contact these recipients and will honor their communication preferences.</label>
+      <ActionFooter layout="inline"><Button type="button" variant="outline" disabled={!ready||busy||copying} loading={busy} onClick={()=>void handoff()}>Open email draft</Button></ActionFooter>
+    </div>}
     {notice&&<WorkspaceNotice tone="success" className="mt-3">{notice}</WorkspaceNotice>}
     {draft&&error&&<WorkspaceNotice tone="danger" className="mt-3">{error}</WorkspaceNotice>}
   </WorkspacePanel>;

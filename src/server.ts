@@ -37,7 +37,7 @@ export default {
   },
   scheduled(event:{cron?:string},env:CloudflareScheduledEnv,ctx:{waitUntil(task:Promise<unknown>):void}):void {
     const task=classifyCloudflareCron(event.cron);
-    // The photo pipeline uses R2 and does not touch Neon; keep its minute tick.
+    // The photo pipeline uses R2; the minute trigger also drives campaign delivery.
     if(task==="photography"){
       ctx.waitUntil(import("./platform/photography/cloudflare-production.server")
         .then(({runBoundTemplatePhotoProduction})=>runBoundTemplatePhotoProduction(env))
@@ -47,14 +47,18 @@ export default {
           message:error instanceof Error?error.message.slice(0,130):"unknown",
         })));
     }
-    // Every 15 minutes, not every minute. The existing durable database
-    // leases and provider receipts preserve idempotency with Netlify's
-    // scheduled maintenance runner, which uses the same cadence.
-    if(task==="deliveries" && env.DATABASE_URL){
+    // Campaigns have a minute cadence using the already deployed minute trigger.
+    // Existing DB leases preserve idempotency across scheduler invocations.
+    if(task==="photography" && env.DATABASE_URL){
       ctx.waitUntil(withRequestDatabase(async()=>{
         const {processEngagementCampaignDeliveries}=await import("./modules/communication/campaign-store.server");
         return processEngagementCampaignDeliveries();
       },env.DATABASE_URL).catch(()=>console.error("CAN campaign dispatch unavailable")));
+    }
+    // Every 15 minutes, not every minute. The existing durable database
+    // leases and provider receipts preserve idempotency with Netlify's
+    // scheduled maintenance runner, which uses the same cadence.
+    if(task==="deliveries" && env.DATABASE_URL){
       ctx.waitUntil(withRequestDatabase(
         async()=>{
           const {processNoncreditWaitlistEmailDeliveries}=await import(
@@ -89,7 +93,7 @@ export default {
       }));
     }
     // One daily attempt is enough: the existing transactional lease still
-    // enforces once-per-day cleanup. Never open Neon on the photo-only tick.
+    // enforces once-per-day cleanup. Retention is separate from campaign processing.
     if(task==="retention" && env.DATABASE_URL &&
       env.CAN_SESSION_DEVICE_RETENTION_ENABLED==="1"){
       ctx.waitUntil(withRequestDatabase(

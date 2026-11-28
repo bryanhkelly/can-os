@@ -1,3 +1,4 @@
+import {readEmailConfiguration} from "@/modules/communication/email-configuration.server";
 import { readEmailProviderReceipt } from "@/domain/email-provider-receipt";
 import { submitResendEmail } from "@/modules/communication/resend-email-transport.server";
 import {sql,type SQL} from "drizzle-orm";
@@ -13,14 +14,29 @@ export async function campaignRows<T>(executor:Executor,query:SQL):Promise<T[]>{
  const result=await executor.execute(query);
  return result.rows as unknown as T[];
 }
-export function campaignSender(){
- const from=process.env.CAN_CAMPAIGN_FROM_EMAIL?.trim();
- const address=process.env.CAN_CAMPAIGN_POSTAL_ADDRESS?.trim();
- const key=process.env.RESEND_API_KEY;
- const origin=process.env.CAN_ACCESS_PUBLIC_ORIGIN;
- if(!from||!address||!key||!origin||!process.env.RESEND_WEBHOOK_SECRET||/[\r\n]/.test(from)||address.length>500)return null;
- try{const url=new URL(origin);if(url.protocol!=="https:"||url.pathname!=="/"||url.search||url.hash||url.username||url.password)return null;}catch{return null;}
- return {from,address,key,origin};
+/** Report configuration requirements without exposing credentials or sender details. */
+export function campaignSenderReadiness(approved?:{sender_from:string;postal_address:string}|null){
+ const config=readEmailConfiguration("campaign");
+ const from=approved?.sender_from??config.from;
+ const address=approved?.postal_address??config.postalAddress;
+ const {apiKey:key,publicOrigin:origin,webhookConfigured}=config;
+ const issues:string[]=[];
+ if(!from||/[\r\n]/.test(from))issues.push("An approved campaign sender is required.");
+ if(!address||address.length>500)issues.push("A valid campaign postal address is required.");
+ if(!key)issues.push("The Resend connection is not configured.");
+ if(!webhookConfigured)issues.push("Signed Resend delivery events are not configured.");
+ try{const url=new URL(origin??"");if(url.protocol!=="https:"||url.pathname!=="/"||url.search||url.hash||url.username||url.password)throw new Error();}
+ catch{issues.push("A valid public HTTPS origin is required.");}
+ return {issues,sender:issues.length===0&&from&&address&&key&&origin?{from,address,key,origin}:null};
+}
+export function campaignSender(){return campaignSenderReadiness().sender;}
+export async function readCampaignSenderReadiness(organizationId:string|null=null){
+ const {readCampaignSenderRegistryState}=await import("./sender-registry.server");
+ const local=organizationId?await readCampaignSenderRegistryState(organizationId):null;
+ const state=local?.configured?local:await readCampaignSenderRegistryState(null);
+ if(state.configured&&!state.active)return {sender:null,issues:["Campaign sender approval has been revoked."]};
+ const result=campaignSenderReadiness(state.active);
+ return {...result,sender:result.sender?{...result.sender,versionId:state.active?.id??null}:null};
 }
 type Work = {
   id: string;
@@ -34,9 +50,11 @@ type Work = {
   public_url: string;
   sender_from: string;
   sender_address: string;
+  sender_scope?: string;
+  sender_version_id?: string|null;
   code: string;
 };
-async function claimCampaignDelivery(){
+async function claimCampaignDelivery(campaignId?:string){
  return db.transaction(async tx=>{
  // Expired ambiguous attempts are never retried outside the provider's idempotency window.
  await tx.execute(sql`UPDATE public.campaign_deliveries d SET status=CASE WHEN d.outcome_unconfirmed OR d.status='processing' THEN 'failed' ELSE 'cancelled' END,
@@ -50,6 +68,7 @@ async function claimCampaignDelivery(){
  WITH candidate AS (
   SELECT d.id FROM public.campaign_deliveries d JOIN public.engagement_campaigns c ON c.id=d.campaign_id
   WHERE c.scheduled_at<=now() AND c.cancelled_at IS NULL AND d.next_attempt_at<=now()
+  AND (${campaignId??null}::uuid IS NULL OR c.id=${campaignId??null}::uuid)
   AND (d.status='pending' OR (d.status='processing' AND d.lease_until<now()))
   AND d.attempts<${campaignMaxAttempts} AND (d.first_attempt_at IS NULL OR d.first_attempt_at>now()-(${campaignRetryWindowMs} * interval '1 millisecond'))
   ORDER BY d.next_attempt_at,d.id LIMIT 1 FOR UPDATE OF d SKIP LOCKED
@@ -61,7 +80,7 @@ async function claimCampaignDelivery(){
   RETURNING d.id,d.lease_id,d.email,d.unsubscribe_token,d.attempts,d.first_attempt_at,d.campaign_id
  )
  SELECT d.id,d.lease_id,d.email,d.unsubscribe_token,d.attempts,d.first_attempt_at,
-  c.subject,c.body,c.public_url,c.sender_from,c.sender_address,l.code
+  c.subject,c.body,c.public_url,c.sender_from,c.sender_address,c.sender_scope,c.sender_version_id,l.code
  FROM claimed d JOIN public.engagement_campaigns c ON c.id=d.campaign_id
  JOIN public.engagement_definitions e ON e.id=c.engagement_id JOIN public.site_go_links l ON l.id=c.link_id`);
  return row;
@@ -88,7 +107,7 @@ async function stillEligible(work:Work){
  ) AS eligible`);
  return row?.eligible===true;
 }
-type CampaignSender = NonNullable<ReturnType<typeof campaignSender>>;
+type CampaignSender = NonNullable<Awaited<ReturnType<typeof readCampaignSenderReadiness>>["sender"]>;
 type CampaignSettlement = Awaited<ReturnType<typeof settle>>;
 type CampaignCounts = {
   accepted: number;
@@ -114,6 +133,7 @@ function matchesCampaignDestination(work: Work, sender: CampaignSender): boolean
   const url = new URL(work.public_url);
   return !parsed.invalid.length && parsed.recipients.length === 1 &&
     work.sender_from === sender.from && work.sender_address === sender.address &&
+    (work.sender_version_id??null) === (sender.versionId??null) &&
     url.origin === new URL(sender.origin).origin && url.pathname === "/go/" + work.code &&
     !url.search && !url.hash && !suppressDemoEmailDelivery(work.email);
 }
@@ -180,14 +200,17 @@ async function processCampaignDelivery(work: Work, sender: CampaignSender): Prom
 }
 
 /** Both schedulers use this exact queue. One message per recipient; never BCC bulk mail. */
-export async function processEngagementCampaignDeliveries(limit = 10): Promise<CampaignCounts> {
+export async function processEngagementCampaignDeliveries(limit = 10, campaignId?:string): Promise<CampaignCounts> {
   const counts: CampaignCounts = { accepted: 0, failed: 0, suppressed: 0, retry: 0, unconfirmed: 0 };
-  const sender = campaignSender();
-  if (!sender) return counts;
+  const config=readEmailConfiguration("campaign");
+  if(!config.apiKey||!config.webhookConfigured||!config.publicOrigin)return counts;
 
   for (let i = 0; i < Math.min(10, limit); i++) {
-    const work = await claimCampaignDelivery();
+    const work = await claimCampaignDelivery(campaignId);
     if (!work) break;
+    const organizationId=work.sender_scope?.startsWith("organization:")?work.sender_scope.slice("organization:".length):null;
+    const sender=(await readCampaignSenderReadiness(organizationId)).sender;
+    if(!sender){countCampaignSettlement(counts,await settle(work,"suppressed"));continue;}
     const result = await processCampaignDelivery(work, sender);
     countCampaignSettlement(counts, result.row);
     if (result.stopBatch) break;
