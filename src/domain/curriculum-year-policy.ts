@@ -31,3 +31,13 @@ export function annualAdoptionEligible(input:{
     adoption.packId===license.packId && license.organizationId===scope.organizationId &&
     licenseValidForYear(license,year,now);
 }
+
+/** Rollout policy is shared by both transport-independent mutation services. */
+export function curriculumAdoptionRollout(env:Readonly<Record<string,string|undefined>>){
+ const annualRequested=env.CAN_ANNUAL_ADOPTIONS_ENABLED==="true";
+ return {
+  annualEnabled:annualRequested&&env.CAN_ANNUAL_ADOPTIONS_SCHEMA_READY==="true"&&
+    env.CAN_ANNUAL_ADOPTIONS_CONNECTED_ACCEPTANCE==="true",
+  legacyWriteEnabled:!annualRequested&&env.CAN_DISABLE_LEGACY_CURRICULUM_ADOPTIONS!=="true",
+ };
+}

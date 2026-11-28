@@ -1,5 +1,5 @@
 import { hasRegistrarAuthority } from "@/domain/school-roles";
-import { and, asc, eq, inArray, or } from "drizzle-orm";
+import { and, asc, eq, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
  curriculumAdoptions, curriculumEntitlements, curriculumOverlays, curriculumPackItems,
@@ -7,6 +7,8 @@ import {
  organizations, programs, sections,
 } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
+import { DomainError } from "@/domain/errors";
+import { curriculumAdoptionRollout } from "@/domain/curriculum-year-policy";
 import { readClassContent } from "@/domain/class-content";
 import { recommendCourseOption } from "@/domain/first-classroom";
 import { schoolCourseOutline } from "@/domain/school-course-outline";
@@ -119,23 +121,25 @@ export async function readMarketplace(actor: Actor, programId: string) {
 export async function installPack(actor: Actor, input:{programId:string;packId:string;termsAccepted:boolean}) {
  return db.transaction(async tx=>{
   const program=await authorizedProgram(actor,input.programId,tx);
-  if(!input.termsAccepted)throw new Error("Accept the pack's stated terms before installation.");
+  if(!input.termsAccepted)throw new DomainError("VALIDATION_FAILED","Accept the pack's stated terms before installation.");
   const [pack]=await tx.select().from(curriculumPacks).where(eq(curriculumPacks.id,input.packId)).limit(1);
   if(!pack || (pack.visibility!=="public" && pack.publisherOrganizationId!==program.organizationId))
    throw new AuthorizationError("published marketplace pack");
   const [published]=await tx.select({id:curriculumPackVersions.id}).from(curriculumPackVersions)
    .where(and(eq(curriculumPackVersions.packId,pack.id),eq(curriculumPackVersions.status,"published"))).limit(1);
-  if(!published)throw new Error("Pack is not published.");
+  if(!published)throw new DomainError("CONFLICT","Pack is not published.");
   // Restricted and commercial licenses require an external agreement; checkbox is insufficient.
   if(!["CC0","CC-BY-4.0","DEMO-INTERNAL"].includes(pack.licenseCode))
-   throw new Error("This publisher requires a verified license agreement before installation.");
+   throw new AuthorizationError("verified publisher license agreement");
   if(pack.licenseCode==="DEMO-INTERNAL" &&
     (program.organizationId!==pack.publisherOrganizationId || pack.metadata.synthetic!==true))
    throw new AuthorizationError("internal synthetic demonstration pack");
+  // Same organization/pack retries serialize across different Programs and transports.
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"curriculum-install:"+program.organizationId+":"+pack.id}))`);
   const [existing]=await tx.select().from(curriculumEntitlements)
    .where(and(eq(curriculumEntitlements.organizationId,program.organizationId),
               eq(curriculumEntitlements.packId,pack.id))).limit(1);
-  if(existing){if(existing.status!=="active")throw new Error("Revoked entitlement requires a publisher review.");
+  if(existing){if(existing.status!=="active")throw new DomainError("CONFLICT","Revoked entitlement requires a publisher review.");
    return {entitlementId:existing.id,installed:false};}
   const [row]=await tx.insert(curriculumEntitlements).values({
     organizationId:program.organizationId,packId:pack.id,termsAcceptedAt:new Date(),
@@ -154,8 +158,7 @@ export async function installPack(actor: Actor, input:{programId:string;packId:s
 export async function adoptPack(actor: Actor,input:{programId:string;packId:string;versionId:string}) {
  // Enforce the same compatibility policy at the domain entry point, not just
  // the HTTP handler: internal callers must never bypass the annual rollout.
- if(process.env.CAN_ANNUAL_ADOPTIONS_ENABLED==="true" ||
-    process.env.CAN_DISABLE_LEGACY_CURRICULUM_ADOPTIONS==="true")
+ if(!curriculumAdoptionRollout(process.env).legacyWriteEnabled)
   throw new AuthorizationError("New curriculum adoption requires verified school-year licensing");
  return db.transaction(async tx=>{
   const program=await authorizedProgram(actor,input.programId,tx);
@@ -166,12 +169,13 @@ export async function adoptPack(actor: Actor,input:{programId:string;packId:stri
   const [release]=await tx.select().from(curriculumPackVersions).where(and(
     eq(curriculumPackVersions.id,input.versionId),eq(curriculumPackVersions.packId,input.packId),
     eq(curriculumPackVersions.status,"published"))).limit(1);
-  if(!release)throw new Error("A published release of this pack is required.");
+  if(!release)throw new DomainError("CONFLICT","A published release of this pack is required.");
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"curriculum-adopt:"+program.id+":"+input.packId}))`);
   const [existing]=await tx.select().from(curriculumAdoptions)
     .where(and(eq(curriculumAdoptions.programId,program.id),eq(curriculumAdoptions.packId,input.packId))).limit(1);
   if(existing){
    if(existing.status==="active" && existing.packVersionId===release.id)return {adoptionId:existing.id,adopted:false};
-   throw new Error("Existing adoption is pinned. Changing or reactivating it requires an explicit revision workflow.");
+   throw new DomainError("CONFLICT","Existing adoption is pinned. Changing or reactivating it requires an explicit revision workflow.");
   }
   const [row]=await tx.insert(curriculumAdoptions).values({
     organizationId:program.organizationId,programId:program.id,siteId:program.siteId,
@@ -196,13 +200,12 @@ export async function addCurriculumSupplement(actor:Actor,input:{
  // A historical program-wide adoption must never grant new supplement rights
  // after annual licensing is enabled. A year-scoped Section/entitlement
  // resolver must be integrated before reopening this command.
- if(process.env.CAN_ANNUAL_ADOPTIONS_ENABLED==="true" ||
-    process.env.CAN_DISABLE_LEGACY_CURRICULUM_ADOPTIONS==="true")
+ if(!curriculumAdoptionRollout(process.env).legacyWriteEnabled)
   throw new AuthorizationError("Curriculum supplements require verified annual adoption and Section licensing");
  return db.transaction(async tx=>{
   const program=await authorizedProgram(actor,input.programId,tx);
-  if(input.scope==="site" && !program.siteId)throw new Error("Site supplement requires a site.");
-  if(input.scope==="section" && !input.sectionId)throw new Error("Section supplement requires a class.");
+  if(input.scope==="site" && !program.siteId)throw new DomainError("VALIDATION_FAILED","Site supplement requires a site.");
+  if(input.scope==="section" && !input.sectionId)throw new DomainError("VALIDATION_FAILED","Section supplement requires a class.");
   const adoptions=await tx.select({id:curriculumAdoptions.id}).from(curriculumAdoptions)
    .innerJoin(curriculumEntitlements,and(
       eq(curriculumEntitlements.packId,curriculumAdoptions.packId),
@@ -223,10 +226,10 @@ export async function addCurriculumSupplement(actor:Actor,input:{
       .from(courseTemplateVersions).where(eq(courseTemplateVersions.id,input.courseVersionId)).limit(1);
     const content=release && readClassContent(release.curriculum);
     if(!content?.modules.some(m=>m.lessons.some(l=>l.id===input.lessonId)))
-      throw new Error("The lesson ID must exist in the pinned publisher release.");
+      throw new DomainError("VALIDATION_FAILED","The lesson ID must exist in the pinned publisher release.");
   }
   const url=new URL(input.url);
-  if(url.protocol!=="https:"||url.username||url.password)throw new Error("Supplement requires a safe HTTPS URL.");
+  if(url.protocol!=="https:"||url.username||url.password)throw new DomainError("VALIDATION_FAILED","Supplement requires a safe HTTPS URL.");
   const [resource]=await tx.insert(curriculumResources).values({
     ownerOrganizationId:program.organizationId,kind:input.kind,title:input.title,url:input.url,
     licenseCode:"USER-SUPPLIED",sourceUrl:input.url,

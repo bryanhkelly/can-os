@@ -1,5 +1,5 @@
 import {describe,it,expect} from "vitest";
-import {annualAdoptionEligible,licenseValidForYear} from "./curriculum-year-policy";
+import {annualAdoptionEligible,licenseValidForYear,curriculumAdoptionRollout} from "./curriculum-year-policy";
 const d=(s:string)=>new Date(s);
 const year={startsAt:d("2027-08-01"),endsAt:d("2028-06-30")};
 const scope={organizationId:"school",programId:"program",siteId:"site",academicProviderOrganizationId:"can",academicYearId:"2027"};
@@ -38,5 +38,26 @@ describe("annual adoption policy",()=>{
  it("allows version upgrade only when pinned to chosen release",()=>{
   expect(annualAdoptionEligible({...base,adoption:{...adoption,packVersionId:"v3"}})).toBe(true);
   expect(annualAdoptionEligible({...base,packVersionPublished:false})).toBe(false);
+ });
+});
+
+describe("curriculum adoption rollout gates",()=>{
+ it("requires all three annual acceptance flags and never enables legacy and annual simultaneously",()=>{
+  for(const requested of [false,true])for(const schema of [false,true])for(const acceptance of [false,true])for(const disabled of [false,true]){
+   const decision=curriculumAdoptionRollout({
+    CAN_ANNUAL_ADOPTIONS_ENABLED:String(requested),
+    CAN_ANNUAL_ADOPTIONS_SCHEMA_READY:String(schema),
+    CAN_ANNUAL_ADOPTIONS_CONNECTED_ACCEPTANCE:String(acceptance),
+    CAN_DISABLE_LEGACY_CURRICULUM_ADOPTIONS:String(disabled),
+   });
+   expect(decision.annualEnabled).toBe(requested&&schema&&acceptance);
+   expect(decision.legacyWriteEnabled).toBe(!requested&&!disabled);
+   expect(decision.annualEnabled&&decision.legacyWriteEnabled).toBe(false);
+  }
+ });
+ it("defaults to existing legacy behavior and denies incomplete annual rollout",()=>{
+  expect(curriculumAdoptionRollout({})).toEqual({annualEnabled:false,legacyWriteEnabled:true});
+  expect(curriculumAdoptionRollout({CAN_ANNUAL_ADOPTIONS_ENABLED:"true"})).toEqual({annualEnabled:false,legacyWriteEnabled:false});
+  expect(curriculumAdoptionRollout({CAN_DISABLE_LEGACY_CURRICULUM_ADOPTIONS:"true"})).toEqual({annualEnabled:false,legacyWriteEnabled:false});
  });
 });

@@ -4,6 +4,8 @@ import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { auditEvents, courseTemplates, courseTemplateVersions, programs, sections } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
+import { DomainError } from "@/domain/errors";
+import { parseCommandInput } from "@/domain/command-input";
 import { EventTypes } from "@/domain/event-types";
 import { assertPublishableCurriculum, curriculumDraftContent, assertTeacherGuidesMatchCourse } from "@/domain/curriculum-authoring";
 import { readClassContent, type ClassContent } from "@/domain/class-content";
@@ -78,7 +80,7 @@ export async function createCurriculumCourse(actor: Actor, input: {
       eq(courseTemplates.owningOrganizationId, program.organizationId), eq(courseTemplates.code, input.code))).limit(1);
     if (existing) {
       if (existing.metadata.authoringRequestId !== input.requestId || existing.title !== input.title || existing.subject !== input.subject)
-        throw new Error("This course code already exists. Open the existing course or use a distinct code.");
+        throw new DomainError("CONFLICT","This course code already exists. Open the existing course or use a distinct code.");
       return { courseId: existing.id };
     }
     const [course] = await tx.insert(courseTemplates).values({ owningOrganizationId: program.organizationId,
@@ -103,17 +105,17 @@ export async function createCurriculumDraft(actor: Actor, input: {
     const versions = await tx.select().from(courseTemplateVersions)
       .where(eq(courseTemplateVersions.courseTemplateId, input.courseId)).orderBy(desc(courseTemplateVersions.version));
     if (versions.some(version => version.curriculum.supersededByCourseVersionId))
-      throw new Error("This curriculum has moved to native Course authoring.");
+      throw new DomainError("CONFLICT","This curriculum has moved to native Course authoring.");
     const retry = versions.find(version => version.curriculum.authoringRequestId === input.requestId);
     if (retry) {
       if ((retry.curriculum.sourceVersionId ?? null) !== (input.sourceVersionId ?? null))
-        throw new Error("Draft request was already used with a different source version.");
+        throw new DomainError("CONFLICT","Draft request was already used with a different source version.");
       return { versionId: retry.id };
     }
     if (versions.some(version => version.status === "draft"))
-      throw new Error("This course already has a draft. Continue editing it before creating another.");
+      throw new DomainError("CONFLICT","This course already has a draft. Continue editing it before creating another.");
     const source = input.sourceVersionId ? versions.find(version => version.id === input.sourceVersionId && version.status === "published") : undefined;
-    if (input.sourceVersionId && !source) throw new Error("Choose a published source version from this course.");
+    if (input.sourceVersionId && !source) throw new DomainError("VALIDATION_FAILED","Choose a published source version from this course.");
     const curriculum = { ...(source?.curriculum ?? {}), learning: source ? readClassContent(source.curriculum) ?? emptyContent : emptyContent,
       authoringRequestId: input.requestId, sourceVersionId: input.sourceVersionId ?? null };
     const [created] = await tx.insert(courseTemplateVersions).values({ courseTemplateId: input.courseId,
@@ -132,15 +134,15 @@ export async function saveCurriculumDraft(actor: Actor, input: {
   programId: string; versionId: string; expectedRevision: string; content: ClassContent;
   teacherGuides?: ClassTeacherGuides | null;
 }) {
-  const content = curriculumDraftContent.parse(input.content);
+  const content = parseCommandInput(curriculumDraftContent,input.content);
   return db.transaction(async tx => {
     const program = await authorize(actor, input.programId, tx);
     const [lookup] = await tx.select().from(courseTemplateVersions).where(eq(courseTemplateVersions.id, input.versionId)).limit(1);
-    if (!lookup) throw new Error("Curriculum version not found.");
+    if (!lookup) throw new AuthorizationError("publisher-owned curriculum version");
     const course = await ownedCourse(tx, lookup.courseTemplateId, program.organizationId);
     const [version] = await tx.select().from(courseTemplateVersions).where(eq(courseTemplateVersions.id, input.versionId)).for("update").limit(1);
-    if (!version || version.status !== "draft") throw new Error("Published curriculum is immutable. Create a new draft.");
-    if (version.curriculum?.supersededByCourseVersionId) throw new Error("This curriculum has moved to native Course authoring.");
+    if (!version || version.status !== "draft") throw new DomainError("CONFLICT","Published curriculum is immutable. Create a new draft.");
+    if (version.curriculum?.supersededByCourseVersionId) throw new DomainError("CONFLICT","This curriculum has moved to native Course authoring.");
     const teacherGuides = input.teacherGuides === undefined
       ? readClassTeacherGuides(version.curriculum)
       : input.teacherGuides === null ? null : assertTeacherGuidesMatchCourse(content, input.teacherGuides, course.code);
@@ -148,7 +150,7 @@ export async function saveCurriculumDraft(actor: Actor, input: {
     const curriculum = { ...version.curriculum, learning: content,
       teacherGuides: teacherGuides ?? undefined };
     if (revision(curriculum) === revision(version.curriculum)) return { revision: revision(curriculum) };
-    if (revision(version.curriculum) !== input.expectedRevision) throw new Error("This draft changed. Reload before saving; your edits have not been applied.");
+    if (revision(version.curriculum) !== input.expectedRevision) throw new DomainError("CONFLICT","This draft changed. Reload before saving; your edits have not been applied.");
     await tx.update(courseTemplateVersions).set({ curriculum, updatedAt: new Date() }).where(eq(courseTemplateVersions.id, version.id));
     await writeAudit(tx, actor, { action: "curriculum.draft.save", entityType: "course_template_version", entityId: version.id,
       scope: { programId: program.id, organizationId: program.organizationId },
@@ -168,26 +170,26 @@ export async function saveCurriculumLesson(actor: Actor, input: {
  programId:string;versionId:string;moduleId:string;lessonId:string;expectedRevision:string;
  lesson:ClassContent["modules"][number]["lessons"][number];
 }){
- if(input.lesson.id!==input.lessonId)throw new Error("Existing publisher lesson IDs must remain stable.");
+ if(input.lesson.id!==input.lessonId)throw new DomainError("VALIDATION_FAILED","Existing publisher lesson IDs must remain stable.");
  return db.transaction(async tx=>{
   const program=await authorize(actor,input.programId,tx);
   const [lookup]=await tx.select().from(courseTemplateVersions)
     .where(eq(courseTemplateVersions.id,input.versionId)).limit(1);
-  if(!lookup)throw new Error("Curriculum version not found.");
+  if(!lookup)throw new AuthorizationError("publisher-owned curriculum version");
   const course=await ownedCourse(tx,lookup.courseTemplateId,program.organizationId);
   const [version]=await tx.select().from(courseTemplateVersions)
     .where(eq(courseTemplateVersions.id,input.versionId)).for("update").limit(1);
-  if(!version||version.status!=="draft")throw new Error("Published curriculum is immutable. Create a new draft.");
-  if(version.curriculum?.supersededByCourseVersionId)throw new Error("This curriculum has moved to native Course authoring.");
+  if(!version||version.status!=="draft")throw new DomainError("CONFLICT","Published curriculum is immutable. Create a new draft.");
+  if(version.curriculum?.supersededByCourseVersionId)throw new DomainError("CONFLICT","This curriculum has moved to native Course authoring.");
   if(revision(version.curriculum)!==input.expectedRevision)
-    throw new Error("This draft changed. Reload before saving your lesson.");
+    throw new DomainError("CONFLICT","This draft changed. Reload before saving your lesson.");
   const content=readClassContent(version.curriculum);
-  if(!content)throw new Error("Create a publisher course outline before saving lessons individually.");
+  if(!content)throw new DomainError("VALIDATION_FAILED","Create a publisher course outline before saving lessons individually.");
   const module=content.modules.find(m=>m.id===input.moduleId);
   if(!module||!module.lessons.some(l=>l.id===input.lessonId))
-    throw new Error("The existing lesson must belong to the selected publisher module.");
+    throw new DomainError("VALIDATION_FAILED","The existing lesson must belong to the selected publisher module.");
   const original=module.lessons.find(l=>l.id===input.lessonId)!;
-  const next=curriculumDraftContent.parse({
+  const next=parseCommandInput(curriculumDraftContent,{
    ...content,modules:content.modules.map(m=>m.id===input.moduleId?{
     ...m,lessons:m.lessons.map(l=>l.id===input.lessonId?input.lesson:l),
    }:m),
@@ -218,26 +220,27 @@ export async function publishCurriculumDraft(actor: Actor, input: {
   return db.transaction(async tx => {
     const program = await authorize(actor, input.programId, tx);
     const [lookup] = await tx.select().from(courseTemplateVersions).where(eq(courseTemplateVersions.id, input.versionId)).limit(1);
-    if (!lookup) throw new Error("Curriculum version not found.");
+    if (!lookup) throw new AuthorizationError("publisher-owned curriculum version");
     const course = await ownedCourse(tx, lookup.courseTemplateId, program.organizationId);
     const [version] = await tx.select().from(courseTemplateVersions).where(eq(courseTemplateVersions.id, input.versionId)).for("update").limit(1);
     if (!version || revision(version.curriculum) !== input.expectedRevision)
-      throw new Error("This draft changed. Reload and review before publishing.");
-    if (version.curriculum?.supersededByCourseVersionId) throw new Error("This curriculum has moved to native Course authoring.");
+      throw new DomainError("CONFLICT","This draft changed. Reload and review before publishing.");
+    if (version.curriculum?.supersededByCourseVersionId) throw new DomainError("CONFLICT","This curriculum has moved to native Course authoring.");
     if (version.status === "published") {
       const [audit] = await tx.select({ after: auditEvents.after }).from(auditEvents)
         .where(and(eq(auditEvents.resourceId, version.id), eq(auditEvents.action, "curriculum.publish"))).limit(1);
-      if (audit?.after?.reason !== input.reason) throw new Error("This release was already published with different input.");
+      if (audit?.after?.reason !== input.reason) throw new DomainError("CONFLICT","This release was already published with different input.");
       return { versionId: version.id };
     }
+    if (version.status !== "draft") throw new DomainError("CONFLICT","Only draft curriculum can be published.");
     const content = readClassContent(version.curriculum);
-    if (!content) throw new Error("Add curriculum content before publishing.");
+    if (!content) throw new DomainError("VALIDATION_FAILED","Add curriculum content before publishing.");
     assertPublishableCurriculum(content);
     const teacherGuides=readClassTeacherGuides(version.curriculum);
     if(teacherGuides)assertTeacherGuidesMatchCourse(content,teacherGuides,course.code);
     const [existingSection] = await tx.select({ id: sections.id }).from(sections)
       .where(eq(sections.courseTemplateVersionId, version.id)).limit(1);
-    if (existingSection) throw new Error("A section already references this draft. Reconcile its version before publishing; existing classes cannot be changed here.");
+    if (existingSection) throw new DomainError("CONFLICT","A section already references this draft. Reconcile its version before publishing; existing classes cannot be changed here.");
     await tx.update(courseTemplateVersions).set({ status: "published", publishedAt: new Date(), updatedAt: new Date() })
       .where(eq(courseTemplateVersions.id, version.id));
     await writeAudit(tx, actor, { action: "curriculum.publish", entityType: "course_template_version", entityId: version.id,

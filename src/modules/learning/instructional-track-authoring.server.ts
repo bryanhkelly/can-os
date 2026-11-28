@@ -679,6 +679,10 @@ export async function reviewInstructionalTrack(
       owningOrganizationId: bundle.course.publisherOrganizationId,
       payload: input,
     }, async () => {
+      // A new review is only a decision on a submitted draft. Retrying an
+      // existing receipt is still allowed; published content uses withdrawal.
+      if (bundle.version.lifecycle !== "draft" || manifest.manifestStatus !== "draft")
+        conflict("Published instructional tracks require the withdrawal workflow.");
       await tx.insert(instructionalTrackReviews).values({
         trackVersionId: bundle.version.id,
         manifestHash: input.expectedRevision,
@@ -761,6 +765,41 @@ export async function publishInstructionalTrack(
           invalid(`Current independent ${kind} approval is required before publication.`);
         }
       }
+      // Submission is not a permanent rights grant. Revalidate the exact sealed
+      // asset usages and current approvals immediately before publication.
+      if (bundle.courseVersion.lifecycle !== "published")
+        invalid("The exact Course version must remain published.");
+      const [presentations, materials, manifestItems] = await Promise.all([
+        tx.select().from(trackLessonPresentations)
+          .where(eq(trackLessonPresentations.trackVersionId, bundle.version.id)),
+        tx.select().from(instructionalTrackMaterials)
+          .where(eq(instructionalTrackMaterials.trackVersionId, bundle.version.id)),
+        tx.select().from(contentPublicationManifestItems)
+          .where(eq(contentPublicationManifestItems.manifestId, manifest.id)),
+      ]);
+      const usages = buildTrackManifestUsages({ presentations, materials });
+      const assets = await assertInstructionalTrackAssetsEligible(tx, usages.map(item => item.assetVersionId));
+      if (manifestItems.length !== usages.length || usages.some(usage => {
+        const item = manifestItems.find(row => row.contentAssetVersionId === usage.assetVersionId &&
+          row.usageKind === usage.usageKind);
+        const asset = assets.get(usage.assetVersionId);
+        return !item || !asset || item.contentHash !== asset.sha256 ||
+          item.rightsEvidenceVersionId !== asset.rightsEvidenceVersionId;
+      })) conflict("The sealed asset manifest no longer matches current approved content and rights.");
+      const rightsReview = reviews.find(review => review.reviewKind === "rights");
+      if (!rightsReview?.evidenceVersionId) invalid("Current track rights evidence is required.");
+      const [rights] = await tx.select({
+        kindCode: evidenceDocuments.kindCode,
+        verifiedAt: evidenceDocumentVersions.verifiedAt,
+        verifiedByPersonId: evidenceDocumentVersions.verifiedByPersonId,
+        validFrom: evidenceDocumentVersions.validFrom,
+        validThrough: evidenceDocumentVersions.validThrough,
+      }).from(evidenceDocumentVersions)
+        .innerJoin(evidenceDocuments, eq(evidenceDocuments.id, evidenceDocumentVersions.documentId))
+        .where(eq(evidenceDocumentVersions.id, rightsReview.evidenceVersionId)).limit(1);
+      if (!rights || rights.kindCode !== "rights" ||
+        !isVerifiedEvidenceCurrent({ ...rights, at: new Date() }))
+        invalid("Track rights evidence expired or is no longer verified.");
       await tx.update(contentPublicationManifests)
         .set({ manifestStatus: "approved" })
         .where(eq(contentPublicationManifests.id, manifest.id));
@@ -926,6 +965,53 @@ export async function readCreatorTrackDraft(context: AccessContext, trackVersion
       revision: await currentDraftRevision(tx, bundle),
       lessons, presentations, materials, assets,
       assetInventoryLimited: assets.length === 250,
+    };
+  });
+}
+
+/** Independent reviewer inspection of the exact sealed manifest, not a grant
+ * to publish or distribute it. No storage references, answer keys or raw
+ * evidence documents are returned. Recheck the live appointment on each read. */
+export async function readInstructionalTrackReview(context:AccessContext,trackVersionId:string){
+  assertAuthenticated(context,"instructional_track.review");
+  return db.transaction(async tx=>{
+    const bundle=await loadDraftBundle(tx,trackVersionId,true);
+    await assertDraftOwner(tx,context,bundle,"instructional_track.review");
+    if(bundle.version.createdByPersonId===context.actorPersonId ||
+      bundle.track.presenterPersonId===context.actorPersonId)
+      throw new AuthorizationError("independent instructional content reviewer");
+    const hash=bundle.version.submissionManifestHash;
+    if(!hash)throw new AuthorizationError("submitted instructional manifest");
+    const [manifest]=await tx.select().from(contentPublicationManifests)
+      .where(and(eq(contentPublicationManifests.trackVersionId,bundle.version.id),
+        eq(contentPublicationManifests.manifestHash,hash))).limit(1);
+    if(!manifest)throw new DomainError("UNAVAILABLE","Submitted manifest unavailable.");
+    const [items,reviews,lessons,presentations]=await Promise.all([
+      tx.select({assetVersionId:contentPublicationManifestItems.contentAssetVersionId,
+        usageKind:contentPublicationManifestItems.usageKind,contentHash:contentPublicationManifestItems.contentHash,
+        rightsEvidenceVersionId:contentPublicationManifestItems.rightsEvidenceVersionId})
+        .from(contentPublicationManifestItems).where(eq(contentPublicationManifestItems.manifestId,manifest.id)),
+      tx.select({reviewKind:instructionalTrackReviews.reviewKind,decision:instructionalTrackReviews.decision,
+        rationale:instructionalTrackReviews.rationale,evidenceVersionId:instructionalTrackReviews.evidenceVersionId,
+        decidedAt:instructionalTrackReviews.decidedAt})
+        .from(instructionalTrackReviews).where(and(eq(instructionalTrackReviews.trackVersionId,bundle.version.id),
+          eq(instructionalTrackReviews.manifestHash,hash))).orderBy(desc(instructionalTrackReviews.decisionOrder)),
+      tx.select({id:courseLessons.id,title:courseLessons.title}).from(courseLessons)
+        .where(eq(courseLessons.courseVersionId,bundle.version.courseVersionId)).orderBy(courseLessons.lessonOrder,courseLessons.id),
+      tx.select({courseLessonId:trackLessonPresentations.courseLessonId,assetVersionId:trackLessonPresentations.assetVersionId,
+        presentationKind:trackLessonPresentations.presentationKind,ordinal:trackLessonPresentations.ordinal})
+        .from(trackLessonPresentations).where(eq(trackLessonPresentations.trackVersionId,bundle.version.id)),
+    ]);
+    return {trackVersionId:bundle.version.id,courseVersionId:bundle.version.courseVersionId,
+      trackTitle:bundle.track.title,trackKind:bundle.version.trackKind,courseTitle:bundle.course.title,
+      manifestId:manifest.id,manifestHash:hash,manifestStatus:manifest.manifestStatus,lifecycle:bundle.version.lifecycle,
+      items,lessons,presentations,
+      reviews:reviewKindSchema.options.map(kind=>{
+        const review=reviews.find(row=>row.reviewKind===kind);
+        return {reviewKind:kind,decision:review?.decision??null,rationale:review?.rationale??null,
+          evidenceVersionId:review?.evidenceVersionId??null,decidedAt:review?.decidedAt.toISOString()??null};
+      }),
+      publicationAuthorityVerified:false as const,
     };
   });
 }

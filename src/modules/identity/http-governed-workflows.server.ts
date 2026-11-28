@@ -72,6 +72,11 @@ import {listSitePreviewSharesService,createSitePreviewShareService,setSitePrevie
 import {exploreCanonicalBlueprintReferencesService,discoverCanonicalBlueprintOfferingsService,readCanonicalBlueprintWorkspaceService,listCanonicalBlueprintReviewsService,listCanonicalBlueprintReviewEvidenceService} from "@/modules/blueprints/blueprint-catalog-read.server";
 import {getStaffLaunchWorkspaceService,getLaunchStudioDraftService,saveLaunchStudioDraftService} from "@/modules/programs/launch-drafts.server";
 import {listLaunchOptionsService,getLaunchEntryService} from "@/modules/programs/launch-discovery.server";
+import { getNativeCourseDraftLessonsService, saveNativeCourseLessonDraftService, getNativeCourseReleaseReadinessService, createNativeCourseAssignmentDraftService, getNativeCourseAssignmentDraftsService } from "@/modules/learning/native-course-draft.server";
+import * as publisherPack from "@/modules/learning/publisher-pack-authoring-http.server";
+import * as marketplace from "@/modules/learning/curriculum-marketplace-http.server";
+import * as trackAuthoring from "@/modules/learning/instructional-track-authoring-http.server";
+import * as curriculumAuthoring from "@/modules/learning/curriculum-authoring-http.server";
 export type WorkflowMode="planning"|"canonical"|"can"|"learner"|"operator-reporting";
 /** Existing independent native reviewer credentials remain distinct from CAN.
  * No fallback, new role, token or grant is manufactured by this adapter. */
@@ -81,6 +86,40 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
  const context=await (mode==="operator-reporting"?(readCookie(request,accessSessionCookie)!==undefined?getIdentityContext(request):getCanonicalCommandContext(request)):mode==="planning"?getBlueprintPlanningContext(request):mode==="canonical"?getCanonicalCommandContext(request):mode==="learner"?getInstructionalLearnerContext(request):getIdentityContext(request));
  if(!context.actorPersonId)throw new AuthorizationError("verified Person");
  return {
+  getCurriculumPrograms:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Legacy curriculum publisher context");return curriculumAuthoring.getCurriculumProgramsService(request,raw);},
+  getCurriculumStudio:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Legacy curriculum publisher context");return curriculumAuthoring.getCurriculumStudioService(request,raw);},
+  createAuthoredCourse:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Legacy curriculum publisher context");return curriculumAuthoring.createAuthoredCourseService(request,raw);},
+  startCurriculumDraft:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Legacy curriculum publisher context");return curriculumAuthoring.startCurriculumDraftService(request,raw);},
+  saveAuthoredCurriculum:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Legacy curriculum publisher context");return curriculumAuthoring.saveAuthoredCurriculumService(request,raw);},
+  saveAuthoredLesson:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Legacy curriculum publisher context");return curriculumAuthoring.saveAuthoredLessonService(request,raw);},
+  publishAuthoredCurriculum:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Legacy curriculum publisher context");return curriculumAuthoring.publishAuthoredCurriculumService(request,raw);},
+  getRecordedInstructionReview:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Instructional Track reviewer context");return trackAuthoring.getRecordedInstructionReviewService(request,raw);},
+  createRecordedInstructionDraft:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Instructional Track authoring context");return trackAuthoring.createRecordedInstructionDraftService(request,raw);},
+  saveRecordedInstructionDraft:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Instructional Track authoring context");return trackAuthoring.saveRecordedInstructionDraftService(request,raw);},
+  submitRecordedInstructionDraft:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Instructional Track authoring context");return trackAuthoring.submitRecordedInstructionDraftService(request,raw);},
+  decideRecordedInstructionReview:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Instructional Track authoring context");return trackAuthoring.decideRecordedInstructionReviewService(request,raw);},
+  publishRecordedInstruction:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Instructional Track authoring context");return trackAuthoring.publishRecordedInstructionService(request,raw);},
+  withdrawRecordedInstruction:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Instructional Track authoring context");return trackAuthoring.withdrawRecordedInstructionService(request,raw);},
+  getCreatorRecordedInstructionDraft:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Instructional Track authoring context");return trackAuthoring.getCreatorRecordedInstructionDraftService(request,raw);},
+  getCurriculumAdopterPrograms:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Curriculum Marketplace context");return marketplace.getCurriculumAdopterProgramsService(request,raw);},
+  getCurriculumJourneyReadiness:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Curriculum Marketplace context");return marketplace.getCurriculumJourneyReadinessService(request,raw);},
+  getCurriculumMarketplace:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Curriculum Marketplace context");return marketplace.getCurriculumMarketplaceService(request,raw);},
+  installCurriculumPack:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Curriculum Marketplace context");return marketplace.installCurriculumPackService(request,raw);},
+  adoptCurriculumPack:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Curriculum Marketplace context");return marketplace.adoptCurriculumPackService(request,raw);},
+  reviewAnnualCurriculumAdoption:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Curriculum Marketplace context");return marketplace.reviewAnnualCurriculumAdoptionService(request,raw);},
+  rolloverAnnualCurriculumAdoption:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Curriculum Marketplace context");return marketplace.rolloverAnnualCurriculumAdoptionService(request,raw);},
+  rollbackAnnualCurriculumPackAdoption:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Curriculum Marketplace context");return marketplace.rollbackAnnualCurriculumPackAdoptionService(request,raw);},
+  addMarketplaceSupplement:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Curriculum Marketplace context");return marketplace.addMarketplaceSupplementService(request,raw);},
+  getPublisherPackStudio:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Publisher Pack context");return publisherPack.getPublisherPackStudioService(request,raw);},
+  createAuthoredPublisherPack:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Publisher Pack context");return publisherPack.createAuthoredPublisherPackService(request,raw);},
+  startPublisherPackDraft:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Publisher Pack context");return publisherPack.startPublisherPackDraftService(request,raw);},
+  saveAuthoredPublisherPack:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Publisher Pack context");return publisherPack.saveAuthoredPublisherPackService(request,raw);},
+  publishAuthoredPublisherPack:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Publisher Pack context");return publisherPack.publishAuthoredPublisherPackService(request,raw);},
+  getNativeCourseDraftLessons:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Native Course authoring context");return getNativeCourseDraftLessonsService(request,raw);},
+  saveNativeCourseLessonDraft:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Native Course authoring context");return saveNativeCourseLessonDraftService(request,raw);},
+  getNativeCourseReleaseReadiness:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Native Course authoring context");return getNativeCourseReleaseReadinessService(request,raw);},
+  createNativeCourseAssignmentDraft:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Native Course authoring context");return createNativeCourseAssignmentDraftService(request,raw);},
+  getNativeCourseAssignmentDrafts:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Native Course authoring context");return getNativeCourseAssignmentDraftsService(request,raw);},
   decideNoncreditCompletion:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Completion administration context");return completionAdmin0.decideNoncreditCompletionService(request,raw);},
   getNoncreditCompletionPolicyCatalog:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Completion administration context");return completionAdmin1.getNoncreditCompletionPolicyCatalogService(request);},
   publishNoncreditCompletionPolicy:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Completion administration context");return completionAdmin1.publishNoncreditCompletionPolicyService(request,raw);},

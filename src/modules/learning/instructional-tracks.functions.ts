@@ -1,18 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { getCommandContext } from "@/modules/identity/command-context.server";
 import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
+import * as authoring from "./instructional-track-authoring-http.server";
 import {
-  createInstructionalTrackDraft,
   createInstructionalTrackDraftSchema,
   instructionalTrackReleaseSchema,
-  publishInstructionalTrack,
-  reviewInstructionalTrack,
   reviewInstructionalTrackSchema,
-  saveInstructionalTrackDraft,
   saveInstructionalTrackDraftSchema,
-  submitInstructionalTrack,
-  withdrawInstructionalTrack,
   withdrawInstructionalTrackSchema,
 } from "./instructional-track-authoring.server";
 import {
@@ -38,42 +32,42 @@ export const createRecordedInstructionDraft = createServerFn({ method: "POST" })
   .validator((value: unknown) => createInstructionalTrackDraftSchema.parse(value))
   .handler(async ({ data }) => {
     privateNoStore();
-    return createInstructionalTrackDraft(await getCommandContext(getRequest()), data);
+    return authoring.createRecordedInstructionDraftService(getRequest(), data);
   });
 
 export const saveRecordedInstructionDraft = createServerFn({ method: "POST" })
   .validator((value: unknown) => saveInstructionalTrackDraftSchema.parse(value))
   .handler(async ({ data }) => {
     privateNoStore();
-    return saveInstructionalTrackDraft(await getCommandContext(getRequest()), data);
+    return authoring.saveRecordedInstructionDraftService(getRequest(), data);
   });
 
 export const submitRecordedInstructionDraft = createServerFn({ method: "POST" })
   .validator((value: unknown) => instructionalTrackReleaseSchema.parse(value))
   .handler(async ({ data }) => {
     privateNoStore();
-    return submitInstructionalTrack(await getCommandContext(getRequest()), data);
+    return authoring.submitRecordedInstructionDraftService(getRequest(), data);
   });
 
 export const decideRecordedInstructionReview = createServerFn({ method: "POST" })
   .validator((value: unknown) => reviewInstructionalTrackSchema.parse(value))
   .handler(async ({ data }) => {
     privateNoStore();
-    return reviewInstructionalTrack(await getCommandContext(getRequest()), data);
+    return authoring.decideRecordedInstructionReviewService(getRequest(), data);
   });
 
 export const publishRecordedInstruction = createServerFn({ method: "POST" })
   .validator((value: unknown) => instructionalTrackReleaseSchema.parse(value))
   .handler(async ({ data }) => {
     privateNoStore();
-    return publishInstructionalTrack(await getCommandContext(getRequest()), data);
+    return authoring.publishRecordedInstructionService(getRequest(), data);
   });
 
 export const withdrawRecordedInstruction = createServerFn({ method: "POST" })
   .validator((value: unknown) => withdrawInstructionalTrackSchema.parse(value))
   .handler(async ({ data }) => {
     privateNoStore();
-    return withdrawInstructionalTrack(await getCommandContext(getRequest()), data);
+    return authoring.withdrawRecordedInstructionService(getRequest(), data);
   });
 
 export const getStudentRecordedInstructors = createServerFn({ method: "GET" })

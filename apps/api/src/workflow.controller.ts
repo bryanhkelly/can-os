@@ -96,7 +96,8 @@ export class WorkflowController{
  @ApiParam({name:'configurationId',type:String,format:'uuid',required:true})
  @ApiOperation({operationId:'getBlueprintConfiguration',summary:'Read the current scoped private configuration'})
  @ApiOkResponse({schema:readDocs.configuration})
- configuration(@Req() req:FastifyRequest,@Param() params:unknown){
+ configuration(@Req() req:FastifyRequest,@Param() params:unknown,@Query() query:unknown){
+  validated(noQuery,query);
   const input=validated(configParams,params),workflow=verifiedWorkflow(req);
   return this.identity.runWorkflow(async()=>readResults.configuration.parse(await workflow.readCanonicalBlueprintConfiguration(input)));
  }
@@ -105,7 +106,8 @@ export class WorkflowController{
  @ApiParam({name:'configurationVersionId',type:String,format:'uuid',required:true})
  @ApiOperation({operationId:'getBlueprintReview',summary:'Read the exact version and current independent review'})
  @ApiOkResponse({schema:readDocs.review})
- review(@Req() req:FastifyRequest,@Param() params:unknown){
+ review(@Req() req:FastifyRequest,@Param() params:unknown,@Query() query:unknown){
+  validated(noQuery,query);
   const input=validated(versionParams,params),workflow=verifiedWorkflow(req);
   return this.identity.runWorkflow(async()=>readResults.review.parse(JSON.parse(JSON.stringify(await workflow.readCanonicalBlueprintReview(input)))));
  }

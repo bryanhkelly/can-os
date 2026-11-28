@@ -6,10 +6,16 @@ import {AuthorizationError} from "@/domain/command-context";
 import {hasInstitutionalProgramCapability} from "@/modules/identity/institutional-capability.server";
 import type {Actor} from "@/modules/identity/actors.server";
 import {emitEvent} from "@/platform/mutation";
-import {recordAudit} from "@/modules/identity/actors.server";
-import {annualAdoptionEligible} from "@/domain/curriculum-year-policy";
+import {recordAudit} from "@/modules/identity/actor-audit.server";
+import {DomainError} from "@/domain/errors";
+import {annualAdoptionEligible,curriculumAdoptionRollout} from "@/domain/curriculum-year-policy";
 import {EventTypes} from "@/domain/event-types";
 
+// Central service gate: neither HTTP, RPC nor internal callers can bypass staged licensing.
+function requireAnnualAdoptionEnabled(){
+ if(!curriculumAdoptionRollout(process.env).annualEnabled)
+  throw new AuthorizationError("Annual curriculum adoption awaits schema and connected release acceptance");
+}
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Year={id:string;startsAt:Date;endsAt:Date};
 async function canonicalYear(query:Pick<Tx,"select">,program:{id:string;organizationId:string;siteId:string|null},yearId:string):Promise<Year>{
@@ -27,6 +33,7 @@ async function canonicalYear(query:Pick<Tx,"select">,program:{id:string;organiza
 export async function readAnnualAdoptionEligibility(actor:Actor, input:{
  programId:string;academicYearId:string;packId:string;now?:Date;
 }, executor:Pick<Tx,"select">=db){
+ requireAnnualAdoptionEnabled();
  const [program]=await executor.select().from(programs).where(eq(programs.id,input.programId)).limit(1);
  if(!program || !await hasInstitutionalProgramCapability(actor,program,"curriculum.adopt",executor))
   throw new AuthorizationError("institutional curriculum adoption grant and program scope");
@@ -62,6 +69,7 @@ export async function readAnnualAdoptionEligibility(actor:Actor, input:{
 export async function rolloverCurriculumAdoption(actor:Actor,input:{
  programId:string;academicYearId:string;packId:string;versionId:string;now?:Date;
 }){
+ requireAnnualAdoptionEnabled();
  return db.transaction(async tx=>{
   const [program]=await tx.select().from(programs).where(eq(programs.id,input.programId)).limit(1);
   if(!program||!await hasInstitutionalProgramCapability(actor,program,"curriculum.adopt",tx))
@@ -84,7 +92,7 @@ export async function rolloverCurriculumAdoption(actor:Actor,input:{
     if(!current.eligible)throw new AuthorizationError("existing annual adoption no longer has valid license rights");
     return {adoptionId:existing.id,created:false};
    }
-   throw new Error("Annual adoption is pinned. Revision or rollback requires a separately authorized workflow.");
+   throw new DomainError("CONFLICT","Annual adoption is pinned. Revision or rollback requires a separately authorized workflow.");
   }
   const metadata=entitlement.metadata??{};
   const parse=(v:unknown)=>typeof v==="string"&&!Number.isNaN(Date.parse(v))?new Date(v):null;
@@ -121,7 +129,8 @@ export async function rolloverCurriculumAdoption(actor:Actor,input:{
 export async function rollbackAnnualCurriculumAdoption(actor:Actor,input:{
  programId:string;academicYearId:string;packId:string;reason:string;
 }){
- if(!input.reason.trim())throw new Error("A rollback reason is required.");
+ requireAnnualAdoptionEnabled();
+ if(!input.reason.trim())throw new DomainError("VALIDATION_FAILED","A rollback reason is required.");
  return db.transaction(async tx=>{
   const [program]=await tx.select().from(programs).where(eq(programs.id,input.programId)).limit(1);
   if(!program||!await hasInstitutionalProgramCapability(actor,program,"curriculum.adopt",tx))
@@ -137,12 +146,12 @@ export async function rollbackAnnualCurriculumAdoption(actor:Actor,input:{
      existing.academicProviderOrganizationId!==program.academicProviderOrganizationId)
    throw new AuthorizationError("annual adoption scope");
   if(existing.status==="rolled_back")return {adoptionId:existing.id,rolledBack:false};
-  if(existing.status!=="active")throw new Error("Only active annual adoptions can be rolled back.");
+  if(existing.status!=="active")throw new DomainError("CONFLICT","Only active annual adoptions can be rolled back.");
   const [changed]=await tx.update(curriculumAnnualAdoptions)
    .set({status:"rolled_back",supersededAt:new Date()})
    .where(and(eq(curriculumAnnualAdoptions.id,existing.id),eq(curriculumAnnualAdoptions.status,"active")))
    .returning({id:curriculumAnnualAdoptions.id});
-  if(!changed)throw new Error("Concurrent annual adoption change; retry after refreshing.");
+  if(!changed)throw new DomainError("CONFLICT","Concurrent annual adoption change; retry after refreshing.");
   await recordAudit(tx,actor,{action:"curriculum.adoption.year_rollback",
    resourceType:"curriculum_annual_adoption",resourceId:existing.id,
    scope:{organizationId:program.organizationId,siteId:program.siteId,programId:program.id},
