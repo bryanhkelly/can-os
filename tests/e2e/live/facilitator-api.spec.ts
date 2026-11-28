@@ -8,7 +8,7 @@ import {pilotRpcPage,pilotRpc as rpc,expectPilotDenial as deny} from "../helpers
 const uuid=z.string().uuid();
 const actor=z.object({email:z.string().email().refine(x=>x===x.toLowerCase()&&x.endsWith(".test")),grantId:uuid,organizationId:uuid}).strict();
 const fixture=z.object({manager:actor,primary:actor,backup:actor,foreign:actor,
-  classId:uuid,siteId:uuid,classSessionId:uuid,liveClassSessionId:uuid.optional(),
+  classId:uuid,siteId:uuid,classSessionId:uuid,liveClassSessionId:uuid,
   replacement:z.object({requestId:uuid,startsAt:z.string().datetime({offset:true}),endsAt:z.string().datetime({offset:true}),lessonId:uuid,agendaRequestId:uuid}).strict()}).strict()
   .parse(JSON.parse(process.env.CAN_FACILITATOR_QA_JSON??"{}"));
 const branch="br-solitary-art-arun91gj";
@@ -76,7 +76,7 @@ test("exact Site manager cancellation and independently authenticated backup sch
     expect(rows).toHaveLength(2);
     expect(rows.find(row=>row.id===classSessionId)).toMatchObject({facilitator_person_id:p.grant.personId,state:"cancelled",facilitated_session_id:null});
     expect(rows.find(row=>row.id===next)).toMatchObject({facilitator_person_id:b.grant.personId,state:"scheduled",facilitated_session_id:null});
-    if(fixture.liveClassSessionId){
+    {
       const sessionId=fixture.liveClassSessionId;
       expect(sessionId).not.toBe(classSessionId);
       const [live]=await sql`SELECT s.facilitator_person_id,p.facilitated_session_id,r.state

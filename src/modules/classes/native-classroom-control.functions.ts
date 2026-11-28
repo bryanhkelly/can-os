@@ -7,6 +7,7 @@ import { canonicalClasses, canonicalClassSessions, facilitatedClassroomPlans,
   facilitatedLearningSessions, domainEvents } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { facilitatedRoomOperationalState } from "@/domain/facilitated-learning";
+import { EventTypes } from "@/domain/event-types";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
 import { requireFacilitatedLearningEnabled } from "@/modules/learning/canonical-learning-release.server";
@@ -55,7 +56,7 @@ export const transferNativeClassroomControl=createServerFn({method:"POST"})
       await assertCurrentCanonicalStaffForMutation(tx,getRequest(),actor);
       const [prior]=await tx.select({payload:domainEvents.payload}).from(domainEvents)
         .where(and(eq(domainEvents.aggregateType,"facilitated_learning_session"),
-          eq(domainEvents.aggregateId,room.id),eq(domainEvents.eventType,"ClassroomControlTransferred"),
+          eq(domainEvents.aggregateId,room.id),eq(domainEvents.eventType,EventTypes.ClassroomControlTransferred),
           sql`${domainEvents.payload}->>'requestId' = ${data.requestId}`)).limit(1);
       if(prior){
         if(prior.payload.fromPersonId!==data.expectedFacilitatorPersonId||
@@ -80,7 +81,7 @@ export const transferNativeClassroomControl=createServerFn({method:"POST"})
         owningOrganizationId:cls.operatingOrganizationId,eventCode:"classroom.control.transferred",
         entityKind:"facilitated_learning_session",entityId:room.id,payload,occurredAt:now});
       await emitCanonicalDomainEvent(tx,{actorPersonId:actor.actorPersonId,
-        eventType:"ClassroomControlTransferred",aggregateType:"facilitated_learning_session",
+        eventType:EventTypes.ClassroomControlTransferred,aggregateType:"facilitated_learning_session",
         aggregateId:room.id,payload,occurredAt:now});
       return {transferred:true,duplicate:false,facilitatedSessionId:room.id,
         currentFacilitatorPersonId:data.toPersonId};
