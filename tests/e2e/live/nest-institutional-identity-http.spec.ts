@@ -27,7 +27,7 @@ test("independent issuer approval and institutional staff delegation use ordinar
   expect((await staff.get(api+"/credential-issuer/pending")).status()).toBe(403);
   expect((await steward.get(api+"/credential-issuer/pending")).status()).toBe(403);
   expect((await reviewer.get(api+"/credential-issuer/mine")).status()).toBe(403);
-  const initial=await staff.get(api+"/credential-issuer/mine");expect(initial.status()).toBe(200);expect(await initial.json()).toBeNull();
+  const initial=await staff.get(api+"/credential-issuer/mine");expect(initial.status()).toBe(200);expect(await initial.json()).toEqual({approval:null});
   const response=await post(staff,"/credential-issuer/requests",{evidenceReference});expect(response.status()).toBe(200);
   const approval=z.object({approvalId:id,requested:z.literal(true)}).parse(await response.json());
   expect((await post(staff,"/credential-issuer/requests",{evidenceReference})).status()).toBe(409);
@@ -39,9 +39,9 @@ test("independent issuer approval and institutional staff delegation use ordinar
   expect((await post(reviewer,"/credential-issuer/decisions",{...decision,expiresAt:undefined})).status()).toBe(400);
   const approved=await post(reviewer,"/credential-issuer/decisions",decision);expect(approved.status()).toBe(200);expect(await approved.json()).toEqual({status:"approved"});
   expect((await post(reviewer,"/credential-issuer/decisions",decision)).status()).toBe(403);
-  expect(await (await staff.get(api+"/credential-issuer/mine")).json()).toMatchObject({id:approval.approvalId,status:"approved"});
+  expect(await (await staff.get(api+"/credential-issuer/mine")).json()).toMatchObject({approval:{id:approval.approvalId,status:"approved"}});
   const revoked=await post(reviewer,"/credential-issuer/revocations",{approvalId:approval.approvalId,reason:evidenceReference});expect(revoked.status()).toBe(200);
-  expect(await (await staff.get(api+"/credential-issuer/mine")).json()).toMatchObject({status:"revoked"});
+  expect(await (await staff.get(api+"/credential-issuer/mine")).json()).toMatchObject({approval:{status:"revoked"}});
   // A role delegation is a Program responsibility, not a new account or grant.
   const path="/academic-staff/delegations",grant={programId:f.programId,personId:f.employeePersonId,role:f.employeeRole,reason};
   expect((await staff.get(api+path,{params:{programId:f.programId}})).status()).toBe(403);
