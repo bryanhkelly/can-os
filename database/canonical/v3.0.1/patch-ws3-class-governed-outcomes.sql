@@ -256,6 +256,13 @@ BEGIN
           AND grant_row.learner_id=attempt.learner_id
         JOIN education_v30.assessment_administrations administration
           ON administration.id=attempt.administration_id
+        JOIN education_v30.assessment_versions version_row
+          ON version_row.id=administration.assessment_version_id
+        JOIN education_v30.assessment_definitions definition
+          ON definition.id=version_row.assessment_id
+          AND definition.purpose IN ('formative','practice','readiness','mastery')
+          AND version_row.lifecycle='published'
+          AND version_row.course_version_id=e.class_course
         JOIN education_v30.learner_profiles learner
           ON learner.id=grant_row.learner_id
         WHERE grant_row.course_attempt_id=e.course_attempt_id
@@ -368,6 +375,13 @@ CREATE OR REPLACE FUNCTION education_v30.v301_ws3_class_completion_is_current(
            AND grant_row.administration_id=at.administration_id
       JOIN education_v30.assessment_administrations administration
         ON administration.id=at.administration_id
+      JOIN education_v30.assessment_versions version_row
+        ON version_row.id=administration.assessment_version_id
+      JOIN education_v30.assessment_definitions definition
+        ON definition.id=version_row.assessment_id
+        AND definition.purpose IN ('formative','practice','readiness','mastery')
+        AND version_row.lifecycle='published'
+        AND version_row.course_version_id=cls.course_version_id
       JOIN education_v30.learner_profiles learner
         ON learner.id=grant_row.learner_id
       WHERE grant_row.course_attempt_id=a.id

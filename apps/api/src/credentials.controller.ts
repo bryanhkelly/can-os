@@ -81,9 +81,9 @@ export class CredentialsController {
  @Post('class-knowledge-check-access')
  @Operation('POST')
  @ApiOperation({operationId:'provisionNativeClassKnowledgeCheckAccess',summary:'provisionNativeClassKnowledgeCheckAccess'})
- @ApiBody({schema:c.nativeDocs.enrollment})
+ @ApiBody({schema:c.nativeDocs.provision})
  @ApiOkResponse({schema:c.nativeDocs.grant})
- async provisionNativeClassKnowledgeCheckAccess(@Req() req:FastifyRequest,@Body() body:unknown){const workflow=verifiedWorkflow(req),input=validated(c.nativeEnrollment,body);return c.nativeGrant.parse(await this.identity.runWorkflow(()=>workflow.provisionNativeClassKnowledgeCheckAccess(input)));}
+ async provisionNativeClassKnowledgeCheckAccess(@Req() req:FastifyRequest,@Body() body:unknown){const workflow=verifiedWorkflow(req),input=validated(c.nativeProvision,body);return c.nativeGrant.parse(await this.identity.runWorkflow(()=>workflow.provisionNativeClassKnowledgeCheckAccess(input)));}
  @Get('class-knowledge-review-queue')
  @Operation('GET')
  @ApiOperation({operationId:'getNativeClassPendingKnowledgeReviews',summary:'getNativeClassPendingKnowledgeReviews'})

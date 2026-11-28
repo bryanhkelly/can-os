@@ -739,3 +739,10 @@ test('course evidence is a private read and excludes raw survey responses or gra
  assert.equal(c.courseEvidenceResult.safeParse(data).success,true);
  assert.equal(c.courseEvidenceResult.safeParse({...data,surveys:[{responseId:id,campaignId:id,submittedAt:'2026-11-28T00:00:00Z',answers:[]}]}).success,false);
 });
+
+test('native Class phase is explicit, backwards compatible and cannot be arbitrary',()=>{
+ const c=require('../dist/credentials.contracts'),id='00000000-0000-4000-8000-000000000001';
+ assert.equal(c.nativeProvision.safeParse({classEnrollmentId:id}).success,true);
+ assert.equal(c.nativeProvision.safeParse({classEnrollmentId:id,phase:'baseline'}).success,true);
+ assert.equal(c.nativeProvision.safeParse({classEnrollmentId:id,phase:'official'}).success,false);
+});

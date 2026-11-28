@@ -32,6 +32,7 @@ export async function checkOutcomeContract(client:BecomunaBrowserApi,id:string){
 
 export async function checkNativeAssessmentContract(client:BecomunaBrowserApi,id:string){
  await client.POST('/api/v1/class-knowledge-check-access',{body:{classEnrollmentId:id}});
+ await client.POST('/api/v1/class-knowledge-check-access',{body:{classEnrollmentId:id,phase:'baseline'}});
  await client.GET('/api/v1/class-knowledge-review-queue',{params:{query:{classId:id}}});
  await client.POST('/api/v1/class-knowledge-check-finalizations',{body:{classEnrollmentId:id,assessmentAttemptId:id}});
  const evidence=await client.GET('/api/v1/me/class-completion-evidence',{params:{query:{classEnrollmentId:id}}});

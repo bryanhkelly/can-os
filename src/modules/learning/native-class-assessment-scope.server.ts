@@ -9,6 +9,7 @@ import {
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
 import type { CanonicalParticipationAccess } from "@/domain/canonical-course-participation";
 import { assertPublisherObjectiveAttemptLimit } from "@/domain/canonical-objective-draft";
+import {assertNativeClassDiagnosticAuthority,matchesNativeClassAssessmentPhase} from "./native-class-assessment-phase.server";
 import { getCanonicalClassPublisher } from "@/modules/classes/native-class-publisher.server";
 
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -73,9 +74,8 @@ export async function loadNativeClassAssessmentScope(
     )).limit(51);
   if(administrations.length>50)
     throw new AuthorizationError("assessment administrations require a narrower Course publication");
-  const phaseRows=administrations.filter(a=>phase==="baseline"?
-    a.purpose==="diagnostic":
-    ["formative","practice","readiness","mastery"].includes(a.purpose));
+  if(phase==="baseline")await assertNativeClassDiagnosticAuthority(tx);
+  const phaseRows=administrations.filter(a=>matchesNativeClassAssessmentPhase(a.purpose,phase));
   if(phaseRows.length!==1)throw new AuthorizationError(
     "one approved Class Course assessment administration for this phase");
   const {administration,version}=phaseRows[0]!;

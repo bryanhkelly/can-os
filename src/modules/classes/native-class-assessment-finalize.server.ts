@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import {parseCommandInput} from "@/domain/command-input";
+import {assertNativeClassDiagnosticAuthority,matchesNativeClassAssessmentPhase} from "@/modules/learning/native-class-assessment-phase.server";
 import {pendingInput,input} from "./native-class-assessment-finalize.inputs";
 import { db } from "@/db/client";
 import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
@@ -177,11 +178,12 @@ export async function finalizeNativeClassKnowledgeCheckService(request:Request,r
       if(!version||version.lifecycle!=="published"||
           version.courseVersionId!==cls.courseVersionId||!definition||
           definition.ownerOrganizationId!==publisherOrganizationId||
-          !["formative","practice","readiness","mastery"].includes(definition.purpose)||
+          !matchesNativeClassAssessmentPhase(definition.purpose,definition.purpose==="diagnostic"?"baseline":"final")||
           !form||form.lifecycle!=="published"||form.shuffleQuestions||
           form.id!==administration.formVersionId||
           form.assessmentVersionId!==version.id)
         throw new AuthorizationError("published objective Course knowledge check");
+      if(definition.purpose==="diagnostic")await assertNativeClassDiagnosticAuthority(tx);
       assertPublisherObjectiveAttemptLimit(version.blueprint,administration.attemptLimit);
       // Independent reviewer session is checked again inside the transaction,
       // including when the result was already finalized.
@@ -214,7 +216,7 @@ export async function finalizeNativeClassKnowledgeCheckService(request:Request,r
         pointsEarned:earned.toFixed(4),pointsPossible:total.toFixed(4),
         outcome:evaluated.outcome,reviewedByPersonId:actor.actorPersonId,
         supersedesId:prior.id,
-        resultEvidence:{source:"class",reviewKind:"independent_provider_confirmation"},
+        resultEvidence:{source:"class",reviewKind:"independent_provider_confirmation",phase:definition.purpose==="diagnostic"?"baseline":"final"},
       }).returning({id:assessmentExecutionResults.id});
       if(!final)throw new Error("Canonical result finalization failed");
       await tx.update(assessmentExecutionAttempts).set({state:"finalized"})

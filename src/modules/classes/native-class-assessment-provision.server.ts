@@ -1,5 +1,6 @@
 import { and, eq, inArray, isNull, gt, lte, or } from "drizzle-orm";
 import {parseCommandInput} from "@/domain/command-input";
+import {assertNativeClassDiagnosticAuthority,matchesNativeClassAssessmentPhase} from "@/modules/learning/native-class-assessment-phase.server";
 import {input} from "./native-class-assessment-provision.inputs";
 import { db } from "@/db/client";
 import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
@@ -37,6 +38,7 @@ export async function provisionNativeClassKnowledgeCheckAccessService(request:Re
     if(!organizationId||actor.scope.organizationIds?.length!==1)
       throw new AuthorizationError("one current operating organization");
     return db.transaction(async tx=>{
+      if(data.phase==="baseline")await assertNativeClassDiagnosticAuthority(tx);
       const [enrollment]=await tx.select().from(canonicalClassEnrollments)
         .where(eq(canonicalClassEnrollments.id,data.classEnrollmentId))
         .for("update").limit(1);
@@ -102,7 +104,7 @@ export async function provisionNativeClassKnowledgeCheckAccessService(request:Re
         c.ownerOrganizationId===publisherOrganizationId&&
         c.versionLifecycle==="published"&&c.formLifecycle==="published"&&
         c.versionCourseId===cls.courseVersionId&&!c.formShuffle&&
-        ["formative","practice","readiness","mastery"].includes(c.purpose));
+        matchesNativeClassAssessmentPhase(c.purpose,data.phase));
       if(available.length!==1)
         throw new AuthorizationError("one approved published objective knowledge check for this Class");
       const administration=available[0]!.administration;
@@ -135,7 +137,7 @@ export async function provisionNativeClassKnowledgeCheckAccessService(request:Re
       if(!created)throw new Error("Canonical Class assessment grant could not be recorded");
       const payload={
         classId:cls.id,classEnrollmentId:enrollment.id,
-        courseAttemptId:attempt.id,assessmentAdministrationId:administration.id,
+        courseAttemptId:attempt.id,assessmentAdministrationId:administration.id,phase:data.phase,
       };
       await writeCanonicalAudit(tx,{
         actorPersonId:actor.actorPersonId!,owningOrganizationId:organizationId,

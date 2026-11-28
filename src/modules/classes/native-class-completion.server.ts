@@ -23,6 +23,8 @@ import {
   learnerProfiles,
   assessmentAccess,
   assessmentFormAdministrations,
+  assessmentVersions,
+  assessmentDefinitions,
   assessmentExecutionAttempts,
   assessmentExecutionResults,
 } from "@/db/canonical-v301";
@@ -77,7 +79,7 @@ async function authorizeReview(tx:Tx, classEnrollmentId:string, actor:Awaited<
     courseVersionId:cls.courseVersionId,
     operatingOrganizationId:cls.operatingOrganizationId,
     siteId:cls.siteId,title:cls.title,deliveryMode:cls.deliveryMode,
-}
+  });
   const [attempt]=await tx.select().from(learnerCourseAttempts)
     .where(and(
       eq(learnerCourseAttempts.id,enrollment.courseAttemptId),
@@ -217,7 +219,12 @@ async function collectReadiness(tx:Tx, data:Awaited<ReturnType<typeof authorizeR
     .from(assessmentAccess)
     .innerJoin(assessmentFormAdministrations,eq(
       assessmentFormAdministrations.id,assessmentAccess.administrationId))
+    .innerJoin(assessmentVersions,eq(assessmentVersions.id,assessmentFormAdministrations.assessmentVersionId))
+    .innerJoin(assessmentDefinitions,eq(assessmentDefinitions.id,assessmentVersions.assessmentId))
     .where(and(eq(assessmentAccess.courseAttemptId,attempt.id),
+      eq(assessmentVersions.lifecycle,"published"),
+      eq(assessmentVersions.courseVersionId,cls.courseVersionId),
+      inArray(assessmentDefinitions.purpose,["formative","practice","readiness","mastery"]),
       eq(assessmentAccess.learnerId,learner.id),
       eq(assessmentAccess.accessStatus,"approved"),
       eq(assessmentFormAdministrations.courseVersionId,cls.courseVersionId),
@@ -282,7 +289,7 @@ async function collectReadiness(tx:Tx, data:Awaited<ReturnType<typeof authorizeR
     completedLessonIds:progress.filter(p=>p.status==="completed"||p.status==="waived")
       .map(p=>p.lessonId),
     sessionEvidence:sessions,assessmentResults:latestResults,now,
-}
+  });
   return readiness;
 }
 
