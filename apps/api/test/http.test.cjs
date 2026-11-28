@@ -659,3 +659,21 @@ test('knowledge checks and completion require verified learner or provider autho
 test('noncredit enrollment publication protects provider scope and explicit Site selection',async()=>{await withServer('0',async(url,document)=>{for(const [route,method] of [["/api/v1/noncredit-enrollment-publisher","GET"],["/api/v1/noncredit-training-readiness","GET"],["/api/v1/noncredit-enrollment-releases","POST"],["/api/v1/noncredit-enrollment-closures","POST"],["/api/v1/noncredit-multisite-releases","POST"]]){assert.ok(document.paths[route][method.toLowerCase()].security);assert.equal((await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined)).status,method==='POST'?503:401);}assert.ok(document.paths['/api/v1/noncredit-enrollment-releases'].post.requestBody.content['application/json'].schema.required.includes('siteId'));});});
 
 test('completion administration requires canonical provider credentials and distinguishes decisions from corrections',async()=>{await withServer('0',async(url,document)=>{for(const [route,method] of [["/api/v1/noncredit-completion-decisions","POST"],["/api/v1/noncredit-completion-policy-catalog","GET"],["/api/v1/noncredit-completion-policies","POST"],["/api/v1/noncredit-completion-review","GET"],["/api/v1/noncredit-completion-queue","GET"],["/api/v1/noncredit-completion-corrections","POST"]]){assert.ok(document.paths[route][method.toLowerCase()].security);assert.equal((await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined)).status,method==='POST'?503:401);}});const c=require('../dist/completion-admin.contracts');assert.equal(c.queueQuery.safeParse({page:'101'}).success,false);assert.equal(c.queueQuery.parse({page:'2'}).page,2);});
+
+test('WS09 intelligence reads have documented security and deny anonymous forged identity',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const [route,query] of [["/api/v1/reports/network-readiness",""],["/api/v1/reports/geography-options","?basis=current"],["/api/v1/reports/site-options",""],["/api/v1/reporting-relationship-recipients","?query=school"],["/api/v1/reporting-relationship-scopes","?kind=site"],["/api/v1/reporting-relationships","?direction=incoming"]]){
+   const op=document.paths[route].get;assert.ok(op.security);assert.ok(op.responses['403']);
+   const response=await fetch(url+route+query,{headers:{'x-organization-id':'00000000-0000-4000-8000-000000000001','x-role':'platform_admin'}});
+   assert.equal(response.status,401);
+  }
+ });
+ const {geographyQuery,requestQuery,intelligenceResults:r,recipientQuery}=require('../dist/reporting.contracts');
+ assert.equal(geographyQuery.safeParse({basis:'current',organizationId:'forged'}).success,false);
+ assert.equal(geographyQuery.safeParse({basis:'all'}).success,false);
+ assert.equal(requestQuery.safeParse({direction:'incoming',scopeKind:'site'}).success,false);
+ assert.equal(recipientQuery.safeParse({query:'x'}).success,false);
+ assert.equal(r.sites.safeParse([{id:'00000000-0000-4000-8000-000000000001',label:'Site',personId:'forged'}]).success,false);
+ assert.equal(r.recipients.safeParse({items:Array.from({length:26},()=>({id:'00000000-0000-4000-8000-000000000001',name:'Site'})),next:null}).success,false);
+ assert.equal(r.readiness.safeParse({networkOrganizationId:'00000000-0000-4000-8000-000000000001',asOf:'2026-11-28T00:00:00Z',counts:{configuredUnits:0,activeUnits:0,configuredMemberships:0,currentMemberships:0,configuredGrants:0,currentGrants:0,currentGrantHosts:0},blockers:[],classification:'private_setup_inventory',disclosureApproved:true}).success,false);
+});

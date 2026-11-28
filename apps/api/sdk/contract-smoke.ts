@@ -16,3 +16,15 @@ export async function checkStudentContract(client:BecomunaBrowserApi, enrollment
  // @ts-expect-error the exact enrollment path parameter is required
  await client.GET('/api/v1/me/class-enrollments/{classEnrollmentId}/resume',{params:{path:{}}});
 }
+
+export async function checkReportingContract(client:BecomunaBrowserApi){
+ const readiness=await client.GET('/api/v1/reports/network-readiness');
+ if(readiness.data){const classification:'private_setup_inventory'=readiness.data.classification;void classification;}
+ await client.GET('/api/v1/reports/geography-options',{params:{query:{basis:'historical'}}});
+ await client.GET('/api/v1/reports/site-options');
+ await client.GET('/api/v1/reporting-relationship-recipients',{params:{query:{query:'school'}}});
+ await client.GET('/api/v1/reporting-relationship-scopes',{params:{query:{kind:'site'}}});
+ await client.GET('/api/v1/reporting-relationships',{params:{query:{direction:'incoming'}}});
+ // @ts-expect-error invalid geography basis
+ await client.GET('/api/v1/reports/geography-options',{params:{query:{basis:'any'}}});
+}

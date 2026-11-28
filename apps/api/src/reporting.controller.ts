@@ -52,4 +52,69 @@ export class ReportingController{
   validated(c.emptyQuery,query);const workflow=verifiedWorkflow(req);
   return this.identity.runWorkflow(async()=>c.portfolio.parse(await workflow.getRelationshipPortfolio(undefined)));
  }
+
+ @Get('reports/network-readiness')
+ @Governed('can','GET')
+ 
+ @ApiOperation({operationId:'getNetworkReportingReadiness',summary:'Private network setup inventory, not disclosure authority'})
+ @ApiOkResponse({schema:c.intelligenceDocs.readiness})
+ getNetworkReportingReadiness(@Req() req:FastifyRequest,@Query() query:unknown){
+  validated(c.emptyQuery,query);const workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>c.intelligenceResults.readiness.parse(await workflow.getNetworkReportingReadiness(undefined)));
+ }
+
+ @Get('reports/geography-options')
+ @Governed('operator-reporting','GET')
+ @ApiQuery({name:'basis',enum:['current','historical'],required:true})
+ @ApiOperation({operationId:'getReportingGeographyOptions',summary:'Authorized geographic filter options, not grants'})
+ @ApiOkResponse({schema:c.intelligenceDocs.geography})
+ getReportingGeographyOptions(@Req() req:FastifyRequest,@Query() query:unknown){
+  const input=validated(c.geographyQuery,query),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>c.intelligenceResults.geography.parse(await workflow.getReportingGeographyOptions(input)));
+ }
+
+ @Get('reports/site-options')
+ @Governed('operator-reporting','GET')
+ 
+ @ApiOperation({operationId:'getProviderReportSites',summary:'Authorized operator Site filter options'})
+ @ApiOkResponse({schema:c.intelligenceDocs.sites})
+ getProviderReportSites(@Req() req:FastifyRequest,@Query() query:unknown){
+  validated(c.emptyQuery,query);const workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>c.intelligenceResults.sites.parse(await workflow.getProviderReportSites(undefined)));
+ }
+
+ @Get('reporting-relationship-recipients')
+ @Governed('can','GET')
+ @ApiQuery({name:'query',type:String,required:true})
+ @ApiQuery({name:'after',schema:{type:'string',format:'uuid'},required:false})
+ @ApiOperation({operationId:'findRelationshipRecipients',summary:'Opt-in organization discovery, no account information'})
+ @ApiOkResponse({schema:c.intelligenceDocs.recipients})
+ findRelationshipRecipients(@Req() req:FastifyRequest,@Query() query:unknown){
+  const input=validated(c.recipientQuery,query),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>c.intelligenceResults.recipients.parse(await workflow.findRelationshipRecipients(input)));
+ }
+
+ @Get('reporting-relationship-scopes')
+ @Governed('can','GET')
+ @ApiQuery({name:'kind',enum:['organization','site','program','offering','class'],required:true})
+ @ApiQuery({name:'after',schema:{type:'string',format:'uuid'},required:false})
+ @ApiOperation({operationId:'getRelationshipScopes',summary:'Owner-scoped resource choices and eligible metric versions'})
+ @ApiOkResponse({schema:c.intelligenceDocs.scopes})
+ getRelationshipScopes(@Req() req:FastifyRequest,@Query() query:unknown){
+  const input=validated(c.scopeQuery,query),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>c.intelligenceResults.scopes.parse(await workflow.getRelationshipScopes(input)));
+ }
+
+ @Get('reporting-relationships')
+ @Governed('can','GET')
+ @ApiQuery({name:'direction',enum:['incoming','outgoing'],required:true})
+ @ApiQuery({name:'after',schema:{type:'string',format:'uuid'},required:false})
+ @ApiQuery({name:'scopeKind',enum:['organization','site','program','offering','class'],required:false,description:'Requires scopeId'})
+ @ApiQuery({name:'scopeId',schema:{type:'string',format:'uuid'},required:false,description:'Requires scopeKind'})
+ @ApiOperation({operationId:'getRelationshipRequests',summary:'Agreement metadata only, no actor identifiers or outcome facts'})
+ @ApiOkResponse({schema:c.intelligenceDocs.requests})
+ getRelationshipRequests(@Req() req:FastifyRequest,@Query() query:unknown){
+  const input=validated(c.requestQuery,query),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>c.intelligenceResults.requests.parse(await workflow.getRelationshipRequests({direction:input.direction,after:input.after,...(input.scopeKind&&input.scopeId?{scope:{scopeKind:input.scopeKind,scopeId:input.scopeId}}:{})})));
+ }
 }
