@@ -4,6 +4,7 @@ import { WorkspaceNotice, WorkspacePanel, DisclosureSection, EmptyState, QuerySt
 import { marketingFormatOptions, type MarketingFormat } from "@/domain/marketing-package-v61";
 import { packageReleaseIsDownloadableV61 } from "@/domain/marketing-package-release-v61";
 import { MarketingMaterialPreviewV61 } from "./MarketingMaterialPreviewV61";
+import type {MarketingWorkspaceTransport} from "@/modules/programs/marketing-workspace-transport";
 import type { listSiteMarketingPackagesV61 } from "@/modules/programs/site-marketing-packages-v61.functions";
 import type {
   listSiteMarketingPackageReleases, listSiteMarketingReleases,
@@ -20,10 +21,10 @@ export type MarketingReleaseComparison={
  * and read-only comparison have no parallel document stores or save actions.
  */
 export function MarketingPackageReleaseHistoryV61({
-  siteId,record,versions,historicalSingles,loading,busy,compare,
+  siteId,record,versions,historicalSingles,loading,busy,compare,transport,
   onDownloadPackage,onCompare,onDownloadOriginal,onDownloadPng,onCopyCaption,onCloseCompare,
 }:{
-  siteId:string;record:MarketingPackageV61Record;
+  transport?:MarketingWorkspaceTransport;siteId:string;record:MarketingPackageV61Record;
   versions:MarketingPackageV61Release[];historicalSingles:MarketingArtifactV61Release[];
   loading:boolean;busy:boolean;compare:MarketingReleaseComparison|null;
   onDownloadPackage:(release:MarketingPackageV61Release)=>void;
@@ -109,7 +110,7 @@ export function MarketingPackageReleaseHistoryV61({
                 <div className="min-w-0 space-y-2">
                   <p className="text-sm font-semibold">Your current materials</p>
                   {record.content.formats.includes(compare.format)
-                    ? <MarketingMaterialPreviewV61 siteId={siteId} title={record.title}
+                    ? <MarketingMaterialPreviewV61 transport={transport} siteId={siteId} title={record.title}
                         brandVersionId={record.brandVersionId}
                         format={compare.format} content={record.content}/>
                     : <WorkspaceNotice>This format was removed from the working Package. It remains available in the original release.</WorkspaceNotice>}
