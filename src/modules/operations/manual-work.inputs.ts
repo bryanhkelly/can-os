@@ -13,3 +13,5 @@ export const manualTaskPageSchema=z.object({
  siteId:id.optional(),programId:id.optional(),afterId:id.optional(),
 }).strict();
 export const workInboxSchema=z.object({}).strict();
+export const dependencyReadSchema=z.object({id}).strict();
+export const dependencyChangeSchema=z.object({id,blockedByActionId:id,operation:z.enum(["add","remove"]),expectedUpdatedAt:z.string().datetime({offset:true}),reason:z.string().trim().min(5).max(500)}).strict();
