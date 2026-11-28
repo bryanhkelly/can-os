@@ -151,3 +151,42 @@ cleanup gates are accepted. No automatic deletion of abandoned bytes is claimed.
 This implementation has **not** been validated against a live R2 bucket. Before enabling live uploads, complete a security/privacy review including anti-malware scanning/quarantine, actual bucket CORS and least-privilege credentials, object expiration/deletion of abandoned uploads, retention/legal holds and records export, access revocation, denial tests across former guardians and schools, audit delivery, and a controlled rollback procedure. Restrict supported MIME types to the currently server-verifiable PDF/JPEG/PNG formats; other office document formats must not be enabled merely by changing the browser file picker.
 
 Production school document access remains a deployment decision; passing source review or setting the upload switch does not mean these operational gates were completed.
+
+
+## Shared-bucket Pilot QA (optional)
+
+A clean pilot QA checkout can use the existing private R2 bucket without creating
+another bucket or copying production credentials into the QA runtime. Stop the
+local preparation server, update the detached QA checkout to the approved release,
+then run from that checkout:
+
+```powershell
+node --import tsx scripts/acceptance/configure-pilot-qa-storage.mjs ../can-os/.env.local
+node --test scripts/acceptance/pilot-qa-storage-credentials.test.mjs
+npx vitest run tests/unit/r2-storage-adapter.test.ts
+npm run qa:pilot -- prepare
+```
+
+Supply the actual local file containing the existing private R2 settings if
+different. The helper reads only the four R2 parent settings from that file for
+credential derivation; it does not load production application configuration.
+It attests the QA database branch, creates a four-hour R2 credential scoped to
+`qa/br-solitary-art-arun91gj/` with GetObject, HeadObject and PutObject only,
+and verifies a create-only synthetic probe and its readback before updating the
+ignored QA config. No production object is read or changed. The probe remains
+under the QA prefix. Do not share the generated session token or secret.
+
+The canonical logical object keys and domain key policies remain unchanged.
+Only the physical signed R2 path gains the QA prefix. Existing production paths
+are unchanged. All private-object operations that use the shared adapter map
+through the same prefix. The credential itself is also enforced by R2. QA
+storage setup does not bypass publisher appointments, independent review,
+eligibility, course publication, or learner authorization. The original
+dedicated bucket option remains supported. Renew the session by running the same
+helper after expiry; existing QA database secrets and object paths are retained.
+The helper has no delete authority; lifecycle cleanup of the QA prefix should
+be configured separately after deciding the required evidence retention period.
+Browser uploads still require the existing bucket CORS policy to allow localhost
+and the signed headers. No automatic lifecycle or CORS change is performed.
+
+Reference: https://developers.cloudflare.com/r2/api/s3/temporary-credentials/
