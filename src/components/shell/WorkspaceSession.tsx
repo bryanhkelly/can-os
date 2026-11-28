@@ -1,10 +1,14 @@
 import { useEffect, useRef, type ReactNode } from "react";
-import { queryOptions, useQuery } from "@tanstack/react-query";
+import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getWorkspaceSession, type WorkspaceSessionResult } from "@/modules/identity/workspace-session.functions";
 import { defaultStudentDisplayPreferences } from "@/domain/student-display-preferences";
 import { currentPageSignInUrl, isPublicCanPath } from "@/domain/auth-route-policy";
 import { WorkspaceSessionContext, useWorkspaceSession } from "./workspace-session-context";
 import {registerAccessClient,isSharedDeviceMode,clearLearnerBrowserState,observeSessionHandoffs} from "@/domain/session-client";
+
+import { logoutApiSession, recordApiSessionActivity } from "@/lib/api/browser-session";
+import { ApiResponseError } from "@/lib/api/api-response";
+import { clearWorkspaceQueries } from "@/lib/api/workspace-query-scope";
 
 export { useActiveWorkspaceMember, useWorkspaceSession } from "./workspace-session-context";
 
@@ -34,6 +38,7 @@ export function WorkspaceSessionProvider({ initial, children }: {
   initial: WorkspaceSessionResult;
   children: ReactNode;
 }) {
+  const queryClient = useQueryClient();
   const { data, error } = useQuery({
     ...workspaceSessionQueryOptions(),
     initialData: initial,
@@ -44,6 +49,7 @@ export function WorkspaceSessionProvider({ initial, children }: {
   useEffect(() => {
     // A new identity/scope must never reuse the previous workspace's mounted state or caches.
     if (changed) {
+      void clearWorkspaceQueries(queryClient);
       clearLearnerBrowserState();
       // Expired or revoked credentials return the member to the exact
       // private page after reauthentication, not to a generic dashboard.
@@ -52,7 +58,7 @@ export function WorkspaceSessionProvider({ initial, children }: {
       else window.location.reload();
     }
     else if (identity !== null) previousIdentity.current = identity;
-  }, [changed, identity]);
+  }, [changed, identity, queryClient]);
   useEffect(() => {
     if (error) console.error("Unable to refresh workspace session", error);
   }, [error]);
@@ -67,7 +73,8 @@ export function WorkspaceSessionProvider({ initial, children }: {
     const stopObserving=observeSessionHandoffs(()=>{
       if(closing)return;
       closing=true;
-      clearLearnerBrowserState();
+      void clearWorkspaceQueries(queryClient);
+      clearLearnerBrowserState(false);
       window.location.replace(currentPageSignInUrl(window.location));
     });
     // Registration never extends idle expiry; only actual trusted interaction does.
@@ -75,29 +82,25 @@ export function WorkspaceSessionProvider({ initial, children }: {
     const guard=window.setInterval(()=>{
       if(closing || !isSharedDeviceMode() || Date.now()-lastInteractionAt<5*60_000)return;
       closing=true;
-      void fetch("/access/logout",{method:"POST",credentials:"same-origin",
-        headers:{"Content-Type":"application/json"}}).finally(()=>{
+      void logoutApiSession().catch(()=>{}).finally(()=>{
+        void clearWorkspaceQueries(queryClient);
         clearLearnerBrowserState();
         window.location.replace(currentPageSignInUrl(window.location));
       });
     },15_000);
     const onInteraction = (event: Event) => {
-      if (!event.isTrusted || document.visibilityState !== "visible") return;
+      if (closing || !event.isTrusted || document.visibilityState !== "visible") return;
       const now=Date.now();
       lastInteractionAt=now;
       if(now-lastSentAt<60_000)return;
       lastSentAt = now;
-      void fetch("/access/session", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind: "activity" }),
-      }).then(response => {
-        if (response.status === 401) {
+      void recordApiSessionActivity().catch(error => {
+        if (error instanceof ApiResponseError && error.status === 401) {
+          closing=true;
+          void clearWorkspaceQueries(queryClient);
           clearLearnerBrowserState();
           window.location.replace(currentPageSignInUrl(window.location));
         }
-      }).catch(() => {
         // Transient network loss does not authorize a longer session.
         // The next real interaction may retry after the client throttle.
       });
@@ -110,7 +113,7 @@ export function WorkspaceSessionProvider({ initial, children }: {
       document.removeEventListener("pointerdown", onInteraction);
       document.removeEventListener("keydown", onInteraction);
     };
-  }, [data.session?.authenticated]);
+  }, [data.session?.authenticated, queryClient]);
   if (changed) return <p role="status" className="p-6">Refreshing workspace...</p>;
   const value = error ? { ...data, error: "Unable to refresh your workspace session. Please try again." } : data;
   return <WorkspaceSessionContext.Provider value={value}>{children}</WorkspaceSessionContext.Provider>;
