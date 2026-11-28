@@ -5,7 +5,7 @@ import type { Database } from "@/db/client";
 import * as schema from "@/db/schema";
 import * as mutation from "@/platform/mutation";
 import { setupSchool } from "@/modules/identity/school-setup.server";
-import { redeemDemoAccess, redeemOneTimeAccess, requestSchoolSetupAccess } from "@/modules/identity/passwordless-access.server";
+import { redeemDemoAccess, redeemOneTimeAccess, requestOneTimeAccess, requestSchoolSetupAccess } from "@/modules/identity/passwordless-access.server";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { startProgramLaunch } from "@/modules/programs/program-launch-service";
 import { assertSitePublicationScope } from "@/domain/site-publication-policy";
@@ -256,4 +256,66 @@ integration("public demo school canonical setup", () => {
     }
     expect(checked).toBe(true);
   }, 120_000);
+  it("recovers an expired personal signup after email submission fails without creating duplicate identity", async () => {
+    const { db: database } = await vi.importActual<{ db: Database }>("@/db/client");
+    const rollback = new Error("rollback-personal-access-recovery");
+    let checked = false;
+    try {
+      await database.transaction(async tx => {
+        state.database = {
+          transaction: async (run: (transaction: Transaction) => Promise<unknown>) => run(tx),
+          select: (...args: unknown[]) => tx.select(...args as never[]),
+          insert: (...args: unknown[]) => tx.insert(...args as never[]),
+          update: (...args: unknown[]) => tx.update(...args as never[]),
+          execute: (...args: unknown[]) => tx.execute(...args as never[]),
+        } as unknown as Database;
+        vi.stubEnv("CAN_ACCESS_TOKEN_PEPPER", "personal-access-recovery-integration-pepper-not-a-secret");
+        vi.stubEnv("CAN_ACCESS_PUBLIC_ORIGIN", "https://app.example.test");
+        const email = `recovery-${crypto.randomUUID()}@example.test`;
+        const [account] = await tx.insert(schema.accessAccounts).values({emailNormalized:email}).returning();
+        if (!account) throw new Error("Account missing");
+        await tx.insert(schema.accessAccountSignups).values({
+          accountId:account.id,firstName:"Pending",lastName:"Registrant",
+          expiresAt:new Date(Date.now()-60_000),
+        });
+        const failure=vi.fn(async()=>{throw new Error("simulated provider outage");});
+        await expect(requestOneTimeAccess(email,failure)).rejects.toThrow("simulated provider outage");
+        expect(failure).toHaveBeenCalledTimes(1);
+        const [pending]=await tx.select().from(schema.accessAccountSignups)
+          .where(eq(schema.accessAccountSignups.accountId,account.id));
+        expect(pending).toMatchObject({firstName:"Pending",lastName:"Registrant",consumedAt:null});
+        expect(pending!.expiresAt.getTime()).toBeGreaterThan(Date.now());
+        const [unverified]=await tx.select().from(schema.accessAccounts)
+          .where(eq(schema.accessAccounts.id,account.id));
+        expect(unverified).toMatchObject({personId:null,emailVerifiedAt:null});
+        const sender=vi.fn(async (_message:{accessUrl:string})=>{});
+        await requestOneTimeAccess(email,sender);
+        expect(sender).not.toHaveBeenCalled(); // cooldown still applies
+        // Simulate an outage longer than the link and registration windows.
+        await tx.update(schema.accessChallenges).set({createdAt:new Date(Date.now()-1_200_000),
+          expiresAt:new Date(Date.now()-60_000)}).where(eq(schema.accessChallenges.accountId,account.id));
+        await tx.update(schema.accessAccountSignups).set({expiresAt:new Date(Date.now()-60_000)})
+          .where(eq(schema.accessAccountSignups.accountId,account.id));
+        await requestOneTimeAccess(email,sender);
+        expect(sender).toHaveBeenCalledTimes(1);
+        const token=new URL(sender.mock.calls[0]![0].accessUrl).hash.slice("#token=".length);
+        const login=await redeemOneTimeAccess(token);
+        expect(login).toMatchObject({accountId:account.id,role:"account_holder"});
+        await expect(redeemOneTimeAccess(token)).rejects.toThrow();
+        const grants=await tx.select().from(schema.accountPersonGrants)
+          .where(eq(schema.accountPersonGrants.accountId,account.id));
+        expect(grants).toHaveLength(1);
+        expect(grants[0]).toMatchObject({role:"account_holder",organizationId:null,siteId:null});
+        const [completed]=await tx.select().from(schema.accessAccountSignups)
+          .where(eq(schema.accessAccountSignups.accountId,account.id));
+        expect(completed?.consumedAt).toBeInstanceOf(Date);
+        checked=true;
+        throw rollback;
+      });
+    } catch(error) {
+      if(error!==rollback)throw error;
+    }
+    expect(checked).toBe(true);
+  },120_000);
+
 });
