@@ -8,6 +8,8 @@ export async function checkStudentContract(client:BecomunaBrowserApi, enrollment
  if(resume.data){const completed:number=resume.data.completed;void completed;}
  const learning=await client.GET('/api/v1/me/class-enrollments/{classEnrollmentId}/learning',{params:{path:{classEnrollmentId:enrollmentId}}});
  if(learning.data){const lessonBody:string|undefined=learning.data.lessons[0]?.lessonBody;void lessonBody;}
+ const assignments=await client.GET('/api/v1/me/class-enrollments/{classEnrollmentId}/assignment-workspace',{params:{path:{classEnrollmentId:enrollmentId}}});
+ if(assignments.data){const response:string|undefined=assignments.data.assignments[0]?.responseText;void response;}
  // Browser-owned Origin is still mandatory on the wire; the browser, not UI code, supplies it.
  await client.POST('/api/v1/me/session/membership',{body:{grantId:enrollmentId}});
  await client.POST('/api/v1/me/session/activity',{body:{}});
