@@ -19,7 +19,7 @@ const asRecord=(value:unknown):Record<string,unknown>=>
     ?value as Record<string,unknown>:{};
 type HomeworkRow={
   id:string;status:string;submitted_at:Date|null;
-  assignment_key:string;assignment_spec:unknown;response:unknown;
+  assignment_key:string;assignment_title:string;response:unknown;
   first_name:string|null;last_name:string|null;preferred_name:string|null;
 };
 
@@ -69,7 +69,7 @@ export const getNativeClassTeacherHomework=createServerFn({method:"GET"})
      const {cls}=await authorizedTeacher(tx,data.classId);
      const result=await tx.execute(sql`
        SELECT gs.id,gs.status,gs.submitted_at,gs.response,
-         ga.assignment_key,ga.assignment_spec,
+         ga.assignment_key,w.title AS assignment_title,
          p.legal_first_name AS first_name,
          p.legal_last_name AS last_name,
          p.preferred_name
@@ -87,12 +87,11 @@ export const getNativeClassTeacherHomework=createServerFn({method:"GET"})
      const rows=(result.rows as HomeworkRow[]).slice(0,100);
      return {
        items:rows.map(row=>{
-         const spec=asRecord(row.assignment_spec);
          const response=asRecord(row.response);
          return {
            id:row.id,
            studentName:row.preferred_name??([row.first_name,row.last_name].filter(Boolean).join(" ")||"Learner"),
-           assignmentTitle:String(spec.title??row.assignment_key),
+           assignmentTitle:row.assignment_title??row.assignment_key,
            status:row.status,
            responseText:typeof response.text==="string"?response.text:"",
            teacherFeedback:response.practiceResponse===true&&typeof response.teacherFeedback==="string"
@@ -170,9 +169,12 @@ export const getNativeClassTeacherHomeworkHistory=createServerFn({method:"GET"})
        JOIN public.learner_course_attempts ca ON ca.id=gs.course_attempt_id AND ca.course_version_id=gs.course_version_id
        JOIN public.class_enrollments ce ON ce.id=ca.class_enrollment_id AND ce.course_attempt_id=ca.id
        JOIN public.graded_assignments ga ON ga.id=gs.assignment_id AND ga.course_version_id=gs.course_version_id
+       JOIN public.official_course_assignment_versions o ON o.id=ga.official_assignment_version_id AND o.course_version_id=ga.course_version_id
        WHERE gs.id=${data.submissionId}::uuid AND ce.class_id=${cls.id}::uuid
          AND ce.status='active' AND ca.status='active' AND ca.section_id IS NULL
          AND ca.course_version_id=${cls.courseVersionId}::uuid AND ga.section_id IS NULL
+         AND ca.deployment_id=${cls.deploymentId}::uuid AND ca.adoption_id=${cls.adoptionId}::uuid
+         AND ca.offering_version_id=${cls.offeringVersionId}::uuid
          AND gs.status IN ('submitted','returned','graded')
          AND (${data.beforeRevision??null}::int IS NULL OR r.revision_no<${data.beforeRevision??null}::int)
        ORDER BY r.revision_no DESC LIMIT 21
@@ -208,10 +210,13 @@ export const returnNativeClassPracticeFeedback=createServerFn({method:"POST"})
         AND ce.course_attempt_id=ca.id AND ce.status='active'
        JOIN public.graded_assignments ga ON ga.id=gs.assignment_id
         AND ga.course_version_id=ca.course_version_id AND ga.section_id IS NULL
+       JOIN public.official_course_assignment_versions o ON o.id=ga.official_assignment_version_id AND o.course_version_id=ga.course_version_id
        WHERE gs.id=${data.submissionId}::uuid
          AND ce.class_id=${cls.id}::uuid
          AND ca.status='active' AND ca.section_id IS NULL
          AND ca.course_version_id=${cls.courseVersionId}::uuid
+         AND ca.deployment_id=${cls.deploymentId}::uuid AND ca.adoption_id=${cls.adoptionId}::uuid
+         AND ca.offering_version_id=${cls.offeringVersionId}::uuid
          AND gs.status IN ('submitted','returned')
          AND gs.response @> '{"practiceResponse":true}'::jsonb
        FOR UPDATE OF gs
@@ -219,6 +224,8 @@ export const returnNativeClassPracticeFeedback=createServerFn({method:"POST"})
      const row=rows.rows[0] as {id:string;status:string;response:unknown}|undefined;
      if(!row)throw new AuthorizationError("current Class practice submission");
      const original=asRecord(row.response);
+     if(row.status==="returned"&&original.teacherFeedback===data.feedback&&original.practiceScore===data.practiceScore)
+       return {submissionId:row.id,status:"returned" as const,practiceOnly:true as const};
      const updated=await tx.execute(sql`
        UPDATE public.graded_submissions
        SET response=response || jsonb_build_object(
