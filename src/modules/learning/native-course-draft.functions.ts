@@ -5,7 +5,7 @@ import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { canonicalOfferingCourses,courseLessons,courseUnits,courses,courseVersions,
-  offeringVersions,offerings,type JsonObject } from "@/db/canonical-v301";
+  offeringVersions,offerings,officialCourseAssignmentVersions,type JsonObject } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
 import {
@@ -189,5 +189,81 @@ export const getNativeCourseReleaseReadiness=createServerFn({method:"GET"})
         independentPublicationVerified:false,
         siteAndOperatorAuthorizationVerified:false,
       };
+    });
+  });
+
+const assignmentInput=z.object({
+  courseVersionId:uuid,
+  assignmentKey:z.string().trim().regex(/^[a-z][a-z0-9_-]{2,79}$/),
+  title:z.string().trim().min(3).max(200),
+  instructions:z.string().trim().min(5).max(12000),
+  required:z.boolean(),
+}).strict();
+
+/** Author immutable Course requirements only on a private Course draft.
+ * Do not grant a local teacher publishing powers, invent a Section, or
+ * change a live Class deadline. Published Course versions are read-only.
+ * A matching delivery assignment is created in the same draft transaction;
+ * learner access remains gated by published Course/Offering authority. */
+export const createNativeCourseAssignmentDraft=createServerFn({method:"POST"})
+  .validator((raw:unknown)=>assignmentInput.parse(raw))
+  .handler(async({data})=>{
+    noStore();
+    const actor=await getCommandContext(getRequest());
+    return db.transaction(async tx=>{
+      const course=await requireAssignedNativeDraft(tx,actor,data.courseVersionId,true);
+      const spec={title:data.title,instructions:data.instructions,format:"text"};
+      const [existing]=await tx.select().from(officialCourseAssignmentVersions)
+        .where(and(eq(officialCourseAssignmentVersions.courseVersionId,data.courseVersionId),
+          eq(officialCourseAssignmentVersions.assignmentKey,data.assignmentKey))).limit(1);
+      if(existing){
+        const existingSpec=existing.officialSpec as Record<string,unknown>;
+        const delivery=await tx.execute(sql`
+          SELECT id FROM public.graded_assignments
+          WHERE course_version_id=${data.courseVersionId}::uuid
+            AND official_assignment_version_id=${existing.id}::uuid
+            AND assignment_key=${data.assignmentKey} AND version_no=1 AND section_id IS NULL
+        `);
+        if(existing.required===data.required&&existingSpec?.title===data.title&&
+          existingSpec?.instructions===data.instructions&&existingSpec?.format==="text"&&delivery.rows.length===1)
+          return {assignmentVersionId:existing.id,created:false};
+        throw new DomainError("CONFLICT","This assignment key is already in use. Reload the draft.");
+      }
+      const [official]=await tx.insert(officialCourseAssignmentVersions).values({
+        courseVersionId:data.courseVersionId,assignmentKey:data.assignmentKey,
+        officialSpec:spec,required:data.required,
+      }).returning({id:officialCourseAssignmentVersions.id});
+      if(!official)throw new Error("Assignment definition was not saved");
+      await tx.execute(sql`
+        INSERT INTO public.graded_assignments
+          (course_version_id,official_assignment_version_id,assignment_key,version_no,assignment_spec)
+        VALUES (${data.courseVersionId}::uuid,${official.id}::uuid,${data.assignmentKey},1,
+          ${JSON.stringify(spec)}::jsonb)
+      `);
+      await writeAudit(tx,actor,{action:"curriculum.native_draft_assignment.create",
+        entityType:"official_course_assignment_version",entityId:official.id,
+        scope:{organizationId:course.organizationId},
+        after:{courseVersionId:data.courseVersionId,assignmentKey:data.assignmentKey,
+          independentPublicationRequired:true}});
+      return {assignmentVersionId:official.id,created:true};
+    });
+  });
+
+export const getNativeCourseAssignmentDrafts=createServerFn({method:"GET"})
+  .validator((raw:unknown)=>z.object({courseVersionId:uuid,offset:z.number().int().min(0).max(1000000).default(0)}).strict().parse(raw))
+  .handler(async({data})=>{
+    noStore();
+    const actor=await getCommandContext(getRequest());
+    return db.transaction(async tx=>{
+      await requireAssignedNativeDraft(tx,actor,data.courseVersionId);
+      const rows=await tx.select().from(officialCourseAssignmentVersions)
+        .where(eq(officialCourseAssignmentVersions.courseVersionId,data.courseVersionId))
+        .orderBy(asc(officialCourseAssignmentVersions.assignmentKey)).limit(101).offset(data.offset);
+      return {items:rows.slice(0,100).map(row=>({
+        id:row.id,assignmentKey:row.assignmentKey,required:row.required,
+        title:String((row.officialSpec as Record<string,unknown>)?.title??row.assignmentKey),
+        instructions:typeof (row.officialSpec as Record<string,unknown>)?.instructions==="string"
+          ?String((row.officialSpec as Record<string,unknown>).instructions):null,
+      })),nextOffset:rows.length>100?data.offset+100:null};
     });
   });
