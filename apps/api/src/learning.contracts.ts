@@ -66,3 +66,13 @@ export const workspaceDoc=obj({
  classId:id,classEnrollmentId:id,courseAttemptId:id,classTitle:title,courseVersionId:id,enrollmentStatus:title,creditMode:title,
  lessons:{type:'array' as const,maxItems:500,items:lessonDoc},outcomes:{type:'array' as const,maxItems:100,items:outcomeDoc},awards:{type:'array' as const,maxItems:100,items:awardDoc},
 });
+
+const detailedAssignment=z.object({
+ id:uuid,title:z.string(),dueAt:iso.nullable(),status:z.string(),submittedAt:iso.nullable(),
+ instructions:z.string(),responseText:z.string(),practiceFeedback:z.string().nullable(),
+ practiceScore:z.number().finite().nullable(),practiceScoreMax:z.number().finite().nullable(),submitted:z.boolean(),
+}).strict();
+export const homeworkWorkspaceSchema=z.object({courseAttemptId:uuid,legacySectionId:uuid.nullable(),assignments:z.array(detailedAssignment).max(100)}).strict();
+const nullableNumber={type:'number' as const,nullable:true};
+const detailedAssignmentDoc=obj({id,title,dueAt:date,status:title,submittedAt:date,instructions:title,responseText:title,practiceFeedback:nullableText,practiceScore:nullableNumber,practiceScoreMax:nullableNumber,submitted:{type:'boolean' as const}});
+export const homeworkWorkspaceDoc=obj({courseAttemptId:id,legacySectionId:{...id,nullable:true},assignments:{type:'array' as const,maxItems:100,items:detailedAssignmentDoc}});
