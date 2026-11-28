@@ -15,8 +15,8 @@ const snapshot=JSON.parse(read("drizzle/meta/0085_snapshot.json")) as {
 };
 
 describe("canonical CAN Person production cutover gate",()=>{
- it("registers the identity schema change as the next main Drizzle migration",()=>{
-  expect(journal.entries.at(-1)).toMatchObject({
+ it("retains the historical Person migration in the ordered Drizzle journal",()=>{
+  expect(journal.entries.find(entry=>entry.idx===85)).toMatchObject({
    idx:85,tag:"0085_historical_person_ownership",
   });
   expect(snapshot.id).toBe("7a1c0000-0000-4085-8085-000000000085");
@@ -52,13 +52,18 @@ describe("canonical CAN Person production cutover gate",()=>{
    scripts:Record<string,string>;
   };
   const release=pkg.scripts["deploy:cloudflare"];
-  expect(release).toMatch(/^node scripts\/acceptance\/check-one-person-deploy-schema\.mjs && /);
+  expect(release.indexOf("node scripts/acceptance/check-one-person-deploy-schema.mjs")).toBeGreaterThanOrEqual(0);
+  expect(release.indexOf("node scripts/acceptance/check-one-person-deploy-schema.mjs")).toBeLessThan(release.indexOf("npm run build:cloudflare"));
   const gate=read("scripts/acceptance/check-one-person-deploy-schema.mjs");
   expect(gate).toContain("br-restless-sea-ar9ooo55");
   expect(gate).toContain("has_person_anchor");
   expect(gate).toContain("single_person_grant_triggers");
   expect(gate).toContain("mismatched_active_grants");
   expect(gate).toContain("unanchored_historical_accounts");
+  expect(gate).toContain("delegated_staff_reader");
+  expect(gate).toContain("independent_issuer_reader");
+  expect(gate).toContain("applied migration differs from source");
+  expect(journal.entries.find(entry=>entry.idx===137)).toMatchObject({tag:"0137_restricted_staff_owner_delegation_parity"});
   expect(gate).not.toContain("INSERT INTO");
   expect(gate).not.toContain("ALTER TABLE");
   const parity=read("scripts/acceptance/check-production-drizzle-parity.mjs");
