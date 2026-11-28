@@ -57,7 +57,7 @@ describe("noncredit 48-hour invitation delivery",()=>{
     const worker=read("src/modules/enrollment/noncredit-waitlist-delivery.server.ts");
     expect(worker).not.toContain("tx.insert(noncreditRegistrations)");
     expect(worker).not.toContain("tx.insert(learnerCourseAttempts)");
-    expect(read("src/modules/enrollment/noncredit-waitlist.functions.ts"))
+    expect(read("src/modules/enrollment/noncredit-waitlist.server.ts"))
       .toContain("emailDeliveryStatus:");
     const cron=read("src/server.ts");
     expect(cron).toContain("processNoncreditWaitlistEmailDeliveries");
