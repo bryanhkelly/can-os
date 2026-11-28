@@ -2,7 +2,7 @@ import {completeNativeClassLesson,submitNativeClassHomeworkCommand} from "@/modu
 import {selectCurrentSessionMembership,recordCurrentSessionActivity} from "./session-lifecycle.server";
 import { getInstructionalLearnerContext } from "./learning-command-context.server";
 import { AuthorizationError } from "@/domain/command-context";
-import { readNativeClassResume } from "@/modules/classes/native-class-learning-read.server";
+import { readNativeClassLearning, readNativeClassResume } from "@/modules/classes/native-class-learning-read.server";
 import { readNativeClassHomeworkSummary } from "@/modules/classes/native-class-homework-read.server";
 import {createLaunchSiteService} from "@/modules/programs/launch-site-create.server";
 import {submitNativeOfferingReleaseService,saveNativeOfferingReleasePolicyService,decideNativeOfferingReleaseService,publishNativeOfferingCoursesService,approveNativeOfferingAssetManifestService,publishNativeOfferingVersionService,getNativeOfferingReviewContentService,getNativeOfferingReleaseOverviewService,getNativeOfferingReleasePolicyReviewService,getNativeOfferingReleaseReviewQueueService} from "@/modules/learning/native-offering-release.server";
@@ -57,6 +57,16 @@ export async function resolveHttpIdentity(request: Request) {
       };
     },
     readStudentClasses: () => readStudentClasses(actor),
+    readLearningWorkspace: async (id:string) => {
+      const workspace=await readNativeClassLearning(await learner(),id);
+      // Preserve RPC Date objects; HTTP uses explicit ISO timestamps.
+      return {
+        ...workspace,
+        lessons:workspace.lessons.map(lesson=>({...lesson,observedAt:lesson.observedAt?.toISOString()??null})),
+        outcomes:workspace.outcomes.map(outcome=>({...outcome,recordedAt:outcome.recordedAt.toISOString()})),
+        awards:workspace.awards.map(award=>({...award,issuedAt:award.issuedAt.toISOString(),revokedAt:award.revokedAt?.toISOString()??null})),
+      };
+    },
     readLearningResume: async (id:string) => readNativeClassResume(await learner(),id),
     readHomeworkSummary: async (id:string) => readNativeClassHomeworkSummary(await learner(),id),
   };
