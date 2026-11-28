@@ -37,7 +37,7 @@ export async function preflightPilot2(plan,env,ledger){
     JOIN public.course_versions cv ON cv.id=c.course_version_id
     WHERE c.id=${s.classId}::uuid AND c.site_id=${s.siteId}::uuid AND c.operating_organization_id=${s.host.organizationId}::uuid
       AND v.id=${s.classOfferingVersionId}::uuid`;
-  if(!state||state.state!=="active"||state.offering_state!=="published"||state.course_state!=="published"||state.class_offering_state!=="published")throw Error("Published authorized Class prerequisites missing");
+  if(!state||state.state!=="active"||!['facilitated','scheduled','hybrid'].includes(state.delivery_mode)||state.offering_state!=="published"||state.course_state!=="published"||state.class_offering_state!=="published")throw Error("Published authorized Class prerequisites missing");
   if(state.enrollments!==(ledger.passed("Pilot 2 enroll both Sites")?s.learners.length:0)||state.sessions!==(ledger.passed("Pilot 2 schedule both Sites")?4:0))throw Error("Canonical Class state changed since the last verified checkpoint");
   for(const m of s.meetings){
    const [asset]=await sql`SELECT count(*)::int AS count FROM public.classes c JOIN public.course_lessons l ON l.course_version_id=c.course_version_id
@@ -83,7 +83,7 @@ async function preflightClassPreparation(sql,s){
  JOIN public.program_deployments d ON d.id=a.deployment_id
  JOIN public.education_operation_organization_roles r ON r.operation_id=d.operation_id
  JOIN public.education_operation_sites os ON os.operation_id=d.operation_id
- JOIN public.classroom_deployment_sites ds ON ds.deployment_id=d.id AND ds.site_id=os.site_id
+ JOIN public.deployment_sites ds ON ds.deployment_id=d.id AND ds.site_id=os.site_id
  WHERE a.deployment_id=${p.deploymentId}::uuid AND ov.id=${p.offeringVersionId}::uuid
  AND cv.id=${p.courseVersionId}::uuid AND a.approval_status='approved'
  AND a.valid_from<=now() AND (a.valid_through IS NULL OR a.valid_through>now())

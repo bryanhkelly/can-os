@@ -15,10 +15,36 @@ import {
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
-import { noncreditPublishCommand, publishedNoncreditConsentHash } from "@/domain/noncredit-self-enrollment";
+import { noncreditPublishCommand, publishedNoncreditConsentHash, matchesPublishedNoncreditRelease } from "@/domain/noncredit-self-enrollment";
 
 type Executor = Pick<typeof db,"select">;
 type Provider = { organizationId: string; siteIds: string[] };
+type ReleaseTx=Parameters<Parameters<typeof db.transaction>[0]>[0];
+type ReleaseSelection={deploymentId:string;adoptionId:string;trainingVersionId:string;courseVersionId:string;
+  offeringVersionId:string;providerOrganizationId:string;siteId:string;deliveryMode:"independent"|"facilitated";
+  opensAt:string;closesAt:string;maxParticipants:number;consentVersion:string;consentText:string};
+
+async function lockNoncreditPublication(tx:ReleaseTx,organizationId:string,deploymentId:string){
+  // Use the existing shared lock namespace for both publication paths.
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"noncredit-multisite:"+organizationId+":"+deploymentId}))`);
+}
+async function findNoncreditPublicationRetry(tx:ReleaseTx,organizationId:string,data:ReleaseSelection){
+  const rows=await tx.select().from(noncreditSelfEnrollmentReleases).where(and(
+    eq(noncreditSelfEnrollmentReleases.registeringOrganizationId,organizationId),
+    eq(noncreditSelfEnrollmentReleases.deploymentId,data.deploymentId),
+    eq(noncreditSelfEnrollmentReleases.trainingVersionId,data.trainingVersionId),
+    eq(noncreditSelfEnrollmentReleases.adoptionId,data.adoptionId),
+    eq(noncreditSelfEnrollmentReleases.courseVersionId,data.courseVersionId),
+    eq(noncreditSelfEnrollmentReleases.siteId,data.siteId),
+    eq(noncreditSelfEnrollmentReleases.opensAt,new Date(data.opensAt)),
+  )).limit(2);
+  if(rows.length>1)throw new AuthorizationError("ambiguous existing registration window requires reconciliation");
+  const prior=rows[0];
+  if(!prior)return null;
+  if(!matchesPublishedNoncreditRelease(prior,data))
+    throw new AuthorizationError("existing registration window differs; close and create a new registration window");
+  return prior.id;
+}
 
 /** Provider's real, currently approved training/deployment/adoption combinations.
  * Listing is NOT the same as a public enrollment release. */
@@ -238,6 +264,7 @@ export const publishNoncreditSelfEnrollment = createServerFn({method:"POST"})
     if(new Date(data.closesAt)<=now)
       throw new AuthorizationError("Enrollment closing must be in the future");
     return db.transaction(async tx=>{
+      await lockNoncreditPublication(tx,provider.organizationId,data.deploymentId);
       const options=await listReleaseCandidates(provider,tx);
       const selected=options.find(row=>
         row.deploymentId===data.deploymentId &&
@@ -252,6 +279,11 @@ export const publishNoncreditSelfEnrollment = createServerFn({method:"POST"})
          !selected.digitalSiteOptions.some(option=>option.id===data.siteId))
         throw new AuthorizationError("authorized Site association for online release");
       await assertCurrentCanonicalStaffForMutation(tx,getRequest(),provider.actor);
+      if(Date.parse(data.closesAt)<=Date.now())throw new AuthorizationError("future registration closing");
+      const prior=await findNoncreditPublicationRetry(tx,provider.organizationId,{
+        ...data,offeringVersionId:selected.offeringVersionId,providerOrganizationId:selected.providerOrganizationId,
+      });
+      if(prior)return {releaseId:prior,alreadyPublished:true};
       const [release]=await tx.insert(noncreditSelfEnrollmentReleases).values({
         deploymentId:selected.deploymentId,adoptionId:selected.adoptionId,
         trainingVersionId:selected.trainingVersionId,courseVersionId:selected.courseVersionId,
@@ -281,7 +313,7 @@ export const publishNoncreditSelfEnrollment = createServerFn({method:"POST"})
         aggregateId:release.id,actorPersonId:provider.actor.actorPersonId!,
         payload:{organizationId:provider.organizationId,siteId:data.siteId},
       });
-      return {releaseId:release.id};
+      return {releaseId:release.id,alreadyPublished:false};
     });
   });
 
@@ -355,7 +387,7 @@ export const publishNoncreditAcrossAuthorizedSites=createServerFn({method:"POST"
       throw new AuthorizationError("unique authorized hosting Sites");
     return db.transaction(async tx=>{
       // Serialize equivalent launches from this operating organization.
-      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"noncredit-multisite:"+provider.organizationId+":"+data.deploymentId}))`);
+      await lockNoncreditPublication(tx,provider.organizationId,data.deploymentId);
       const candidates=await listReleaseCandidates(provider,tx);
       const selected=candidates.find(row=>
         row.deploymentId===data.deploymentId &&
@@ -368,25 +400,13 @@ export const publishNoncreditAcrossAuthorizedSites=createServerFn({method:"POST"
       await assertCurrentCanonicalStaffForMutation(tx,getRequest(),provider.actor);
       const released:{siteId:string;releaseId:string;alreadyPublished:boolean}[]=[];
       for(const siteId of ids){
-        const existing=await tx.select().from(noncreditSelfEnrollmentReleases)
-          .where(and(
-            eq(noncreditSelfEnrollmentReleases.registeringOrganizationId,provider.organizationId),
-            eq(noncreditSelfEnrollmentReleases.deploymentId,selected.deploymentId),
-            eq(noncreditSelfEnrollmentReleases.trainingVersionId,selected.trainingVersionId),
-            eq(noncreditSelfEnrollmentReleases.adoptionId,selected.adoptionId),
-            eq(noncreditSelfEnrollmentReleases.courseVersionId,selected.courseVersionId),
-            eq(noncreditSelfEnrollmentReleases.siteId,siteId),
-            eq(noncreditSelfEnrollmentReleases.opensAt,new Date(data.opensAt)),
-          )).limit(1);
-        if(existing.length){
-          const prior=existing[0]!;
-          if(prior.closesAt.getTime()!==new Date(data.closesAt).getTime()||
-            prior.maxParticipants!==data.maxParticipants||
-            prior.consentVersion!==data.consentVersion||
-            prior.consentText!==data.consentText||
-            prior.status!=="published")
-            throw new AuthorizationError("existing cohort differs; close and create a new registration window");
-          released.push({siteId,releaseId:prior.id,alreadyPublished:true});
+        if(Date.parse(data.closesAt)<=Date.now())throw new AuthorizationError("future registration closing");
+        const prior=await findNoncreditPublicationRetry(tx,provider.organizationId,{
+          ...data,siteId,deliveryMode:"facilitated",
+          offeringVersionId:selected.offeringVersionId,providerOrganizationId:selected.providerOrganizationId,
+        });
+        if(prior){
+          released.push({siteId,releaseId:prior,alreadyPublished:true});
           continue;
         }
         const [row]=await tx.insert(noncreditSelfEnrollmentReleases).values({

@@ -26,6 +26,21 @@ export const noncreditPublishCommand = z.object({
   consentText:z.string().trim().min(25).max(4000),
 }).strict().refine(x=>new Date(x.opensAt)<new Date(x.closesAt),{message:"Enrollment close must follow opening"});
 
+/** Shared retry contract for single-Site and multi-Site publication. The
+ * original terms and delivery mode must match; closed releases never reopen. */
+export function matchesPublishedNoncreditRelease(prior:{
+  status:string;deliveryMode:string;offeringVersionId:string;providerOrganizationId:string;
+  closesAt:Date;maxParticipants:number;consentVersion:string;consentText:string;
+},requested:{
+  deliveryMode:string;offeringVersionId:string;providerOrganizationId:string;
+  closesAt:string;maxParticipants:number;consentVersion:string;consentText:string;
+}):boolean{
+  return prior.status==="published"&&prior.deliveryMode===requested.deliveryMode&&
+    prior.offeringVersionId===requested.offeringVersionId&&prior.providerOrganizationId===requested.providerOrganizationId&&
+    prior.closesAt.getTime()===Date.parse(requested.closesAt)&&prior.maxParticipants===requested.maxParticipants&&
+    prior.consentVersion===requested.consentVersion&&prior.consentText===requested.consentText;
+}
+
 /** Consent is bound to the exact server published text and revision, not a
  * mutable browser/localStorage copy. */
 export function publishedNoncreditConsentHash(consentVersion:string,consentText:string) {
