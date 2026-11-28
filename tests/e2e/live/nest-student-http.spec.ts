@@ -51,12 +51,28 @@ test("independent standard HTTP client validates both students and rejects forei
        expect(learning.headers()["cache-control"]).toBe("no-store");
        const detail=await http.get(target+"/assignment-workspace");expect(detail.status()).toBe(200);
        expect(await detail.json()).toMatchObject({courseAttemptId:e.courseAttemptId,assignments:expect.any(Array)});
+       const instructionTarget=api+"/me/course-attempts/"+e.courseAttemptId;
+       const choices=await http.get(instructionTarget+"/instructors");expect(choices.status()).toBe(200);
+       const choiceShape=z.object({choices:z.array(z.object({trackVersionId:uuid})),blocked:z.array(z.object({trackVersionId:uuid})),selection:z.object({trackVersionId:uuid,revision:z.number().int().positive()}).nullable()}).parse(await choices.json());
+       const history=await http.get(instructionTarget+"/practice-history");expect(history.status()).toBe(200);
+       expect(Array.isArray(await history.json())).toBe(true);
+       expect((await http.get(instructionTarget+"/instructors?personId="+student.personId)).status()).toBe(400);
+       if(choiceShape.selection&&choiceShape.choices.some(c=>c.trackVersionId===choiceShape.selection?.trackVersionId)){
+         // A currently eligible selected presenter must open via the same course attempt.
+         const selected=await http.get(instructionTarget+"/instruction");expect(selected.status()).toBe(200);
+         expect(await selected.json()).toMatchObject({courseAttemptId:e.courseAttemptId,selection:{trackVersionId:choiceShape.selection.trackVersionId}});
+       }
      }
      for(const foreign of fixture.students.filter(s=>s.personId!==student.personId)){
        expect((await http.post(api+"/me/session/membership",{headers:{Origin:origin},data:{grantId:foreign.grantId}})).status()).toBe(403);
        expect((await qaSession(context,"nest")).activeGrantId).toBe(student.grantId);
        for(const e of foreign.enrollments){
          expect(own.classes.some(c=>c.classId===e.classId||c.enrollmentId===e.classEnrollmentId)).toBe(false);
+         const foreignInstruction=api+"/me/course-attempts/"+e.courseAttemptId;
+         for(const resource of ["instructors","instruction","practice-history"]){
+           expect((await http.get(foreignInstruction+"/"+resource)).status()).toBe(403);
+         }
+         expect((await http.post(foreignInstruction+"/instructor-selections",{headers:{Origin:origin},data:{requestId:e.courseAttemptId,trackVersionId:e.courseAttemptId,expectedRevision:0}})).status()).toBe(403);
          for(const resource of ["resume","assignments","learning","assignment-workspace","historical-work"]){
            const denied=await http.get(api+"/me/class-enrollments/"+e.classEnrollmentId+"/"+resource);
            expect(denied.status()).toBe(403);

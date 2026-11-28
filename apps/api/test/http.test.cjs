@@ -689,12 +689,13 @@ test('learning module resolves the shared identity provider without a duplicate 
  const {LearningController}=require('../dist/learning.controller');
  const {RoomController}=require('../dist/room.controller');
  const {ClassroomController}=require('../dist/classroom.controller');
+ const {InstructionalController}=require('../dist/instructional.controller');
  const {app}=await createApi(readConfig({}));
  try{
   const shared=app.select(IdentityModule).get(CanonicalIdentityService,{strict:true});
   assert.equal(app.get(CanonicalIdentityService),shared);
   const module=app.select(LearningModule);
-  for(const controller of [LearningController,RoomController,ClassroomController])
+  for(const controller of [LearningController,RoomController,ClassroomController,InstructionalController])
    assert.equal(module.get(controller,{strict:true}).identity,shared);
  }finally{await app.close();}
 });
@@ -730,4 +731,20 @@ test('recorded instruction wire contracts reject caller-selected identity, inval
  const row={id,courseUnitId:id,trackVersionId:id,policyVersionId:id,scoreNumeric:null,recordedAt:'2026-11-28T00:00:00.000Z',trackTitle:null,courseUnitTitle:null,answers:[{promptKey:'a',promptText:'Question',response:'Answer'}]};
  assert.equal(output.history.safeParse([row]).success,true);
  assert.equal(output.history.safeParse([{...row,answers:[{...row.answers[0],answerKey:'private'}]}]).success,false);
+});
+
+test('facilitator workspace and activity aggregates have protected contracts',async()=>{
+ await withServer('0',async(url,document)=>{
+  const id='00000000-0000-4000-8000-000000000001';
+  for(const route of ['/api/v1/me/facilitated-classroom-workspace','/api/v1/classrooms/{facilitatedSessionId}/host-activity']){
+   assert.ok(document.paths[route].get.security);
+   const response=await fetch(url+route.replace('{facilitatedSessionId}',id),{headers:{'x-role':'facilitator','x-person-id':id}});
+   assert.equal(response.status,401);
+  }
+ });
+ const {hostResults}=require('../dist/room.contracts');
+ const value={roomState:'live',releases:[],pairedCount:0,activeDevicesEstimate:0,partial:false,labels:{device:'Not attendance',response:'Not grades'}};
+ assert.equal(hostResults.activity.safeParse(value).success,true);
+ assert.equal(hostResults.activity.safeParse({...value,roster:[]}).success,false);
+ assert.equal(hostResults.activity.safeParse({...value,rawAnswers:[]}).success,false);
 });
