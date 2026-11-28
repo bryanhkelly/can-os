@@ -10,6 +10,7 @@ import { WorkspaceShell, WorkspacePanel, WorkspaceNotice } from "@/components/wo
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { safeAccessReturnTo } from "@/domain/access-navigation";
 import { useHydrated } from "@/lib/use-hydrated";
+import { registerAccount } from "@/lib/api/browser-access";
 
 export const Route = createFileRoute("/access/register")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -35,20 +36,17 @@ function RegisterPersonalAccount() {
   const hydrated = useHydrated();
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy || privateAccessCode) return;
+    if (busy || privateAccessCode || !adultConfirmed) return;
     setBusy(true); setMessage(""); setMessageTone("info");
     try {
-      const response = await fetch("/access/register", {
-        method: "POST", credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ firstName, lastName, email, adultConfirmed,
-          ...(returnTo ? { returnTo } : {}) }),
+      const { response, data: result } = await registerAccount({
+        firstName, lastName, email, adultConfirmed: true,
+        ...(returnTo ? { returnTo } : {}),
       });
       if (response.status === 429) { setMessageTone("attention"); setMessage("Too many requests. Please try again later."); }
       else if (response.status === 503) { setMessageTone("danger"); setMessage("Account creation is temporarily unavailable."); }
-      else if (!response.ok) { setMessageTone("attention"); setMessage("Please check your name and email address."); }
+      else if (!response.ok || !result?.accepted) { setMessageTone("attention"); setMessage("Please check your name and email address."); }
       else {
-        const result=await response.json() as {privateAccessCode?:string};
         setPrivateAccessCode(result.privateAccessCode??null);
         setMessage(result.privateAccessCode ? "Your demo account is ready. Sign in with 000000." : isDemoAccountEmail(email) ? "If you already have an eligible account, use your existing access credential to sign in." : "If this address is eligible, we have requested a secure email link. Open it to complete account creation or sign in.");
       }
