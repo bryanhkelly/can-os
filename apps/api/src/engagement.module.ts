@@ -7,9 +7,11 @@ import {SenderAdminController} from './sender-admin.controller';
 import {CampaignController} from './campaign.controller';
 import {GoLinksController} from './go-links.controller';
 
+import {PublicEngagementController} from './public-engagement.controller';
+
 /** Owns the engagement HTTP surface; shares the single configured canonical identity provider. */
 @Module({
   imports: [CanonicalIdentityModule],
-  controllers: [MarketingArtifactsController, MarketingPackagesController, EngagementController, SenderAdminController, CampaignController, GoLinksController],
+  controllers: [PublicEngagementController, MarketingArtifactsController, MarketingPackagesController, EngagementController, SenderAdminController, CampaignController, GoLinksController],
 })
 export class EngagementModule {}
