@@ -6,7 +6,7 @@ const read=(path:string)=>readFileSync(path,"utf8");
 describe("native Class enrollment method exposure",()=>{
   const publisher=read("src/components/learning/NativeClassManager.tsx");
   const roster=read("src/routes/class_.$classId.tsx");
-  const invitation=read("src/modules/classes/native-class-invitations.functions.ts");
+  const invitation=read("src/modules/classes/native-class-invitations.server.ts");
   const enrollment=read("src/modules/classes/native-class-enrollment.functions.ts");
   const policy=read("src/domain/native-class-lifecycle.ts");
 
