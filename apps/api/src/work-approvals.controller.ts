@@ -182,4 +182,66 @@ export class WorkApprovalsController{
   const value=await this.identity.runWorkflow(()=>workflow.revokeCanonicalCredentialIssuerApproval(input));
   return c.results.revoked.parse(JSON.parse(JSON.stringify(value)));
  }
+ @Get('jurisdiction-profiles/reviews')
+ @WorkOperation('GET')
+ @ApiOperation({operationId:'listJurisdictionProfileReviews',summary:'list jurisdiction profile reviews'})
+ 
+ @ApiOkResponse({schema:c.jurisdictionDocs.reviews})
+ async listJurisdictionProfileReviews(@Req() req:FastifyRequest,@Query() query:unknown){
+  const workflow=verifiedWorkflow(req);
+  const input={...validated(c.queries.none,query)};
+  const value=await this.identity.runWorkflow(()=>workflow.listJurisdictionProfileReviews(input));
+  return c.jurisdictionResults.reviews.parse(JSON.parse(JSON.stringify(value)));
+ }
+
+ @Get('jurisdiction-profiles/guidance')
+ @WorkOperation('GET')
+ @ApiOperation({operationId:'listPublishedJurisdictionGuidance',summary:'list published jurisdiction guidance'})
+ 
+ @ApiOkResponse({schema:c.jurisdictionDocs.guidance})
+ async listPublishedJurisdictionGuidance(@Req() req:FastifyRequest,@Query() query:unknown){
+  const workflow=verifiedWorkflow(req);
+  const input={...validated(c.queries.none,query)};
+  const value=await this.identity.runWorkflow(()=>workflow.listPublishedJurisdictionGuidance(input));
+  return c.jurisdictionResults.guidance.parse(JSON.parse(JSON.stringify(value)));
+ }
+
+ @Post('jurisdiction-profiles/:id/review')
+ @WorkOperation('POST')
+ @ApiOperation({operationId:'saveJurisdictionProfileReview',summary:'save jurisdiction profile review'})
+ @ApiParam({name:'id',type:String,format:'uuid',required:true})
+ @ApiBody({schema:c.jurisdictionBodyDocs.review})
+ @ApiOkResponse({schema:c.jurisdictionDocs.saved})
+ async saveJurisdictionProfileReview(@Req() req:FastifyRequest,@Param() params:unknown,@Body() body:unknown){
+  const workflow=verifiedWorkflow(req);
+  const input={...validated(c.params.id,params)},...validated(c.jurisdictionBodies.review,body)};
+  const value=await this.identity.runWorkflow(()=>workflow.saveJurisdictionProfileReview(input));
+  return c.jurisdictionResults.saved.parse(JSON.parse(JSON.stringify(value)));
+ }
+
+ @Post('jurisdiction-profiles/:id/verification')
+ @WorkOperation('POST')
+ @ApiOperation({operationId:'verifyJurisdictionProfileReview',summary:'verify jurisdiction profile review'})
+ @ApiParam({name:'id',type:String,format:'uuid',required:true})
+ @ApiBody({schema:c.jurisdictionBodyDocs.verify})
+ @ApiOkResponse({schema:c.jurisdictionDocs.saved})
+ async verifyJurisdictionProfileReview(@Req() req:FastifyRequest,@Param() params:unknown,@Body() body:unknown){
+  const workflow=verifiedWorkflow(req);
+  const input={...validated(c.params.id,params)},...validated(c.jurisdictionBodies.verify,body)};
+  const value=await this.identity.runWorkflow(()=>workflow.verifyJurisdictionProfileReview(input));
+  return c.jurisdictionResults.saved.parse(JSON.parse(JSON.stringify(value)));
+ }
+
+ @Post('jurisdiction-profiles/:id/publication')
+ @WorkOperation('POST')
+ @ApiOperation({operationId:'publishJurisdictionProfile',summary:'publish jurisdiction profile'})
+ @ApiParam({name:'id',type:String,format:'uuid',required:true})
+ @ApiBody({schema:c.jurisdictionBodyDocs.publish})
+ @ApiOkResponse({schema:c.jurisdictionDocs.saved})
+ async publishJurisdictionProfile(@Req() req:FastifyRequest,@Param() params:unknown,@Body() body:unknown){
+  const workflow=verifiedWorkflow(req);
+  const input={...validated(c.params.id,params)},...validated(c.jurisdictionBodies.publish,body)};
+  const value=await this.identity.runWorkflow(()=>workflow.publishJurisdictionProfile(input));
+  return c.jurisdictionResults.saved.parse(JSON.parse(JSON.stringify(value)));
+ }
 }
