@@ -726,3 +726,16 @@ test('native Class assessment and evidence APIs are governed and reject caller-o
  assert.equal(c.nativeFinalize.safeParse({classEnrollmentId:id,assessmentAttemptId:id,pointsEarned:100}).success,false);
  assert.equal(c.nativePending.safeParse({pending:[{classEnrollmentId:id,assessmentAttemptId:id,learnerName:'Learner',submittedAt:null,answers:[]}],partial:false}).success,false);
 });
+
+test('course evidence is a private read and excludes raw survey responses or grading keys',async()=>{
+ await withServer('0',async(url,document)=>{
+  const route='/api/v1/me/course-evidence';
+  assert.ok(document.paths[route].get.security);
+  assert.equal((await fetch(url+route,{headers:{'x-role':'learner'}})).status,401);
+ });
+ const c=require('../dist/credentials.contracts'),id='00000000-0000-4000-8000-000000000001';
+ assert.equal(c.courseEvidenceQuery.safeParse({courseAttemptId:id,personId:id}).success,false);
+ const data={courseAttemptId:id,observations:[],assessments:[],surveys:[],completion:null,caution:'Estimated interaction only'};
+ assert.equal(c.courseEvidenceResult.safeParse(data).success,true);
+ assert.equal(c.courseEvidenceResult.safeParse({...data,surveys:[{responseId:id,campaignId:id,submittedAt:'2026-11-28T00:00:00Z',answers:[]}]}).success,false);
+});

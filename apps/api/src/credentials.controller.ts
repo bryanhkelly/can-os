@@ -102,4 +102,11 @@ export class CredentialsController {
  @ApiQuery({name:'classEnrollmentId',schema:{type:'string',format:'uuid'},required:true})
  @ApiOkResponse({schema:c.nativeDocs.evidence})
  async getNativeClassCanonicalEvidence(@Req() req:FastifyRequest,@Query() query:unknown){const workflow=verifiedWorkflow(req),input=validated(c.nativeEnrollment,query);return c.nativeEvidence.parse(await this.identity.runWorkflow(()=>workflow.getNativeClassCanonicalEvidence(input)));}
+
+ @Get('me/course-evidence')
+ @LearnerRead()
+ @ApiOperation({operationId:'getCanonicalCourseEvidence',summary:'Private learner-owned observations and current canonical results, excluding survey answers'})
+ @ApiQuery({name:'courseAttemptId',schema:{type:'string',format:'uuid'},required:true})
+ @ApiOkResponse({schema:c.courseEvidenceDoc})
+ async getCanonicalCourseEvidence(@Req() req:FastifyRequest,@Query() query:unknown){const workflow=verifiedWorkflow(req),input=validated(c.courseEvidenceQuery,query);return c.courseEvidenceResult.parse(await this.identity.runWorkflow(()=>workflow.getCanonicalCourseEvidence(input)));}
 }

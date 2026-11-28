@@ -39,3 +39,10 @@ export async function checkNativeAssessmentContract(client:BecomunaBrowserApi,id
  // @ts-expect-error scoring is server-authoritative
  await client.POST('/api/v1/class-knowledge-check-finalizations',{body:{classEnrollmentId:id,assessmentAttemptId:id,pointsEarned:100}});
 }
+
+export async function checkCourseEvidenceContract(client:BecomunaBrowserApi,id:string){
+ const result=await client.GET('/api/v1/me/course-evidence',{params:{query:{courseAttemptId:id}}});
+ if(result.data){const evidenceId:string=result.data.courseAttemptId;void evidenceId;}
+ // @ts-expect-error identity is inferred from verified session
+ await client.GET('/api/v1/me/course-evidence',{params:{query:{courseAttemptId:id,personId:id}}});
+}
