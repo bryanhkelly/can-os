@@ -4,6 +4,10 @@
   "type": "module",
   "scripts": {
     "dev": "node scripts/dev.mjs",
+    "api:sdk:prepare": "npm --prefix apps/api run sdk:generate && npm --prefix apps/api run sdk:check",
+    "dev:api-first": "npm run api:sdk:prepare && npm run dev",
+    "build:api-first": "npm run api:sdk:prepare && npm run build",
+    "test:api-first:frontend": "node --test scripts/architecture/frontend-sdk-cutover.test.mjs apps/api/sdk/server-read-transport.test.mjs",
     "build": "vite build",
     "assets:prepare": "node scripts/prepare-template-images.mjs",
     "prebuild": "npm run db:check:journal && npm run verify:reporting:sql && npm run check:build-source-syntax && npm run check:local-import-exports && npm run check:class-architecture && npm run check:component-boundaries && npm run design:source && npm run check:route-identifiers && npm run assets:prepare",

@@ -43,7 +43,7 @@ describe("shared CAN OS account access in Launch Studio V6.1",()=>{
     expect(topbar).toContain("<WorkspaceAccountTrigger");
     expect(workspace).toContain("changeSession(signOutOfWorkspace)");
     expect(standalone).toContain("await signOutOfWorkspace()");
-    expect(signout).toContain('fetch("/access/logout"');
+    expect(signout).toContain("await logoutApiSession()");
     expect(signout).toContain("clearLearnerBrowserState()");
     expect(signout).toContain('window.location.assign("/access")');
   });

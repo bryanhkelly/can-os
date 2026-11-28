@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { ActionFooter, EmptyState, WorkspaceNotice } from "@/components/workspace";
 import { ClassVideoPlayer } from "@/components/learning/ClassVideoPlayer";
-import { markNativeClassLessonComplete } from "@/modules/classes/native-class-learning.functions";
+import { completeLearnerLesson } from "@/lib/api/browser-learning";
 import { normalizeClientError } from "@/lib/client-error";
 
 type Lesson={
@@ -32,9 +32,7 @@ export function NativeClassLessonContentPanel({classEnrollmentId,lessons,selecte
     if(working||!selected)return;
     setWorking(true);setNotice("");setError("");
     try{
-      const result=await markNativeClassLessonComplete({
-        data:{classEnrollmentId,lessonId:selected.lessonId},
-      });
+      const result=await completeLearnerLesson(classEnrollmentId,selected.lessonId);
       setNotice(result.alreadyCompleted
         ?"You already marked this lesson complete."
         :"Lesson milestone saved to your Course Attempt.");

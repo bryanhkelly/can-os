@@ -6,11 +6,9 @@ vi.mock("@tanstack/react-router", () => ({
   useRouter: () => ({ invalidate: vi.fn() }),
   useBlocker: vi.fn(),
 }));
-vi.mock("@/modules/programs/site-programs-audiences-v61.functions", () => ({
-  saveSiteProgramsAudiencesV61: vi.fn(),
-}));
-vi.mock("@/modules/blueprints/blueprint-reference-catalog.functions", () => ({
-  exploreBlueprintReferenceCatalog: vi.fn().mockResolvedValue([]),
+vi.mock("@/lib/api/browser-site-planning", () => ({
+  saveSiteProgramsAudiences: vi.fn(),
+  readProgramReferences: vi.fn().mockResolvedValue([]),
 }));
 
 import { EstablishProgramsAudiencesV61 } from "@/components/launch-studio/EstablishProgramsAudiencesV61";
@@ -62,7 +60,9 @@ describe("V6.1 Programs & Audiences route and screen", () => {
 
   it("keeps all Site intent commands scoped, revision-aware and private", () => {
     const route = read("src/routes/launch.site.tsx");
-    const server = read("src/modules/programs/site-programs-audiences-v61.functions.ts");
+    const server = read("src/modules/programs/site-programs-audiences-v61.server.ts");
+    const transport = read("src/modules/programs/site-programs-audiences-v61.functions.ts");
+    const sdk = read("src/lib/api/browser-site-planning.ts");
     const ui = read("src/components/launch-studio/EstablishProgramsAudiencesV61.tsx");
     expect(route).toContain('deps.module === "programs-audiences"');
     expect(route).toContain("readSiteProgramsAudiencesV61({ data: { siteId: site.id } })");
@@ -80,13 +80,15 @@ describe("V6.1 Programs & Audiences route and screen", () => {
     expect(server).not.toContain("if (selectedPrograms.length)");
     expect(server.indexOf("const addedCodes")).toBeGreaterThan(
       server.indexOf("site.updatedAt.toISOString() !== data.expectedRevision"));
-    expect(ui).toContain("exploreBlueprintReferenceCatalog");
+    expect(ui).toContain("readProgramReferences(siteId, controller.signal)");
+    expect(ui).toContain("saveSiteProgramsAudiences(siteId,");
+    expect(sdk).toContain('POST("/api/v1/sites/{siteId}/programs-audiences"');
     expect(ui).toContain("Published Program ideas");
     expect(ui).toContain("programCodes");
     expect(server).toContain('assertSiteSetupScope(actor, site, "program.read")');
     expect(server).toContain('.for("update")');
     expect(server).toContain("data.expectedRevision");
-    expect(server).toContain('setResponseHeader("Cache-Control", "private, no-store")');
+    expect(transport).toContain('setResponseHeader("Cache-Control","private, no-store")');
     expect(server).not.toContain("tx.insert(programs)");
     expect(server).not.toContain("tx.insert(classes)");
     expect(ui).toContain("useLaunchUnsavedChanges");
