@@ -7,6 +7,7 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
 import { useHydrated } from "@/lib/use-hydrated";
+import { requestAccessLink } from "@/lib/api/browser-access";
 import {clearLearnerBrowserState} from "@/domain/session-client";
 import { BuildDiagnosticsFooter } from "@/components/shell/BuildDiagnosticsFooter";
 export const Route=createFileRoute("/access/")({
@@ -37,10 +38,10 @@ function AccessPage(){
   if(isDemoEmail){clearLearnerBrowserState();setBusy(true);return;}
   e.preventDefault();setBusy(true);setStatus({text:"",isError:false});
   try{
-   const response=await fetch("/access/request",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,returnTo:search.returnTo})});
+   const {response,data}=await requestAccessLink({email,returnTo:search.returnTo});
    if(response.status===429){setStatus({text:"Too many sign-in requests right now. Please try again shortly.",isError:true});return;}
    if(response.status===503){setStatus({text:"Sign-in is temporarily unavailable. Please try again shortly.",isError:true});return;}
-   if(!response.ok){setStatus({text:"Unable to send a link. Please check your email address or try again.",isError:true});return;}
+   if(!response.ok||!data?.accepted){setStatus({text:"Unable to send a link. Please check your email address or try again.",isError:true});return;}
    setStatus({text:"If this email is eligible, we will attempt to send a secure sign-in link. If it does not arrive, check your junk folder and request another link after one minute. Your unfinished personal registration will be preserved.",isError:false});
   }catch{setStatus({text:"Sign-in is temporarily unavailable. Please try again shortly.",isError:true});}finally{setBusy(false);}
  }
