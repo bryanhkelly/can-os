@@ -51,3 +51,15 @@ test('unmarked operations fail closed', () => {
   PublicOperation()(Controller.prototype, 'method', { value: handler });
   assert.equal(guard.canActivate(context), true);
 });
+
+test('canonical reads deny anonymous callers and do not trust forged identity headers', async () => {
+  await withServer('0', async (url, document) => {
+    for (const route of ['/api/v1/me','/api/v1/me/student/classes']) {
+      const response = await fetch(url + route, {headers:{'x-person-id':'forged','x-role':'platform_owner'}});
+      assert.equal(response.status,401);
+      assert.equal((await response.json()).code,'AUTHENTICATION_REQUIRED');
+    }
+    assert.ok(document.paths['/api/v1/me'].get.security);
+    assert.ok(document.paths['/api/v1/me/student/classes'].get.security);
+  });
+});

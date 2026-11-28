@@ -3,6 +3,7 @@ import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { healthOpenApiSchema, healthSchema, type Health } from './contracts';
 import { DefaultDenyGuard, PublicOperation } from './security';
+import { IdentityController, CanonicalIdentityService } from './identity';
 import { ProblemFilter } from './problem.filter';
 
 @ApiTags('Platform')
@@ -16,8 +17,9 @@ export class HealthController {
 }
 
 @Module({
-  controllers: [HealthController],
+  controllers: [HealthController, IdentityController],
   providers: [
+    CanonicalIdentityService,
     { provide: APP_GUARD, useClass: DefaultDenyGuard },
     { provide: APP_FILTER, useClass: ProblemFilter },
   ],

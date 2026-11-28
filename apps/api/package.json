@@ -8,7 +8,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "node dist/main.js",
-    "test": "npm run build && node --test test/http.test.cjs"
+    "test": "npm run build && node --test test/http.test.cjs",
+    "build:canonical": "node scripts/build-canonical.mjs"
   },
   "dependencies": {
     "@nestjs/common": "11.2.12",
