@@ -19,7 +19,18 @@ const releaseAsset=z.object({assetVersionId:uuid,usageKind:z.enum(["required_ins
 const releasePolicy=z.object({courseVersionId:uuid,minimumApprovedPrimaryTracks:z.number().int().min(1).max(10),
   completeLessonCoverageRequired:z.literal(true),independentAcademicReviewRequired:z.literal(true),
   rightsClearanceRequired:z.literal(true),accessibilityReviewRequired:z.literal(true)}).strict();
+const reviewKind=z.enum(["academic","rights","accessibility","coverage","safety"]);
+const reviewDecision=z.object({reviewKind,decision:z.enum(["approved","rejected"]),
+  evidenceVersionId:uuid.nullable(),rationale:z.string().trim().min(10).max(2000)}).strict()
+  .refine(d=>d.decision!=="approved"||d.evidenceVersionId!==null,"Approval requires independently verified evidence");
+const reportSite=z.object({manager:actor,classId:uuid,siteId:uuid,
+  sessionIds:z.array(uuid).length(4),expectedDistinctPeople:z.number().int().min(2).max(20),
+  expectedPresentOccurrences:z.number().int().min(1).max(80)}).strict();
 const scenario=z.discriminatedUnion("stage",[
+  z.object({stage:z.literal("review-release"),reviewer:actor,author:actor,offering:manifest,
+    decisions:z.array(reviewDecision).min(1).max(5)}).strict(),
+  z.object({stage:z.literal("cohort-report"),sites:z.array(reportSite).length(2),
+    from:z.string().regex(/^\d{4}-\d{2}-\d{2}$/),to:z.string().regex(/^\d{4}-\d{2}-\d{2}$/)}).strict(),
   z.object({stage:z.literal("configure-release"),reviewer:actor,offeringVersionId:uuid,
     expectedManuscriptHash:hash,expectedPolicyRevision:hash,requirements:z.array(releasePolicy).min(1).max(50),
     reviewEvidenceVersionId:uuid,rationale:z.string().min(10).max(2000)}).strict(),
@@ -80,7 +91,101 @@ test("governed pilot API stage",async({browser},info)=>{
   expect(identity).toEqual({project:"sweet-hall-62441909",branch});
   let evidence:Record<string,unknown>={stage:scenario.stage,revision:process.env.CAN_RELEASE_SOURCE_SHA};
   try{
-    if(scenario.stage==="configure-release"||scenario.stage==="submit-release"){
+    if(scenario.stage==="review-release"){
+      const {reviewer,author,offering,decisions}=scenario;
+      expect(reviewer.organizationId).toBe(author.organizationId);
+      expect(reviewer.email).not.toBe(author.email);
+      expect(new Set(decisions.map(d=>d.reviewKind)).size).toBe(decisions.length);
+      await authorizeFixture(author);
+      const [submitted]=await sql`SELECT count(*)::int AS count FROM public.content_publication_manifests m
+        JOIN public.offering_versions v ON v.id=m.offering_version_id
+        JOIN public.offerings o ON o.id=v.offering_id
+        JOIN public.access_accounts a ON a.person_id=m.created_by_person_id
+        WHERE m.id=${offering.manifestId}::uuid AND v.id=${offering.offeringVersionId}::uuid
+          AND m.manifest_hash=${offering.expectedHash} AND m.manifest_status='draft'
+          AND v.lifecycle='draft' AND o.publisher_organization_id=${author.organizationId}::uuid
+          AND a.email_normalized=${author.email}`;
+      expect(submitted?.count).toBe(1);
+      const authorPage=await openActor(browser,author,contexts);
+      const reviewerPage=await openActor(browser,reviewer,contexts);
+      await expect(rpc(authorPage,"release","getNativeOfferingReviewContent",offering)).rejects.toThrow();
+      const content=await rpc<{reviewedManifestHash:string;offeringVersionId:string}>(
+        reviewerPage,"release","getNativeOfferingReviewContent",offering);
+      expect(content).toMatchObject({reviewedManifestHash:offering.expectedHash,offeringVersionId:offering.offeringVersionId});
+      // The private manifest must contain actual independently made decisions
+      // for this exact reviewed snapshot. Do not derive or invent approvals.
+      for(const decision of decisions){
+        const [prior]=await sql`SELECT decision,evidence_version_id::text AS evidence,
+          (reviewer_person_id=(SELECT person_id FROM public.access_accounts WHERE email_normalized=${reviewer.email})) AS same_reviewer
+          FROM public.content_manifest_review_decisions WHERE manifest_id=${offering.manifestId}::uuid
+            AND review_kind=${decision.reviewKind} ORDER BY decision_order DESC LIMIT 1`;
+        if(prior?.decision===decision.decision&&prior.evidence===decision.evidenceVersionId&&prior.same_reviewer)continue;
+        expect(await rpc(reviewerPage,"release","decideNativeOfferingRelease",{...offering,...decision}))
+          .toMatchObject({manifestId:offering.manifestId,reviewKind:decision.reviewKind,decision:decision.decision});
+        const [current]=await sql`SELECT decision,evidence_version_id::text AS evidence,
+          (reviewer_person_id=(SELECT person_id FROM public.access_accounts WHERE email_normalized=${reviewer.email})) AS same_reviewer
+          FROM public.content_manifest_review_decisions WHERE manifest_id=${offering.manifestId}::uuid
+            AND review_kind=${decision.reviewKind} ORDER BY decision_order DESC LIMIT 1`;
+        expect(current).toEqual({decision:decision.decision,evidence:decision.evidenceVersionId,same_reviewer:true});
+      }
+      evidence={...evidence,reviewedKinds:decisions.length,approvedKinds:decisions.filter(d=>d.decision==="approved").length,
+        offeringPublished:false};
+    }else if(scenario.stage==="cohort-report"){
+      const {sites,from,to}=scenario;
+      expect(new Set(sites.map(s=>s.siteId)).size).toBe(2);
+      expect(new Set(sites.map(s=>s.classId)).size).toBe(2);
+      expect(new Set(sites.map(s=>s.manager.organizationId)).size).toBe(2);
+      expect(new Set(sites.flatMap(s=>s.sessionIds)).size).toBe(8);
+      const pages:Page[]=[];
+      for(const site of sites){
+        await classScope(site.classId,site.siteId,site.manager.organizationId);
+        pages.push(await openActor(browser,site.manager,contexts));
+      }
+      const counts:{sessions:number;attendance:number;people:number}[]=[];
+      for(const [i,site] of sites.entries()){
+        const input={classId:site.classId,from,to};
+        const page=pages[i]!,foreign=pages[1-i]!;
+        await expect(rpc(foreign,"report","getNativeClassReport",input)).rejects.toThrow();
+        const [persisted]=await sql`WITH rooms AS (
+          SELECT cs.id,r.id AS room_id FROM public.class_sessions cs
+          JOIN public.facilitated_classroom_plans p ON p.id=cs.classroom_plan_id
+          JOIN public.facilitated_learning_sessions r ON r.id=p.facilitated_session_id
+          JOIN public.delivery_sessions d ON d.id=cs.delivery_session_id
+          WHERE cs.class_id=${site.classId}::uuid AND p.site_id=${site.siteId}::uuid
+            AND r.site_id=${site.siteId}::uuid AND r.host_organization_id=${site.manager.organizationId}::uuid
+            AND r.state='ended' AND r.ended_at IS NOT NULL
+            AND cs.id=ANY(${site.sessionIds}::uuid[]) AND d.starts_at>=${from}::date AND d.starts_at<${to}::date
+            AND d.starts_at<=now()
+        ), latest AS (
+          SELECT DISTINCT ON (a.facilitated_session_id,a.course_attempt_id)
+            a.status,a.course_attempt_id,e.learner_person_id
+          FROM public.facilitated_room_attendance_assertions a
+          JOIN rooms r ON r.room_id=a.facilitated_session_id
+          JOIN public.learner_course_attempts ca ON ca.id=a.course_attempt_id
+          JOIN public.class_enrollments e ON e.id=ca.class_enrollment_id AND e.class_id=${site.classId}::uuid
+          WHERE a.asserted_at<=now()
+          ORDER BY a.facilitated_session_id,a.course_attempt_id,a.asserted_at DESC,a.id DESC
+        ) SELECT (SELECT count(*)::int FROM rooms) AS sessions,
+          (SELECT count(*)::int FROM latest WHERE status='present') AS attendance,
+          (SELECT count(DISTINCT learner_person_id)::int FROM latest WHERE status='present') AS attendees,
+          (SELECT count(DISTINCT learner_person_id)::int FROM public.class_enrollments
+             WHERE class_id=${site.classId}::uuid AND enrolled_at>=${from}::date AND enrolled_at<${to}::date
+             AND enrolled_at<=now()) AS people`;
+        expect(persisted).toMatchObject({sessions:4,attendance:site.expectedPresentOccurrences,people:site.expectedDistinctPeople});
+        const report=await rpc<{visibility:string;publicationApproved:boolean;metrics:Record<string,number|null>}>(
+          page,"report","getNativeClassReport",input);
+        expect(report).toMatchObject({visibility:"authorized_provider_private",publicationApproved:false});
+        expect(report.metrics).toMatchObject({sessionsScheduled:4,sessionsDelivered:4,
+          verifiedAttendance:persisted?.attendance,verifiedAttendees:persisted?.attendees,uniquePeople:persisted?.people});
+        counts.push({sessions:Number(persisted?.sessions),attendance:Number(persisted?.attendance),people:Number(persisted?.people)});
+      }
+      // Deliberately no sum of Site-level unique people: a learner may attend
+      // both Sites. These are provider-private acceptance counts, not HQ impact.
+      evidence={...evidence,sites:2,endedSessions:counts.reduce((n,x)=>n+x.sessions,0),
+        verifiedAttendanceOccurrences:counts.reduce((n,x)=>n+x.attendance,0),
+        distinctPeopleBySite:counts.map(x=>x.people),crossSiteReportDenials:2,
+        nationalOutcomesVerified:false};
+    }else if(scenario.stage==="configure-release"||scenario.stage==="submit-release"){
       const {offeringVersionId,expectedManuscriptHash}=scenario;
       const acting=scenario.stage==="configure-release"?scenario.reviewer:scenario.author;
       const [owned]=await sql`SELECT count(*)::int AS count FROM public.offering_versions v
