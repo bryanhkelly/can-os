@@ -31,3 +31,22 @@ export async function checkCampaignContract(client:BecomunaBrowserApi,id:string)
  // @ts-expect-error direct and saved-list recipients cannot be mixed
  await campaigns.queueEngagementCampaign({data:{...scope,listId:id,raw:'test@example.test',consentSource:'Documented permission',attested:true,requestId:id,scheduledAt:new Date().toISOString(),confirmed:true}});
 }
+
+import {createEngagementApi} from './engagement-api';
+export async function checkEngagementContract(client:BecomunaBrowserApi,id:string){
+ const api=createEngagementApi(client);
+ const links=await api.listSiteGoLinksPage({data:{siteId:id,limit:20}});
+ const cursor:string|null=links.nextCursor;void cursor;
+ await api.createSiteGoLink({data:{siteId:id,requestId:id,destination:{kind:'information',journeyId:'start-a-school'}}});
+ await api.listOwnerEngagementDefinitions({data:{owner:{kind:'organization',organizationId:id}}});
+ await api.readSenderAdministration({data:{organizationId:null}});
+ await api.saveSiteMarketingPackageV61({data:{siteId:id,packageId:id,expectedRevision:1,title:'Pilot',content:{purpose:'site-announcement',audiences:['families'],geography:'',headline:'Pilot',message:'Pilot invitation',callToAction:'Register',formats:['email']}}});
+ // @ts-expect-error new Go Link requires stable request identity
+ await api.createSiteGoLink({data:{siteId:id,destination:{kind:'information',journeyId:'start-a-school'}}});
+ // @ts-expect-error a preview snapshot cannot be issued through generic Go Link creation
+ await api.createSiteGoLink({data:{siteId:id,requestId:id,destination:{kind:'website-preview',snapshotId:id,snapshotDigest:'x',sourceRevision:1,brandVersionId:id}}});
+ // @ts-expect-error organization owner requires an exact organization
+ await api.listOwnerEngagementDefinitions({data:{owner:{kind:'organization'}}});
+ // @ts-expect-error marketing updates require expected revision
+ await api.deleteSiteMarketingPackageV61({data:{siteId:id,packageId:id}});
+}
