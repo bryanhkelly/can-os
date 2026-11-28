@@ -1,4 +1,4 @@
-import { issuePrivateAccountCredential } from "./private-account-credential.server";
+import { LOCAL_DEMO_ACCESS_CODE } from "@/domain/local-demo-access";
 import { identityEmailDomain } from "@/domain/domain-classification";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -151,7 +151,6 @@ export async function provisionDemoSiteSignup(input: unknown) {
   const domain = data.email.split("@")[1]!;
   if (!isDemoAccountEmail(data.email) || !isDemoSchoolDomain(domain) || domain === DEMO_ACCOUNT_DOMAIN)
     throw new DomainError("FORBIDDEN");
-  const {privateAccessCode,privateAccessCodeHash}=issuePrivateAccountCredential();
   return db.transaction(async tx => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"demo-founder:" + domain}))`);
     // Canonical Organization identity may predate the credential registry.
@@ -166,7 +165,7 @@ export async function provisionDemoSiteSignup(input: unknown) {
       .where(eq(accessAccounts.emailNormalized,data.email)).limit(1);
     if (occupied) throw new DomainError("CONFLICT");
     const now = new Date();
-    const [account] = await tx.insert(accessAccounts).values({emailNormalized:data.email,privateAccessCodeHash})
+    const [account] = await tx.insert(accessAccounts).values({emailNormalized:data.email})
       .returning({id:accessAccounts.id});
     if (!account) throw new Error("Account could not be created");
     const [signup] = await tx.insert(schoolSetupSignups).values({
@@ -176,7 +175,7 @@ export async function provisionDemoSiteSignup(input: unknown) {
     }).returning();
     if (!signup) throw new Error("Site signup could not be created");
     const provisioned = await provisionVerifiedSchoolSignup(tx,signup,account.id,data.email,now,"demo_code");
-    // Only this successful first response carries the raw credential. Never log it.
-    return {...provisioned,privateAccessCode};
+    // The registered synthetic Site uses the shared demo credential.
+    return {...provisioned,privateAccessCode:LOCAL_DEMO_ACCESS_CODE};
   });
 }
