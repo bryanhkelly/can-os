@@ -4,9 +4,10 @@ import type { FastifyRequest } from 'fastify';
 import { CanonicalIdentityService, type Identity } from './identity.service';
 
 const PUBLIC = Symbol('public-operation');
-const CANONICAL = Symbol('canonical-read-operation');
+const CANONICAL = Symbol('canonical-operation');
 export const PublicOperation = () => SetMetadata(PUBLIC, true);
-export const CanonicalReadOperation = () => SetMetadata(CANONICAL, true);
+export const CanonicalReadOperation = () => SetMetadata(CANONICAL, 'read');
+export const CanonicalWriteOperation = () => SetMetadata(CANONICAL, 'write');
 const identities = new WeakMap<FastifyRequest, Identity>();
 export function verifiedIdentity(request: FastifyRequest): Identity {
   const identity = identities.get(request);
@@ -20,11 +21,11 @@ export class DefaultDenyGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const targets = [context.getHandler(), context.getClass()];
     const publicOperation = this.reflector.getAllAndOverride<boolean>(PUBLIC, targets) === true;
-    const canonicalRead = this.reflector.getAllAndOverride<boolean>(CANONICAL, targets) === true;
-    if (publicOperation && !canonicalRead) return true;
-    if (canonicalRead && !publicOperation) {
+    const mode = this.reflector.getAllAndOverride<'read'|'write'>(CANONICAL, targets);
+    if (publicOperation && !mode) return true;
+    if ((mode==='read'||mode==='write') && !publicOperation) {
       const request = context.switchToHttp().getRequest<FastifyRequest>();
-      identities.set(request, await this.canonical.authenticate(request));
+      identities.set(request, await this.canonical.authenticate(request,mode));
       return true;
     }
     throw new UnauthorizedException();

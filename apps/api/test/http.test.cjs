@@ -91,3 +91,24 @@ test('learner contract rejects invalid parameters and unintended response fields
   assert.equal(resumeSchema.safeParse({classId:'00000000-0000-4000-8000-000000000001',title:'Class',lesson:null,completed:1,total:1}).success,true);
   assert.equal(homeworkSchema.safeParse({assignments:[{id:'00000000-0000-4000-8000-000000000001',title:'Assignment',dueAt:null,status:'assigned',submittedAt:null,responseText:'private'}]}).success,false);
 });
+
+test('write operations are off by default and cannot be enabled in production',async()=>{
+  assert.throws(()=>readConfig({API_CANONICAL_WRITES:'1'}));
+  assert.throws(()=>readConfig({API_CANONICAL_WRITES:'1',API_CANONICAL_READS:'1',NODE_ENV:'production'}));
+  await withServer('0',async(url,document)=>{
+    const route='/api/v1/me/session/membership';
+    const response=await fetch(url+route,{method:'POST',headers:{'content-type':'application/json',Origin:url},body:'{}'});
+    assert.equal(response.status,503);
+    assert.equal(document.paths[route].post.operationId,'selectMyMembership');
+    assert.ok(document.paths[route].post.security);
+  });
+});
+test('write guard rejects wrong origin and content type before loading database bridge',async()=>{
+  const {CanonicalIdentityService}=require('../dist/identity.service');
+  const service=new CanonicalIdentityService();
+  service.configure(true,'http://localhost:3001');
+  const req={method:'POST',headers:{origin:'https://foreign.example','content-type':'application/json',cookie:'unrelated=value'}};
+  await assert.rejects(()=>service.authenticate(req,'write'),/Forbidden/);
+  await assert.rejects(()=>service.authenticate({...req,headers:{...req.headers,origin:'http://localhost:3001','content-type':'text/plain'}},'write'),/Unsupported Media Type/);
+  await assert.rejects(()=>service.authenticate({...req,headers:{origin:'http://localhost:3001','content-type':'application/json'}},'write'),/Unauthorized/);
+});

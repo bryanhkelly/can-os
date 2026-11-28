@@ -1,3 +1,5 @@
+import {completeNativeClassLesson,submitNativeClassHomeworkCommand} from "@/modules/classes/native-class-learner-write.server";
+import {selectCurrentSessionMembership,recordCurrentSessionActivity} from "./session-lifecycle.server";
 import { getInstructionalLearnerContext } from "./learning-command-context.server";
 import { AuthorizationError } from "@/domain/command-context";
 import { readNativeClassResume } from "@/modules/classes/native-class-learning-read.server";
@@ -16,6 +18,9 @@ export async function resolveHttpIdentity(request: Request) {
     if (context.actorPersonId !== personId) throw new AuthorizationError("one verified learning Person");
     return context;
   }
+  function requireWrite(){
+    if(request.method!=="POST")throw new AuthorizationError("explicit mutation request");
+  }
   return {
     me: {
       personId: actor.actorPersonId,
@@ -25,6 +30,10 @@ export async function resolveHttpIdentity(request: Request) {
       siteIds: actor.scope.siteIds ?? [],
       programIds: actor.scope.programIds ?? [],
     },
+    selectMembership:async (grantId:string)=>{requireWrite();await selectCurrentSessionMembership(actor,grantId);},
+    recordActivity:async ()=>{requireWrite();await recordCurrentSessionActivity(actor);},
+    completeLesson:async (classEnrollmentId:string,lessonId:string)=>{requireWrite();return completeNativeClassLesson(await learner(),{classEnrollmentId,lessonId});},
+    submitHomework:async (classEnrollmentId:string,assignmentId:string,responseText:string)=>{requireWrite();return submitNativeClassHomeworkCommand(await learner(),{classEnrollmentId,assignmentId,responseText});},
     readStudentClasses: () => readStudentClasses(actor),
     readLearningResume: async (id:string) => readNativeClassResume(await learner(),id),
     readHomeworkSummary: async (id:string) => readNativeClassHomeworkSummary(await learner(),id),

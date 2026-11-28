@@ -1,8 +1,8 @@
-import { Controller, Get, Req, ForbiddenException } from '@nestjs/common';
-import { ApiCookieAuth, ApiOperation, ApiTags, ApiOkResponse, ApiResponse } from '@nestjs/swagger';
+import { Controller, Get, Post, Body, HttpCode, Req, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { ApiCookieAuth, ApiOperation, ApiTags, ApiOkResponse, ApiResponse, ApiBody, ApiHeader } from '@nestjs/swagger';
 import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { CanonicalReadOperation, verifiedIdentity } from './security';
+import { CanonicalReadOperation, CanonicalWriteOperation, verifiedIdentity } from './security';
 import { CanonicalIdentityService } from './identity.service';
 import { problemOpenApiSchema } from './contracts';
 
@@ -54,5 +54,38 @@ export class IdentityController {
       if (meSchema.parse(identity.me).role !== 'student') throw new ForbiddenException();
       return studentClassesSchema.parse(await identity.readStudentClasses());
     });
+  }
+  @Post('session/membership')
+  @CanonicalWriteOperation()
+  @HttpCode(204)
+  @ApiOperation({operationId:'selectMyMembership',summary:'Select an authorized membership of the current account'})
+  @ApiHeader({name:'Origin',required:true})
+  @ApiBody({schema:{type:'object',additionalProperties:false,required:['grantId'],properties:{grantId:id}}})
+  @ApiResponse({status:204})
+  @ApiResponse({status:400,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+  @ApiResponse({status:401,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+  @ApiResponse({status:403,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+  @ApiResponse({status:415,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+  @ApiResponse({status:503,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+  select(@Req() request:FastifyRequest,@Body() body:unknown){
+    const parsed=z.object({grantId:uuid}).strict().safeParse(body);
+    if(!parsed.success)throw new BadRequestException();
+    return this.identity.run(verifiedIdentity(request),actor=>actor.selectMembership(parsed.data.grantId));
+  }
+  @Post('session/activity')
+  @CanonicalWriteOperation()
+  @HttpCode(204)
+  @ApiOperation({operationId:'recordMySessionActivity',summary:'Record explicit interactive session activity'})
+  @ApiHeader({name:'Origin',required:true})
+  @ApiBody({schema:{type:'object',additionalProperties:false}})
+  @ApiResponse({status:204})
+  @ApiResponse({status:400,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+  @ApiResponse({status:401,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+  @ApiResponse({status:403,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+  @ApiResponse({status:415,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+  @ApiResponse({status:503,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+  activity(@Req() request:FastifyRequest,@Body() body:unknown){
+    if(!z.object({}).strict().safeParse(body).success)throw new BadRequestException();
+    return this.identity.run(verifiedIdentity(request),actor=>actor.recordActivity());
   }
 }
