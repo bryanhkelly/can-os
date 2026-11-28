@@ -31,6 +31,7 @@ const cohortSite=z.object({classId:uuid,siteId:uuid,ownerOrganizationId:uuid,cla
 const lessonInstruction=z.object({lessonId:uuid,assetVersionId:uuid,prompt:z.string().trim().min(5).max(1000),
   choices:z.array(z.string().trim().min(1).max(200)).min(2).max(8)}).strict();
 const scenario=z.discriminatedUnion("stage",[
+  z.object({stage:z.literal("place-deployment"),operator:actor,foreign:actor,deploymentId:uuid,siteId:uuid}).strict(),
   z.object({stage:z.literal("prepare-blueprint"),author:actor,siteId:uuid,
     configurationId:uuid,initialVersionId:uuid,blueprintId:uuid,blueprintVersionId:uuid,
     name:z.string().min(2).max(120),version:z.record(z.unknown())}).strict(),
@@ -155,7 +156,27 @@ test("governed pilot API stage",async({browser},info)=>{
   expect(identity).toEqual({project:"sweet-hall-62441909",branch});
   let evidence:Record<string,unknown>={stage:scenario.stage,revision:process.env.CAN_RELEASE_SOURCE_SHA};
   try{
-    if(scenario.stage==="prepare-blueprint"){
+    if(scenario.stage==="place-deployment"){
+      const {operator,foreign,deploymentId,siteId}=scenario;
+      expect(operator.organizationId).not.toBe(foreign.organizationId);
+      const page=await openActor(browser,operator,contexts),outside=await openActor(browser,foreign,contexts);
+      const input={deploymentId,siteId};
+      await deny(outside,"deployment","placeNativeDeploymentSite",input);
+      const before=await sql`SELECT d.status,a.approval_status FROM public.program_deployments d
+        JOIN public.deployment_offering_adoptions a ON a.deployment_id=d.id WHERE d.id=${deploymentId}::uuid`;
+      expect(before.length).toBeGreaterThan(0);
+      expect(before.every(r=>["planning","review"].includes(r.status)&&r.approval_status==="proposed")).toBe(true);
+      const placed=await rpc<{placementId:string;created:boolean}>(page,"deployment","placeNativeDeploymentSite",input);
+      uuid.parse(placed.placementId);expect(placed.created).toBe(true);
+      expect(await rpc(page,"deployment","placeNativeDeploymentSite",input)).toMatchObject({...input,placementId:placed.placementId,created:false});
+      const rows=await sql`SELECT id::text FROM public.deployment_sites WHERE deployment_id=${deploymentId}::uuid
+        AND site_id=${siteId}::uuid AND purpose='instruction'`;
+      expect(rows).toEqual([{id:placed.placementId}]);
+      const after=await sql`SELECT d.status,a.approval_status FROM public.program_deployments d
+        JOIN public.deployment_offering_adoptions a ON a.deployment_id=d.id WHERE d.id=${deploymentId}::uuid`;
+      expect(after).toEqual(before);
+      evidence={...evidence,placementId:placed.placementId,deploymentId,siteId,placementCreated:true,adoptionApproved:false,deploymentActivated:false};
+    }else if(scenario.stage==="prepare-blueprint"){
       const {author,siteId,configurationId,initialVersionId,blueprintId,blueprintVersionId,name,version}=scenario;
       const [site]=await sql`SELECT count(*)::int AS count FROM public.sites WHERE id=${siteId}::uuid AND organization_id=${author.organizationId}::uuid`;
       expect(site?.count).toBe(1);

@@ -1,4 +1,4 @@
-import { pgTable, timestamp, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 /**
  * Existing canonical placement tables. A school enrollment must be currently
@@ -9,6 +9,7 @@ export const classroomDeploymentSites = pgTable("deployment_sites", {
   id: uuid("id").primaryKey(),
   deploymentId: uuid("deployment_id").notNull(),
   siteId: uuid("site_id").notNull(),
+  purpose: text("purpose").notNull().default("instruction"),
 });
 
 export const classroomEnrollmentSitePlacements = pgTable("enrollment_site_placements", {
