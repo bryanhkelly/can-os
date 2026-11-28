@@ -1,3 +1,4 @@
+import {relationshipPopulation} from "./reporting-relationship-population";
 import {canonicalJson} from "@/lib/canonical-json";
 import {assertAuthorizedReportFacts,matchesReportingPopulation,rollupAuthorizedParticipation,type ParticipationReportingFact,type ReportingScopeProof,type ReportingPopulation} from "@/domain/participation-rollups";
 import {assertRelationshipActor,relationshipMatchesFact,type ReportingRelationship,type VerifiedRelationshipActor,type RelationshipMetric} from "@/domain/bottom-up-reporting-relationships";
@@ -46,7 +47,8 @@ export function projectRelationshipRegistrationMetric(
   if(facts.length>100_000||agreements.length>10_000)throw new Error("Relationship projection exceeds bounded source window");
   const definition=supported[metric.metricKey as RegistrationMetricKey];
   const live=agreements.filter(a=>authority.currentAgreementIds.has(a.id)&&
-    a.recipientOrganizationId===recipientOrganizationId);
+    a.recipientOrganizationId===recipientOrganizationId&&
+    (a.dataPopulation===undefined||a.dataPopulation===relationshipPopulation(authority.population.ownerDomains.get(a.ownerOrganizationId)??null)));
   const liveByOwner=new Map<string,ReportingRelationship[]>();
   for(const agreement of live){
     const existing=liveByOwner.get(agreement.ownerOrganizationId);
