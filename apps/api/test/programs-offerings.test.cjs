@@ -3,6 +3,8 @@ const assert = require('node:assert/strict');
 const { createApi, readConfig } = require('../dist/bootstrap');
 const { CanonicalIdentityService } = require('../dist/identity.service');
 const { ProgramsOfferingsModule } = require('../dist/programs-offerings.module');
+const { NativeCourseDraftController } = require('../dist/native-course-draft.controller');
+const { PublisherPackController } = require('../dist/publisher-pack.controller');
 const { CatalogController } = require('../dist/catalog.controller');
 const { WorkflowController } = require('../dist/workflow.controller');
 const { OfferingReleaseController } = require('../dist/platform-commands.controller');
@@ -13,7 +15,7 @@ test('WS04 registers its controllers once and shares the configured identity ser
   try {
     const domain = app.select(ProgramsOfferingsModule);
     const identity = app.get(CanonicalIdentityService);
-    for (const Controller of [CatalogController, WorkflowController, OfferingReleaseController, NoncreditPublicationController]) {
+    for (const Controller of [CatalogController, WorkflowController, OfferingReleaseController, NoncreditPublicationController, NativeCourseDraftController, PublisherPackController]) {
       const instance = domain.get(Controller, { strict: true });
       assert.equal(instance.identity, identity);
     }
@@ -32,7 +34,8 @@ test('WS04 registers its controllers once and shares the configured identity ser
       'getReleaseOverview', 'getReleasePolicy', 'submitRelease', 'saveReleasePolicy', 'decideRelease',
       'publishCourses', 'approveAssetManifest', 'publishOffering', 'getNoncreditEnrollmentPublisher',
       'getNoncreditTrainingReadiness', 'publishNoncreditSelfEnrollment', 'closeNoncreditSelfEnrollment',
-      'publishNoncreditAcrossAuthorizedSites'
+      'publishNoncreditAcrossAuthorizedSites',
+      'getNativeCourseDraftLessons', 'saveNativeCourseLessonDraft', 'getNativeCourseReleaseReadiness', 'createNativeCourseAssignmentDraft', 'getNativeCourseAssignmentDrafts', 'getPublisherPackStudio', 'createAuthoredPublisherPack', 'startPublisherPackDraft', 'saveAuthoredPublisherPack', 'publishAuthoredPublisherPack'
     ]) {
       assert.ok(ids.includes(id), 'Missing WS04 operation: ' + id);
     }
@@ -96,4 +99,28 @@ test('native lesson boundary denies hidden fields, invalid duration and caller a
  assert.equal(inputs.lesson.safeParse({...lesson,expectedRevision:'bad'}).success,false);
  assert.equal(inputs.assignment.safeParse({assignmentKey:'assignment_1',title:'Assignment',instructions:'Write an answer',required:true,sectionId:'forged'}).success,false);
  assert.equal(results.saved.safeParse({revision:'a'.repeat(64),changed:true,published:true}).success,false);
+});
+
+test('Publisher Pack endpoints require standard authenticated scope and protect command input',async()=>{
+ const {app,document}=await createApi(readConfig({API_DOCS:'0'}));
+ const id='00000000-0000-4000-8000-000000000001';
+ try{
+  await app.listen(0,'127.0.0.1');const url=await app.getUrl();
+  const base='/api/v1/programs/{programId}/publisher-packs';
+  for(const [suffix,method] of [['','GET'],['','POST'],['/{packId}/drafts','POST'],['/versions/{versionId}/revisions','POST'],['/versions/{versionId}/publication','POST']]){
+   const path=base+suffix,op=document.paths[path][method.toLowerCase()];
+   assert.ok(op.security);assert.ok(op.responses['403']);assert.ok(op.responses['409']);
+   const response=await fetch(url+path.replace(/\{[^}]+\}/g,id),method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);
+  }
+ }finally{await app.close();}
+});
+test('Publisher Pack contract rejects duplicate courses, hidden authority and unconfirmed publication',()=>{
+ const {inputs,results}=require('../dist/publisher-pack.contracts');
+ const id='00000000-0000-4000-8000-000000000001',expectedRevision='a'.repeat(64);
+ assert.equal(inputs.save.safeParse({expectedRevision,courseVersionIds:[id]}).success,true);
+ assert.equal(inputs.save.safeParse({expectedRevision,courseVersionIds:[id,id]}).success,false);
+ assert.equal(inputs.publish.safeParse({expectedRevision,confirmed:false,reason:'Reviewed publication'}).success,false);
+ assert.equal(inputs.publish.safeParse({expectedRevision,confirmed:true,reason:'Reviewed publication',reviewerPersonId:id}).success,false);
+ assert.equal(results.draft.safeParse({versionId:id,created:true,offeringPublished:true}).success,false);
 });
