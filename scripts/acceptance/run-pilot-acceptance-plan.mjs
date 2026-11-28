@@ -4,6 +4,8 @@ import {spawnSync} from "node:child_process";
 import {setTimeout as delay} from "node:timers/promises";
 import {neon} from "@neondatabase/serverless";
 import {z} from "zod";
+import {join} from "node:path";
+import {acceptanceFingerprint,openPilotLedger} from "./pilot-run-ledger.mjs";
 
 const uuid=z.string().uuid();
 const day=z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -47,11 +49,15 @@ export function parsePlan(raw){
 }
 export async function runPilotAcceptance({mode,env,root,modes}){
  const summary={mode,revision:env.CAN_RELEASE_SOURCE_SHA,stages:[],status:"blocked",nationalDisclosure:"not tested",blocker:null};
+ let ledger;
  const run=(name,command,extra={})=>{
+  if(ledger?.passed(name)){console.log("RESUME verified "+name);summary.stages.push({name,status:"passed",resumed:true});return;}
+  ledger?.begin(name);
   console.log("START "+name);
   const start=Date.now();
-  const result=spawnSync(process.execPath,modes[command],{cwd:root,env:{...env,...extra},stdio:"inherit"});
+  const result=spawnSync(process.execPath,modes[command],{cwd:root,env:{...env,...extra},stdio:"inherit",timeout:12*60*1000});
   const passed=result.status===0&&!result.error;
+  ledger?.finish(name,passed);
   summary.stages.push({name,status:passed?"passed":"failed",elapsedMs:Date.now()-start});
   if(!passed)throw Error("Stage failed: "+name);
  };
@@ -60,7 +66,18 @@ export async function runPilotAcceptance({mode,env,root,modes}){
   const plan=mode==="pilot1"?{}:parsePlan(env.CAN_PILOT_QA_PLAN_JSON||"{}");
   if(mode!=="pilot1"&&!plan.pilot2)throw Error("Reviewed Pilot 2 plan required");
   if(mode!=="pilot2"&&(!env.CAN_PILOT_QA_FIXTURE_JSON||!env.CAN_PILOT_QA_API_ACTORS_JSON))throw Error("Reviewed Pilot 1 fixture and email-link actors required");
+  ledger=openPilotLedger({directory:join(root,"acceptance-artifacts","pilot-runs"),mode,revision:env.CAN_RELEASE_SOURCE_SHA,
+    fingerprint:acceptanceFingerprint({mode,revision:env.CAN_RELEASE_SOURCE_SHA,branch:env.CAN_PILOT_QA_BRANCH_ID,
+      plan:mode==="pilot1"?null:plan,fixture:mode==="pilot2"?null:env.CAN_PILOT_QA_FIXTURE_JSON,
+      actors:mode==="pilot2"?null:env.CAN_PILOT_QA_API_ACTORS_JSON})});
+  ledger.assertResumable();
   run("schema","schema");
+  // Validate both prepared targets before provisioning or consuming any learner review.
+  if(mode!=="pilot2"&&!ledger.passed("Pilot 1 complete API journey")){
+    const preflight=spawnSync(process.execPath,["scripts/acceptance/check-noncredit-full-journey-fixture.mjs"],{cwd:root,env:{...env,CAN_PILOT_QA_STANDARD_ACCESS:"true"},stdio:"inherit",timeout:120000});
+    if(preflight.status!==0)throw Error("Pilot 1 fixture preflight failed");
+  }
+  if(mode!=="pilot1")await preflightPilot2(plan.pilot2,env,ledger);
   run("fresh provisioning and authentication","provision");
   if(mode!=="pilot2")run("Pilot 1 complete API journey","api");
   if(mode!=="pilot1"){
@@ -68,13 +85,8 @@ export async function runPilotAcceptance({mode,env,root,modes}){
    const sql=neon(env.TEST_DATABASE_URL);
    // Preflight read-only: no existing enrollments or scheduled Sessions are
    // allowed. A failed run is retained as evidence, not silently replayed.
-   for(const s of sites){
-    const [state]=await sql`SELECT
-      (SELECT count(*)::int FROM public.class_enrollments WHERE class_id=${s.classId}::uuid) AS enrollments,
-      (SELECT count(*)::int FROM public.class_sessions WHERE class_id=${s.classId}::uuid) AS sessions`;
-    if(state?.enrollments!==0||state?.sessions!==0)throw Error("Pilot 2 requires fresh Classes; preserve partial runs");
-   }
-   if(sites.some(s=>s.meetings.some(m=>Date.parse(m.startsAt)<Date.now()+5*60000)))throw Error("Choose fresh future meeting windows");
+   // Recheck current state after Pilot 1 and before starting Pilot 2.
+   await preflightPilot2(plan.pilot2,env,ledger);
    governed("Pilot 2 enroll both Sites",{stage:"enroll-cohort",sites:sites.map(s=>({classId:s.classId,siteId:s.siteId,ownerOrganizationId:s.host.organizationId,classOfferingVersionId:s.classOfferingVersionId,creditMode:"not_applicable",learners:s.learners.map(l=>l.actor)}))});
    governed("Pilot 2 schedule both Sites",{stage:"schedule",sites:sites.map(s=>({host:s.host,classId:s.classId,siteId:s.siteId,meetings:s.meetings.map(({requestId,agendaRequestId,startsAt,endsAt,lessonId})=>({requestId,agendaRequestId,startsAt,endsAt,lessonId}))}))});
    const cohorts=[];
@@ -97,20 +109,23 @@ export async function runPilotAcceptance({mode,env,root,modes}){
    }
    const tasks=cohorts.flatMap((c,i)=>c.s.meetings.map((m,j)=>({c,i,m,j}))).sort((a,b)=>Date.parse(a.m.startsAt)-Date.parse(b.m.startsAt));
    for(const {c,i,m,j} of tasks){
+    const name="Pilot 2 Site "+(i+1)+" meeting "+(j+1);
+    if(ledger.passed(name)){summary.stages.push({name,status:"passed",resumed:true});continue;}
     const wait=Math.max(0,Date.parse(m.startsAt)-Date.now());
     if(wait>0){console.log("Waiting for ordinary scheduled meeting window: "+m.startsAt);await delay(wait);}
     if(Date.now()>=Date.parse(m.endsAt))throw Error("Missed authorized meeting window; no clock override");
-    governed("Pilot 2 Site "+(i+1)+" meeting "+(j+1),{stage:"deliver",host:c.s.host,classId:c.s.classId,siteId:c.s.siteId,classSessionId:c.sessionIds[j],learners:c.learners,foreign:cohorts[1-i].learners[0],instruction:{lessonId:m.lessonId,assetVersionId:m.assetVersionId,prompt:m.prompt,choices:m.choices}});
+    governed(name,{stage:"deliver",host:c.s.host,classId:c.s.classId,siteId:c.s.siteId,classSessionId:c.sessionIds[j],learners:c.learners,foreign:cohorts[1-i].learners[0],instruction:{lessonId:m.lessonId,assetVersionId:m.assetVersionId,prompt:m.prompt,choices:m.choices}});
    }
    governed("Pilot 2 provider report reconciliation",{stage:"cohort-report",from,to,sites:cohorts.map(c=>({manager:c.s.manager,classId:c.s.classId,siteId:c.s.siteId,sessionIds:c.sessionIds,expectedDistinctPeople:c.learners.length,expectedPresentOccurrences:4*c.learners.filter(l=>l.present??l.paired).length}))});
    governed("Site reporting relationship acceptance and revocation",{stage:"relationships",...relationship});
   }
-  summary.status="passed";
+  ledger.complete();summary.status="passed";
  }catch(error){
   // Zod input and driver errors may embed private fixture values. Never echo them.
   summary.blocker=summary.stages.find(s=>s.status==="failed")?.name??"Plan validation or prerequisite reconciliation";
   console.error("Acceptance stopped; inspect the failed stage and reviewed prerequisites. No business bypass attempted.");
  }finally{
+  if(ledger){summary.ledgerPath=ledger.path;ledger.release();}
   console.log(JSON.stringify(summary,null,2));
  }
  return summary.status==="passed"?0:1;
