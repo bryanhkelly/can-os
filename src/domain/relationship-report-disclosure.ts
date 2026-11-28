@@ -4,14 +4,14 @@ import type {RelationshipMetric} from "./bottom-up-reporting-relationships";
 import type {RelationshipPopulation} from "./reporting-relationship-population";
 
 export const RELATIONSHIP_MINIMUM_DISTINCT_CONTRIBUTORS=10;
-type Scope={
+export type RelationshipDisclosureScope={
   recipientOrganizationId:string;population:RelationshipPopulation;
   metric:RelationshipMetric;from:string;to:string;asOf:string;
   agreementIds:readonly string[];manifestDigest:string;
 };
 /** Trusted server constructs this digest from the exact authorized scope and
  * reconciled source manifest; the client cannot supply either proof. */
-export async function relationshipDisclosureDigest(scope:Scope):Promise<string>{
+export async function relationshipDisclosureDigest(scope:RelationshipDisclosureScope):Promise<string>{
   const from=Date.parse(scope.from),to=Date.parse(scope.to),asOf=Date.parse(scope.asOf);
   if(!scope.recipientOrganizationId||!scope.agreementIds.length||scope.agreementIds.some(id=>!id)||new Set(scope.agreementIds).size!==scope.agreementIds.length||!/^[a-f0-9]{64}$/.test(scope.manifestDigest)||!scope.metric.metricKey||!scope.metric.definitionVersion||!["real","synthetic"].includes(scope.population)||![from,to,asOf].every(Number.isFinite)||from>=to||to>asOf||to-from>366*86400000)
     throw Error("Exact relationship report scope and source manifest required");

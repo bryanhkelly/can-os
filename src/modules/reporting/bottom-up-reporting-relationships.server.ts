@@ -11,6 +11,7 @@ import {AuthorizationError} from "@/domain/command-context";
 import {relationshipProposalMetrics} from "@/domain/relationship-metric-policy";
 import {readRelationshipRegistrationFacts,countRelationshipRegistrationCandidates} from "./relationship-registration-sources.server";
 import {projectRelationshipRegistrationMetric} from "@/domain/relationship-registration-projection";
+import {fingerprintRelationshipRegistrationCalculation} from "./relationship-report-manifest.server";
 import {reconcileRegistrationSource} from "@/domain/relationship-source-reconciliation";
 import {readAuthorizedOwnerDomains} from "@/modules/insights/reporting-population.server";
 import {buildCurrentReportingMetricRegistry} from "@/domain/reporting-metric-registry";
@@ -419,7 +420,8 @@ export async function readInternalRelationshipRegistrationProjection(request:Req
       sourceProof:{verifiedOrganizationIds:new Set(owners),verifiedSiteIds:new Set(facts.map(f=>f.deliverySiteId))},
       population:{classification:population,ownerDomains},
     },{from,to,asOf:now.toISOString()},now);
-    return {projection,disclosureApproved:false as const,coverage:{
+    const calculationFingerprint=fingerprintRelationshipRegistrationCalculation({recipientOrganizationId:recipient,population,metric,window:{from,to,asOf:now.toISOString()},agreements:live,facts,sourceJoin,projection});
+    return {projection,calculationFingerprint,disclosureApproved:false as const,coverage:{
       siteBackedOnly:true,noncreditSelfEnrollmentClaimsOnly:true,programMappingAvailable:false,
       sourceJoin,sourceCompletenessVerified:false,
     }};
