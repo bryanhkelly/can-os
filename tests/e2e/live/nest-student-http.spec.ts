@@ -21,6 +21,7 @@ test("independent standard HTTP client validates both students and rejects forei
  try {
    const anonymous=await client();
    expect((await anonymous.get(api+"/me")).status()).toBe(401);
+   expect((await anonymous.get(api+"/me/class-enrollments/"+fixture.students[0]!.enrollments[0]!.classEnrollmentId+"/learning")).status()).toBe(401);
    expect((await anonymous.post(api+"/me/session/activity",{headers:{Origin:origin},data:{}})).status()).toBe(401);
    for(const student of fixture.students){
      const http=await client(), context={request:http};
@@ -45,20 +46,23 @@ test("independent standard HTTP client validates both students and rejects forei
        expect(await resume.json()).toMatchObject({classId:e.classId});
        const assignments=await http.get(target+"/assignments");expect(assignments.status()).toBe(200);
        homework.parse(await assignments.json());
+       const learning=await http.get(target+"/learning");expect(learning.status()).toBe(200);
+       expect(await learning.json()).toMatchObject({classId:e.classId,classEnrollmentId:e.classEnrollmentId,courseAttemptId:e.courseAttemptId,lessons:expect.any(Array),outcomes:expect.any(Array),awards:expect.any(Array)});
+       expect(learning.headers()["cache-control"]).toBe("no-store");
      }
      for(const foreign of fixture.students.filter(s=>s.personId!==student.personId)){
        expect((await http.post(api+"/me/session/membership",{headers:{Origin:origin},data:{grantId:foreign.grantId}})).status()).toBe(403);
        expect((await qaSession(context,"nest")).activeGrantId).toBe(student.grantId);
        for(const e of foreign.enrollments){
          expect(own.classes.some(c=>c.classId===e.classId||c.enrollmentId===e.classEnrollmentId)).toBe(false);
-         for(const resource of ["resume","assignments"]){
+         for(const resource of ["resume","assignments","learning"]){
            const denied=await http.get(api+"/me/class-enrollments/"+e.classEnrollmentId+"/"+resource);
            expect(denied.status()).toBe(403);
            expect((await denied.json()).code).toBe("FORBIDDEN");
          }
        }
      }
-     expect((await http.get(api+"/me/class-enrollments/not-a-uuid/resume")).status()).toBe(400);
+     for(const resource of ["resume","learning"])expect((await http.get(api+"/me/class-enrollments/not-a-uuid/"+resource)).status()).toBe(400);
    }
    if(fixture.write){
      const w=fixture.write;
@@ -83,6 +87,9 @@ test("independent standard HTTP client validates both students and rejects forei
      expect(await replay.json()).toEqual({recorded:true,alreadyCompleted:true});
      const after=await own.get(target+"/resume");expect(after.status()).toBe(200);
      expect(await after.json()).toMatchObject({completed:progress.completed+1,total:progress.total});
+     const workspace=await own.get(target+"/learning");expect(workspace.status()).toBe(200);
+     const lessons=z.object({lessons:z.array(z.object({lessonId:uuid,progressStatus:z.string().nullable()}))}).parse(await workspace.json());
+     expect(lessons.lessons.find(l=>l.lessonId===w.lessonId)?.progressStatus).toBe("completed");
      const submitted=await own.post(assignment,{...options,data:input});expect(submitted.status()).toBe(200);
      const first=z.object({submissionId:uuid,alreadySubmitted:z.literal(false)}).parse(await submitted.json());
      const duplicate=await own.post(assignment,{...options,data:input});expect(duplicate.status()).toBe(200);
