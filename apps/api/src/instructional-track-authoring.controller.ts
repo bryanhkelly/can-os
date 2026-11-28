@@ -95,4 +95,15 @@ export class InstructionalTrackAuthoringController{
   return this.identity.runWorkflow(async()=>c.results.draft.parse(await workflow.getCreatorRecordedInstructionDraft(input)));
  }
 
+
+ @Get('instructional-track-versions/:trackVersionId/review')
+ @Operation('GET')
+ @ApiOperation({operationId:'getRecordedInstructionReview',summary:'Read exact sealed manifest and recorded review decisions; not publication authority'})
+ @ApiParam({name:'trackVersionId',type:String,format:'uuid',required:true})
+ @ApiOkResponse({schema:c.reviewSnapshotDoc})
+ async getRecordedInstructionReview(@Req() req:FastifyRequest,@Param() params:unknown,@Query() query:unknown){
+  const workflow=verifiedWorkflow(req),ids=validated(c.params.track,params);
+  validated(c.inputs.empty,query);
+  return this.identity.runWorkflow(async()=>c.reviewSnapshot.parse(await workflow.getRecordedInstructionReview(ids)));
+ }
 }

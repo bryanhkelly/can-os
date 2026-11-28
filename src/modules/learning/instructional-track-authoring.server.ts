@@ -968,3 +968,50 @@ export async function readCreatorTrackDraft(context: AccessContext, trackVersion
     };
   });
 }
+
+/** Independent reviewer inspection of the exact sealed manifest, not a grant
+ * to publish or distribute it. No storage references, answer keys or raw
+ * evidence documents are returned. Recheck the live appointment on each read. */
+export async function readInstructionalTrackReview(context:AccessContext,trackVersionId:string){
+  assertAuthenticated(context,"instructional_track.review");
+  return db.transaction(async tx=>{
+    const bundle=await loadDraftBundle(tx,trackVersionId,true);
+    await assertDraftOwner(tx,context,bundle,"instructional_track.review");
+    if(bundle.version.createdByPersonId===context.actorPersonId ||
+      bundle.track.presenterPersonId===context.actorPersonId)
+      throw new AuthorizationError("independent instructional content reviewer");
+    const hash=bundle.version.submissionManifestHash;
+    if(!hash)throw new AuthorizationError("submitted instructional manifest");
+    const [manifest]=await tx.select().from(contentPublicationManifests)
+      .where(and(eq(contentPublicationManifests.trackVersionId,bundle.version.id),
+        eq(contentPublicationManifests.manifestHash,hash))).limit(1);
+    if(!manifest)throw new DomainError("UNAVAILABLE","Submitted manifest unavailable.");
+    const [items,reviews,lessons,presentations]=await Promise.all([
+      tx.select({assetVersionId:contentPublicationManifestItems.contentAssetVersionId,
+        usageKind:contentPublicationManifestItems.usageKind,contentHash:contentPublicationManifestItems.contentHash,
+        rightsEvidenceVersionId:contentPublicationManifestItems.rightsEvidenceVersionId})
+        .from(contentPublicationManifestItems).where(eq(contentPublicationManifestItems.manifestId,manifest.id)),
+      tx.select({reviewKind:instructionalTrackReviews.reviewKind,decision:instructionalTrackReviews.decision,
+        rationale:instructionalTrackReviews.rationale,evidenceVersionId:instructionalTrackReviews.evidenceVersionId,
+        decidedAt:instructionalTrackReviews.decidedAt})
+        .from(instructionalTrackReviews).where(and(eq(instructionalTrackReviews.trackVersionId,bundle.version.id),
+          eq(instructionalTrackReviews.manifestHash,hash))).orderBy(desc(instructionalTrackReviews.decisionOrder)),
+      tx.select({id:courseLessons.id,title:courseLessons.title}).from(courseLessons)
+        .where(eq(courseLessons.courseVersionId,bundle.version.courseVersionId)).orderBy(courseLessons.lessonOrder,courseLessons.id),
+      tx.select({courseLessonId:trackLessonPresentations.courseLessonId,assetVersionId:trackLessonPresentations.assetVersionId,
+        presentationKind:trackLessonPresentations.presentationKind,ordinal:trackLessonPresentations.ordinal})
+        .from(trackLessonPresentations).where(eq(trackLessonPresentations.trackVersionId,bundle.version.id)),
+    ]);
+    return {trackVersionId:bundle.version.id,courseVersionId:bundle.version.courseVersionId,
+      trackTitle:bundle.track.title,trackKind:bundle.version.trackKind,courseTitle:bundle.course.title,
+      manifestId:manifest.id,manifestHash:hash,manifestStatus:manifest.manifestStatus,lifecycle:bundle.version.lifecycle,
+      items,lessons,presentations,
+      reviews:reviewKindSchema.options.map(kind=>{
+        const review=reviews.find(row=>row.reviewKind===kind);
+        return {reviewKind:kind,decision:review?.decision??null,rationale:review?.rationale??null,
+          evidenceVersionId:review?.evidenceVersionId??null,decidedAt:review?.decidedAt.toISOString()??null};
+      }),
+      publicationAuthorityVerified:false as const,
+    };
+  });
+}

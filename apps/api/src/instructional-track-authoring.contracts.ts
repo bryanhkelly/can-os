@@ -29,3 +29,19 @@ const releaseProps={requestId:id,expectedRevision:h};
 export const inputDocs={create:obj({requestId:id,trackId:id,title:text(1,250),trackKind:{...en(kind.options),default:'primary'}},['requestId','title']),save:obj({...releaseProps,materials:arr(materialDoc,2000),presentations:arr(obj(presentationProps,['courseLessonId','assetVersionId','presentationKind','ordinal']),4000)}),release:obj(releaseProps),review:obj({...releaseProps,reviewKind:en(reviewKind.options),decision:en(decision.options),rationale:text(10,2000),evidenceVersionId:nullable(id)},['requestId','expectedRevision','reviewKind','decision','rationale']),withdraw:obj({requestId:id,withdrawalKind:en(withdrawalKind.options),reason:text(10,2000),legacyAccessUntil:nullable(date)})};
 const rev={trackVersionId:id,revision:h};
 export const docs={created:obj({...rev,trackId:id}),saved:obj(rev),submitted:obj({trackVersionId:id,manifestId:id,manifestHash:h}),reviewed:obj({trackVersionId:id,manifestHash:h,reviewKind:en(reviewKind.options),decision:en(decision.options)}),published:obj({trackVersionId:id,manifestHash:h,lifecycle:en(['published'])}),withdrawn:obj({...rev,withdrawalKind:en(withdrawalKind.options),effectiveAt:date,legacyAccessUntil:nullable(date)}),draft:obj({...rev,trackTitle:str,courseTitle:str,courseVersionId:id,trackKind:en(kind.options),lessons:arr(obj({id,title:str,courseUnitId:id,lessonOrder:int})),presentations:arr(obj(presentationProps)),materials:arr(materialDoc),assets:arr(obj({id,title:str,kind:str,versionNo:{...int,minimum:1}}),250),boundAssets:arr(obj({id,title:str,lifecycle:en(['draft','published'])})),assetInventoryLimited:bool})};
+
+const usage=z.enum(['required_instruction','supporting','accessibility','assessment']);
+const reviewDecision=z.enum(['approved','changes_requested','rejected','withdrawn']);
+export const reviewSnapshot=z.object({trackVersionId:uuid,courseVersionId:uuid,trackTitle:s,trackKind:kind,courseTitle:s,
+ manifestId:uuid,manifestHash:hash,manifestStatus:z.enum(['draft','approved']),lifecycle:z.enum(['draft','published']),
+ items:z.array(z.object({assetVersionId:uuid,usageKind:usage,contentHash:hash,rightsEvidenceVersionId:uuid.nullable()}).strict()),
+ lessons:z.array(z.object({id:uuid,title:s}).strict()),
+ presentations:z.array(z.object({courseLessonId:uuid,assetVersionId:uuid,presentationKind,ordinal:n.min(1)}).strict()),
+ reviews:z.array(z.object({reviewKind,decision:reviewDecision.nullable(),rationale:s.nullable(),evidenceVersionId:uuid.nullable(),decidedAt:s.datetime().nullable()}).strict()).length(5),
+ publicationAuthorityVerified:z.literal(false)}).strict();
+export const reviewSnapshotDoc=obj({trackVersionId:id,courseVersionId:id,trackTitle:str,trackKind:en(kind.options),courseTitle:str,
+ manifestId:id,manifestHash:h,manifestStatus:en(['draft','approved']),lifecycle:en(['draft','published']),
+ items:arr(obj({assetVersionId:id,usageKind:en(usage.options),contentHash:h,rightsEvidenceVersionId:nullable(id)})),
+ lessons:arr(obj({id,title:str})),presentations:arr(obj({courseLessonId:id,assetVersionId:id,presentationKind:en(presentationKind.options),ordinal:{...int,minimum:1}})),
+ reviews:{...arr(obj({reviewKind:en(reviewKind.options),decision:nullable(en(reviewDecision.options)),rationale:nullable(str),evidenceVersionId:nullable(id),decidedAt:nullable(date)}),5),minItems:5},
+ publicationAuthorityVerified:{...bool,enum:[false]}});

@@ -39,7 +39,7 @@ test('WS04 registers its controllers once and shares the configured identity ser
       'publishNoncreditAcrossAuthorizedSites',
       'getNativeCourseDraftLessons', 'saveNativeCourseLessonDraft', 'getNativeCourseReleaseReadiness', 'createNativeCourseAssignmentDraft', 'getNativeCourseAssignmentDrafts', 'getPublisherPackStudio', 'createAuthoredPublisherPack', 'startPublisherPackDraft', 'saveAuthoredPublisherPack', 'publishAuthoredPublisherPack',
       'getCurriculumAdopterPrograms', 'getCurriculumJourneyReadiness', 'getCurriculumMarketplace', 'installCurriculumPack', 'adoptCurriculumPack', 'reviewAnnualCurriculumAdoption', 'rolloverAnnualCurriculumAdoption', 'rollbackAnnualCurriculumPackAdoption', 'addMarketplaceSupplement',
-      'createRecordedInstructionDraft', 'saveRecordedInstructionDraft', 'submitRecordedInstructionDraft', 'decideRecordedInstructionReview', 'publishRecordedInstruction', 'withdrawRecordedInstruction', 'getCreatorRecordedInstructionDraft'
+      'createRecordedInstructionDraft', 'saveRecordedInstructionDraft', 'submitRecordedInstructionDraft', 'decideRecordedInstructionReview', 'publishRecordedInstruction', 'withdrawRecordedInstruction', 'getCreatorRecordedInstructionDraft', 'getRecordedInstructionReview'
     ]) {
       assert.ok(ids.includes(id), 'Missing WS04 operation: ' + id);
     }
@@ -183,7 +183,7 @@ test('Instructional Track routes expose governed authoring, review, publication 
  try{
   await app.listen(0,'127.0.0.1');const url=await app.getUrl();
   const base='/api/v1/instructional-track-versions/{trackVersionId}/';
-  const routes=[['/api/v1/course-versions/{courseVersionId}/instructional-track-drafts','POST'],...['revisions','submissions','reviews','publication','withdrawals'].map(s=>[base+s,'POST']),[base+'draft','GET']];
+  const routes=[['/api/v1/course-versions/{courseVersionId}/instructional-track-drafts','POST'],...['revisions','submissions','reviews','publication','withdrawals'].map(s=>[base+s,'POST']),[base+'draft','GET'],[base+'review','GET']];
   for(const [path,method] of routes){
    const op=document.paths[path][method.toLowerCase()];
    assert.ok(op.security);assert.ok(op.responses['403']);assert.ok(op.responses['409']);
@@ -206,4 +206,15 @@ test('Instructional Track contracts reject private answer keys, authority inject
  assert.equal(inputs.save.safeParse({...save,materials:[{...material,activitySpec:{nested:[{correct_answer:'private'}]}}]}).success,false);
  assert.equal(inputs.save.safeParse({...save,presentations:[{courseLessonId:id,assetVersionId:id,presentationKind:'primary',ordinal:1,accessibilityNotes:{solution:'private'}}]}).success,false);
  assert.equal(results.published.safeParse({trackVersionId:id,manifestHash:expectedRevision,lifecycle:'published',studentAccessGranted:true}).success,false);
+});
+
+test('Instructional Track reviewer snapshot is diagnostic and excludes storage and authority fields',()=>{
+ const {reviewSnapshot}=require('../dist/instructional-track-authoring.contracts');
+ const id='00000000-0000-4000-8000-000000000001',hash='a'.repeat(64);
+ const snapshot={trackVersionId:id,courseVersionId:id,trackTitle:'Track',trackKind:'primary',courseTitle:'Course',manifestId:id,manifestHash:hash,manifestStatus:'draft',lifecycle:'draft',
+ items:[{assetVersionId:id,usageKind:'required_instruction',contentHash:hash,rightsEvidenceVersionId:id}],
+ lessons:[],presentations:[],reviews:['academic','rights','accessibility','coverage','safeguarding'].map(reviewKind=>({reviewKind,decision:null,rationale:null,evidenceVersionId:null,decidedAt:null})),publicationAuthorityVerified:false};
+ assert.equal(reviewSnapshot.safeParse(snapshot).success,true);
+ assert.equal(reviewSnapshot.safeParse({...snapshot,publicationAuthorityVerified:true}).success,false);
+ assert.equal(reviewSnapshot.safeParse({...snapshot,items:[{...snapshot.items[0],storageReference:'private'}]}).success,false);
 });

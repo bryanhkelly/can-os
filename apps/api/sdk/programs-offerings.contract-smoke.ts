@@ -75,3 +75,8 @@ export async function checkInstructionalTrackContracts(client:BecomunaBrowserApi
  // @ts-expect-error publication requires the exact submitted manifest hash
  await client.POST('/api/v1/instructional-track-versions/{trackVersionId}/publication',{params:{path:track},body:{requestId:id}});
 }
+
+export async function checkTrackReviewSnapshot(client:BecomunaBrowserApi,id:string){
+ const response=await client.GET('/api/v1/instructional-track-versions/{trackVersionId}/review',{params:{path:{trackVersionId:id}}});
+ if(response.data){const hash:string=response.data.manifestHash;void hash;}
+}

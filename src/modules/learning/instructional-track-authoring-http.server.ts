@@ -1,7 +1,7 @@
 import {z} from "zod";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {parseCommandInput} from "@/domain/command-input";
-import {createInstructionalTrackDraft,saveInstructionalTrackDraft,submitInstructionalTrack,reviewInstructionalTrack,publishInstructionalTrack,withdrawInstructionalTrack,readCreatorTrackDraft,createInstructionalTrackDraftSchema,saveInstructionalTrackDraftSchema,instructionalTrackReleaseSchema,reviewInstructionalTrackSchema,withdrawInstructionalTrackSchema} from "./instructional-track-authoring.server";
+import {readInstructionalTrackReview,createInstructionalTrackDraft,saveInstructionalTrackDraft,submitInstructionalTrack,reviewInstructionalTrack,publishInstructionalTrack,withdrawInstructionalTrack,readCreatorTrackDraft,createInstructionalTrackDraftSchema,saveInstructionalTrackDraftSchema,instructionalTrackReleaseSchema,reviewInstructionalTrackSchema,withdrawInstructionalTrackSchema} from "./instructional-track-authoring.server";
 const read=z.object({trackVersionId:z.string().uuid()}).strict();
 export async function createRecordedInstructionDraftService(request:Request,raw:unknown){
  const input=parseCommandInput(createInstructionalTrackDraftSchema,raw);
@@ -30,4 +30,9 @@ export async function withdrawRecordedInstructionService(request:Request,raw:unk
 export async function getCreatorRecordedInstructionDraftService(request:Request,raw:unknown){
  const input=parseCommandInput(read,raw);
  return readCreatorTrackDraft(await getCommandContext(request),input.trackVersionId);
+}
+
+export async function getRecordedInstructionReviewService(request:Request,raw:unknown){
+ const input=parseCommandInput(read,raw);
+ return readInstructionalTrackReview(await getCommandContext(request),input.trackVersionId);
 }
