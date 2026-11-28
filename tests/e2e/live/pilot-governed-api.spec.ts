@@ -26,7 +26,12 @@ const reviewDecision=z.object({reviewKind,decision:z.enum(["approved","rejected"
 const reportSite=z.object({manager:actor,classId:uuid,siteId:uuid,
   sessionIds:z.array(uuid).length(4),expectedDistinctPeople:z.number().int().min(2).max(20),
   expectedPresentOccurrences:z.number().int().min(1).max(80)}).strict();
+const cohortSite=z.object({classId:uuid,siteId:uuid,ownerOrganizationId:uuid,classOfferingVersionId:uuid,
+  creditMode:z.enum(["for_credit","audit","not_applicable"]),learners:z.array(actor).min(2).max(20)}).strict();
+const lessonInstruction=z.object({lessonId:uuid,assetVersionId:uuid,prompt:z.string().trim().min(5).max(1000),
+  choices:z.array(z.string().trim().min(1).max(200)).min(2).max(8)}).strict();
 const scenario=z.discriminatedUnion("stage",[
+  z.object({stage:z.literal("enroll-cohort"),sites:z.array(cohortSite).length(2)}).strict(),
   z.object({stage:z.literal("review-release"),reviewer:actor,author:actor,offering:manifest,
     decisions:z.array(reviewDecision).min(1).max(5)}).strict(),
   z.object({stage:z.literal("cohort-report"),sites:z.array(reportSite).length(2),
@@ -40,7 +45,7 @@ const scenario=z.discriminatedUnion("stage",[
   z.object({stage:z.literal("enroll"),learner:actor,classId:uuid,siteId:uuid,ownerOrganizationId:uuid,classOfferingVersionId:uuid,creditMode:z.enum(["for_credit","audit","not_applicable"])}).strict(),
   z.object({stage:z.literal("schedule"),sites:z.array(siteScope).length(2)}).strict(),
   z.object({stage:z.literal("deliver"),host:actor,classId:uuid,siteId:uuid,classSessionId:uuid,
-    learners:z.array(learner).min(2).max(20),foreign:learner}).strict(),
+    learners:z.array(learner).min(2).max(20),foreign:learner,instruction:lessonInstruction.optional()}).strict(),
   z.object({stage:z.literal("relationships"),owner:actor,recipient:actor,foreign:actor,siteId:uuid,metrics:z.array(metric).min(1).max(4)}).strict()
 ]).parse(JSON.parse(process.env.CAN_PILOT_QA_GOVERNED_JSON??"{}"));
 const sql=neon(process.env.TEST_DATABASE_URL!);
@@ -85,6 +90,33 @@ async function classScope(classId:string,siteId:string,ownerId:string){
       AND o.metadata->>'qa_only'='true' AND o.metadata->>'intended_branch'=${branch} AND c.state='active'`;
   expect(row?.count).toBe(1);
 }
+type EnrollmentTarget=Omit<z.infer<typeof cohortSite>,"learners">&{learner:Actor};
+async function enrollOne(browser:Browser,contexts:BrowserContext[],target:EnrollmentTarget){
+  const {learner,classId,siteId,ownerOrganizationId,classOfferingVersionId,creditMode}=target;
+  await classScope(classId,siteId,ownerOrganizationId);
+  const [target]=await sql`SELECT count(*)::int AS count FROM public.class_offering_versions
+    WHERE id=${classOfferingVersionId}::uuid AND class_id=${classId}::uuid AND state='published'`;
+  expect(target?.count).toBe(1);
+  const page=await openActor(browser,learner,contexts);
+  const counts=async()=> (await sql`SELECT
+    (SELECT count(*)::int FROM public.noncredit_registrations n JOIN public.access_accounts a ON a.person_id=n.participant_person_id
+      WHERE a.email_normalized=${learner.email}) AS registrations,
+    (SELECT count(*)::int FROM public.class_enrollments e JOIN public.access_accounts a ON a.person_id=e.learner_person_id
+      WHERE a.email_normalized=${learner.email} AND e.class_id=${classId}::uuid) AS enrollments`)[0];
+  const before=await counts();expect(before?.enrollments).toBe(0);
+  const input={classOfferingVersionId,creditMode,adultAttested:true,consentAccepted:true};
+  const fresh=await rpc<{classEnrollmentId:string;courseAttemptId:string;alreadyEnrolled:boolean}>(page,"enrollment","enrollInNativeClass",input);
+  expect(fresh.alreadyEnrolled).toBe(false);
+  expect(await rpc(page,"enrollment","enrollInNativeClass",input)).toMatchObject({...fresh,alreadyEnrolled:true});
+  const after=await counts();
+  expect(after).toEqual({registrations:before?.registrations,enrollments:1});
+  const [link]=await sql`SELECT a.class_enrollment_id::text AS enrollment,a.noncredit_registration_id::text AS registration
+    FROM public.learner_course_attempts a JOIN public.class_enrollments e ON e.id=a.class_enrollment_id AND e.course_attempt_id=a.id
+    WHERE a.id=${fresh.courseAttemptId}::uuid AND e.id=${fresh.classEnrollmentId}::uuid AND e.class_id=${classId}::uuid`;
+  expect(link).toEqual({enrollment:fresh.classEnrollmentId,registration:null});
+  return fresh;
+}
+
 test("governed pilot API stage",async({browser},info)=>{
   const contexts:BrowserContext[]=[];
   const [identity]=await sql`SELECT current_setting('neon.project_id',true) AS project,current_setting('neon.branch_id',true) AS branch`;
@@ -251,29 +283,33 @@ test("governed pilot API stage",async({browser},info)=>{
       expect(published?.lifecycle).toBe("published");
       evidence={...evidence,offeringsPublished:1};
     }else if(scenario.stage==="enroll"){
-      const {learner,classId,siteId,ownerOrganizationId,classOfferingVersionId,creditMode}=scenario;
-      await classScope(classId,siteId,ownerOrganizationId);
-      const [target]=await sql`SELECT count(*)::int AS count FROM public.class_offering_versions
-        WHERE id=${classOfferingVersionId}::uuid AND class_id=${classId}::uuid AND state='published'`;
-      expect(target?.count).toBe(1);
-      const page=await openActor(browser,learner,contexts);
-      const counts=async()=> (await sql`SELECT
-        (SELECT count(*)::int FROM public.noncredit_registrations n JOIN public.access_accounts a ON a.person_id=n.participant_person_id
-          WHERE a.email_normalized=${learner.email}) AS registrations,
-        (SELECT count(*)::int FROM public.class_enrollments e JOIN public.access_accounts a ON a.person_id=e.learner_person_id
-          WHERE a.email_normalized=${learner.email} AND e.class_id=${classId}::uuid) AS enrollments`)[0];
-      const before=await counts();expect(before?.enrollments).toBe(0);
-      const input={classOfferingVersionId,creditMode,adultAttested:true,consentAccepted:true};
-      const fresh=await rpc<{classEnrollmentId:string;courseAttemptId:string;alreadyEnrolled:boolean}>(page,"enrollment","enrollInNativeClass",input);
-      expect(fresh.alreadyEnrolled).toBe(false);
-      expect(await rpc(page,"enrollment","enrollInNativeClass",input)).toMatchObject({...fresh,alreadyEnrolled:true});
-      const after=await counts();
-      expect(after).toEqual({registrations:before?.registrations,enrollments:1});
-      const [link]=await sql`SELECT a.class_enrollment_id::text AS enrollment,a.noncredit_registration_id::text AS registration
-        FROM public.learner_course_attempts a JOIN public.class_enrollments e ON e.id=a.class_enrollment_id AND e.course_attempt_id=a.id
-        WHERE a.id=${fresh.courseAttemptId}::uuid AND e.id=${fresh.classEnrollmentId}::uuid AND e.class_id=${classId}::uuid`;
-      expect(link).toEqual({enrollment:fresh.classEnrollmentId,registration:null});
+      await enrollOne(browser,contexts,scenario);
       evidence={...evidence,newClassEnrollments:1,newNoncreditRegistrations:0};
+    }else if(scenario.stage==="enroll-cohort"){
+      const {sites}=scenario;
+      expect(new Set(sites.map(s=>s.siteId)).size).toBe(2);
+      expect(new Set(sites.map(s=>s.ownerOrganizationId)).size).toBe(2);
+      expect(new Set(sites.map(s=>s.classId)).size).toBe(2);
+      const roster=sites.flatMap(s=>s.learners);
+      expect(new Set(roster.map(l=>l.email)).size).toBe(roster.length);
+      // Preflight all actor and target boundaries before enrollment writes.
+      for(const site of sites){
+        await classScope(site.classId,site.siteId,site.ownerOrganizationId);
+        const [published]=await sql`SELECT count(*)::int AS count FROM public.class_offering_versions
+          WHERE id=${site.classOfferingVersionId}::uuid AND class_id=${site.classId}::uuid AND state='published'`;
+        expect(published?.count).toBe(1);
+        for(const learner of site.learners)await authorizeFixture(learner);
+      }
+      const attempts=new Set<string>(),enrollments=new Set<string>();
+      for(const site of sites){
+        for(const learner of site.learners){
+          const result=await enrollOne(browser,contexts,{...site,learner});
+          attempts.add(result.courseAttemptId);enrollments.add(result.classEnrollmentId);
+        }
+      }
+      expect(attempts.size).toBe(roster.length);expect(enrollments.size).toBe(roster.length);
+      evidence={...evidence,sites:2,newClassEnrollments:enrollments.size,newNoncreditRegistrations:0,
+        distinctCourseAttempts:attempts.size,learnersBySite:sites.map(site=>site.learners.length)};
     }else if(scenario.stage==="schedule"){
       expect(new Set(scenario.sites.map(s=>s.siteId)).size).toBe(2);
       expect(new Set(scenario.sites.map(s=>s.host.organizationId)).size).toBe(2);
@@ -299,7 +335,7 @@ test("governed pilot API stage",async({browser},info)=>{
       }
       evidence={...evidence,sites:2,scheduledSessions:8,deliveryVerified:false};
     }else if(scenario.stage==="deliver"){
-      const {host,classId,siteId,classSessionId,learners,foreign}=scenario;
+      const {host,classId,siteId,classSessionId,learners,foreign,instruction}=scenario;
       await classScope(classId,siteId,host.organizationId);
       expect(new Set(learners.map(l=>l.courseAttemptId)).size).toBe(learners.length);
       expect(learners.some(l=>l.paired)).toBe(true);expect(learners.some(l=>!l.paired)).toBe(true);
@@ -322,11 +358,44 @@ test("governed pilot API stage",async({browser},info)=>{
       try{
         const outside=await openActor(browser,foreign.actor,contexts);
         await expect(rpc(outside,"room","pairWithFacilitatedRoom",{courseAttemptId:foreign.courseAttemptId,pairingCode:room.pairingCode})).rejects.toThrow();
+        const pairedActors=new Map<string,Page>();
         for(const l of learners){
           if(l.paired){
             const participant=await openActor(browser,l.actor,contexts);
+            pairedActors.set(l.courseAttemptId,participant);
             expect(await rpc(participant,"room","pairWithFacilitatedRoom",{courseAttemptId:l.courseAttemptId,pairingCode:room.pairingCode})).toMatchObject({paired:true});
           }
+        }
+        let activityResponses=0;
+        if(instruction){
+          const {lessonId,assetVersionId,prompt,choices}=instruction;
+          const media=await rpc<{media:{lessonId:string;assetVersionId:string}[]}>(
+            page,"room","getFacilitatedRoomMedia",scope);
+          expect(media.media.some(m=>m.lessonId===lessonId&&m.assetVersionId===assetVersionId)).toBe(true);
+          await expect(rpc(outside,"room","getFacilitatedRoomMediaAccess",{...scope,lessonId,assetVersionId})).rejects.toThrow();
+          const access=await rpc<{downloadUrl:string;expiresInSeconds:number}>(page,"room","getFacilitatedRoomMediaAccess",{...scope,lessonId,assetVersionId});
+          // Never attach the signed media URL or manufacture played/ended events.
+          if(!access.downloadUrl.startsWith("https://"))throw Error("Expected authorized HTTPS media access");
+          const input={...scope,lessonId,requestId:randomUUID(),prompt,answerType:"single_choice",choices};
+          const released=await rpc<{id:string;duplicate:boolean}>(page,"activity","releaseClassroomActivity",input);
+          expect(released.duplicate).toBe(false);
+          expect(await rpc(page,"activity","releaseClassroomActivity",input)).toMatchObject({id:released.id,duplicate:true});
+          await expect(rpc(outside,"activity","getClassroomLearnerActivities",{...scope,courseAttemptId:foreign.courseAttemptId})).rejects.toThrow();
+          for(const [courseAttemptId,participant] of pairedActors){
+            const learnerScope={...scope,courseAttemptId};
+            const visible=await rpc<{activities:{id:string;responded:boolean}[]}>(participant,"activity","getClassroomLearnerActivities",learnerScope);
+            expect(visible.activities.find(a=>a.id===released.id)).toMatchObject({responded:false});
+            const answer={...learnerScope,activityReleaseId:released.id,clientSubmissionId:randomUUID(),clientInstanceId:randomUUID(),
+              answerChoice:0,answerText:null};
+            expect(await rpc(participant,"activity","submitClassroomResponse",answer)).toMatchObject({saved:true,duplicate:false,graded:false});
+            expect(await rpc(participant,"activity","submitClassroomResponse",answer)).toMatchObject({saved:true,duplicate:true,graded:false});
+            activityResponses++;
+          }
+          expect(await rpc(page,"activity","closeClassroomActivity",{...scope,activityReleaseId:released.id})).toMatchObject({closed:true});
+          const [persisted]=await sql`SELECT count(*)::int AS responses,count(DISTINCT course_attempt_id)::int AS attempts
+            FROM public.facilitated_room_activity_responses WHERE activity_release_id=${released.id}::uuid
+            AND facilitated_session_id=${scope.facilitatedSessionId}::uuid`;
+          expect(persisted).toEqual({responses:activityResponses,attempts:activityResponses});
         }
         const before=await rpc<{members:{courseAttemptId:string;latestStatus:string;pairedDevice:boolean}[]}>(page,"attendance","getClassroomAttendanceRoster",scope);
         for(const l of learners){
@@ -341,7 +410,7 @@ test("governed pilot API stage",async({browser},info)=>{
         const after=await rpc<typeof before>(page,"attendance","getClassroomAttendanceRoster",scope);
         for(const l of learners)expect(after.members.find(m=>m.courseAttemptId===l.courseAttemptId)?.latestStatus).toBe(l.paired?"present":"absent");
         evidence={...evidence,sessionDelivered:1,participants:learners.length,paired:learners.filter(l=>l.paired).length,
-          corrected:learners.filter(l=>!l.paired).length,playbackVerified:false};
+          corrected:learners.filter(l=>!l.paired).length,authorizedMediaAccess:Boolean(instruction),formativeResponses:activityResponses,playbackVerified:false};
       }finally{
         expect(await rpc(page,"room","endFacilitatedLearningRoom",scope)).toMatchObject({ended:true});
       }
