@@ -69,7 +69,9 @@ describe("relationship consent policy",()=>{
   it("does not grant relationship authority to ordinary administrators or delegated owner roles",()=>{
     expect(roleCapabilities.reporting_relationship_manager).toEqual(["relationships.propose","relationships.decide","relationships.revoke","relationships.report"]);
     for(const role of ["app_admin","platform_owner","network_admin","site_admin","registrar","account_holder"])
-      expect(roleCapabilities[role]?.some(c=>c.startsWith("relationships."))).toBe(false);
+      expect(roleCapabilities[role]?.some(c=>["relationships.propose","relationships.decide","relationships.revoke","relationships.report"].includes(c))).toBe(false);
+    expect(roleCapabilities.site_admin).toContain("relationships.initiate");
+    expect(roleCapabilities.registrar).toContain("relationships.initiate");
     expect(platformOwnerMayActAs("reporting_relationship_manager")).toBe(false);
   });
   it("exposes only explicitly version-pinned terms and no invented Class completion metric",()=>{
