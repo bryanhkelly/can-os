@@ -1,3 +1,5 @@
+import {assertManualTaskOwner} from "./manual-work.server";
+import {manualTaskType} from "./manual-work-policy.server";
 import {parseCommandInput} from "@/domain/command-input";
 import {actionStatusSchema,actionAssignmentSchema,actionDeadlineSchema,ownedActionResolutionSchema} from "./action-workspace.inputs";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
@@ -40,8 +42,8 @@ export async function getOperationsActionsService(request:Request,raw:unknown){
   ownerFirstName:people.legalFirstName,ownerLastName:people.legalLastName,
   status:actions.status,priority:actions.priority,dueAt:actions.dueAt,createdAt:actions.createdAt,
   metadata:actions.metadata
- }).from(actions).leftJoin(people,eq(people.id,actions.ownerPersonId)).where(and(inArray(actions.siteId,scoped.siteIds),inArray(actions.status,["open","in_progress","waiting"]),ne(actions.subjectType,"class_enrollment"),allowedPrograms,...(data.programId?[eq(actions.programId,data.programId)]:[]))).orderBy(sql`CASE ${actions.priority} WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 ELSE 2 END`,
-   asc(actions.dueAt),desc(actions.createdAt)).limit(250));
+ }).from(actions).leftJoin(people,eq(people.id,actions.ownerPersonId)).where(and(inArray(actions.siteId,scoped.siteIds),inArray(actions.organizationId,actor.scope.organizationIds??[]),inArray(actions.status,["open","in_progress","waiting"]),ne(actions.subjectType,"class_enrollment"),allowedPrograms,...(data.programId?[eq(actions.programId,data.programId)]:[]))).orderBy(sql`CASE ${actions.priority} WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 ELSE 2 END`,
+   asc(actions.dueAt),desc(actions.createdAt),asc(actions.id)).limit(250));
  // Resolve distinct coverage owners concurrently instead of performing one
  // sequential database read per matching Program.
  const coverageProgramIds=[...new Set(records.filter(record=>
@@ -185,6 +187,7 @@ export async function assignOperationsActionService(request:Request,raw:unknown)
     if(!record.siteId)throw new AuthorizationError("site-scoped action required for assignment");
     const [grant]=await tx.select({id:accountPersonGrants.id}).from(accountPersonGrants).where(and(eq(accountPersonGrants.personId,data.ownerPersonId),eq(accountPersonGrants.siteId,record.siteId!),eq(accountPersonGrants.active,true),inArray(accountPersonGrants.role,["site_admin","registrar","teacher","specialist","counselor"]))).limit(1);
     if(!grant)throw new AuthorizationError("assignee must have active site membership");
+    if(record.type===manualTaskType)await assertManualTaskOwner(tx,record.organizationId!,record.siteId,data.ownerPersonId);
     if(academic)await assertAcademicActionStaff(tx,data.ownerPersonId,record);
    }
    const priority=coverageGap&&!data.ownerPersonId?"urgent":data.priority;
