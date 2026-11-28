@@ -16,7 +16,7 @@ import {
 
 import { requireCanonicalFacilitator } from "./canonical-facilitator-access.server";
 import {
-  authorizedHostDeployment, createFacilitatedRoomForHost,
+  authorizedHostDeployment, createFacilitatedRoomForHost, ownedRoom, assertRoomLive,
 } from "./facilitated-learning-operations.server";
 import { requireFacilitatedLearningEnabled } from "./canonical-learning-release.server";
 import { approvedSiteCourse, auditPlan, scheduleOneClassroom } from "./classroom-schedule-operations.server";
@@ -230,11 +230,20 @@ export const openScheduledClassroom=createServerFn({method:"POST"})
       // Native Class-controlled playback requires exact Class Session audience
       // enforcement across pairing, media and attendance. Never fall back to
       // the old deployment/Course/Site room authorization.
-      if(native)throw new AuthorizationError("native Class room controls are not yet released");
-      if(plan.state==="started" && plan.facilitatedSessionId)
-        return {facilitatedSessionId:plan.facilitatedSessionId,
+      if(native)throw new AuthorizationError("open this room through its native Class Session");
+      if(plan.state==="started" && plan.facilitatedSessionId){
+        const room=await ownedRoom(tx,host,plan.facilitatedSessionId,true);
+        if(room.deploymentId!==plan.deploymentId ||
+          room.courseVersionId!==plan.courseVersionId ||
+          room.siteId!==plan.siteId ||
+          room.hostOrganizationId!==plan.hostOrganizationId ||
+          room.facilitatorPersonId!==plan.facilitatorPersonId)
+          throw new AuthorizationError("exact scheduled classroom room");
+        assertRoomLive(room,new Date());
+        return {facilitatedSessionId:room.id,
           pairingCode:null as string|null,pairingExpiresAt:null as string|null,
           alreadyStarted:true};
+      }
       if(plan.state!=="scheduled")throw new AuthorizationError("active scheduled classroom");
       const now=new Date();
       if(!canOpenScheduledClassroom(delivery.startsAt,delivery.endsAt,now))
