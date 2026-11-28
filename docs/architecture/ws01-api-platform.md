@@ -6,6 +6,7 @@ Integration target: `architecture/api-first-nestjs`. WS01 owns framework/bootstr
 
 - NestJS/Fastify remain the single target business API runtime. The existing /api/v1 prefix, default-deny guard and exact-origin writes are preserved.
 - Shared error normalization recognizes known Fastify parser errors without leaking payloads, credentials or exception messages. Unknown errors and internal/output validation faults remain 500.
+- Opt-in `API_REQUEST_LOGS=1` records correlation, route template, method, status and elapsed time only; no raw URL, query, headers or body. External tracing and alerting remain pending.
 - Every generated operation documents correlation and cache policy; body-bearing methods document malformed input, oversized body and unsupported media type. Existing operation-specific error and security declarations remain intact.
 - The generated browser SDK remains a projection of the canonical executable OpenAPI document, not a second API. Artifact verification regenerates the document and types, then compares SHA-256 fingerprints.
 - A multi-stage container builds from locked root and API packages, runs as an unprivileged user, and retains disabled business reads/writes and Swagger when network-facing. The smoke harness checks ordinary HTTP, disabled writes, protected reads and non-root execution. Liveness is not database readiness.
@@ -20,7 +21,6 @@ npm ci
 npm ci --prefix apps/api
 node scripts/architecture/check-http-api-wiring.mjs
 npm run --prefix apps/api verify:platform
-npm run --prefix apps/api sdk:verify
 docker build -f apps/api/Dockerfile -t becomuna-api:ws01 .
 node apps/api/scripts/smoke-container.mjs becomuna-api:ws01
 ```
