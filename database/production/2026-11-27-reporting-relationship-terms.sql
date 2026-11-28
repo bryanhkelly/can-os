@@ -12,6 +12,7 @@ BEGIN
 END $guard$;
 
 ALTER TABLE public.reporting_relationship_agreements
+  ADD COLUMN data_population text NOT NULL DEFAULT 'unknown' CHECK (data_population IN ('real','synthetic','unknown')),
   ADD COLUMN coverage_mode text NOT NULL DEFAULT 'prospective',
   ADD COLUMN coverage_from timestamptz,
   ADD COLUMN supersedes_id uuid REFERENCES public.reporting_relationship_agreements(id),
@@ -45,6 +46,7 @@ LANGUAGE plpgsql SET search_path=pg_catalog,public AS $revision$
 DECLARE predecessor public.reporting_relationship_agreements%ROWTYPE;
 BEGIN
   IF TG_OP='UPDATE' AND NOT (OLD.status='pending' AND NEW.status='accepted') THEN RETURN NEW; END IF;
+  IF NEW.data_population NOT IN ('real','synthetic') THEN RAISE EXCEPTION 'Explicit relationship population required'; END IF;
   SELECT * INTO predecessor FROM public.reporting_relationship_agreements r
     WHERE r.owner_organization_id=NEW.owner_organization_id
       AND r.recipient_organization_id=NEW.recipient_organization_id
@@ -56,7 +58,7 @@ BEGIN
   IF NEW.supersedes_id IS NULL THEN
     IF FOUND THEN RAISE EXCEPTION 'Existing accepted terms require an explicit amendment'; END IF;
   ELSE
-    IF NOT FOUND OR predecessor.id<>NEW.supersedes_id THEN
+    IF NOT FOUND OR predecessor.id<>NEW.supersedes_id OR predecessor.data_population<>NEW.data_population THEN
       RAISE EXCEPTION 'Amendment must reference the current accepted agreement with identical parties, kind and scope';
     END IF;
     IF TG_OP='UPDATE' THEN
