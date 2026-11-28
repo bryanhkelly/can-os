@@ -19,13 +19,14 @@ const uuid=z.string().uuid();
 const iso=z.coerce.date().transform(value=>value.toISOString());
 const rowSchema=relationshipProposalSchema.extend({
   id:uuid,ownerOrganizationId:uuid,proposedByPersonId:uuid,proposedAt:iso,
-  validThrough:iso.nullable(),
+  validThrough:iso.nullable(),coverageFrom:iso.nullable(),
   status:z.enum(["pending","accepted","declined","withdrawn","revoked"]),
   acceptedAt:iso.nullable(),acceptedByPersonId:uuid.nullable(),
 });
 const columns=sql`id,owner_organization_id AS "ownerOrganizationId",
   recipient_organization_id AS "recipientOrganizationId",scope_kind AS "scopeKind",
   scope_id AS "scopeId",relationship_kind AS "relationshipKind",metrics,
+  coverage_mode AS "coverageMode",coverage_from AS "coverageFrom",supersedes_id AS "supersedesId",
   valid_through AS "validThrough",proposed_at AS "proposedAt",
   proposed_by_person_id AS "proposedByPersonId",status,
   accepted_at AS "acceptedAt",accepted_by_person_id AS "acceptedByPersonId"`;
@@ -133,13 +134,14 @@ export async function proposeReportingRelationship(request:Request,input:unknown
     const result=await tx.execute(sql`
       INSERT INTO public.reporting_relationship_agreements
         (owner_organization_id,recipient_organization_id,scope_kind,site_id,program_id,offering_id,class_id,
-         relationship_kind,metrics,valid_through,proposed_by_person_id,last_action_by_person_id,last_action_organization_id)
+         relationship_kind,metrics,valid_through,coverage_mode,coverage_from,supersedes_id,proposed_by_person_id,last_action_by_person_id,last_action_organization_id)
       VALUES (${scope.ownerOrganizationId}::uuid,${proposal.recipientOrganizationId}::uuid,${proposal.scopeKind},
         ${proposal.scopeKind==="site"?proposal.scopeId:null}::uuid,
         ${proposal.scopeKind==="program"?proposal.scopeId:null}::uuid,
         ${proposal.scopeKind==="offering"?proposal.scopeId:null}::uuid,
         ${proposal.scopeKind==="class"?proposal.scopeId:null}::uuid,
         ${proposal.relationshipKind},${JSON.stringify(proposal.metrics)}::jsonb,${proposal.validThrough}::timestamptz,
+        ${proposal.coverageMode??"prospective"},${proposal.coverageFrom??null}::timestamptz,${proposal.supersedesId??null}::uuid,
         ${person}::uuid,${person}::uuid,${scope.ownerOrganizationId}::uuid)
       RETURNING ${columns}`);
     return rowSchema.parse(result.rows[0]);
@@ -180,8 +182,8 @@ export async function decideReportingRelationship(request:Request,input:unknown)
     if(action==="accept"){
       await requireEligibleRecipient(tx,current.ownerOrganizationId,current.recipientOrganizationId);
       await requireEligibleRecipient(tx,current.recipientOrganizationId,current.ownerOrganizationId);
-      const {recipientOrganizationId,scopeKind,scopeId,relationshipKind,metrics,validThrough}=current;
-      validateRelationshipProposal({recipientOrganizationId,scopeKind,scopeId,relationshipKind,metrics,validThrough},
+      const {recipientOrganizationId,scopeKind,scopeId,relationshipKind,metrics,validThrough,coverageMode,coverageFrom,supersedesId}=current;
+      validateRelationshipProposal({recipientOrganizationId,scopeKind,scopeId,relationshipKind,metrics,validThrough,coverageMode,coverageFrom,supersedesId},
         scope,buildCurrentReportingMetricRegistry(),relationshipProposalMetrics(scopeKind),new Date());
     }
     const next=transitionRelationship(current,action as RelationshipAction,actor,new Date(),scope);
