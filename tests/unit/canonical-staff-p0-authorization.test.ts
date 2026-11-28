@@ -55,7 +55,7 @@ describe("canonical single-login P0 authorization boundaries", () => {
       expect(capabilities.has("noncredit.enrollment.manage")).toBe(true);
       expect(capabilities.has("blueprint.review")).toBe(false);
     }
-    const preview = source("src/modules/learning/credential-preview.functions.ts");
+    const preview = source("src/modules/learning/credential-preview.server.ts");
     const issuance = source("src/modules/learning/credential-issuance.functions.ts");
     expect(preview).toContain('assertCapability(actor, "credential.preview")');
     expect(issuance).toContain("assertCurrentCredentialIssuer(tx, getRequest(), actor)");

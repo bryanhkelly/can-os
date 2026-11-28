@@ -677,3 +677,21 @@ test('credential reader and sample preview are private, fail closed and never is
  assert.equal(c.preview.safeParse({trainingVersionId:id,format:'pdf',recipientName:'forged'}).success,false);
  assert.equal(c.artifactResult.safeParse({filename:'sample.pdf',mediaType:'application/pdf',base64:'YWJj',issued:true}).success,false);
 });
+
+test('source-bound evidence and revocation endpoints use canonical authority and strict intent contracts',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const [route,method] of [['/api/v1/completion-evidence-review-requests','POST'],['/api/v1/completion-evidence-review-queue','GET'],['/api/v1/completion-evidence-review-decisions','POST'],['/api/v1/credential-revocations','POST']]){
+   assert.ok(document.paths[route][method.toLowerCase()].security);
+   const response=await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);
+  }
+ });
+ const c=require('../dist/credentials.contracts'),id='00000000-0000-4000-8000-000000000001';
+ const request={purpose:'award_revocation',issuanceId:id,evidenceVersionId:id,reason:'Independently verified evidence'};
+ assert.equal(c.evidenceRequest.safeParse(request).success,true);
+ assert.equal(c.evidenceRequest.safeParse({...request,registrationId:id}).success,false);
+ assert.equal(c.evidenceRequest.safeParse({...request,approvedByPersonId:id}).success,false);
+ assert.equal(c.evidenceDecision.safeParse({requestId:id,decision:'approve',siteId:id}).success,false);
+ assert.equal(c.evidenceQueue.safeParse({page:'101'}).success,false);
+ assert.equal(c.revocation.safeParse({issuanceId:id,evidenceVersionId:id,reason:'short'}).success,false);
+});

@@ -1,3 +1,5 @@
+import * as completionEvidence from "@/modules/learning/completion-evidence-review.server";
+import {revokeLearningAwardIssuanceService} from "@/modules/learning/credential-revocation.server";
 import * as learnerCredentials from "@/modules/learning/learner-credentials.server";
 import {previewNoncreditCredentialService} from "@/modules/learning/credential-preview.server";
 import * as completionAdmin0 from "@/modules/learning/noncredit-completion-decisions.server";
@@ -83,6 +85,10 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
  const context=await (mode==="operator-reporting"?(readCookie(request,accessSessionCookie)!==undefined?getIdentityContext(request):getCanonicalCommandContext(request)):mode==="planning"?getBlueprintPlanningContext(request):mode==="canonical"?getCanonicalCommandContext(request):mode==="learner"?getInstructionalLearnerContext(request):getIdentityContext(request));
  if(!context.actorPersonId)throw new AuthorizationError("verified Person");
  return {
+  requestCompletionEvidenceReview:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Completion evidence context");return completionEvidence.requestCompletionEvidenceReviewService(request,raw);},
+  getPendingCompletionEvidenceReviews:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Completion evidence context");return completionEvidence.getPendingCompletionEvidenceReviewsService(request,raw);},
+  decideCompletionEvidenceReview:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Completion evidence context");return completionEvidence.decideCompletionEvidenceReviewService(request,raw);},
+  revokeLearningAwardIssuance:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Completion evidence context");return revokeLearningAwardIssuanceService(request,raw);},
   listMyNoncreditCredentials:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Credential reader context");const rows=await learnerCredentials.listMyNoncreditCredentialsService(request);return rows.map(row=>({...row,issuedAt:new Date(row.issuedAt).toISOString(),expiresAt:row.expiresAt===null?null:new Date(row.expiresAt).toISOString()}));},
   downloadMyNoncreditCredential:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Credential reader context");return learnerCredentials.downloadMyNoncreditCredentialService(request,raw);},
   previewNoncreditCredential:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Credential preview context");return previewNoncreditCredentialService(request,raw);},

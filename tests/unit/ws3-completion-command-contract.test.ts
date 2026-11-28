@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const file = (path: string) => readFileSync(path, "utf8");
 const corrections = file("src/modules/learning/noncredit-completion-corrections.server.ts");
-const revocation = file("src/modules/learning/credential-revocation.functions.ts");
+const revocation = file("src/modules/learning/credential-revocation.server.ts");
 const decisions = file("src/modules/learning/noncredit-completion-decisions.server.ts");
 const siteGuard = file("src/modules/learning/verified-completion-site.server.ts");
 const credentialSql = file("database/canonical/v3.0.1/patch-achievement-credentials.sql");

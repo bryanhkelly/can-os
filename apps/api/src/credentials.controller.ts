@@ -1,5 +1,5 @@
 import {Controller,Get,Post,Body,Query,Req,HttpCode,applyDecorators} from '@nestjs/common';
-import {ApiTags,ApiCookieAuth,ApiOperation,ApiBody,ApiOkResponse,ApiHeader,ApiResponse} from '@nestjs/swagger';
+import {ApiTags,ApiCookieAuth,ApiOperation,ApiBody,ApiOkResponse,ApiHeader,ApiResponse,ApiQuery} from '@nestjs/swagger';
 import type {FastifyRequest} from 'fastify';
 import {GovernedWorkflowOperation,verifiedWorkflow} from './security';
 import {CanonicalIdentityService} from './identity.service';
@@ -28,4 +28,28 @@ export class CredentialsController {
  @ApiBody({schema:c.docs.preview})
  @ApiOkResponse({schema:c.docs.artifact})
  async previewNoncreditCredential(@Req() req:FastifyRequest,@Body() body:unknown){const workflow=verifiedWorkflow(req),input=validated(c.preview,body);return c.artifactResult.parse(await this.identity.runWorkflow(()=>workflow.previewNoncreditCredential(input)));}
+ @Post('completion-evidence-review-requests')
+ @Operation('POST')
+ @ApiOperation({operationId:'requestCompletionEvidenceReview',summary:'Request an independent review of exact source-bound completion evidence'})
+ @ApiBody({schema:c.evidenceDocs.request})
+ @ApiOkResponse({schema:c.evidenceDocs.requested})
+ async requestCompletionEvidenceReview(@Req() req:FastifyRequest,@Body() body:unknown){const workflow=verifiedWorkflow(req),input=validated(c.evidenceRequest,body);return c.requested.parse(await this.identity.runWorkflow(()=>workflow.requestCompletionEvidenceReview(input)));}
+ @Get('completion-evidence-review-queue')
+ @Operation('GET')
+ @ApiOperation({operationId:'getPendingCompletionEvidenceReviews',summary:'Read exact-Site pending evidence requests excluding own submissions'})
+ @ApiQuery({name:'page',schema:{type:'integer',minimum:0,maximum:100,default:0},required:false})
+ @ApiOkResponse({schema:c.evidenceDocs.queue})
+ async getPendingCompletionEvidenceReviews(@Req() req:FastifyRequest,@Query() query:unknown){const workflow=verifiedWorkflow(req),input=validated(c.evidenceQueue,query);return c.queueResult.parse(await this.identity.runWorkflow(()=>workflow.getPendingCompletionEvidenceReviews(input)));}
+ @Post('completion-evidence-review-decisions')
+ @Operation('POST')
+ @ApiOperation({operationId:'decideCompletionEvidenceReview',summary:'Approve or reject independently reviewed evidence'})
+ @ApiBody({schema:c.evidenceDocs.decision})
+ @ApiOkResponse({schema:c.evidenceDocs.decided})
+ async decideCompletionEvidenceReview(@Req() req:FastifyRequest,@Body() body:unknown){const workflow=verifiedWorkflow(req),input=validated(c.evidenceDecision,body);return c.decided.parse(await this.identity.runWorkflow(()=>workflow.decideCompletionEvidenceReview(input)));}
+ @Post('credential-revocations')
+ @Operation('POST')
+ @ApiOperation({operationId:'revokeLearningAwardIssuance',summary:'Revoke a credential with independent source-bound evidence and current issuer authority'})
+ @ApiBody({schema:c.evidenceDocs.revocation})
+ @ApiOkResponse({schema:c.evidenceDocs.revoked})
+ async revokeLearningAwardIssuance(@Req() req:FastifyRequest,@Body() body:unknown){const workflow=verifiedWorkflow(req),input=validated(c.revocation,body);return c.revoked.parse(await this.identity.runWorkflow(()=>workflow.revokeLearningAwardIssuance(input)));}
 }
