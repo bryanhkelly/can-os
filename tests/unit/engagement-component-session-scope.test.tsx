@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { engagementOwnerScopeKey } from "@/domain/engagement-owner-scope";
 import { engagementChannels, engagementChannelSchema, engagementChannelLabels } from "@/domain/engagement-definition";
 import { GoLinkWorkspace } from "@/components/launch-studio/GoLinkWorkspace";
+import {legacyEngagementTransport,type EngagementWorkspaceTransport} from "@/modules/engagement/engagement-workspace-transport";
 import {legacyGoLinkTransport,type GoLinkWorkspaceTransport} from "@/modules/engagement/go-link-workspace-transport";
 import { UniversalEngagementPublisher } from "@/components/launch-studio/UniversalEngagementPublisher";
 import { LaunchPreviewSharing } from "@/components/launch-studio/LaunchPreviewSharing";
@@ -23,6 +24,12 @@ describe("Engagement component session isolation", () => {
     const transport:GoLinkWorkspaceTransport={kind:"nest",api:legacyGoLinkTransport.api};
     const props={siteId:"site-a",packageId:"package-a"};
     expect(GoLinkWorkspace({...props,transport}).key).not.toBe(GoLinkWorkspace(props).key);
+  });
+  it("isolates publisher and library session keys when the selected transport changes",()=>{
+    const transport:EngagementWorkspaceTransport={...legacyEngagementTransport,kind:"nest"};
+    const props={siteId:"site-a",packageId:"package-a"};
+    expect(UniversalEngagementPublisher({...props,transport}).key).not.toBe(UniversalEngagementPublisher(props).key);
+    expect(SiteEngagementLibrary({...props,transport}).key).not.toBe(SiteEngagementLibrary(props).key);
   });
   it("separates Site, platform and Organization engagement libraries", () => {
     const local = SiteEngagementLibrary({siteId:"site-a",packageId:"package-a"});
