@@ -1,9 +1,9 @@
 import { requireFacilitatedLearningEnabled } from "@/modules/learning/canonical-learning-release.server";
 import { assertNativeClassRoomStaff } from "@/modules/classes/native-class-room-boundary.server";
 import { createServerFn } from "@tanstack/react-start";
-import { digestCode, generatePairingCode, displayCode, recordRoomAuditAndEvent, currentRoomParticipantPermitted, ownedRoom, assertRoomLive, currentRoomMediaAudience, assertRoomMediaRightsForAudience, assertAuthorizedFacilitatedRoomMedia, createFacilitatedRoomForHost } from "./facilitated-learning-operations.server";
+import { digestCode, generatePairingCode, derivePairingRenewalCode, displayCode, recordRoomAuditAndEvent, currentRoomParticipantPermitted, ownedRoom, assertRoomLive, currentRoomMediaAudience, assertRoomMediaRightsForAudience, assertAuthorizedFacilitatedRoomMedia, createFacilitatedRoomForHost } from "./facilitated-learning-operations.server";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, asc, countDistinct, desc, eq, gt, inArray, isNull, lte, or } from "drizzle-orm";
+import { and, asc, countDistinct, desc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -253,7 +253,7 @@ export const startFacilitatedLearningRoom = createServerFn({method:"POST"})
   });
 
 export const renewFacilitatedLearningPairing = createServerFn({method:"POST"})
-  .validator((value:unknown)=>roomIdInput.parse(value))
+  .validator((value:unknown)=>roomIdInput.extend({requestId:z.string().uuid().optional()}).strict().parse(value))
   .handler(async({data})=>{
     requireFacilitatedLearningEnabled();
     privateResult();
@@ -261,7 +261,22 @@ export const renewFacilitatedLearningPairing = createServerFn({method:"POST"})
     return db.transaction(async tx=>{
       const room=await ownedRoom(tx,host,data.facilitatedSessionId,true);
       const now=new Date(); assertRoomLive(room,now);
-      const code=generatePairingCode();
+      const personId=host.actor.actorPersonId!;
+      const code=data.requestId?derivePairingRenewalCode(room.id,personId,data.requestId):generatePairingCode();
+      if(data.requestId){
+        const [prior]=await tx.select({actorPersonId:domainEvents.actorPersonId,payload:domainEvents.payload}).from(domainEvents)
+          .where(and(eq(domainEvents.aggregateType,"facilitated_learning_session"),
+            eq(domainEvents.aggregateId,room.id),eq(domainEvents.eventType,"FacilitatedLearningPairingRenewed"),
+            sql`${domainEvents.payload}->>'requestId' = ${data.requestId}`)).limit(1);
+        if(prior){
+          // Never revive an expired, rotated or transferred pairing code.
+          if(prior.actorPersonId!==personId||prior.payload.pairingExpiresAt!==room.pairingExpiresAt.toISOString()||
+             room.pairingExpiresAt<=now||room.pairingCodeDigest!==digestCode(code))
+            throw new AuthorizationError("pairing renewal superseded; use a new request");
+          return {facilitatedSessionId:room.id,pairingCode:displayCode(code),
+            pairingExpiresAt:room.pairingExpiresAt.toISOString(),duplicate:true};
+        }
+      }
       const expiresAt=new Date(Math.min(
         now.getTime()+facilitatedPairingWindowMs,
         room.startedAt.getTime()+facilitatedRoomMaxMs,
@@ -272,10 +287,11 @@ export const renewFacilitatedLearningPairing = createServerFn({method:"POST"})
       await recordRoomAuditAndEvent(tx,{
         actorPersonId:host.actor.actorPersonId!,organizationId:host.organizationId,
         eventCode:"learning.facilitated.pairing.renewed",eventType:"FacilitatedLearningPairingRenewed",
-        sessionId:room.id,payload:{pairingExpiresAt:expiresAt.toISOString()},
+        sessionId:room.id,payload:{pairingExpiresAt:expiresAt.toISOString(),
+          ...(data.requestId?{requestId:data.requestId}:{})},
       });
       return {facilitatedSessionId:room.id,pairingCode:displayCode(code),
-        pairingExpiresAt:expiresAt.toISOString()};
+        pairingExpiresAt:expiresAt.toISOString(),duplicate:false};
     });
   });
 
@@ -317,7 +333,8 @@ export const recordFacilitatedPlayback = createServerFn({method:"POST"})
           eq(facilitatedLearningPlayback.requestId,data.requestId),
         )).limit(1);
       if(existing){
-        if(existing.kind!==data.kind||existing.lessonId!==data.lessonId||
+        if(existing.facilitatorPersonId!==host.actor.actorPersonId||
+          existing.kind!==data.kind||existing.lessonId!==data.lessonId||
           existing.assetVersionId!==data.assetVersionId||
           existing.positionSeconds!==data.positionSeconds)
           throw new Error("Conflicting facilitated playback retry");

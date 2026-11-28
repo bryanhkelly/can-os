@@ -15,6 +15,7 @@ import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { assertNativeClassSessionSeries, canChangeUnopenedClassSession } from "@/domain/native-class-sessions";
 import { requireNativeClassSessionHost } from "./native-class-session-host.server";
 import { currentClassAuthority } from "./native-class-authority.server";
+import { nativeClassForRoom } from "./native-class-room-boundary.server";
 import { assertCurrentNativeClassFacilitatorSession } from "./native-class-facilitator-session.server";
 import { requireCanonicalFacilitator } from "@/modules/learning/canonical-facilitator-access.server";
 import { requireFacilitatedLearningEnabled } from "@/modules/learning/canonical-learning-release.server";
@@ -305,8 +306,7 @@ export const openNativeClassSession=createServerFn({method:"POST"})
       const [link]=await tx.select().from(canonicalClassSessions)
         .where(and(eq(canonicalClassSessions.id,data.classSessionId),
           eq(canonicalClassSessions.classId,instance.id))).limit(1);
-      if(!link||link.facilitatorPersonId!==host.actor.actorPersonId)
-        throw new AuthorizationError("your own assigned Class Session");
+      if(!link)throw new AuthorizationError("exact assigned Class Session");
       const [plan]=await tx.select().from(facilitatedClassroomPlans)
         .where(eq(facilitatedClassroomPlans.id,link.classroomPlanId))
         .for("update").limit(1);
@@ -318,7 +318,7 @@ export const openNativeClassSession=createServerFn({method:"POST"})
          plan.courseVersionId!==instance.courseVersionId ||
          plan.siteId!==instance.siteId ||
          plan.hostOrganizationId!==host.organizationId ||
-         plan.facilitatorPersonId!==host.actor.actorPersonId ||
+         plan.facilitatorPersonId!==link.facilitatorPersonId ||
          plan.enrollmentReleaseId!==null ||
          delivery.siteId!==instance.siteId ||
          delivery.deploymentId!==instance.deploymentId)
@@ -327,12 +327,7 @@ export const openNativeClassSession=createServerFn({method:"POST"})
         // Never return an ended, emergency-revoked or timed-out room as
         // successfully reopened. The Class Session is immutable: a new
         // session must be scheduled rather than reviving the old room.
-        const [room]=await tx.select({
-          id:facilitatedLearningSessions.id,
-          state:facilitatedLearningSessions.state,
-          startedAt:facilitatedLearningSessions.startedAt,
-          endedAt:facilitatedLearningSessions.endedAt,
-        }).from(facilitatedLearningSessions).where(and(
+        const [room]=await tx.select().from(facilitatedLearningSessions).where(and(
           eq(facilitatedLearningSessions.id,plan.facilitatedSessionId),
           eq(facilitatedLearningSessions.deploymentId,instance.deploymentId),
           eq(facilitatedLearningSessions.courseVersionId,instance.courseVersionId),
@@ -342,10 +337,14 @@ export const openNativeClassSession=createServerFn({method:"POST"})
         )).limit(1);
         if(!room || facilitatedRoomOperationalState(room,now)!=="live")
           throw new AuthorizationError("Class Session room is ended or expired; schedule a new Session");
+        if((await nativeClassForRoom(tx,room))?.classSessionId!==link.id)
+          throw new AuthorizationError("exact current classroom control assignment");
         return {classSessionId:link.id,facilitatedSessionId:room.id,
           pairingCode:null as string|null,pairingExpiresAt:null as string|null,
           alreadyStarted:true};
       }
+      if(link.facilitatorPersonId!==host.actor.actorPersonId)
+        throw new AuthorizationError("original assigned facilitator must open an unopened Session");
       if(requiresClassSessionAgenda({
         featureEnabled:true,
         mandatoryFrom:"1970-01-01T00:00:00.000Z",

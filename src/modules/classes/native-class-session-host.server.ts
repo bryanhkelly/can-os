@@ -1,9 +1,9 @@
-import { and, eq, gt, isNull, lte, or } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
-import { canonicalClasses, canonicalClassStaffAssignments } from "@/db/canonical-v301";
+import { canonicalClasses } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { currentClassAuthority } from "./native-class-authority.server";
-import { assertCurrentNativeTeachingGrant } from "./native-class-room-boundary.server";
+import { assertAssignedNativeClassFacilitator } from "./native-class-room-boundary.server";
 import { requireCanonicalFacilitator } from "@/modules/learning/canonical-facilitator-access.server";
 
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -23,19 +23,6 @@ export async function requireNativeClassSessionHost(
      !["scheduled","hybrid","facilitated"].includes(instance.deliveryMode))
     throw new AuthorizationError("active, authorized hosted Class");
   await currentClassAuthority(tx,instance.id,now);
-  const [assignment]=await tx.select({
-    id:canonicalClassStaffAssignments.id,
-  }).from(canonicalClassStaffAssignments)
-    .where(and(
-      eq(canonicalClassStaffAssignments.classId,instance.id),
-      eq(canonicalClassStaffAssignments.personId,host.actor.actorPersonId!),
-      eq(canonicalClassStaffAssignments.roleCode,"facilitator"),
-      eq(canonicalClassStaffAssignments.state,"approved"),
-      lte(canonicalClassStaffAssignments.beginsAt,now),
-      or(isNull(canonicalClassStaffAssignments.endsAt),
-        gt(canonicalClassStaffAssignments.endsAt,now)),
-    )).limit(1);
-  if(!assignment)throw new AuthorizationError("explicit active Class facilitator assignment");
-  await assertCurrentNativeTeachingGrant(tx,host.actor.actorPersonId!,host.organizationId,instance.siteId);
+  await assertAssignedNativeClassFacilitator(tx,instance.id,host.actor.actorPersonId!,host.organizationId,instance.siteId,now);
   return instance;
 }

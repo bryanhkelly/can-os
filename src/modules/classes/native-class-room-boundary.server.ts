@@ -1,10 +1,10 @@
-import { and, eq, gt, isNotNull, isNull, lte, or } from "drizzle-orm";
+import { and, desc, eq, gt, isNotNull, isNull, lte, or } from "drizzle-orm";
 import { accessAccounts, accountPersonGrants, people } from "@/db/schema";
 import { db } from "@/db/client";
 import {
   canonicalClasses, canonicalClassSessions, canonicalClassEnrollments,
   canonicalClassStaffAssignments, facilitatedClassroomPlans,
-  learnerCourseAttempts,
+  learnerCourseAttempts, domainEvents,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { currentClassAuthority } from "./native-class-authority.server";
@@ -60,6 +60,8 @@ export async function nativeClassForRoom(tx:Tx,room:Room){
     planSiteId:facilitatedClassroomPlans.siteId,
     planOrganizationId:facilitatedClassroomPlans.hostOrganizationId,
     planFacilitatorId:facilitatedClassroomPlans.facilitatorPersonId,
+    originalFacilitatorId:canonicalClassSessions.facilitatorPersonId,
+    classSessionId:canonicalClassSessions.id,
     classInstance:canonicalClasses,
   }).from(canonicalClassSessions)
     .innerJoin(facilitatedClassroomPlans,
@@ -74,7 +76,7 @@ export async function nativeClassForRoom(tx:Tx,room:Room){
      row.planDeploymentId!==room.deploymentId ||
      row.planSiteId!==room.siteId ||
      row.planOrganizationId!==room.hostOrganizationId ||
-     row.planFacilitatorId!==room.facilitatorPersonId ||
+     row.planFacilitatorId!==row.originalFacilitatorId ||
      cls.id!==row.classId||cls.state!=="active" ||
      cls.deploymentId!==room.deploymentId ||
      cls.courseVersionId!==room.courseVersionId ||
@@ -83,7 +85,20 @@ export async function nativeClassForRoom(tx:Tx,room:Room){
     throw new AuthorizationError("exact live Class Session and facilitated room");
   }
   await currentClassAuthority(tx,cls.id,new Date());
-  return {classId:cls.id,adoptionId:cls.adoptionId,
+  // Preserve the immutable scheduled facilitator. A different current room
+  // controller must have the matching durable manager-directed transfer.
+  {
+    const [transfer]=await tx.select({payload:domainEvents.payload}).from(domainEvents)
+      .where(and(eq(domainEvents.aggregateType,"facilitated_learning_session"),
+        eq(domainEvents.aggregateId,room.id),eq(domainEvents.eventType,"ClassroomControlTransferred")))
+      .orderBy(desc(domainEvents.occurredAt),desc(domainEvents.id)).limit(1);
+    if(transfer ? (transfer.payload.classSessionId!==row.classSessionId||
+       transfer.payload.toPersonId!==room.facilitatorPersonId||
+       transfer.payload.originalFacilitatorPersonId!==row.originalFacilitatorId)
+       : row.originalFacilitatorId!==room.facilitatorPersonId)
+      throw new AuthorizationError("governed current classroom control assignment");
+  }
+  return {classId:cls.id,classSessionId:row.classSessionId,originalFacilitatorPersonId:row.originalFacilitatorId,adoptionId:cls.adoptionId,
     offeringVersionId:cls.offeringVersionId,courseVersionId:cls.courseVersionId,
     deploymentId:cls.deploymentId,siteId:cls.siteId,
     facilitatorPersonId:room.facilitatorPersonId,
@@ -96,11 +111,15 @@ export async function nativeClassForRoom(tx:Tx,room:Room){
 export async function assertNativeClassRoomStaff(tx:Tx,room:Room){
   const linked=await nativeClassForRoom(tx,room);
   if(!linked)return null;
-  const now=new Date();
+  await assertAssignedNativeClassFacilitator(tx,linked.classId,room.facilitatorPersonId,room.hostOrganizationId,room.siteId,new Date());
+  return linked;
+}
+
+export async function assertAssignedNativeClassFacilitator(tx:Tx,classId:string,personId:string,organizationId:string,siteId:string,now:Date){
   const [staff]=await tx.select({id:canonicalClassStaffAssignments.id})
     .from(canonicalClassStaffAssignments).where(and(
-      eq(canonicalClassStaffAssignments.classId,linked.classId),
-      eq(canonicalClassStaffAssignments.personId,room.facilitatorPersonId),
+      eq(canonicalClassStaffAssignments.classId,classId),
+      eq(canonicalClassStaffAssignments.personId,personId),
       eq(canonicalClassStaffAssignments.roleCode,"facilitator"),
       eq(canonicalClassStaffAssignments.state,"approved"),
       lte(canonicalClassStaffAssignments.beginsAt,now),
@@ -108,8 +127,7 @@ export async function assertNativeClassRoomStaff(tx:Tx,room:Room){
         gt(canonicalClassStaffAssignments.endsAt,now)),
     )).limit(1);
   if(!staff)throw new AuthorizationError("current facilitator assignment to the exact Class");
-  await assertCurrentNativeTeachingGrant(tx,room.facilitatorPersonId,room.hostOrganizationId,room.siteId);
-  return linked;
+  await assertCurrentNativeTeachingGrant(tx,personId,organizationId,siteId);
 }
 
 /** Personal learner/attendance data is visible only when a verified Class

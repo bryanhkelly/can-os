@@ -30,6 +30,17 @@ export function generatePairingCode() {
   }
   return code;
 }
+/** A recoverable renewal code is pseudorandom under the existing server-only
+ * pepper. The domain tag and fixed UUID fields separate it from code hashing.
+ * Never persist the plaintext or derive a code without current room authority.
+ */
+export function derivePairingRenewalCode(roomId:string,personId:string,requestId:string) {
+  const bytes=createHmac("sha256",pairingPepper())
+    .update("can-facilitated-pairing-renewal:v1:"+roomId+":"+personId+":"+requestId).digest();
+  // The canonical alphabet contains exactly 32 symbols (5 bits per symbol).
+  if(facilitatedCodeAlphabet.length!==32)throw new Error("Invalid pairing alphabet");
+  return Array.from(bytes.subarray(0,facilitatedCodeLength),b=>facilitatedCodeAlphabet[b&31]!).join("");
+}
 export function displayCode(code: string) { return code.slice(0, 5) + "-" + code.slice(5); }
 
 /**
@@ -508,7 +519,6 @@ export async function selfEnrolledNoncreditRoomSitePermitted(
     throw error;
   }
 }
-
 
 /** Revalidate the current, already-authorized Course Attempt against this exact
  * room. Live callers must additionally check the room lifecycle; historical

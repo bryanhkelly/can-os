@@ -86,6 +86,7 @@ export const EventTypes = {
   SiteRoomRetired: "SiteRoomRetired",
   SectionRoomAssigned: "SectionRoomAssigned",
   RoomCoverageScheduled: "RoomCoverageScheduled",
+  ClassroomControlTransferred: "ClassroomControlTransferred",
   DemoRoomFacilitatorProvisioned: "DemoRoomFacilitatorProvisioned",
   NetworkAgreementVerified: "NetworkAgreementVerified",
   NetworkAdministratorProvisioned: "NetworkAdministratorProvisioned",

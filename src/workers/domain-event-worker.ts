@@ -102,6 +102,7 @@ for (const eventType of [
 
   EventTypes.SectionRoomAssigned,
   EventTypes.RoomCoverageScheduled,
+  EventTypes.ClassroomControlTransferred,
   EventTypes.DemoRoomFacilitatorProvisioned,
   EventTypes.SchoolSetupCompleted,
   EventTypes.SchoolYearCreated,

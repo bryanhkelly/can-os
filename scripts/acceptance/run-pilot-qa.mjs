@@ -40,6 +40,7 @@ function init() {
     TEST_DATABASE_URL: "", CAN_APPLICATION_DB_HOST: "",
     CAN_CANONICAL_AUTH_DATABASE_URL: "", CAN_CANONICAL_OPERATIONS_DATABASE_URL: "",
     CAN_ACCESS_TOKEN_PEPPER: secret(), CAN_CANONICAL_ACCESS_TOKEN_PEPPER: secret(),
+    CAN_FACILITATED_PAIRING_PEPPER: secret(),
     CAN_NONCREDIT_ASSESSMENT_KEY_HEX: secret(),
     CAN_R2_ACCOUNT_ID: "", CAN_R2_BUCKET: "can-os-pilot-qa",
     CAN_R2_ACCESS_KEY_ID: "", CAN_R2_SECRET_ACCESS_KEY: "", CAN_R2_SESSION_TOKEN: "",
@@ -61,7 +62,7 @@ function localConfiguration() {
   const permitted = new Set([
     "APP_ENV","NODE_ENV","CAN_TEST_DB_WRITES_ENABLED","CAN_PILOT_QA_BRANCH_ID",
     "TEST_DATABASE_URL","CAN_APPLICATION_DB_HOST","CAN_CANONICAL_AUTH_DATABASE_URL",
-    "CAN_CANONICAL_OPERATIONS_DATABASE_URL","CAN_ACCESS_TOKEN_PEPPER","CAN_CANONICAL_ACCESS_TOKEN_PEPPER",
+    "CAN_CANONICAL_OPERATIONS_DATABASE_URL","CAN_ACCESS_TOKEN_PEPPER","CAN_CANONICAL_ACCESS_TOKEN_PEPPER","CAN_FACILITATED_PAIRING_PEPPER",
     "CAN_NONCREDIT_ASSESSMENT_KEY_HEX","CAN_NONCREDIT_AUTO_FINALIZATION_ENABLED",
     "CAN_R2_ACCOUNT_ID","CAN_R2_BUCKET","CAN_R2_ACCESS_KEY_ID","CAN_R2_SECRET_ACCESS_KEY","CAN_R2_SESSION_TOKEN",
     "CAN_PILOT_QA_LEARNER_SESSION","CAN_PILOT_QA_OTHER_SESSION","CAN_PILOT_QA_PROVIDER_SESSION","CAN_PILOT_QA_FIXTURE_JSON","CAN_PILOT_QA_GOVERNED_JSON",
@@ -119,6 +120,8 @@ try {
         if(!(await checkPilotMigrationParity(env)).ready) fail("Repair QA database parity before preparation.");
         if((env.CAN_ACCESS_TOKEN_PEPPER?.length??0)<32||(env.CAN_CANONICAL_ACCESS_TOKEN_PEPPER?.length??0)<32)
           fail("Independent QA session keys required.");
+        if(["facilitator","governed","pilot1","pilot2","all"].includes(mode) &&
+          (env.CAN_FACILITATED_PAIRING_PEPPER?.length??0)<32) fail("Independent QA pairing pepper required; preserve it across fixture runs.");
         Object.assign(env,{DATABASE_URL:env.TEST_DATABASE_URL,CAN_ACCESS_PUBLIC_ORIGIN:"https://app.can-os.test",
           CAN_ACCESS_MAIL_OUTBOX_DIR:outbox});
         console.log("Private preparation: http://localhost:5183");
