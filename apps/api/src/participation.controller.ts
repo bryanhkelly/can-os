@@ -1,4 +1,4 @@
-import {Controller,Get,Post,Req,Res,Body,Query,HttpCode,applyDecorators} from '@nestjs/common';
+import {Controller,Get,Post,Req,Res,Body,Query,HttpCode,Header,applyDecorators} from '@nestjs/common';
 import {ApiTags,ApiCookieAuth,ApiOperation,ApiBody,ApiOkResponse,ApiHeader,ApiResponse,ApiQuery} from '@nestjs/swagger';
 import type {FastifyRequest,FastifyReply} from 'fastify';
 import {GovernedWorkflowOperation,verifiedWorkflow} from './security';
@@ -267,5 +267,159 @@ export class ParticipationController{
  getMyNativeClassInvitations(@Req() req:FastifyRequest,@Query() query:unknown){
   const input=validated(admission.emptyCommand,query),workflow=verifiedWorkflow(req);
   return this.identity.runWorkflow(async()=>admission.myClassInvitationsResult.parse(JSON.parse(JSON.stringify(await workflow.getMyNativeClassInvitations(input)))));
+ }
+
+ @Post('admission-inquiries')
+ @Command('can')
+ @Header('Cache-Control','private, no-store')
+ @Header('Referrer-Policy','no-referrer')
+ @ApiOperation({operationId:'createAdmissionsInquiry',summary:'Create a scoped registrar inquiry; no offer or enrollment'})
+ @ApiBody({schema:admission.intakeDocs.inquiry})
+ @ApiOkResponse({schema:admission.intakeDocs.inquiryReceipt})
+ createAdmissionsInquiry(@Req() req:FastifyRequest,@Body() body:unknown){
+  const input=validated(admission.admissionsInquiryInput,body),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.inquiryReceipt.parse(await workflow.createAdmissionsInquiry(input)));
+ }
+ @Post('admission-stage-transitions')
+ @Command('can')
+ @Header('Cache-Control','private, no-store')
+ @Header('Referrer-Policy','no-referrer')
+ @ApiOperation({operationId:'transitionAdmissionsStage',summary:'Apply a governed admissions decision'})
+ @ApiBody({schema:admission.intakeDocs.transition})
+ @ApiOkResponse({schema:admission.intakeDocs.stageReceipt})
+ transitionAdmissionsStage(@Req() req:FastifyRequest,@Body() body:unknown){
+  const input=validated(admission.admissionsTransitionInput,body),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.stageReceipt.parse(await workflow.transitionAdmissionsStage(input)));
+ }
+ @Post('admission-guardian-verifications')
+ @Command('can')
+ @Header('Cache-Control','private, no-store')
+ @Header('Referrer-Policy','no-referrer')
+ @ApiOperation({operationId:'verifyAdmissionsGuardianRelationship',summary:'Independently verify the recorded guardian relationship'})
+ @ApiBody({schema:admission.intakeDocs.verification})
+ @ApiOkResponse({schema:admission.intakeDocs.verificationReceipt})
+ verifyAdmissionsGuardianRelationship(@Req() req:FastifyRequest,@Body() body:unknown){
+  const input=validated(admission.guardianVerificationInput,body),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.guardianVerificationReceipt.parse(await workflow.verifyAdmissionsGuardianRelationship(input)));
+ }
+ @Post('admission-guardian-accounts')
+ @Command('can')
+ @Header('Cache-Control','private, no-store')
+ @Header('Referrer-Policy','no-referrer')
+ @ApiOperation({operationId:'provisionInquiryGuardianAccount',summary:'Provision the verified guardian's scoped account'})
+ @ApiBody({schema:admission.intakeDocs.application})
+ @ApiOkResponse({schema:admission.intakeDocs.provisionReceipt})
+ provisionInquiryGuardianAccount(@Req() req:FastifyRequest,@Body() body:unknown){
+  const input=validated(admission.admissionsApplicationInput,body),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.guardianProvisionReceipt.parse(await workflow.provisionInquiryGuardianAccount(input)));
+ }
+ @Post('admission-guardian-invitations')
+ @Command('can')
+ @Header('Cache-Control','private, no-store')
+ @Header('Referrer-Policy','no-referrer')
+ @ApiOperation({operationId:'sendAdmissionsGuardianInvitation',summary:'Request the existing verified guardian sign-in workflow'})
+ @ApiBody({schema:admission.intakeDocs.application})
+ @ApiOkResponse({schema:admission.intakeDocs.invitationReceipt})
+ sendAdmissionsGuardianInvitation(@Req() req:FastifyRequest,@Body() body:unknown){
+  const input=validated(admission.admissionsApplicationInput,body),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.guardianInvitationReceipt.parse(await workflow.sendAdmissionsGuardianInvitation(input)));
+ }
+ @Get('admission-intake-programs')
+ @GovernedWorkflowOperation('can','GET')
+ @ApiCookieAuth('session')
+ @Header('Cache-Control','private, no-store')
+ @Header('Referrer-Policy','no-referrer')
+ @ApiOperation({operationId:'listAdmissionsIntakePrograms',summary:'List authorized admissions programs'})
+ 
+ @ApiOkResponse({schema:admission.intakeDocs.programs})
+ @ApiResponse({status:400,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:401,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:403,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:500,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:503,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ listAdmissionsIntakePrograms(@Req() req:FastifyRequest,@Query() query:unknown){
+  const input=validated(admission.emptyCommand,query),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.intakeProgramsResult.parse(await workflow.listAdmissionsIntakePrograms(input)));
+ }
+ @Get('admission-existing-students')
+ @GovernedWorkflowOperation('can','GET')
+ @ApiCookieAuth('session')
+ @Header('Cache-Control','private, no-store')
+ @Header('Referrer-Policy','no-referrer')
+ @ApiOperation({operationId:'listAdmissionsExistingStudentsPage',summary:'Page through authorized existing students and verified guardians'})
+ @ApiQuery({name:'siteId',required:false,schema:{type:'string',format:'uuid'}})
+ @ApiQuery({name:'programId',required:false,schema:{type:'string',format:'uuid'}})
+ @ApiQuery({name:'applicationId',required:false,schema:{type:'string',format:'uuid'}})
+ @ApiQuery({name:'search',required:false,schema:{type:'string',maxLength:100}})
+ @ApiQuery({name:'pageSize',required:false,schema:{type:'integer',minimum:1,maximum:100,default:40}})
+ @ApiQuery({name:'page',required:false,schema:{type:'integer',minimum:1,maximum:10000,default:1}})
+ @ApiOkResponse({schema:admission.intakeDocs.students})
+ @ApiResponse({status:400,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:401,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:403,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:500,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:503,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ listAdmissionsExistingStudentsPage(@Req() req:FastifyRequest,@Query() query:unknown){
+  const input=validated(admission.admissionsIntakeQuery,query),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.existingStudentsResult.parse(await workflow.listAdmissionsExistingStudentsPage(input)));
+ }
+ @Get('admission-stage-counts')
+ @GovernedWorkflowOperation('can','GET')
+ @ApiCookieAuth('session')
+ @Header('Cache-Control','private, no-store')
+ @Header('Referrer-Policy','no-referrer')
+ @ApiOperation({operationId:'getAdmissionsStageCounts',summary:'Count applications by stage within authorized scope'})
+ @ApiQuery({name:'siteId',required:false,schema:{type:'string',format:'uuid'}})
+ @ApiQuery({name:'programId',required:false,schema:{type:'string',format:'uuid'}})
+ @ApiQuery({name:'search',required:false,schema:{type:'string',maxLength:100}})
+ @ApiOkResponse({schema:admission.intakeDocs.counts})
+ @ApiResponse({status:400,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:401,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:403,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:500,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:503,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ getAdmissionsStageCounts(@Req() req:FastifyRequest,@Query() query:unknown){
+  const input=validated(admission.admissionsCountsQuery,query),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.admissionsCountsResult.parse(await workflow.getAdmissionsStageCounts(input)));
+ }
+ @Get('admission-household-search')
+ @GovernedWorkflowOperation('can','GET')
+ @ApiCookieAuth('session')
+ @Header('Cache-Control','private, no-store')
+ @Header('Referrer-Policy','no-referrer')
+ @ApiOperation({operationId:'searchAdmissionsHouseholds',summary:'Search verified sibling reuse candidates'})
+ @ApiQuery({name:'programId',required:true,schema:{type:'string',format:'uuid'}})
+ @ApiQuery({name:'search',required:true,schema:{type:'string',maxLength:100,minLength:2}})
+ @ApiOkResponse({schema:admission.intakeDocs.households})
+ @ApiResponse({status:400,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:401,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:403,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:500,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:503,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ searchAdmissionsHouseholds(@Req() req:FastifyRequest,@Query() query:unknown){
+  const input=validated(admission.admissionsHouseholdsQuery,query),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.admissionsHouseholdsResult.parse(await workflow.searchAdmissionsHouseholds(input)));
+ }
+ @Get('admission-applications')
+ @GovernedWorkflowOperation('can','GET')
+ @ApiCookieAuth('session')
+ @Header('Cache-Control','private, no-store')
+ @Header('Referrer-Policy','no-referrer')
+ @ApiOperation({operationId:'listAdmissionsIntake',summary:'Page through scoped admissions applications'})
+ @ApiQuery({name:'siteId',required:false,schema:{type:'string',format:'uuid'}})
+ @ApiQuery({name:'programId',required:false,schema:{type:'string',format:'uuid'}})
+ @ApiQuery({name:'applicationId',required:false,schema:{type:'string',format:'uuid'}})
+ @ApiQuery({name:'search',required:false,schema:{type:'string',maxLength:100}})
+ @ApiQuery({name:'pageSize',required:false,schema:{type:'integer',minimum:1,maximum:100,default:40}})
+ @ApiQuery({name:'page',required:false,schema:{type:'integer',minimum:1,maximum:10000,default:1}})
+ @ApiOkResponse({schema:admission.intakeDocs.intake})
+ @ApiResponse({status:400,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:401,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:403,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:500,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:503,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ listAdmissionsIntake(@Req() req:FastifyRequest,@Query() query:unknown){
+  const input=validated(admission.admissionsIntakeQuery,query),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.admissionsIntakeResult.parse(await workflow.listAdmissionsIntake(input)));
  }
 }
