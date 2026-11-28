@@ -19,7 +19,7 @@ async function operator(request:Request){
  if(!actor.actorPersonId||!hasRegistrarAuthority(actor.role)||actor.scope.organizationIds?.length!==1||!actor.scope.siteIds?.length)
   throw new AuthorizationError("authorized operations staff");
  assertCapability(actor,"action.resolve");
- return {actor,org:actor.scope.organizationIds[0]};
+ return {actor,org:actor.scope.organizationIds[0]!};
 }
 export async function assertManualTaskResource(tx:Tx,actor:Awaited<ReturnType<typeof operator>>["actor"],org:string,siteId:string,programId:string|null){
  if(!actor.scope.siteIds?.includes(siteId)||programId&&!actor.scope.programIds?.includes(programId))throw new AuthorizationError("operational task scope");
