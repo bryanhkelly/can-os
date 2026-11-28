@@ -72,7 +72,17 @@ integration("Church-owned Site with independently authorized CAN academic servic
           },[grant]);
         };
         const host = contextFor("registrar",hostPerson.id,church.id,site.id);
-        const steward = contextFor("can_network_steward",stewardPerson.id,can.id,null);
+        // Use a real canonical grant and signed session for the institutional
+        // staff mutation tests; no synthetic actor bypass of the shared guard.
+        const {issueOpaqueSecret,hashAccessSecret,accessSessionCookie}=await import("@/domain/access-tokens");
+        const pepper="rollback-program-steward-identity-test-pepper";
+        vi.stubEnv("CAN_ACCESS_TOKEN_PEPPER",pepper);
+        const [stewardAccount]=await tx.insert(s.accessAccounts).values({personId:stewardPerson.id,emailNormalized:"steward-"+suffix+"@example.invalid",emailVerifiedAt:new Date()}).returning();
+        const [stewardGrant]=await tx.insert(s.accountPersonGrants).values({accountId:stewardAccount!.id,personId:stewardPerson.id,role:"can_network_steward",organizationId:can.id,siteId:null,active:true}).returning();
+        const secret=issueOpaqueSecret();
+        const [stewardSession]=await tx.insert(s.accessSessions).values({accountId:stewardAccount!.id,activeGrantId:stewardGrant!.id,secretHash:hashAccessSecret(secret,pepper),expiresAt:new Date(Date.now()+3600000),authenticationMethod:"email_link"}).returning();
+        const stewardRequest=new Request("http://localhost",{method:"POST",headers:{cookie:accessSessionCookie+"="+secret}});
+        const steward=resolveAccessContext({accountId:stewardAccount!.id,activeGrantId:stewardGrant!.id,sessionId:stewardSession!.id},[{...stewardGrant!,role:"can_network_steward"}]);
         const unrelated = contextFor("registrar",hostPerson.id,other.id,null);
         const launch = await startProgramLaunch(host,{
           hostOrganizationId:church.id,siteId:site.id,jurisdictionId:jurisdiction.id,
@@ -209,7 +219,7 @@ integration("Church-owned Site with independently authorized CAN academic servic
           legalFirstName:"CAN",legalLastName:"Records Officer",
         }).returning();
         const [staffAccount]=await tx.insert(s.accessAccounts).values({
-          emailNormalized:"can-records-"+suffix+"@example.invalid",
+          personId:staffPerson!.id,emailNormalized:"can-records-"+suffix+"@example.invalid",
           emailVerifiedAt:new Date(),
         }).returning();
         await tx.insert(s.accountPersonGrants).values({
@@ -222,25 +232,25 @@ integration("Church-owned Site with independently authorized CAN academic servic
           role:"registrar" as const,
           reason:"CAN maintains the official academic record for this school.",
         };
-        await expect(delegateCANAcademicProgramStaff(host,staffCommand)).rejects.toThrow();
-        const granted=await delegateCANAcademicProgramStaff(steward,staffCommand);
+        await expect(delegateCANAcademicProgramStaff(host,stewardRequest,staffCommand)).rejects.toThrow();
+        const granted=await delegateCANAcademicProgramStaff(steward,stewardRequest,staffCommand);
         expect(granted.created).toBe(true);
-        expect((await delegateCANAcademicProgramStaff(steward,staffCommand)).created).toBe(false);
+        expect((await delegateCANAcademicProgramStaff(steward,stewardRequest,staffCommand)).created).toBe(false);
         expect((await listCANAcademicProgramStaff(steward,launch.programId)).current
           .some(row=>row.id===granted.roleAssignmentId)).toBe(true);
         expect(await listDelegatedCANTranscriptPrograms(staffActor,tx))
           .toEqual([{programId:launch.programId,siteId:site.id}]);
-        await revokeCANAcademicProgramStaff(steward,{
+        await revokeCANAcademicProgramStaff(steward,stewardRequest,{
           roleAssignmentId:granted.roleAssignmentId,
           reason:"The academic registrar is no longer assigned to this school.",
         });
         expect(await listDelegatedCANTranscriptPrograms(staffActor,tx)).toEqual([]);
         expect((await listCANAcademicProgramStaff(steward,launch.programId)).current
           .some(row=>row.id===granted.roleAssignmentId)).toBe(false);
-        await expect(revokeCANAcademicProgramStaff(steward,{
+        await expect(revokeCANAcademicProgramStaff(steward,stewardRequest,{
           roleAssignmentId:granted.roleAssignmentId,reason:"Repeat revocation must not reactivate access.",
         })).rejects.toThrow("specific CAN-owned academic staff delegation");
-        const renewed=await delegateCANAcademicProgramStaff(steward,staffCommand);
+        const renewed=await delegateCANAcademicProgramStaff(steward,stewardRequest,staffCommand);
         expect(renewed).toEqual({roleAssignmentId:granted.roleAssignmentId,created:true});
         expect(await listDelegatedCANTranscriptPrograms(staffActor,tx))
           .toEqual([{programId:launch.programId,siteId:site.id}]);
@@ -299,7 +309,7 @@ integration("Church-owned Site with independently authorized CAN academic servic
             emailVerifiedAt:new Date(),
           }).returning().then(x=>x[0]!),
           tx.insert(s.accessAccounts).values({
-            emailNormalized:"can-teacher-"+suffix+"@example.invalid",
+            personId:canPerson.id,emailNormalized:"can-teacher-"+suffix+"@example.invalid",
             emailVerifiedAt:new Date(),
           }).returning().then(x=>x[0]!),
         ]);
@@ -317,7 +327,7 @@ integration("Church-owned Site with independently authorized CAN academic servic
         // eligible; the host-local facilitator is assigned only later, for
         // the class-access denial checks. The CAN instructor is assigned below
         // through the real launch command after delegation and qualification.
-        const teacherDelegation=await delegateCANAcademicProgramStaff(steward,{
+        const teacherDelegation=await delegateCANAcademicProgramStaff(steward,stewardRequest,{
           programId:launch.programId,personId:canPerson.id,role:"teacher",
           reason:"CAN delegates instruction for this exact contracted Program.",
         });
@@ -416,7 +426,7 @@ integration("Church-owned Site with independently authorized CAN academic servic
           .where(eq(s.staffingEligibilityEvaluations.roleAssignmentId,
             teacherDelegation.roleAssignmentId));
         expect(complianceHistory.length).toBeGreaterThan(0);
-        await revokeCANAcademicProgramStaff(steward,{
+        await revokeCANAcademicProgramStaff(steward,stewardRequest,{
           roleAssignmentId:teacherDelegation.roleAssignmentId,
           reason:"CAN withdraws this instructor from the contracted Program.",
         });
@@ -437,7 +447,7 @@ integration("Church-owned Site with independently authorized CAN academic servic
           .rejects.toThrow("current provider-owned teacher Program delegation");
         expect(await accessibleClasses(canTeacher as Actor)).toEqual([]);
         // Restore through the canonical command for the remaining agreement tests.
-        const restoredTeacherDelegation=await delegateCANAcademicProgramStaff(steward,{
+        const restoredTeacherDelegation=await delegateCANAcademicProgramStaff(steward,stewardRequest,{
           programId:launch.programId,personId:canPerson.id,role:"teacher",
           reason:"CAN restores instruction for the remaining acceptance checks.",
         });
@@ -461,10 +471,10 @@ integration("Church-owned Site with independently authorized CAN academic servic
         });
         expect(await listDelegatedCANTranscriptPrograms(canRegistrar,tx)).toEqual([]);
         expect(await listDelegatedCANTranscriptPrograms(staffActor,tx)).toEqual([]);
-        await expect(delegateCANAcademicProgramStaff(steward,staffCommand)).rejects.toThrow();
+        await expect(delegateCANAcademicProgramStaff(steward,stewardRequest,staffCommand)).rejects.toThrow();
         // Removing an employee's Program grant remains possible even when
         // the school-services agreement has already been suspended.
-        await revokeCANAcademicProgramStaff(steward,{
+        await revokeCANAcademicProgramStaff(steward,stewardRequest,{
           roleAssignmentId:renewed.roleAssignmentId,
           reason:"Remove all remaining record access after school service withdrawal.",
         });
@@ -512,7 +522,7 @@ integration("Church-owned Site with independently authorized CAN academic servic
       });
     } catch(error) {
       if(error!==rollback)throw error;
-    } finally {state.tx=undefined;}
+    } finally {state.tx=undefined;vi.unstubAllEnvs();}
     expect(complete).toBe(true);
     const s=await import("@/db/schema");
     const {eq}=await import("drizzle-orm");
