@@ -9,7 +9,7 @@ import { readSessionGrants, readOwnerDelegationGrants } from "./session-grants.s
 export async function readWorkspaceSession(request: Request) {
   let context;
   try {
-    context = await getIdentityContext(request);
+    context = await getIdentityContext(request,{allowExpiredOwnerRecovery:true});
   } catch (error) {
     if (error instanceof AuthorizationError) return { authenticated: false as const };
     throw error;
