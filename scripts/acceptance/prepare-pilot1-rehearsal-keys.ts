@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import {Pool} from "@neondatabase/serverless";
 import {sealNoncreditAnswerKey,openNoncreditAnswerKey,NONCREDIT_KEY_REF} from "../../src/domain/noncredit-knowledge-check";
 import {verifyAdmissionsNeonBranch} from "../verify-admissions-neon-branch.mjs";
-const branch="br-spring-frog-arnmih9w";
+const branch="br-solitary-art-arun91gj";
 const env=process.env;
 const key=env.CAN_NONCREDIT_ASSESSMENT_KEY_HEX??"";
 assert.equal(env.CAN_PILOT_QA_BRANCH_ID,branch);
