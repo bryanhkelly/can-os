@@ -29,12 +29,22 @@ export async function assertCurrentCredentialIssuer(
     throw new AuthorizationError("single verified CAN issuer session");
   }
   const digest = hashAccessSecret(raw, pepper);
+  // The award triggers independently validate this same current bearer.
+  // Transaction-local only; no raw cookie or caller-selected actor is persisted.
+  await tx.execute(sql`SELECT set_config('can.credential.session_hash', ${digest}, true)`);
   const result = await tx.execute(sql`
     SELECT approval.id
     FROM education_v30.v301_can_staff_session_context(${digest}::text) staff
     JOIN public.access_sessions can_session
       ON can_session.id=staff.session_id
         AND can_session.secret_hash=${digest}::text
+    JOIN public.account_person_grants current_grant ON current_grant.id=staff.grant_id
+      AND current_grant.account_id=can_session.account_id AND current_grant.active
+    JOIN public.access_accounts issuer ON issuer.id=can_session.account_id
+      AND issuer.person_id=staff.person_id AND NOT issuer.disabled
+      AND issuer.email_verified_at IS NOT NULL AND issuer.private_access_code_hash IS NULL
+      AND issuer.email_normalized NOT LIKE '%.demo'
+    JOIN public.people person ON person.id=staff.person_id AND person.active
     JOIN public.canonical_sensitive_capability_approvals approval
       ON approval.account_person_grant_id=staff.grant_id
         AND approval.requested_by_can_account_id=can_session.account_id
@@ -48,7 +58,16 @@ export async function assertCurrentCredentialIssuer(
       AND staff.person_id=${actor.actorPersonId}::uuid
       AND staff.organization_id=${actor.scope.organizationIds?.[0]}::uuid
       AND staff.site_id=${actor.scope.siteIds?.[0]}::uuid
-    FOR SHARE OF approval
+      AND can_session.delegated_grant_id IS NULL
+      AND can_session.delegated_mode IS NULL
+      AND can_session.delegated_until IS NULL
+      AND can_session.delegated_reason IS NULL
+      AND can_session.revoked_at IS NULL
+      AND can_session.expires_at>clock_timestamp()
+      AND can_session.updated_at>clock_timestamp()-interval '30 minutes'
+      AND (NOT can_session.shared_device OR can_session.last_activity_at>clock_timestamp()-interval '5 minutes')
+      AND can_session.active_grant_id=current_grant.id
+    FOR SHARE OF approval,can_session,current_grant,issuer,person
   `);
   if (result.rows.length !== 1) {
     throw new AuthorizationError("current independent credential issuer approval");
