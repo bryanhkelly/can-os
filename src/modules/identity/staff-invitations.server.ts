@@ -83,6 +83,20 @@ export async function acceptStaffInvitations(
     const [site]=await tx.select({id:sites.id}).from(sites).where(and(eq(sites.id,invitation.siteId),eq(sites.organizationId,invitation.organizationId))).for("share").limit(1);
     if(!site||!localStaffInviteRoles.includes(invitation.role as typeof localStaffInviteRoles[number]))
       throw new AuthorizationError("current invited Site membership");
+    // Lock the exact inactive grant, then reread immutable invitation events.
+    // A stale invitation snapshot must never re-enable a previously accepted
+    // and subsequently revoked grant.
+    const [current]=await tx.select({id:accountPersonGrants.id}).from(accountPersonGrants)
+      .where(and(eq(accountPersonGrants.id,invitation.id),eq(accountPersonGrants.accountId,accountId),
+        eq(accountPersonGrants.personId,invitation.personId),eq(accountPersonGrants.role,invitation.role),
+        eq(accountPersonGrants.organizationId,invitation.organizationId),eq(accountPersonGrants.siteId,invitation.siteId),
+        eq(accountPersonGrants.active,false))).for("update").limit(1);
+    if(!current)continue;
+    const events=await tx.select({eventType:domainEvents.eventType}).from(domainEvents).where(and(
+      eq(domainEvents.aggregateType,STAFF_INVITATION_AGGREGATE),eq(domainEvents.aggregateId,invitation.id),
+      inArray(domainEvents.eventType,[EventTypes.StaffInvitationIssued,EventTypes.StaffInvitationAccepted])));
+    if(!events.some(event=>event.eventType===EventTypes.StaffInvitationIssued)||
+       events.some(event=>event.eventType===EventTypes.StaffInvitationAccepted))continue;
     const [updated] = await tx.update(accountPersonGrants)
       .set({ active: true, updatedAt: now })
       .where(and(
