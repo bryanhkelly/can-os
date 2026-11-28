@@ -31,7 +31,10 @@ export async function provisionScopedPersonAccount(tx: Tx, input: {
   const email = normalizeAccessEmail(input.email);
   await lockAccountProvisioningEmail(tx, email);
   let [account] = await readLockedProvisioningAccount(tx, email);
-  const individual = isDemoAccountEmail(email) && (account?.privateCredential === true || (!account && input.allowIndividualCredential === true));
+  // A new Person at an explicitly approved synthetic Site uses the standard demo code.
+  // Individual credentials remain available only for separately governed, non-demo scopes.
+  const sharedScope = isDemoAccountEmail(email) && await matchesDemoCredentialScope(email,input.organizationId,input.siteId,tx);
+  const individual = isDemoAccountEmail(email) && (account?.privateCredential === true || (!account && !sharedScope && input.allowIndividualCredential === true));
   if (!individual) await assertScopedCredential(tx,email,input.organizationId,input.siteId);
   if (account?.disabled || (account?.personId && account.personId!==input.personId) || (account?.privateCredential && account.personId!==input.personId))
     throw new AuthorizationError("current account Person binding");
