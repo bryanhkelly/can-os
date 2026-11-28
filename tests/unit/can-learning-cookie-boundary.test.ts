@@ -45,10 +45,17 @@ describe("single CAN login is required for instructional learning",()=>{
  it("enforces the same boundary for identity and learning-session persistence",()=>{
   const source=readFileSync("src/modules/identity/learning-command-context.server.ts","utf8");
   expect(source.match(/canLearningCookieMode\(request\)/g)?.length).toBe(2);
-  expect(source).toContain('=== "can_with_native"');
+  expect(source).toContain('==="can_with_native"');
   expect(source).toContain("getCanonicalCommandContext(request)");
-  expect(source).toContain("getCanonicalSessionRow(request)");
-  expect(source).toContain("context.actorPersonId !== row.person_id");
+  expect(source).not.toContain("getCanonicalSessionRow(request)");
+  expect(source).toContain('context.role!=="learner"');
+  expect(source).toContain("!context.nativeLearningSessionId");
+  expect(source).toContain("sessionId:context.nativeLearningSessionId");
+  expect(source).toContain("actor.delegatedByPlatformOwner");
+  const canonical=readFileSync("src/modules/identity/canonical-command-context.server.ts","utf8");
+  expect(canonical).toContain("nativeLearningSessionId:native.session_id");
+  expect(canonical).toContain("native.person_id!==actor.actorPersonId");
+  expect(canonical).toContain("links[0]?.nativeAccountId !== native.account_id");
   expect(source).toContain("getDirectCANLearningContext(request)");
   expect(source).toContain("actor.sessionAccountId");
   expect(source).toContain("direct CAN Person learning session");
