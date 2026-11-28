@@ -14,6 +14,7 @@ import {MarketingPackagesController} from './marketing-packages.controller';
 import {EngagementController} from './engagement.controller';
 import {SenderAdminController} from './sender-admin.controller';
 import {CampaignController} from './campaign.controller';
+import {IssuerApprovalController} from './issuer-approval.controller';
 import {StaffAdminController} from './staff-admin.controller';
 import {OwnerControlController} from './owner-control.controller';
 import {AccessController} from './access.controller';
@@ -50,7 +51,7 @@ export class HealthController {
 }
 
 @Module({
-  controllers: [CompletionAdminController, NoncreditPublicationController, KnowledgeCheckController, OutcomesController, SurveysController, MarketingArtifactsController, MarketingPackagesController, EngagementController, SenderAdminController, CampaignController, LaunchWorkspaceController, CatalogController, PreviewSharesController, WebsiteController, GoLinksController, SitePublishingController, SiteProfileController, BrandController, SitePlanningController, LaunchController, RoleWorkspacesController, ReportingController, ClassAdminController, RoomController, ClassroomController, ParticipationController, WorkflowController, StaffAdminController, OwnerControlController, AccessController, HealthController, IdentityController, LearningController, SitesController, OfferingReleaseController],
+  controllers: [CompletionAdminController, NoncreditPublicationController, KnowledgeCheckController, OutcomesController, SurveysController, MarketingArtifactsController, MarketingPackagesController, EngagementController, SenderAdminController, CampaignController, LaunchWorkspaceController, CatalogController, PreviewSharesController, WebsiteController, GoLinksController, SitePublishingController, SiteProfileController, BrandController, SitePlanningController, LaunchController, RoleWorkspacesController, ReportingController, ClassAdminController, RoomController, ClassroomController, ParticipationController, WorkflowController, IssuerApprovalController, StaffAdminController, OwnerControlController, AccessController, HealthController, IdentityController, LearningController, SitesController, OfferingReleaseController],
   providers: [
     CanonicalIdentityService,
     { provide: APP_GUARD, useClass: DefaultDenyGuard },
