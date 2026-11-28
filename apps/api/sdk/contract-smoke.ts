@@ -16,3 +16,16 @@ export async function checkStudentContract(client:BecomunaBrowserApi, enrollment
  // @ts-expect-error the exact enrollment path parameter is required
  await client.GET('/api/v1/me/class-enrollments/{classEnrollmentId}/resume',{params:{path:{}}});
 }
+
+export async function checkOutcomeContract(client:BecomunaBrowserApi,id:string){
+ const awards=await client.GET('/api/v1/me/credentials');
+ if(awards.data){for(const award of awards.data){const current:boolean=award.current;void current;}}
+ const preview=await client.POST('/api/v1/credential-previews',{body:{trainingVersionId:id,format:'pdf'}});
+ if(preview.data){const artifact:string=preview.data.base64;void artifact;}
+ await client.GET('/api/v1/class-completion-queue',{params:{query:{classId:id,page:0}}});
+ await client.POST('/api/v1/completion-evidence-review-decisions',{body:{requestId:id,decision:'approve'}});
+ // @ts-expect-error Person identity is server resolved, not caller supplied
+ await client.POST('/api/v1/me/credential-downloads',{body:{issuanceId:id,format:'pdf',personId:id}});
+ // @ts-expect-error issuance is intentionally not exposed until acceptance
+ await client.POST('/api/v1/credential-issuances',{body:{}});
+}

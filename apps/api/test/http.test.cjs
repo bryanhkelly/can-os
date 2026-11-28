@@ -695,3 +695,19 @@ test('source-bound evidence and revocation endpoints use canonical authority and
  assert.equal(c.evidenceQueue.safeParse({page:'101'}).success,false);
  assert.equal(c.revocation.safeParse({issuanceId:id,evidenceVersionId:id,reason:'short'}).success,false);
 });
+
+test('Class completion policies, decisions and reviews preserve distinct governed operations',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const [route,method] of [['/api/v1/class-completion-review','GET'],['/api/v1/class-completion-queue','GET'],['/api/v1/class-completion-decisions','POST'],['/api/v1/class-completion-policies','POST']]){
+   assert.ok(document.paths[route][method.toLowerCase()].security);
+   assert.equal((await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined)).status,method==='POST'?503:401);
+  }
+ });
+ const c=require('../dist/credentials.contracts'),id='00000000-0000-4000-8000-000000000001';
+ const policy={classId:id,expectedLatestVersion:null,requireAllLessons:false,requiredVerifiedSessions:0,requirePassingAssessment:false,policyEvidenceVersionId:id};
+ assert.equal(c.classPolicy.safeParse(policy).success,false);
+ assert.equal(c.classPolicy.safeParse({...policy,requiredVerifiedSessions:4}).success,true);
+ assert.equal(c.classPolicy.safeParse({...policy,requiredVerifiedSessions:4,approvedByPersonId:id}).success,false);
+ assert.equal(c.classDecision.safeParse({classEnrollmentId:id,expectedPolicyVersionId:id,expectedPriorOutcomeId:null,outcome:'completed',evidenceVersionId:id,reason:'Reviewed evidence'}).success,true);
+ assert.equal(c.classQueue.safeParse({classId:id,page:'101'}).success,false);
+});

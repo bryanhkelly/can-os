@@ -32,3 +32,25 @@ export const evidenceDocs={
  requested:obj({requestId:uuid,status:en(['pending'])}),decided:obj({requestId:uuid,status:en(['approved','rejected'])}),revoked:obj({eventId:uuid,alreadyRevoked:bool}),
  queue:obj({page:{type:'integer',minimum:0,maximum:100},hasMore:bool,pending:{type:'array',maxItems:50,items:obj({requestId:uuid,purpose:en(purpose.options),sourceId:nil,expectedPriorDecisionId:nil,proposedOutcome:{...en(outcome.options),nullable:true},reviewReason:str,evidenceVersionId:uuid,createdAt:dt})}})
 };
+
+const blockers=z.enum(['inactive_participation','policy_unavailable','policy_not_pinned','lessons_incomplete','attendance_unverified','assessment_not_passed']),count=z.number().int().nonnegative();
+export const classInspect=z.object({classEnrollmentId:id}).strict();
+export const classQueue=z.object({classId:id,page:z.string().regex(/^(0|[1-9][0-9]?|100)$/).transform(Number).optional()}).strict();
+export const classDecision=z.object({classEnrollmentId:id,expectedPolicyVersionId:id,expectedPriorOutcomeId:id.nullable(),outcome,...common}).strict();
+export const classPolicy=z.object({classId:id,expectedLatestVersion:z.number().int().positive().nullable(),requireAllLessons:z.boolean(),requiredVerifiedSessions:z.number().int().min(0).max(52),requirePassingAssessment:z.boolean(),policyEvidenceVersionId:id,effectiveAt:date.optional()}).strict().refine(d=>d.requireAllLessons||d.requiredVerifiedSessions>0||d.requirePassingAssessment);
+const readiness=z.object({readyForIndependentReview:z.boolean(),blockers:z.array(blockers),completedLessons:count,totalLessons:count,verifiedSessions:count,passingResultIds:z.array(id),verifiedCompletion:z.literal(false)}).strict();
+export const classReviewResult=z.object({classEnrollmentId:id,courseAttemptId:id,classId:id,policyVersionId:id.nullable(),readiness,currentDecision:z.object({id,resultCode:z.string(),sourceEvidenceVersionId:id.nullable(),recordedAt:date}).strict().nullable(),verifiedCompletion:z.boolean(),note:z.string()}).strict();
+export const classQueueResult=z.object({classId:id,classTitle:z.string(),latestCompletionPolicyVersion:count.nullable(),page:count,hasMore:z.boolean(),participants:z.array(z.object({classEnrollmentId:id,displayName:z.string(),enrollmentStatus:z.string(),completedLessons:count,totalLessons:count,verifiedSessions:count,finalizedPassingResults:count,readyForIndependentReview:z.boolean(),blockers:z.array(blockers),currentOutcome:z.string().nullable(),currentOutcomeId:id.nullable(),policyVersionId:id.nullable()}).strict()).max(10),note:z.string()}).strict();
+export const classDecisionResult=z.object({outcomeId:id,alreadyRecorded:z.boolean()}).strict();
+export const classPolicyResult=z.object({policyVersionId:id,versionNo:count,appliesTo:z.literal('future_enrollments')}).strict();
+const integer={type:'integer' as const,minimum:0},blockerDoc={type:'array' as const,items:en(blockers.options)},nullableString={...str,nullable:true},nullableCount={...integer,nullable:true};
+const counts={completedLessons:integer,totalLessons:integer,verifiedSessions:integer};
+const readinessDoc=obj({readyForIndependentReview:bool,blockers:blockerDoc,...counts,passingResultIds:{type:'array',items:uuid},verifiedCompletion:{...bool,enum:[false]}});
+const policyProps={classId:uuid,expectedLatestVersion:{...integer,minimum:1,nullable:true},requireAllLessons:bool,requiredVerifiedSessions:{...integer,maximum:52},requirePassingAssessment:bool,policyEvidenceVersionId:uuid,effectiveAt:dt};
+export const classDocs={
+ decision:obj({classEnrollmentId:uuid,expectedPolicyVersionId:uuid,expectedPriorOutcomeId:nil,outcome:en(outcome.options),...commonDoc}),
+ policy:{...obj(policyProps),required:Object.keys(policyProps).filter(k=>k!=='effectiveAt')},
+ review:obj({classEnrollmentId:uuid,courseAttemptId:uuid,classId:uuid,policyVersionId:nil,readiness:readinessDoc,currentDecision:{...obj({id:uuid,resultCode:str,sourceEvidenceVersionId:nil,recordedAt:dt}),nullable:true},verifiedCompletion:bool,note:str}),
+ queue:obj({classId:uuid,classTitle:str,latestCompletionPolicyVersion:nullableCount,page:integer,hasMore:bool,participants:{type:'array',maxItems:10,items:obj({classEnrollmentId:uuid,displayName:str,enrollmentStatus:str,...counts,finalizedPassingResults:integer,readyForIndependentReview:bool,blockers:blockerDoc,currentOutcome:nullableString,currentOutcomeId:nil,policyVersionId:nil})},note:str}),
+ decisionResult:obj({outcomeId:uuid,alreadyRecorded:bool}),policyResult:obj({policyVersionId:uuid,versionNo:integer,appliesTo:en(['future_enrollments'])})
+};

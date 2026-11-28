@@ -52,4 +52,29 @@ export class CredentialsController {
  @ApiBody({schema:c.evidenceDocs.revocation})
  @ApiOkResponse({schema:c.evidenceDocs.revoked})
  async revokeLearningAwardIssuance(@Req() req:FastifyRequest,@Body() body:unknown){const workflow=verifiedWorkflow(req),input=validated(c.revocation,body);return c.revoked.parse(await this.identity.runWorkflow(()=>workflow.revokeLearningAwardIssuance(input)));}
+ @Get('class-completion-review')
+ @Operation('GET')
+ @ApiOperation({operationId:'getNativeClassCompletionReview',summary:'Read independently governed Class completion readiness'})
+ @ApiQuery({name:'classEnrollmentId',schema:{type:'string',format:'uuid'},required:true})
+ @ApiOkResponse({schema:c.classDocs.review})
+ async getNativeClassCompletionReview(@Req() req:FastifyRequest,@Query() query:unknown){const workflow=verifiedWorkflow(req),input=validated(c.classInspect,query);return c.classReviewResult.parse(await this.identity.runWorkflow(()=>workflow.getNativeClassCompletionReview(input)));}
+ @Get('class-completion-queue')
+ @Operation('GET')
+ @ApiOperation({operationId:'getNativeClassCompletionQueue',summary:'Read bounded exact-Site Class completion queue'})
+ @ApiQuery({name:'classId',schema:{type:'string',format:'uuid'},required:true})
+ @ApiQuery({name:'page',schema:{type:'integer',minimum:0,maximum:100,default:0},required:false})
+ @ApiOkResponse({schema:c.classDocs.queue})
+ async getNativeClassCompletionQueue(@Req() req:FastifyRequest,@Query() query:unknown){const workflow=verifiedWorkflow(req),input=validated(c.classQueue,query);return c.classQueueResult.parse(await this.identity.runWorkflow(()=>workflow.getNativeClassCompletionQueue(input)));}
+ @Post('class-completion-decisions')
+ @Operation('POST')
+ @ApiOperation({operationId:'decideNativeClassCompletion',summary:'Record or supersede an independently governed Class outcome'})
+ @ApiBody({schema:c.classDocs.decision})
+ @ApiOkResponse({schema:c.classDocs.decisionResult})
+ async decideNativeClassCompletion(@Req() req:FastifyRequest,@Body() body:unknown){const workflow=verifiedWorkflow(req),input=validated(c.classDecision,body);return c.classDecisionResult.parse(await this.identity.runWorkflow(()=>workflow.decideNativeClassCompletion(input)));}
+ @Post('class-completion-policies')
+ @Operation('POST')
+ @ApiOperation({operationId:'publishNativeClassCompletionPolicy',summary:'Publish immutable Class policy for future enrollments'})
+ @ApiBody({schema:c.classDocs.policy})
+ @ApiOkResponse({schema:c.classDocs.policyResult})
+ async publishNativeClassCompletionPolicy(@Req() req:FastifyRequest,@Body() body:unknown){const workflow=verifiedWorkflow(req),input=validated(c.classPolicy,body);return c.classPolicyResult.parse(await this.identity.runWorkflow(()=>workflow.publishNativeClassCompletionPolicy(input)));}
 }

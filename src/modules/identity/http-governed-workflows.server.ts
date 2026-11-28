@@ -1,3 +1,5 @@
+import * as classCompletion from "@/modules/classes/native-class-completion.server";
+import {publishNativeClassCompletionPolicyService} from "@/modules/classes/native-class-completion-policy.server";
 import * as completionEvidence from "@/modules/learning/completion-evidence-review.server";
 import {revokeLearningAwardIssuanceService} from "@/modules/learning/credential-revocation.server";
 import * as learnerCredentials from "@/modules/learning/learner-credentials.server";
@@ -85,6 +87,10 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
  const context=await (mode==="operator-reporting"?(readCookie(request,accessSessionCookie)!==undefined?getIdentityContext(request):getCanonicalCommandContext(request)):mode==="planning"?getBlueprintPlanningContext(request):mode==="canonical"?getCanonicalCommandContext(request):mode==="learner"?getInstructionalLearnerContext(request):getIdentityContext(request));
  if(!context.actorPersonId)throw new AuthorizationError("verified Person");
  return {
+  getNativeClassCompletionReview:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Class completion context");return classCompletion.getNativeClassCompletionReviewService(request,raw);},
+  decideNativeClassCompletion:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Class completion context");return classCompletion.decideNativeClassCompletionService(request,raw);},
+  getNativeClassCompletionQueue:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Class completion context");return classCompletion.getNativeClassCompletionQueueService(request,raw);},
+  publishNativeClassCompletionPolicy:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Class completion context");return publishNativeClassCompletionPolicyService(request,raw);},
   requestCompletionEvidenceReview:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Completion evidence context");return completionEvidence.requestCompletionEvidenceReviewService(request,raw);},
   getPendingCompletionEvidenceReviews:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Completion evidence context");return completionEvidence.getPendingCompletionEvidenceReviewsService(request,raw);},
   decideCompletionEvidenceReview:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Completion evidence context");return completionEvidence.decideCompletionEvidenceReviewService(request,raw);},

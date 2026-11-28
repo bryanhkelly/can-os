@@ -2,10 +2,10 @@ import {readFileSync} from "node:fs";
 import {describe,expect,it} from "vitest";
 const file=(path:string)=>readFileSync(path,"utf8");
 
-const publish=file("src/modules/classes/native-class-completion-policy.functions.ts");
+const publish=file("src/modules/classes/native-class-completion-policy.server.ts");
 const ui=file("src/components/learning/NativeClassCompletionOperatorPanel.tsx");
 const classSql=file("database/canonical/v3.0.1/patch-ws3-class-completion-policy-pins.sql");
-const evidenceReview=file("src/modules/learning/completion-evidence-review.functions.ts");
+const evidenceReview=file("src/modules/learning/completion-evidence-review.server.ts");
 
 describe("WS3 Class completion policy publication",()=>{
   it("requires independent exact-Site staff and correct Class creator authority",()=>{
