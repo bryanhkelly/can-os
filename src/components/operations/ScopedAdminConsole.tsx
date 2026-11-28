@@ -136,7 +136,9 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false,
       setIdentityReason("");setExistingPersonId("");
       setNotice(!result.pending
         ? "demoAccess" in result && result.demoAccess
-          ? `Access is approved for ${values.email}. No email is sent. Use the account’s current credential or contact the Platform Owner for secure enrollment.`
+          ? result.deliveryStatus==="demo_code"
+            ? `Access is approved for ${values.email}. Sign in with 000000. No email is needed.`
+            : `Access is approved for ${values.email}. Use the existing individual credential or contact the Platform Owner for secure recovery.`
           : `${values.email} already has an active grant; no new invitation was sent.`
         : "demoAccess" in result && result.demoAccess
           ? `Invitation recorded for ${values.email}. No email is sent to this address. Use the current account credential or contact the Platform Owner.`
@@ -242,7 +244,7 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false,
                   <FormMessage />
                 </FormItem>
               )} />
-              {isDemoAccountEmail(form.watch("email"))&&<div className="sm:col-span-2 space-y-3"><p className="text-sm text-muted-foreground">For individual credentials, confirm the intended recipient independently. Existing Accounts require the exact canonical Person ID. Leave blank only for the existing restricted fixture workflow.</p><Field label="Identity confirmation reason"><Input value={identityReason} onChange={e=>setIdentityReason(e.target.value)} maxLength={500} placeholder="How you independently confirmed the recipient" /></Field><Field label="Existing Person ID (only for an existing Account)"><Input value={existingPersonId} onChange={e=>setExistingPersonId(e.target.value)} autoComplete="off" /></Field></div>}
+              {isDemoAccountEmail(form.watch("email"))&&<div className="sm:col-span-2 space-y-3"><p className="text-sm text-muted-foreground">Registered synthetic Site accounts use 000000. Individual credential confirmation is needed only for protected non-deliverable accounts outside the approved synthetic credential scope or existing individual credentials.</p><Field label="Individual credential confirmation (if required)"><Input value={identityReason} onChange={e=>setIdentityReason(e.target.value)} maxLength={500} placeholder="How you independently confirmed the recipient" /></Field><Field label="Existing Person ID (only for an existing Account)"><Input value={existingPersonId} onChange={e=>setExistingPersonId(e.target.value)} autoComplete="off" /></Field></div>}
               <ActionFooter layout="form" className="sm:col-span-2">
                 <Button variant="default" size="lg" type="submit" loading={busy} loadingLabel="Inviting…"
                   disabled={busy || Boolean(lockedSiteId && !sites.some(site => site.id === lockedSiteId))}>
