@@ -3,7 +3,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db/client";
 import { accountPersonGrants, enrollments, programs, sections, sectionTeachers, terms } from "@/db/schema";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
-import { authorizeClass } from "@/modules/learning/class-access.server";
+import { authorizeClass } from "@/modules/learning/class-access-core.server";
 import { assertNativeClassTeacher } from "@/modules/classes/native-class-teacher-authority.server";
 import { nativeClassWorkRows } from "@/modules/classes/native-class-work-query.server";
 import { z } from "zod";
