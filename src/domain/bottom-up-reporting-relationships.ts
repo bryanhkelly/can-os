@@ -72,7 +72,7 @@ export function validateRelationshipProposal(input:unknown,owner:VerifiedRelatio
  * or a publisher-wide Offering. New disclosure capabilities must be ratified
  * separately from ordinary administration and insights access. */
 export function assertRelationshipActor(actor:VerifiedRelationshipActor,organizationId:string,
-  capability:"relationships.propose"|"relationships.decide"|"relationships.revoke"|"relationships.report",
+  capability:"relationships.initiate"|"relationships.propose"|"relationships.decide"|"relationships.revoke"|"relationships.report",
   siteId:string|null=null):string {
   if(!actor.actorPersonId||actor.sessionAccountId||actor.impersonatedByAccountId||
     actor.delegatedByPlatformOwner||!actor.capabilities.has(capability)||
