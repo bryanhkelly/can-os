@@ -250,3 +250,17 @@ test('learner recovery and media access do not expose session secrets in respons
  const {readyDoc}=require('../dist/participation.contracts');
  assert.deepEqual(Object.keys(readyDoc.properties),['ready']);
 });
+
+test('Class management has distinct activation, publication and closure operations',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const [method,path] of [["POST","/api/v1/classes"],["POST","/api/v1/class-activations"],["POST","/api/v1/class-offering-publications"],["POST","/api/v1/class-offering-closures"],["POST","/api/v1/class-offering-versions"],["GET","/api/v1/classes"],["GET","/api/v1/me/class-operator-sites"],["GET","/api/v1/class-course-options"]]){
+   const op=document.paths[path][method.toLowerCase()];assert.ok(op.security);assert.ok(op.responses['403']);
+   const response=await fetch(url+path,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);
+  }
+ });
+ const {optionsQuery}=require('../dist/class-admin.contracts');
+ assert.equal(optionsQuery.safeParse({cursor:'100001'}).success,false);
+ assert.equal(optionsQuery.safeParse({siteId:'not-a-uuid'}).success,false);
+ assert.equal(optionsQuery.safeParse({organizationId:'forged'}).success,false);
+});
