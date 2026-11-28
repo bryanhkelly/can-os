@@ -1,3 +1,4 @@
+import {listLaunchOptionsService,getLaunchEntryService,launchEntryInput} from "./launch-discovery.server";
 import {resolveLaunchRegistrar,startLaunchInput,startLaunchService,completeLaunchRequirementInput,completeLaunchRequirementService,submitLaunchEvidenceInput,submitLaunchEvidenceService,reviewLaunchEvidenceInput,reviewLaunchEvidenceService,activateLaunchInput,activateLaunchService,scheduleLaunchOrientationInput,scheduleLaunchOrientationService} from "./launch-commands.server";
 import {createLaunchSiteInput,createLaunchSiteService} from "./launch-site-create.server";
 import { schoolPlanningLocationSchema } from "@/domain/school-stub";
@@ -33,83 +34,7 @@ const uuid = z.string().uuid();
 function registrarContext(capability:string){return resolveLaunchRegistrar(getRequest(),capability);}
 
 /** Wizard dropdown options, scoped to the registrar's verified organization grant. */
-export const listLaunchOptions = createServerFn({ method: "GET" }).handler(
-  async () => {
-    setResponseHeader("Cache-Control","private, no-store");
-    const context = await registrarContext("program.read");
-    const organizationIds = context.scope.organizationIds ?? [];
-    if (!organizationIds.length) {
-      return { organizations: [], academicProviderOrganizations: [], creditIssuingOrganizations: [], sites: [], jurisdictions: [],
-        canCreateSite: context.grantSiteId === null && context.capabilities.has("program.launch.start"),
-        schoolSetupAdministrator: context.role === "site_admin" };
-    }
-    const [{ db }, s, { and, asc, eq, inArray, or }] = await Promise.all([
-      import("@/db/client"),
-      import("@/db/schema"),
-      import("drizzle-orm"),
-    ]);
-    const [organizationRows, siteRows, jurisdictionRows, canProviderRows] = await Promise.all([
-      db
-        .select({ id: s.organizations.id, name: s.organizations.name, type: s.organizations.type, slug: s.organizations.slug })
-        .from(s.organizations)
-        .where(inArray(s.organizations.id, organizationIds))
-        .orderBy(asc(s.organizations.name)),
-      db
-        .select({
-          id: s.sites.id,
-          organizationId: s.sites.organizationId,
-          lifecycleStatus: s.sites.lifecycleStatus,
-          name: s.sites.name,
-          slug: s.sites.slug,
-          timezone: s.sites.timezone,
-          address: s.sites.address,
-          metadata: s.sites.metadata,
-          updatedAt: s.sites.updatedAt,
-          websiteSlug:s.sitePublications.slug,
-          websiteStatus:s.sitePublications.status,
-        })
-        .from(s.sites)
-        .leftJoin(s.sitePublications,eq(s.sitePublications.siteId,s.sites.id))
-        .where(and(inArray(s.sites.organizationId, organizationIds),
-          ...(context.grantSiteId === null ? [] : [eq(s.sites.id, context.grantSiteId)])))
-        .orderBy(asc(s.sites.name)),
-      db
-        .select({ id: s.jurisdictions.id, code: s.jurisdictions.code, name: s.jurisdictions.name })
-        .from(s.jurisdictions)
-        .orderBy(asc(s.jurisdictions.name)),
-      // CAN provider choices are distinct from the host's organization grants.
-      // This is public organization identity, not a grant or verified service agreement.
-      db.select({ id: s.organizations.id, name: s.organizations.name, type: s.organizations.type, slug: s.organizations.slug })
-        .from(s.organizations).where(eq(s.organizations.type, "can_network"))
-        .orderBy(asc(s.organizations.name)),
-    ]);
-    // One scoped lookup establishes whether the Site has a real saved copy
-    // revision. A reserved public address alone is not Website & Brand completion.
-    const contentRows = siteRows.length
-      ? await db.selectDistinct({siteId:s.siteLocalContentVersions.siteId})
-        .from(s.siteLocalContentVersions)
-        .where(inArray(s.siteLocalContentVersions.siteId,siteRows.map(site=>site.id)))
-      : [];
-    const sitesWithContent = new Set(contentRows.map(row=>row.siteId));
-    const knownIds = new Set(organizationRows.map(organization => organization.id));
-    const academicProviderOrganizations = [
-      ...organizationRows,
-      ...canProviderRows.filter(provider => !knownIds.has(provider.id)),
-    ];
-    return {
-      organizations: organizationRows, // The host selector remains scoped to the local registrar.
-      academicProviderOrganizations,
-      creditIssuingOrganizations: academicProviderOrganizations,
-      sites: siteRows.map(({metadata,websiteSlug,websiteStatus,...site}) => {
-        const planningLocation=schoolPlanningLocationSchema.safeParse(metadata.schoolPlanningLocation);
-        return { ...site, planningLocation:planningLocation.success?planningLocation.data:null, ...site, updatedAt:site.updatedAt.toISOString(), address: site.address === null ? null : safeJsonObject(site.address), addressStatus:readSitePhysicalAddress(site.address).status, sitePhysicalAddressRevision:typeof metadata.sitePhysicalAddressRevision==="string"?metadata.sitePhysicalAddressRevision:null, siteIdentityRevision:typeof metadata.siteIdentityRevision==="string"?metadata.siteIdentityRevision:null, contactDraft:safeJson(metadata.setupContact??null), siteInformationDraft:safeJson(metadata.siteInformation??null),
-          websiteContentSaved:sitesWithContent.has(site.id),websiteDraft:websiteSlug&&isPublicSiteSlug(websiteSlug)&&(websiteStatus==="draft"||websiteStatus==="published")?{host:publicSiteHost(websiteSlug),status:websiteStatus}:null }; }),
-      jurisdictions: jurisdictionRows,
-      canCreateSite: context.grantSiteId === null && context.capabilities.has("program.launch.start"),
-        schoolSetupAdministrator: context.role === "site_admin",
-    };
-  },
-);
+export const listLaunchOptions=createServerFn({method:"GET"}).handler(async()=>{setResponseHeader("Cache-Control","private, no-store");return listLaunchOptionsService(getRequest());});
 
 /** Start a GF3 host/program launch: creates the Program and instantiates its Launch Journey. */
 export const startLaunch=createServerFn({method:"POST"})
@@ -277,29 +202,4 @@ export const scheduleLaunchOrientation=createServerFn({method:"POST"})
 
 /** Read-only landing decision. Uses the same verified registrar/capability
  * boundary as starting a launch; it never creates or completes records. */
-export const getLaunchEntry = createServerFn({ method: "GET" })
-  .validator((value: unknown) => z.object({
-    siteId: uuid.optional(), programId: uuid.optional(),
-  }).strict().parse(value))
-  .handler(async ({ data }) => {
-    const context = await registrarContext("program.launch.start");
-    const options = await listLaunchOptions();
-    if (!options.organizations.length) return null;
-    const [{ db }, s, { and, eq, inArray }] = await Promise.all([
-      import("@/db/client"), import("@/db/schema"), import("drizzle-orm"),
-    ]);
-    // Organization-wide registrars can legitimately have no enumerated Program IDs.
-    // Discover existing Programs through the verified organization/Site grant, not
-    // through an optional list that would falsely signal a first-time launch.
-    const records = await db.select({
-      id: s.programs.id, siteId: s.programs.siteId, status: s.programs.status,
-    }).from(s.programs).where(and(
-      inArray(s.programs.organizationId, options.organizations.map(org => org.id)),
-      ...(context.grantSiteId === null ? [] : [eq(s.programs.siteId, context.grantSiteId)]),
-      ...(context.grantSiteId !== null && context.scope.programIds?.length
-        ? [inArray(s.programs.id, context.scope.programIds)] : []),
-      ...(context.scope.siteIds?.length
-        ? [inArray(s.programs.siteId, context.scope.siteIds)] : []),
-    ));
-    return launchEntrySelection({ programs: records, sites: options.sites, selection: data });
-  });
+export const getLaunchEntry=createServerFn({method:"GET"}).validator((raw:unknown)=>launchEntryInput.parse(raw)).handler(async({data})=>{setResponseHeader("Cache-Control","private, no-store");return getLaunchEntryService(getRequest(),data);});

@@ -453,3 +453,19 @@ test('catalog discovery is governed and cannot assert activation or expose priva
  assert.equal(results.workspace.safeParse(workspace).success,true);
  assert.equal(results.workspace.safeParse({...workspace,operations:[{id,name:'private'}]}).success,false);
 });
+
+test('launch workspace drafts are revisioned, role-bound, and reject supplied identity',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const [method,path] of [["GET","/api/v1/me/staff-launch-workspace"],["GET","/api/v1/me/launch-drafts"],["POST","/api/v1/me/launch-drafts"],["GET","/api/v1/me/launch-options"],["GET","/api/v1/me/launch-entry"]]){
+   assert.ok(document.paths[path][method.toLowerCase()].security);
+   const response=await fetch(url+path,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);
+  }
+ });
+ const {save,entry}=require('../dist/launch-workspace.contracts');
+ const valid={audience:'staff',context:'preparation',expectedRevision:0,value:{audience:'staff',fields:{notes:'private'}}};
+ assert.equal(save.safeParse(valid).success,true);
+ assert.equal(save.safeParse({...valid,accountId:'forged'}).success,false);
+ assert.equal(save.safeParse({...valid,audience:'family'}).success,false);
+ assert.equal(entry.safeParse({siteId:'invalid'}).success,false);
+});
