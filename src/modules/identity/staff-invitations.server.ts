@@ -1,7 +1,9 @@
 import { and, eq, inArray } from "drizzle-orm";
 import type { db } from "@/db/client";
-import { accessAccounts, accountPersonGrants, domainEvents, people } from "@/db/schema";
+import { accessAccounts, accountPersonGrants, domainEvents, people, sites } from "@/db/schema";
 import { localStaffInviteRoles } from "@/domain/staff-onboarding-policy";
+import { AuthorizationError } from "@/domain/command-context";
+import { assertRawAccountPerson } from "./unambiguous-adult-account.server";
 import { EventTypes } from "@/domain/event-types";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
@@ -70,6 +72,17 @@ export async function acceptStaffInvitations(
 ): Promise<PendingStaffInvitation[]> {
   const accepted: PendingStaffInvitation[] = [];
   for (const invitation of invitations) {
+    // A pending row must still bind the same immutable Account Person and
+    // exact Site at acceptance time, not just when the invitation was issued.
+    const [account] = await tx.select({personId:accessAccounts.personId})
+      .from(accessAccounts).innerJoin(people,and(eq(people.id,accessAccounts.personId),eq(people.active,true)))
+      .where(and(eq(accessAccounts.id,accountId),eq(accessAccounts.disabled,false))).for("share").limit(1);
+    if(!account?.personId||account.personId!==invitation.personId||invitation.accountId!==accountId)
+      throw new AuthorizationError("current invited Account Person");
+    await assertRawAccountPerson(accountId,invitation.personId,tx);
+    const [site]=await tx.select({id:sites.id}).from(sites).where(and(eq(sites.id,invitation.siteId),eq(sites.organizationId,invitation.organizationId))).for("share").limit(1);
+    if(!site||!localStaffInviteRoles.includes(invitation.role as typeof localStaffInviteRoles[number]))
+      throw new AuthorizationError("current invited Site membership");
     const [updated] = await tx.update(accountPersonGrants)
       .set({ active: true, updatedAt: now })
       .where(and(
@@ -82,9 +95,6 @@ export async function acceptStaffInvitations(
         eq(accountPersonGrants.active, false),
         )).returning({ id: accountPersonGrants.id });
     if (!updated) continue;
-    const [account] = await tx.select({ id: accessAccounts.id }).from(accessAccounts)
-      .where(and(eq(accessAccounts.id, accountId), eq(accessAccounts.disabled, false))).limit(1);
-    if (!account) throw new Error("Account unavailable");
     await emitEvent(tx, {
       eventType: EventTypes.StaffInvitationAccepted,
       aggregateType: STAFF_INVITATION_AGGREGATE,
