@@ -225,22 +225,31 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
       await lockAccountProvisioningEmail(tx, emailNormalized);
       const localDemoIdentity = isDemoAccountEmail(emailNormalized);
       const confirmation = data.privateIdentityConfirmation;
-      const individual = localDemoIdentity && !!confirmation;
-      if (confirmation && (!localDemoIdentity || !privateAccountRoleEligible(data.role)))
+      let [account] = await readLockedProvisioningAccount(tx, emailNormalized);
+      if (account?.disabled) throw new DomainError("FORBIDDEN", "Disabled account cannot be invited");
+      const sharedScope = localDemoIdentity && await matchesLegacyStaffInvitationScope(emailNormalized, organizationId, siteId, tx);
+      // An approved synthetic Site never issues a new private code merely
+      // because the operator entered optional identity-confirmation details.
+      // Existing individual credentials and independently governed live
+      // non-deliverable identities retain their stronger authentication.
+      const individual = localDemoIdentity && !!confirmation &&
+        (account?.privateCredential === true || !sharedScope);
+      if (confirmation && !localDemoIdentity)
         throw new AuthorizationError("eligible individual staff identity");
+      if (confirmation?.existingPersonId && account?.personId !== confirmation.existingPersonId)
+        throw new AuthorizationError("confirmed existing Person");
       if (individual) {
+        if (!privateAccountRoleEligible(data.role))
+          throw new AuthorizationError("eligible individual staff identity");
         if (actor.sessionAccountId || actor.impersonatedByAccountId || actor.delegatedByPlatformOwner)
           throw new AuthorizationError("direct administrator identity");
         if (!await canIssueIndividualCredential(tx,actor))
           throw new AuthorizationError("individually authenticated administrator");
       }
-      // Legacy shared credentials retain the exact original tenant boundary.
-      if (localDemoIdentity && !individual && !await matchesLegacyStaffInvitationScope(emailNormalized, organizationId, siteId, tx)) {
-        throw new DomainError("FORBIDDEN", "Use governed individual identity enrollment or the original shared credential scope");
+      if (localDemoIdentity && !individual && !sharedScope) {
+        throw new DomainError("FORBIDDEN", "Use governed individual identity enrollment or the approved synthetic credential scope");
       }
       let privateAccessCode:string|undefined;
-      let [account] = await readLockedProvisioningAccount(tx, emailNormalized);
-      if (account?.disabled) throw new DomainError("FORBIDDEN", "Disabled account cannot be invited");
       if (account?.privateCredential && !individual)
         throw new AuthorizationError("explicit individual identity confirmation required");
       if (individual && !individualStaffTargetEligible(account,confirmation?.existingPersonId))
@@ -288,16 +297,16 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
           eq(accountPersonGrants.siteId, siteId),
         )).limit(1);
       if (existingGrant) {
-        if (existingGrant.active) return { accountId: account!.id, personId, grantId: existingGrant.id, created: false as const, pending: false };
+        if (existingGrant.active) return { accountId: account!.id, personId, grantId: existingGrant.id, created: false as const, pending: false, privateCredential: individual };
         const pending = (await listPendingStaffInvitations(tx, account!.id)).some(grant => grant.id === existingGrant.id);
         if (!pending) throw new Error("An inactive grant already exists; review it separately instead of creating a replacement invitation");
         if (localDemoIdentity) {
           const invitations = await listPendingStaffInvitations(tx, account!.id);
           const accepted = await acceptStaffInvitations(tx, account!.id, invitations.filter(item => item.id === existingGrant.id), new Date(), {actorPersonId:actor.actorPersonId!});
           if (!accepted.length) throw new Error("Demo staff approval could not be recorded");
-          return { accountId: account!.id, personId, grantId: existingGrant.id, created: false as const, pending: false };
+          return { accountId: account!.id, personId, grantId: existingGrant.id, created: false as const, pending: false, privateCredential: individual };
         }
-        return { accountId: account!.id, personId, grantId: existingGrant.id, created: false as const, pending: true };
+        return { accountId: account!.id, personId, grantId: existingGrant.id, created: false as const, pending: true, privateCredential: individual };
       }
       const [grant] = await tx.insert(accountPersonGrants).values({
         accountId: account!.id, personId, role: data.role, organizationId, siteId, active: false,
@@ -325,9 +334,9 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
         const pending = await listPendingStaffInvitations(tx, account!.id);
         const accepted = await acceptStaffInvitations(tx, account!.id, pending.filter(item => item.id === grant.id), new Date(), {actorPersonId:actor.actorPersonId!});
         if (!accepted.length) throw new Error("Demo staff approval could not be recorded");
-        return { accountId: account!.id, personId, grantId: grant.id, created: true as const, pending: false, ...(privateAccessCode?{privateAccessCode}:{}) };
+        return { accountId: account!.id, personId, grantId: grant.id, created: true as const, pending: false, privateCredential: individual, ...(privateAccessCode?{privateAccessCode}:{}) };
       }
-      return { accountId: account!.id, personId, grantId: grant.id, created: true as const, pending: true };
+      return { accountId: account!.id, personId, grantId: grant.id, created: true as const, pending: true, privateCredential: individual };
     });
     if (data.privateIdentityConfirmation) {
       setResponseHeader("Cache-Control","private, no-store");
@@ -335,7 +344,7 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
     }
     if (!invitation.pending || isDemoAccountEmail(emailNormalized))
       return { ...invitation, emailSent: false, demoAccess: isDemoAccountEmail(emailNormalized),
-        deliveryStatus: isDemoAccountEmail(emailNormalized) ? (data.privateIdentityConfirmation ? "private_code" as const : "demo_code" as const) : "already_active" as const };
+        deliveryStatus: isDemoAccountEmail(emailNormalized) ? (invitation.privateCredential ? "private_code" as const : "demo_code" as const) : "already_active" as const };
     try {
       const deliveryStatus = await requestOneTimeAccessWithDeliveryStatus(
         emailNormalized, data.role === "teacher" ? "/profiles" : undefined);
