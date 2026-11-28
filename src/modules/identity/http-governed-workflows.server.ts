@@ -117,6 +117,8 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
   invitePublicAdmissionsInterestToApply:participation.invitePublicAdmissionsInterestToApply,
   setPublicAdmissionsInterestStatus:participation.setPublicAdmissionsInterestStatus,
   getGuardianAdmissionOffers:participation.getGuardianAdmissionOffers,
+  listPublicTransferDestinations:participation.listPublicTransferDestinations,
+  requestTransferDestinationFamilyStart:participation.requestTransferDestinationFamilyStart,
   joinNoncreditWaitlist:participation.joinNoncreditWaitlist,
   cancelMyNoncreditWaitlist:participation.cancelMyNoncreditWaitlist,
   getMyNoncreditWaitlistPage:participation.getMyNoncreditWaitlistPage,
