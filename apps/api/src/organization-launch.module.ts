@@ -1,0 +1,14 @@
+import {Module} from '@nestjs/common';
+import {CanonicalIdentityModule} from './canonical-identity.module';
+import {LaunchWorkspaceController} from './launch-workspace.controller';
+import {PreviewSharesController} from './preview-shares.controller';
+import {WebsiteController} from './website.controller';
+import {SitePublishingController} from './site-publishing.controller';
+import {SiteProfileController} from './site-profile.controller';
+import {BrandController} from './brand.controller';
+import {SitePlanningController} from './site-planning.controller';
+import {LaunchController} from './launch.controller';
+import {SitesController} from './sites.controller';
+import {SiteGeographyController} from './site-geography.controller';
+@Module({imports:[CanonicalIdentityModule],controllers:[SitesController,LaunchWorkspaceController,PreviewSharesController,WebsiteController,SitePublishingController,SiteProfileController,BrandController,SitePlanningController,LaunchController,SiteGeographyController]})
+export class OrganizationLaunchModule {}

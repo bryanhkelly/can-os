@@ -659,3 +659,28 @@ test('knowledge checks and completion require verified learner or provider autho
 test('noncredit enrollment publication protects provider scope and explicit Site selection',async()=>{await withServer('0',async(url,document)=>{for(const [route,method] of [["/api/v1/noncredit-enrollment-publisher","GET"],["/api/v1/noncredit-training-readiness","GET"],["/api/v1/noncredit-enrollment-releases","POST"],["/api/v1/noncredit-enrollment-closures","POST"],["/api/v1/noncredit-multisite-releases","POST"]]){assert.ok(document.paths[route][method.toLowerCase()].security);assert.equal((await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined)).status,method==='POST'?503:401);}assert.ok(document.paths['/api/v1/noncredit-enrollment-releases'].post.requestBody.content['application/json'].schema.required.includes('siteId'));});});
 
 test('completion administration requires canonical provider credentials and distinguishes decisions from corrections',async()=>{await withServer('0',async(url,document)=>{for(const [route,method] of [["/api/v1/noncredit-completion-decisions","POST"],["/api/v1/noncredit-completion-policy-catalog","GET"],["/api/v1/noncredit-completion-policies","POST"],["/api/v1/noncredit-completion-review","GET"],["/api/v1/noncredit-completion-queue","GET"],["/api/v1/noncredit-completion-corrections","POST"]]){assert.ok(document.paths[route][method.toLowerCase()].security);assert.equal((await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined)).status,method==='POST'?503:401);}});const c=require('../dist/completion-admin.contracts');assert.equal(c.queueQuery.safeParse({page:'101'}).success,false);assert.equal(c.queueQuery.parse({page:'2'}).page,2);});
+
+
+test('WS03 modular registration preserves singleton identity and protected geographic facts',async()=>{
+ const {CanonicalIdentityService}=require('../dist/identity.service');
+ const {OrganizationLaunchModule}=require('../dist/organization-launch.module');
+ const {CanonicalIdentityModule}=require('../dist/canonical-identity.module');
+ const {createApi,readConfig}=require('../dist/bootstrap');
+ const {app,document}=await createApi(readConfig({}));
+ try {
+  assert.equal(app.select(OrganizationLaunchModule).get(CanonicalIdentityService),app.select(CanonicalIdentityModule).get(CanonicalIdentityService,{strict:true}));
+  const p='/api/v1/sites/{siteId}/geography';
+  assert.equal(document.paths[p].get.operationId,'readSiteGeography');
+  assert.ok(document.paths[p].get.security);
+  await app.listen(0,'127.0.0.1');
+  const response=await fetch((await app.getUrl())+p.replace('{siteId}','00000000-0000-4000-8000-000000000001'),{headers:{'x-role':'platform_owner','x-person-id':'forged'}});
+  assert.equal(response.status,401);
+  assert.equal(response.headers.get('cache-control'),'no-store');
+ } finally {await app.close();}
+ const {geography,params,empty}=require('../dist/site-geography.contracts');
+ const siteId='00000000-0000-4000-8000-000000000001';
+ assert.equal(geography.safeParse({siteId,status:'unknown',market:null,areas:[],version:null}).success,true);
+ assert.equal(geography.safeParse({siteId,status:'unknown',market:null,areas:[],version:null,approval:true}).success,false);
+ assert.equal(params.safeParse({siteId,organizationId:siteId}).success,false);
+ assert.equal(empty.safeParse({asOf:'2025-01-01'}).success,false);
+});

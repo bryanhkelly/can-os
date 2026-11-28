@@ -16,3 +16,15 @@ export async function checkStudentContract(client:BecomunaBrowserApi, enrollment
  // @ts-expect-error the exact enrollment path parameter is required
  await client.GET('/api/v1/me/class-enrollments/{classEnrollmentId}/resume',{params:{path:{}}});
 }
+
+// WS03: generated browser paths must retain exact Site scoping.
+export async function checkOrganizationLaunchContract(client:BecomunaBrowserApi,siteId:string){
+ const params={path:{siteId}};
+ const geography=await client.GET('/api/v1/sites/{siteId}/geography',{params});
+ if(geography.data){const status:string=geography.data.status;void status;}
+ await client.GET('/api/v1/sites/{siteId}/information',{params});
+ await client.GET('/api/v1/sites/{siteId}/programs-audiences',{params});
+ await client.GET('/api/v1/sites/{siteId}/publication-readiness',{params});
+ // @ts-expect-error Site scope must be explicit
+ await client.GET('/api/v1/sites/{siteId}/geography',{params:{path:{}}});
+}

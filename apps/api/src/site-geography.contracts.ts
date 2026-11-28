@@ -1,0 +1,13 @@
+import {z} from 'zod';
+const kinds=['country','state','region','county','place','tract','metro','micro','csa','congressional_district','state_legislative_upper','state_legislative_lower','school_district','urban_area'] as const;
+const id=z.string().uuid(),text=z.string();
+const fact=z.object({code:text,name:text,kind:z.enum(kinds),sourceId:text}).strict();
+const market=fact.extend({kind:z.enum(['metro','micro'])});
+const version=z.object({id,marketStatus:z.enum(['metro','micro','outside_market','unknown']),source:text,benchmark:text,vintage:text,resolvedAt:text.datetime({offset:true})}).strict();
+export const params=z.object({siteId:id}).strict();
+export const empty=z.object({}).strict();
+export const geography=z.object({siteId:id,status:text,market:market.nullable(),areas:z.array(fact),version:version.nullable()}).strict();
+const s={type:'string' as const},uuid={...s,format:'uuid'};
+const obj=(properties:Record<string,any>)=>({type:'object' as const,properties,required:Object.keys(properties),additionalProperties:false});
+const areaDoc=obj({code:s,name:s,kind:{...s,enum:[...kinds]},sourceId:s});
+export const geographyDoc=obj({siteId:uuid,status:s,market:{...obj({...areaDoc.properties,kind:{...s,enum:['metro','micro']}}),nullable:true},areas:{type:'array' as const,items:areaDoc},version:{...obj({id:uuid,marketStatus:{...s,enum:['metro','micro','outside_market','unknown']},source:s,benchmark:s,vintage:s,resolvedAt:{...s,format:'date-time'}}),nullable:true}});
