@@ -8,8 +8,7 @@ import { ActionFooter, SelectionCard, WorkspaceNotice } from "@/components/works
 import {
   reconcileSiteExperienceAssociationsV61, siteProgramsAudiencesV61SaveSchema, type SiteProgramsAudiencesV61,
 } from "@/domain/site-launch-preferences";
-import { saveSiteProgramsAudiencesV61 } from "@/modules/programs/site-programs-audiences-v61.functions";
-import { exploreBlueprintReferenceCatalog } from "@/modules/blueprints/blueprint-reference-catalog.functions";
+import { readProgramReferences, saveSiteProgramsAudiences } from "@/lib/api/browser-site-planning";
 import type { BlueprintReferenceCatalogItem } from "@/domain/blueprint-reference-catalog";
 import { academyReferenceMayBeSelected, schoolYearInterestMayBeSelected,
   noSchoolYearAvailability, type SchoolYearAvailability } from "@/domain/site-program-access-v61";
@@ -135,12 +134,13 @@ export function EstablishProgramsAudiencesV61({ siteId, initial, existingProgram
   }, [step]);
   useEffect(() => {
     let current = true;
+    const controller = new AbortController();
     setProgramCatalog(null);
     setCatalogError("");
-    void exploreBlueprintReferenceCatalog({ data: { siteId } })
+    void readProgramReferences(siteId, controller.signal)
       .then(items => { if (current) setProgramCatalog(items.filter(item => item.kind === "program_model")); })
       .catch(() => { if (current) setCatalogError("The published Program catalog is unavailable for this Site."); });
-    return () => { current = false; };
+    return () => { current = false; controller.abort(); };
   }, [siteId, catalogReload]);
 
   function selectStep(next: InternalStep) {
@@ -192,9 +192,9 @@ export function EstablishProgramsAudiencesV61({ siteId, initial, existingProgram
     let submitted = false;
     try {
       submitted = true;
-      const result = await saveSiteProgramsAudiencesV61({ data: {
-        siteId, expectedRevision: revision.current, intent: checked.data,
-      } });
+      const result = await saveSiteProgramsAudiences(siteId, {
+        expectedRevision: revision.current, intent: checked.data,
+      });
       if (result.siteId !== siteId || !result.revision)
         throw new Error("The Site save could not be verified. Reload before trying again.");
       revision.current = result.revision;
