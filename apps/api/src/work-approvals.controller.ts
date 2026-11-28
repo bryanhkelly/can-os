@@ -214,7 +214,7 @@ export class WorkApprovalsController{
  @ApiOkResponse({schema:c.jurisdictionDocs.saved})
  async saveJurisdictionProfileReview(@Req() req:FastifyRequest,@Param() params:unknown,@Body() body:unknown){
   const workflow=verifiedWorkflow(req);
-  const input={...validated(c.params.id,params)},...validated(c.jurisdictionBodies.review,body)};
+  const input={...validated(c.params.id,params),...validated(c.jurisdictionBodies.review,body)};
   const value=await this.identity.runWorkflow(()=>workflow.saveJurisdictionProfileReview(input));
   return c.jurisdictionResults.saved.parse(JSON.parse(JSON.stringify(value)));
  }
@@ -227,7 +227,7 @@ export class WorkApprovalsController{
  @ApiOkResponse({schema:c.jurisdictionDocs.saved})
  async verifyJurisdictionProfileReview(@Req() req:FastifyRequest,@Param() params:unknown,@Body() body:unknown){
   const workflow=verifiedWorkflow(req);
-  const input={...validated(c.params.id,params)},...validated(c.jurisdictionBodies.verify,body)};
+  const input={...validated(c.params.id,params),...validated(c.jurisdictionBodies.verify,body)};
   const value=await this.identity.runWorkflow(()=>workflow.verifyJurisdictionProfileReview(input));
   return c.jurisdictionResults.saved.parse(JSON.parse(JSON.stringify(value)));
  }
@@ -240,7 +240,7 @@ export class WorkApprovalsController{
  @ApiOkResponse({schema:c.jurisdictionDocs.saved})
  async publishJurisdictionProfile(@Req() req:FastifyRequest,@Param() params:unknown,@Body() body:unknown){
   const workflow=verifiedWorkflow(req);
-  const input={...validated(c.params.id,params)},...validated(c.jurisdictionBodies.publish,body)};
+  const input={...validated(c.params.id,params),...validated(c.jurisdictionBodies.publish,body)};
   const value=await this.identity.runWorkflow(()=>workflow.publishJurisdictionProfile(input));
   return c.jurisdictionResults.saved.parse(JSON.parse(JSON.stringify(value)));
  }
