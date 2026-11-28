@@ -472,4 +472,75 @@ export class ParticipationController{
   const input=validated(admission.emptyCommand,query),workflow=verifiedWorkflow(req);
   return this.identity.runWorkflow(async()=>admission.familyWorkspaceResult.parse(await workflow.getGuardianFamilyApplicationWorkspace(input)));
  }
+
+ @Post('admission-interest-assignments')
+ @Command('can')
+ @Header('Cache-Control','private, no-store')
+ @Header('Referrer-Policy','no-referrer')
+ @ApiOperation({operationId:'assignPublicSiteInterestToProgram',summary:'Assign a Site interest to an authorized admissions Program'})
+ @ApiBody({schema:admission.interestDocs.assign})
+ @ApiOkResponse({schema:admission.interestDocs.assigned})
+ assignPublicSiteInterestToProgram(@Req() req:FastifyRequest,@Body() body:unknown){
+  const input=validated(admission.interestAssignmentInput,body),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.interestAssignmentReceipt.parse(await workflow.assignPublicSiteInterestToProgram(input)));
+ }
+ @Post('admission-interest-invitations')
+ @Command('can')
+ @Header('Cache-Control','private, no-store')
+ @Header('Referrer-Policy','no-referrer')
+ @ApiOperation({operationId:'invitePublicAdmissionsInterestToApply',summary:'Request verified-email application invitation for consented adult interest'})
+ @ApiBody({schema:admission.interestDocs.invite})
+ @ApiOkResponse({schema:admission.interestDocs.invited})
+ invitePublicAdmissionsInterestToApply(@Req() req:FastifyRequest,@Body() body:unknown){
+  const input=validated(admission.interestInvitationInput,body),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.interestInvitationReceipt.parse(await workflow.invitePublicAdmissionsInterestToApply(input)));
+ }
+ @Post('admission-interest-status-changes')
+ @Command('can')
+ @Header('Cache-Control','private, no-store')
+ @Header('Referrer-Policy','no-referrer')
+ @ApiOperation({operationId:'setPublicAdmissionsInterestStatus',summary:'Record authorized follow-up or close an interest'})
+ @ApiBody({schema:admission.interestDocs.status})
+ @ApiOkResponse({schema:admission.interestDocs.changed})
+ setPublicAdmissionsInterestStatus(@Req() req:FastifyRequest,@Body() body:unknown){
+  const input=validated(admission.interestStatusInput,body),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.interestStatusReceipt.parse(await workflow.setPublicAdmissionsInterestStatus(input)));
+ }
+ @Get('admission-interests')
+ @GovernedWorkflowOperation('can','GET')
+ @ApiCookieAuth('session')
+ @Header('Cache-Control','private, no-store')
+ @Header('Referrer-Policy','no-referrer')
+ @ApiOperation({operationId:'listPublicAdmissionsInterests',summary:'Scoped admissions interest inbox with stable pagination'})
+ @ApiQuery({name:'interestId',required:false,schema:{type:'string',format:'uuid'}})
+ @ApiQuery({name:'siteId',required:false,schema:{type:'string',format:'uuid'}})
+ @ApiQuery({name:'programId',required:false,schema:{type:'string',format:'uuid'}})
+ @ApiQuery({name:'cursor',required:false,schema:{type:'string',maxLength:80}})
+ @ApiOkResponse({schema:admission.interestDocs.page})
+ @ApiResponse({status:400,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:401,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:403,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:500,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:503,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ listPublicAdmissionsInterests(@Req() req:FastifyRequest,@Query() query:unknown){
+  const input=validated(admission.publicInterestQuery,query),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.publicInterestPageResult.parse(await workflow.listPublicAdmissionsInterests(input)));
+ }
+ @Get('me/admission-offers')
+ @GovernedWorkflowOperation('can','GET')
+ @ApiCookieAuth('session')
+ @Header('Cache-Control','private, no-store')
+ @Header('Referrer-Policy','no-referrer')
+ @ApiOperation({operationId:'getGuardianAdmissionOffers',summary:'Read offers only for independently verified guardian relationships'})
+ @ApiQuery({name:'studentPersonId',required:false,schema:{type:'string',format:'uuid'}})
+ @ApiOkResponse({schema:admission.interestDocs.guardianOffers})
+ @ApiResponse({status:400,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:401,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:403,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:500,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:503,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ getGuardianAdmissionOffers(@Req() req:FastifyRequest,@Query() query:unknown){
+  const input=validated(admission.guardianOffersQuery,query),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.guardianOffersResult.parse(await workflow.getGuardianAdmissionOffers(input)));
+ }
 }
