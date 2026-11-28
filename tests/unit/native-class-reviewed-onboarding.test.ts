@@ -3,7 +3,8 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const read=(path:string)=>readFileSync(resolve(process.cwd(),path),"utf8");
-const activation=read("src/modules/classes/native-class-reviewed-onboarding.functions.ts");
+const activation=read("src/modules/classes/native-class-reviewed-onboarding.server.ts");
+const transport=read("src/modules/classes/native-class-reviewed-onboarding.functions.ts");
 const migration=read("database/canonical/v3.0.1/patch-reviewed-adult-class-onboarding.sql");
 const route=read("src/routes/class.tsx");
 const entry=read("src/modules/classes/native-class-entry.ts");
@@ -11,7 +12,7 @@ const entry=read("src/modules/classes/native-class-entry.ts");
 describe("reviewed adult Class activation: one sign-in, never self-verification",()=>{
   it("consumes only independent pre-existing approved evidence for exact CAN Person",()=>{
     for(const condition of [
-      'requireVerifiedAdultAccount()',
+      'resolveVerifiedAdultAccount(request)',
       'probeCanonicalAuthReader()',
       'review.status!=="approved"',
       'review.accessPersonId!==owner.personId',
@@ -51,9 +52,9 @@ describe("reviewed adult Class activation: one sign-in, never self-verification"
     expect(activation).toContain('.returning({accessAccountId:accessAdultLearningReviews.accessAccountId})');
     expect(activation).toContain('if(!consumed)');
     expect(activation).toContain('eventCode:"class.learner.identity.activated"');
-    expect(activation).toContain('issueNativeLearnerSession(tx,nativeAccountId,grantId,now)');
-    expect(activation.indexOf('appendResponseHeader("Set-Cookie",result.cookie)'))
-      .toBeGreaterThan(activation.indexOf('db.transaction(async tx=>'));
+    expect(activation).toContain('issueNativeLearnerSession(tx,request,owner,nativeAccountId,grantId,now)');
+    expect(activation.indexOf('assertVerifiedAdultSessionForMutation(tx,request,owner)')).toBeLessThan(activation.indexOf('tx.insert(canonicalAccounts)'));
+    expect(transport.indexOf('appendResponseHeader("Set-Cookie",cookie)')).toBeGreaterThan(transport.indexOf('await activateReviewedNativeClassLearnerService(getRequest())'));
   });
   it("restricts evidence mutation and requires a different reviewer",()=>{
     expect(migration).toContain('adult_learning_independent_reviewer');
