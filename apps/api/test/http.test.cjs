@@ -706,3 +706,25 @@ test('admission offer response is not enrollment activation and Class exits rema
  assert.equal(c.classCancelInput.safeParse({classEnrollmentId:id,reason:'requested'}).success,false);
  assert.equal(c.classExitReceipt.safeParse({classEnrollmentId:id,status:'completed',releasedSeat:true,alreadyClosed:false}).success,false);
 });
+
+test('Class participation exposes distinct protected approvals, invitations and assignments',async()=>{
+ const id='00000000-0000-4000-8000-000000000001';
+ await withServer('0',async(url,document)=>{
+  for(const [method,path] of [['POST','/api/v1/class-approval-requests'],['POST','/api/v1/class-approval-decisions'],['GET','/api/v1/me/class-approvals'],['GET','/api/v1/class-approval-queue'],['POST','/api/v1/class-invitations'],['GET','/api/v1/me/class-invitations'],['POST','/api/v1/class-invitation-declines'],['POST','/api/v1/class-enrollment-assignments']]){
+   const op=document.paths[path][method.toLowerCase()];
+   assert.ok(op.security);assert.ok(op.responses['403']);
+   if(method==='POST')assert.ok(op.requestBody);
+   const res=await fetch(url+path,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(res.status,method==='POST'?503:401);
+  }
+ });
+ const c=require('../dist/participation.contracts');
+ assert.equal(c.requestClassApprovalInput.safeParse({classOfferingVersionId:id,requestId:id}).success,true);
+ assert.equal(c.requestClassApprovalInput.safeParse({classOfferingVersionId:id,requestId:id,learnerPersonId:id}).success,false);
+ assert.equal(c.decideClassApprovalInput.safeParse({approvalRequestId:id,decision:'approved',reason:'eligible'}).success,true);
+ assert.equal(c.classApprovalReceipt.safeParse({approvalRequestId:id,state:'approved',duplicate:false,classEnrollmentId:id}).success,false);
+ assert.equal(c.classInvitationReceipt.safeParse({invitationId:id,expiresAt:'2026-11-29T00:00:00Z',duplicate:false,courseAttemptId:id}).success,false);
+ assert.equal(c.assignAdultInput.safeParse({classId:id,learnerPersonId:id,creditMode:'for_credit'}).success,false);
+ assert.equal(c.assignAdultInput.safeParse({classId:id,learnerPersonId:id,creditMode:'audit'}).success,true);
+ assert.equal(c.classApprovalQueueResult.safeParse([{approvalRequestId:id,learnerPersonId:id,applicantPersonId:id,state:'approved',requestedAt:'2026-11-28T00:00:00Z',expiresAt:'2026-11-29T00:00:00Z'}]).success,false);
+});
