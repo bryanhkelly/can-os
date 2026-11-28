@@ -3,6 +3,7 @@ import { IdentityModule } from './identity.module';
 import { LearningController } from './learning.controller';
 import { ClassroomController } from './classroom.controller';
 import { InstructionalController } from './instructional.controller';
+import { RehearsalController } from './rehearsal.controller';
 import { RoomController } from './room.controller';
 
 /** WS07 owns learner delivery, Class sessions and Classroom Connect transport.
@@ -11,6 +12,6 @@ import { RoomController } from './room.controller';
  */
 @Module({
  imports:[IdentityModule],
- controllers:[LearningController,ClassroomController,RoomController,InstructionalController],
+ controllers:[LearningController,ClassroomController,RoomController,InstructionalController,RehearsalController],
 })
 export class LearningModule {}

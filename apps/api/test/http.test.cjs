@@ -690,12 +690,13 @@ test('learning module resolves the shared identity provider without a duplicate 
  const {RoomController}=require('../dist/room.controller');
  const {ClassroomController}=require('../dist/classroom.controller');
  const {InstructionalController}=require('../dist/instructional.controller');
+ const {RehearsalController}=require('../dist/rehearsal.controller');
  const {app}=await createApi(readConfig({}));
  try{
   const shared=app.select(IdentityModule).get(CanonicalIdentityService,{strict:true});
   assert.equal(app.get(CanonicalIdentityService),shared);
   const module=app.select(LearningModule);
-  for(const controller of [LearningController,RoomController,ClassroomController,InstructionalController])
+  for(const controller of [LearningController,RoomController,ClassroomController,InstructionalController,RehearsalController])
    assert.equal(module.get(controller,{strict:true}).identity,shared);
  }finally{await app.close();}
 });
@@ -747,4 +748,32 @@ test('facilitator workspace and activity aggregates have protected contracts',as
  assert.equal(hostResults.activity.safeParse(value).success,true);
  assert.equal(hostResults.activity.safeParse({...value,roster:[]}).success,false);
  assert.equal(hostResults.activity.safeParse({...value,rawAnswers:[]}).success,false);
+});
+
+test('rehearsal REST operations are protected and separate from live learning evidence',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const route of ['choices','media']){
+   const path='/api/v1/classroom-rehearsal/'+route;
+   assert.ok(document.paths[path].get.security);
+   assert.equal((await fetch(url+path,{headers:{'x-role':'room_facilitator'}})).status,401);
+  }
+  for(const route of ['media-access','playback-events']){
+   const path='/api/v1/classroom-rehearsal/'+route;
+   assert.ok(document.paths[path].post.security);
+   assert.ok(document.paths[path].post.responses['409']);
+   assert.equal((await fetch(url+path,{method:'POST',headers:{Origin:url,'content-type':'application/json'},body:'{}'})).status,503);
+  }
+ });
+ const {inputs,results}=require('../dist/rehearsal.contracts');
+ const id='00000000-0000-4000-8000-000000000001';
+ const scope={deploymentId:id,courseVersionId:id,siteId:id,adoptionId:id};
+ const event={...scope,lessonId:id,assetVersionId:id,requestId:id,kind:'played'};
+ assert.equal(inputs.playback.safeParse(event).success,true);
+ assert.equal(inputs.playback.safeParse({...event,courseAttemptId:id}).success,false);
+ assert.equal(inputs.scope.safeParse({...scope,personId:id}).success,false);
+ assert.equal(results.playback.safeParse({saved:true,duplicate:false,rehearsalOnly:true}).success,true);
+ assert.equal(results.playback.safeParse({saved:false,duplicate:true,rehearsalOnly:true}).success,true);
+ assert.equal(results.playback.safeParse({saved:true,duplicate:true,rehearsalOnly:true}).success,false);
+ assert.equal(results.playback.safeParse({saved:true,duplicate:false,rehearsalOnly:true,attendance:true}).success,false);
+ assert.equal(results.access.safeParse({downloadUrl:'http://example.test',expiresInSeconds:30}).success,false);
 });

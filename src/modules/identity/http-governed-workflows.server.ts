@@ -46,6 +46,7 @@ import {issueClassroomProjectorCommandService,getClassroomProjectorCommandServic
 import {releaseClassroomActivityService,closeClassroomActivityService,submitClassroomResponseService,recordClassroomPresenceService,getClassroomLearnerActivitiesService,getClassroomHostActivityService,getClassroomPresentationStateService} from "@/modules/learning/classroom-evidence.server";
 import {getClassroomConnectCourseChoicesService} from "@/modules/learning/classroom-connect.server";
 import {getInstructionalLearnerContext} from "./learning-command-context.server";
+import { getClassroomRehearsalChoicesService, getClassroomRehearsalMediaService, getClassroomRehearsalMediaAccessService, recordClassroomRehearsalPlaybackService, rehearsalInput, mediaInput, playbackInput } from "@/modules/learning/classroom-rehearsal.server";
 import {getFacilitatedHostWorkspaceService,getFacilitatedRoomMediaService,getFacilitatedRoomMediaAccessService,getLearnerFacilitatedRoomService} from "@/modules/learning/facilitated-learning.server";
 import {getNativeClassSessionAgendaService} from "@/modules/classes/native-class-session-agenda.server";
 import {resumeLinkedNativeClassLearnerService} from "@/modules/classes/native-class-session-recovery.server";
@@ -230,6 +231,10 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
   getMyUnifiedClassDrafts:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("class operator context");return getMyUnifiedClassDraftsService(request,raw);},
   getNativeClassOperatorSites:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("class operator context");return getNativeClassOperatorSitesService(request,raw);},
   getUnifiedClassCourseOptions:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("class operator context");return getUnifiedClassCourseOptionsService(request,raw);},
+  getClassroomRehearsalChoices:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("facilitator rehearsal context");return getClassroomRehearsalChoicesService(request);},
+  getClassroomRehearsalMedia:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("facilitator rehearsal context");return getClassroomRehearsalMediaService(request,parseCommandInput(rehearsalInput,raw));},
+  getClassroomRehearsalMediaAccess:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("facilitator rehearsal context");return getClassroomRehearsalMediaAccessService(request,parseCommandInput(mediaInput,raw));},
+  recordClassroomRehearsalPlayback:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("facilitator rehearsal context");return recordClassroomRehearsalPlaybackService(request,parseCommandInput(playbackInput,raw));},
   getFacilitatedHostWorkspace:async(raw:unknown)=>{
     if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("facilitator workspace context");
     const workspace=await getFacilitatedHostWorkspaceService(request,raw);
