@@ -18,7 +18,7 @@ describe("one Site UUID; retired identity bridge",()=>{
     "src/modules/sites/site-published-classes.server.ts",
     "src/modules/sites/site-noncredit-releases.server.ts",
     "src/modules/identity/platform-admin.functions.ts",
-    "src/modules/identity/canonical-sensitive-approvals.functions.ts",
+    "src/modules/identity/canonical-sensitive-approvals.server.ts",
     "src/modules/sites/staff-principal-verification.functions.ts",
   ];
   for(const file of files)
@@ -26,7 +26,7 @@ describe("one Site UUID; retired identity bridge",()=>{
   expect(read(files[0])).toContain("lifecycleStatus:sites.lifecycleStatus");
   expect(read(files[0])).not.toContain("catalogSites");
   expect(read(files[3])).toContain("native.id=s.id");
-  expect(read(files[4])).toContain("eq(accountPersonGrants.siteId,grant.siteId)");
+  expect(read(files[4])).toContain("assertIssuerOperatingSite(tx,grant.organizationId,grant.siteId)");
   expect(read(files[5])).toContain("retired native Person correspondence");
   expect(read(files[5])).not.toContain("tx.insert(accessAccountCanonicalPrincipals)");
  });
