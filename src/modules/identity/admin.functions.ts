@@ -4,7 +4,7 @@ import {requireActor} from "./actors.server";
 import {localStaffInviteInput} from "@/domain/staff-onboarding-policy";
 import {listScopedSitesService,listPeopleService,listAccessAccountsService,inviteStaffMemberService,setGrantActiveService,staffPeopleQuery,staffGrantStateInput} from "./staff-admin.server";
 
-const registrar=()=>requireActor(["registrar"],"admin.manage");
+const registrar=()=>requireActor(["registrar"], "admin.manage");
 const noStore=()=>setResponseHeader("Cache-Control","private, no-store");
 
 export const listScopedSites=createServerFn({method:"GET"}).handler(async()=>{
