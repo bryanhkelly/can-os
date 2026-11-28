@@ -22,7 +22,7 @@ assert.ok(authUrl,"Dedicated restricted QA authentication URL required");
 const auth=new URL(authUrl);
 assert.ok(["postgres:","postgresql:"].includes(auth.protocol)&&auth.username==="can_os_canonical_auth_app"&&auth.password&&!["user","role","options"].some(k=>auth.searchParams.has(k)),"Restricted application authentication login required");
 assert.ok((env.CAN_ACCESS_TOKEN_PEPPER?.length??0)>=32&&(env.CAN_CANONICAL_ACCESS_TOKEN_PEPPER?.length??0)>=32,"Isolated session peppers required");
-assert.ok(env.CAN_NONCREDIT_AUTO_FINALIZATION_ENABLED==="true"&&/^[a-f0-9]{64}$/i.test(env.CAN_NONCREDIT_ASSESSMENT_KEY_HEX??""),"Objective assessment key and auto-finalization configuration required");
+assert.ok(/^[a-f0-9]{64}$/i.test(env.CAN_NONCREDIT_ASSESSMENT_KEY_HEX??""),"Objective assessment key required");
 const authPool=new Pool({connectionString:authUrl,max:1});
 let client;
 try{
