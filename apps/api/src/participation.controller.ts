@@ -422,4 +422,54 @@ export class ParticipationController{
   const input=validated(admission.admissionsIntakeQuery,query),workflow=verifiedWorkflow(req);
   return this.identity.runWorkflow(async()=>admission.admissionsIntakeResult.parse(await workflow.listAdmissionsIntake(input)));
  }
+
+ @Post('family-applications')
+ @Command('can')
+ @Header('Cache-Control','private, no-store')
+ @Header('Referrer-Policy','no-referrer')
+ @ApiOperation({operationId:'startGuardianFamilyApplication',summary:'Verified guardian starts a scoped family application'})
+ @ApiBody({schema:admission.familyDocs.application})
+ @ApiOkResponse({schema:admission.intakeDocs.inquiryReceipt})
+ startGuardianFamilyApplication(@Req() req:FastifyRequest,@Body() body:unknown){
+  const input=validated(admission.familyApplicationInput,body),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.inquiryReceipt.parse(await workflow.startGuardianFamilyApplication(input)));
+ }
+ @Post('admission-guardian-access-revocations')
+ @Command('can')
+ @Header('Cache-Control','private, no-store')
+ @Header('Referrer-Policy','no-referrer')
+ @ApiOperation({operationId:'revokeAdmissionsGuardianAccess',summary:'Registrar revokes exact guardian grant and its bound sessions'})
+ @ApiBody({schema:admission.familyDocs.access})
+ @ApiOkResponse({schema:admission.familyDocs.revoked})
+ revokeAdmissionsGuardianAccess(@Req() req:FastifyRequest,@Body() body:unknown){
+  const input=validated(admission.guardianAccessChangeInput,body),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.guardianRevokeReceipt.parse(await workflow.revokeAdmissionsGuardianAccess(input)));
+ }
+ @Post('admission-guardian-access-restorations')
+ @Command('can')
+ @Header('Cache-Control','private, no-store')
+ @Header('Referrer-Policy','no-referrer')
+ @ApiOperation({operationId:'restoreAdmissionsGuardianAccess',summary:'Registrar restores exact guardian grant without restoring revoked sessions'})
+ @ApiBody({schema:admission.familyDocs.access})
+ @ApiOkResponse({schema:admission.familyDocs.restored})
+ restoreAdmissionsGuardianAccess(@Req() req:FastifyRequest,@Body() body:unknown){
+  const input=validated(admission.guardianAccessChangeInput,body),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.guardianRestoreReceipt.parse(await workflow.restoreAdmissionsGuardianAccess(input)));
+ }
+ @Get('me/family-application-workspace')
+ @GovernedWorkflowOperation('can','GET')
+ @ApiCookieAuth('session')
+ @Header('Cache-Control','private, no-store')
+ @Header('Referrer-Policy','no-referrer')
+ @ApiOperation({operationId:'getGuardianFamilyApplicationWorkspace',summary:'Verified guardian reads authorized school programs and own family applications'})
+ @ApiOkResponse({schema:admission.familyDocs.workspace})
+ @ApiResponse({status:400,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:401,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:403,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:500,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ @ApiResponse({status:503,content:{'application/problem+json':{schema:problemOpenApiSchema}}})
+ getGuardianFamilyApplicationWorkspace(@Req() req:FastifyRequest,@Query() query:unknown){
+  const input=validated(admission.emptyCommand,query),workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>admission.familyWorkspaceResult.parse(await workflow.getGuardianFamilyApplicationWorkspace(input)));
+ }
 }
