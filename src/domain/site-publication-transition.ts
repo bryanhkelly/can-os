@@ -1,3 +1,4 @@
+import {DomainError} from "./errors";
 /**
  * Site publication approves a public landing/catalog only. It does not open
  * admissions, publish individual Programs, or change activity registration.
@@ -36,7 +37,7 @@ export function planSitePublicationTransition(input: {
   }
   const target: SitePublicationStatus = action === "unpublish" ? "draft" : "published";
   if(action==="republish" && current.status!=="published")
-    throw new Error("Publish the Site before using Republish.");
+    throw new DomainError("CONFLICT","Publish the Site before using Republish.");
   if (current.status === target && action!=="republish") {
     // No new write, event, or audit for a repeated request. A later opposite
     // action cannot be overwritten by replaying a stale revision.
@@ -44,7 +45,7 @@ export function planSitePublicationTransition(input: {
       publishedAt: current.publishedAt, updatedAt: current.updatedAt };
   }
   if (current.updatedAt.toISOString() !== input.expectedRevision) {
-    throw new Error("Site publication changed. Refresh and review before trying again.");
+    throw new DomainError("CONFLICT","Site publication changed. Refresh and review before trying again.");
   }
   if (input.reason.trim().length < 10 || input.reason.trim().length > 500) {
     throw new Error("Provide a 10–500 character publication decision reason");

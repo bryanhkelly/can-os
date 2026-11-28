@@ -382,3 +382,14 @@ test('Site profile endpoints are protected and use exact revisions',async()=>{
  assert.equal(bodies.address.safeParse({address:null}).success,false);
  assert.equal(bodies.contact.safeParse({expectedRevision:'2026-11-28T00:00:00Z',contact:null,publicClaimApproved:true}).success,false);
 });
+
+test('publication decisions remain independently authorized and reject enrollment overrides',async()=>{
+ await withServer('0',async(url,document)=>{
+  for(const route of ["/api/v1/sites/{siteId}/public-identity-changes","/api/v1/sites/{siteId}/public-address-reservations","/api/v1/sites/{siteId}/publication-decisions","/api/v1/sites/{siteId}/programs/{programId}/marketing-decisions"]){
+   const op=document.paths[route].post;assert.ok(op.security);assert.ok(op.responses['409']);
+   assert.equal((await fetch(url+route.replace(/\{[^}]+\}/g,'00000000-0000-4000-8000-000000000001'),{method:'POST',headers:{Origin:url,'content-type':'application/json'},body:'{}'})).status,503);
+  }
+ });
+ const {bodies}=require('../dist/site-publishing.contracts');
+ assert.equal(bodies.publish.safeParse({action:'publish',expectedRevision:'2026-11-28T00:00:00Z',reason:'Reviewed website copy',contentReviewed:true,openEnrollment:true}).success,false);
+});

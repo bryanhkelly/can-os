@@ -1,3 +1,4 @@
+import {DomainError} from "@/domain/errors";
 import {emitReportableChange} from "@/platform/reportable-event";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -31,7 +32,7 @@ export async function changeAcademicProgramPublication(
   return db.transaction(async tx => {
     const site = await requireSitePublisher(actor, input.siteId, tx);
     if (!(actor.scope.programIds ?? []).includes(input.programId)) {
-      throw new Error("This Program is not in your authorized scope");
+      throw new AuthorizationError("Program marketing scope");
     }
 
     // Serializes against Site publish/unpublish and other academic decisions.
@@ -76,7 +77,7 @@ export async function changeAcademicProgramPublication(
         updatedAt: current?.updatedAt.toISOString() ?? null };
     }
     if ((current?.updatedAt.toISOString() ?? null) !== input.expectedRevision) {
-      throw new Error("Program marketing approval changed. Refresh and try again.");
+      throw new DomainError("CONFLICT","Program marketing approval changed. Refresh and try again.");
     }
     const reason = input.reason.trim();
     if (reason.length < 10 || reason.length > 500)
