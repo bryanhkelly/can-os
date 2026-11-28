@@ -88,10 +88,21 @@ test("ordinary REST cancellation, replacement and live facilitator takeover pres
     const start=Date.parse(startsAt),end=Date.parse(endsAt);
     const meetings=Array.from({length:4},(_,i)=>({requestId:i===0?requestId:randomUUID(),startsAt:new Date(start+i*7*86400000).toISOString(),endsAt:new Date(end+i*7*86400000).toISOString()}));
     const series={classId,cadence:"custom",meetings};
-    const created=await post<{sessions:{classSessionId:string;duplicate:boolean}[];created:number}>(b.http,"/class-session-schedules",series);
-    expect(created.sessions).toHaveLength(4);expect(created.created).toBe(4);
-    const replay=await post<typeof created>(b.http,"/class-session-schedules",series);
+    type SeriesReceipt={sessions:{classSessionId:string;duplicate:boolean}[];created:number};
+    const concurrent=await Promise.all([
+      post<SeriesReceipt>(b.http,"/class-session-schedules",series),
+      post<SeriesReceipt>(b.http,"/class-session-schedules",series),
+    ]);
+    expect(concurrent.map(r=>r.created).sort((a,b)=>a-b)).toEqual([0,4]);
+    const created=concurrent.find(r=>r.created===4)!;
+    const concurrentReplay=concurrent.find(r=>r.created===0)!;
+    expect(created.sessions).toHaveLength(4);
+    expect(concurrentReplay.sessions.map(x=>x.classSessionId)).toEqual(created.sessions.map(x=>x.classSessionId));
+    expect(concurrentReplay.sessions.every(x=>x.duplicate)).toBe(true);
+    const replay=await post<SeriesReceipt>(b.http,"/class-session-schedules",series);
     expect(replay.created).toBe(0);expect(replay.sessions.map(x=>x.classSessionId)).toEqual(created.sessions.map(x=>x.classSessionId));expect(replay.sessions.every(x=>x.duplicate)).toBe(true);
+    const changed={...series,meetings:series.meetings.map((meeting,i)=>i===0?{...meeting,startsAt:new Date(Date.parse(meeting.startsAt)+60000).toISOString(),endsAt:new Date(Date.parse(meeting.endsAt)+60000).toISOString()}:meeting)};
+    const conflict=await b.http.post(api+"/class-session-schedules",{headers,data:changed});expect(conflict.status()).toBe(409);
     const next=created.sessions[0]!.classSessionId;expect(next).not.toBe(classSessionId);
     expect(await post(b.http,"/class-session-agenda-revisions",{classId,classSessionId:next,requestId:agendaRequestId,expectedRevisionNo:0,items:[{kind:"watch",referenceId:lessonId}]})).toMatchObject({classSessionId:next});
     for(const session of created.sessions.slice(1)){
