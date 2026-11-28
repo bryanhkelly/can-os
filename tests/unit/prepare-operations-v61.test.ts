@@ -19,9 +19,12 @@ describe("V6.1 Prepare operational integration boundaries", () => {
 
   it("saves learning environment through the existing audited Site Information command", () => {
     const operations = read("src/components/launch-studio/PrepareOperationsV61.tsx");
-    const saved = read("src/modules/programs/site-information-v61.functions.ts");
-    expect(operations).toContain("readSiteInformationV61({ data: { siteId } })");
-    expect(operations).toContain("saveSiteInformationV61({");
+    const saved = read("src/modules/programs/site-information-v61.server.ts");
+    const sdk = read("src/lib/api/browser-site-planning.ts");
+    expect(operations).toContain("readSiteInformation(siteId, controller.signal)");
+    expect(sdk).toContain('GET("/api/v1/sites/{siteId}/information"');
+    expect(operations).toContain("saveSiteInformation(siteId, {");
+    expect(sdk).toContain('POST("/api/v1/sites/{siteId}/information"');
     expect(operations).toContain('section: "environment"');
     expect(operations).toContain("siteEnvironmentV61Schema.safeParse");
     expect(operations).toContain("expectedRevision");
