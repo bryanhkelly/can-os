@@ -684,3 +684,25 @@ test('waitlist and withdrawal are private standard operations with strict distin
  assert.equal(c.withdrawRegistrationInput.safeParse({registrationId:id,confirm:false}).success,false);
  assert.equal(c.withdrawRegistrationResult.safeParse({withdrawn:true,alreadyWithdrawn:true}).success,true);
 });
+
+test('admission offer response is not enrollment activation and Class exits remain protected',async()=>{
+ const id='00000000-0000-4000-8000-000000000001';
+ await withServer('0',async(url,document)=>{
+  for(const [method,path] of [['GET','/api/v1/admission-offer-options'],['POST','/api/v1/admission-offers'],['POST','/api/v1/admission-offer-responses'],['POST','/api/v1/admission-enrollment-activations'],['POST','/api/v1/admission-offer-withdrawals'],['POST','/api/v1/class-enrollment-withdrawals'],['POST','/api/v1/class-enrollment-cancellations']]){
+   const op=document.paths[path][method.toLowerCase()];
+   assert.ok(op.security);assert.ok(op.responses['403']);
+   if(method==='POST')assert.ok(op.requestBody);
+   const res=await fetch(url+path,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(res.status,method==='POST'?503:401);
+  }
+ });
+ const c=require('../dist/participation.contracts');
+ assert.equal(c.respondOfferInput.safeParse({offerId:id,decision:'accept'}).success,true);
+ assert.equal(c.respondOfferInput.safeParse({offerId:id,decision:'accept',sectionId:id}).success,false);
+ assert.equal(c.offerReceipt.safeParse({offerId:id,enrollmentId:id}).success,false);
+ assert.equal(c.activationReceipt.safeParse({enrollmentId:id}).success,true);
+ assert.equal(c.withdrawOfferInput.safeParse({offerId:id,reason:'short',confirmed:true}).success,false);
+ assert.equal(c.classWithdrawInput.safeParse({classEnrollmentId:id,learnerPersonId:id}).success,false);
+ assert.equal(c.classCancelInput.safeParse({classEnrollmentId:id,reason:'requested'}).success,false);
+ assert.equal(c.classExitReceipt.safeParse({classEnrollmentId:id,status:'completed',releasedSeat:true,alreadyClosed:false}).success,false);
+});
