@@ -717,3 +717,29 @@ test('WS10 manual work contracts require current scope, request IDs and audited 
  assert.equal(manualQueries.inbox.safeParse({role:'can_credential_reviewer'}).success,false);
  assert.equal(manualResults.inbox.safeParse({sources:[],privateEvidence:'secret'}).success,false);
 });
+
+test('WS10 dependency routes are governed and contract rejects invalid graph commands',async()=>{
+ const id='00000000-0000-4000-8000-000000000001';
+ const blocker='00000000-0000-4000-8000-000000000002';
+ await withServer('0',async(url,document)=>{
+  const path='/api/v1/work/tasks/{id}/dependencies';
+  const actual='/api/v1/work/tasks/'+id+'/dependencies';
+  assert.equal(document.paths[path].get.operationId,'getOperationalTaskDependencies');
+  assert.equal(document.paths[path].post.operationId,'changeOperationalTaskDependency');
+  assert.ok(document.paths[path].get.security);
+  assert.ok(document.paths[path].post.security);
+  assert.equal((await fetch(url+actual,{headers:{'x-role':'site_admin'}})).status,401);
+  assert.equal((await fetch(url+actual,{method:'POST',headers:{Origin:url,'content-type':'application/json'},body:'{}'})).status,503);
+ });
+ const {dependencyBody,dependencyResults,manualResults}=require('../dist/work-approvals.contracts');
+ const command={blockedByActionId:blocker,operation:'add',expectedUpdatedAt:'2026-11-28T00:00:00Z',reason:'Prepare facility first'};
+ assert.equal(dependencyBody.safeParse(command).success,true);
+ assert.equal(dependencyBody.safeParse({...command,operation:'approve'}).success,false);
+ assert.equal(dependencyBody.safeParse({...command,expectedUpdatedAt:undefined}).success,false);
+ assert.equal(dependencyBody.safeParse({...command,organizationId:id}).success,false);
+ assert.equal(dependencyResults.read.safeParse({actionId:id,updatedAt:command.expectedUpdatedAt,blocked:true,prerequisites:[{id:blocker,title:'Prepare facility',status:'open',satisfied:false}]}).success,true);
+ assert.equal(dependencyResults.read.safeParse({actionId:id,updatedAt:command.expectedUpdatedAt,blocked:true,prerequisites:[{id:blocker,title:'Prepare facility',status:'open',satisfied:false,privateEvidence:'hidden'}]}).success,false);
+ for(const source of ['jurisdiction_review','reporting_relationship_review']){
+  assert.equal(manualResults.inbox.safeParse({sources:[{source,items:[],possiblyTruncated:false,limit:100,href:'/home'}]}).success,true);
+ }
+});
