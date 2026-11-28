@@ -42,3 +42,21 @@ export async function checkAuthoringContracts(client:BecomunaBrowserApi,id:strin
  // @ts-expect-error caller must not set publication authority
  await client.POST('/api/v1/course-versions/{courseVersionId}/draft-assignments',{params:{path:course},body:{assignmentKey:'assignment_1',title:'Assignment title',instructions:'Explain the concept',required:true,reviewerPersonId:id}});
 }
+
+export async function checkMarketplaceContracts(client:BecomunaBrowserApi,id:string){
+ const program={programId:id},annual={...program,packId:id,academicYearId:id};
+ await client.GET('/api/v1/curriculum-adopter-programs');
+ const market=await client.GET('/api/v1/programs/{programId}/curriculum-marketplace',{params:{path:program}});
+ if(market.data){const enabled:boolean=market.data.canPublish;void enabled;}
+ await client.GET('/api/v1/programs/{programId}/curriculum-journey-readiness',{params:{path:program}});
+ await client.POST('/api/v1/programs/{programId}/curriculum-entitlements',{params:{path:program},body:{packId:id,termsAccepted:true}});
+ await client.POST('/api/v1/programs/{programId}/curriculum-adoptions',{params:{path:program},body:{packId:id,versionId:id}});
+ await client.GET('/api/v1/programs/{programId}/curriculum-packs/{packId}/academic-years/{academicYearId}/adoption',{params:{path:annual}});
+ await client.POST('/api/v1/programs/{programId}/curriculum-packs/{packId}/academic-years/{academicYearId}/adoption',{params:{path:annual},body:{versionId:id}});
+ await client.POST('/api/v1/programs/{programId}/curriculum-packs/{packId}/academic-years/{academicYearId}/adoption/rollbacks',{params:{path:annual},body:{reason:'Verified license withdrawn'}});
+ await client.POST('/api/v1/programs/{programId}/curriculum-supplements',{params:{path:program},body:{courseVersionId:id,scope:'program',title:'Learning resource',kind:'link',url:'https://example.org/resource'}});
+ // @ts-expect-error terms must be explicitly accepted
+ await client.POST('/api/v1/programs/{programId}/curriculum-entitlements',{params:{path:program},body:{packId:id,termsAccepted:false}});
+ // @ts-expect-error cannot set academic year implicitly or in an unrelated body
+ await client.POST('/api/v1/programs/{programId}/curriculum-packs/{packId}/academic-years/{academicYearId}/adoption',{params:{path:{...program,packId:id}},body:{versionId:id}});
+}

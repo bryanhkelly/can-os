@@ -5,6 +5,7 @@ const { CanonicalIdentityService } = require('../dist/identity.service');
 const { ProgramsOfferingsModule } = require('../dist/programs-offerings.module');
 const { NativeCourseDraftController } = require('../dist/native-course-draft.controller');
 const { PublisherPackController } = require('../dist/publisher-pack.controller');
+const { CurriculumMarketplaceController } = require('../dist/curriculum-marketplace.controller');
 const { CatalogController } = require('../dist/catalog.controller');
 const { WorkflowController } = require('../dist/workflow.controller');
 const { OfferingReleaseController } = require('../dist/platform-commands.controller');
@@ -15,7 +16,7 @@ test('WS04 registers its controllers once and shares the configured identity ser
   try {
     const domain = app.select(ProgramsOfferingsModule);
     const identity = app.get(CanonicalIdentityService);
-    for (const Controller of [CatalogController, WorkflowController, OfferingReleaseController, NoncreditPublicationController, NativeCourseDraftController, PublisherPackController]) {
+    for (const Controller of [CatalogController, WorkflowController, OfferingReleaseController, NoncreditPublicationController, NativeCourseDraftController, PublisherPackController, CurriculumMarketplaceController]) {
       const instance = domain.get(Controller, { strict: true });
       assert.equal(instance.identity, identity);
     }
@@ -35,7 +36,8 @@ test('WS04 registers its controllers once and shares the configured identity ser
       'publishCourses', 'approveAssetManifest', 'publishOffering', 'getNoncreditEnrollmentPublisher',
       'getNoncreditTrainingReadiness', 'publishNoncreditSelfEnrollment', 'closeNoncreditSelfEnrollment',
       'publishNoncreditAcrossAuthorizedSites',
-      'getNativeCourseDraftLessons', 'saveNativeCourseLessonDraft', 'getNativeCourseReleaseReadiness', 'createNativeCourseAssignmentDraft', 'getNativeCourseAssignmentDrafts', 'getPublisherPackStudio', 'createAuthoredPublisherPack', 'startPublisherPackDraft', 'saveAuthoredPublisherPack', 'publishAuthoredPublisherPack'
+      'getNativeCourseDraftLessons', 'saveNativeCourseLessonDraft', 'getNativeCourseReleaseReadiness', 'createNativeCourseAssignmentDraft', 'getNativeCourseAssignmentDrafts', 'getPublisherPackStudio', 'createAuthoredPublisherPack', 'startPublisherPackDraft', 'saveAuthoredPublisherPack', 'publishAuthoredPublisherPack',
+      'getCurriculumAdopterPrograms', 'getCurriculumJourneyReadiness', 'getCurriculumMarketplace', 'installCurriculumPack', 'adoptCurriculumPack', 'reviewAnnualCurriculumAdoption', 'rolloverAnnualCurriculumAdoption', 'rollbackAnnualCurriculumPackAdoption', 'addMarketplaceSupplement'
     ]) {
       assert.ok(ids.includes(id), 'Missing WS04 operation: ' + id);
     }
@@ -134,4 +136,41 @@ test('native Course lesson paging exposes continuation and rejects unreasonable 
  const result={courseVersionId:id,courseTitle:'Course',versionNo:1,limited:false,nextOffset:null,lessons:[]};
  assert.equal(results.lessons.safeParse(result).success,true);
  assert.equal(results.lessons.safeParse({...result,nextOffset:-1}).success,false);
+});
+
+test('Marketplace routes are protected and enforce explicit Program/year authority',async()=>{
+ const {app,document}=await createApi(readConfig({API_DOCS:'0'}));
+ const id='00000000-0000-4000-8000-000000000001';
+ try{
+  await app.listen(0,'127.0.0.1');const url=await app.getUrl();
+  const base='/api/v1/programs/{programId}/';
+  const annual=base+'curriculum-packs/{packId}/academic-years/{academicYearId}/adoption';
+  for(const [path,method] of [
+   ['/api/v1/curriculum-adopter-programs','GET'],[base+'curriculum-journey-readiness','GET'],
+   [base+'curriculum-marketplace','GET'],[base+'curriculum-entitlements','POST'],
+   [base+'curriculum-adoptions','POST'],[annual,'GET'],[annual,'POST'],
+   [annual+'/rollbacks','POST'],[base+'curriculum-supplements','POST']
+  ]){
+   const op=document.paths[path][method.toLowerCase()];
+   assert.ok(op.security);assert.ok(op.responses['403']);assert.ok(op.responses['409']);
+   const response=await fetch(url+path.replace(/\{[^}]+\}/g,id),method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);
+  }
+ }finally{await app.close();}
+});
+test('Marketplace contracts reject license bypass, forged scope and unsafe supplement URLs',()=>{
+ const {inputs,results}=require('../dist/curriculum-marketplace.contracts');
+ const id='00000000-0000-4000-8000-000000000001';
+ assert.equal(inputs.install.safeParse({packId:id,termsAccepted:true}).success,true);
+ assert.equal(inputs.install.safeParse({packId:id,termsAccepted:false}).success,false);
+ assert.equal(inputs.install.safeParse({packId:id,termsAccepted:true,licenseCode:'COMMERCIAL'}).success,false);
+ assert.equal(inputs.rollover.safeParse({versionId:id,now:'2027-01-01'}).success,false);
+ assert.equal(inputs.rollover.safeParse({versionId:id,academicYearId:id}).success,false);
+ const supplement={courseVersionId:id,scope:'program',title:'Learning resource',kind:'link',url:'https://example.org/resource'};
+ assert.equal(inputs.supplement.safeParse(supplement).success,true);
+ for(const url of ['http://example.org','https://user:password@example.org','javascript:alert(1)'])
+  assert.equal(inputs.supplement.safeParse({...supplement,url}).success,false);
+ assert.equal(results.eligibility.safeParse({eligible:false,reason:'no_year_adoption'}).success,true);
+ assert.equal(results.eligibility.safeParse({eligible:true,reason:'invalid_or_expired',versionId:id}).success,false);
+ assert.equal(results.eligibility.safeParse({eligible:true,reason:'active',versionId:id,activationEligible:true}).success,false);
 });
