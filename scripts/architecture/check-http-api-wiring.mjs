@@ -1,6 +1,6 @@
 import ts from 'typescript';
 import {readFile,readdir} from 'node:fs/promises';
-import {resolve,relative} from 'node:path';
+import {resolve,relative,dirname} from 'node:path';
 const errors=[],root=process.cwd();
 const read=async path=>{
  const source=ts.createSourceFile(path,await readFile(resolve(root,path),'utf8'),ts.ScriptTarget.Latest,true);
@@ -14,7 +14,41 @@ const module=await read('apps/api/src/app.module.ts');
 const bridge=await read('src/modules/identity/http-governed-workflows.server.ts');
 const identity=await read('apps/api/src/identity.service.ts');
 const registered=new Set(),implementation=new Set(),declared=new Set(),called=new Set(),operations=new Map(),routes=new Map();
-visit(module,n=>{if(ts.isPropertyAssignment(n)&&n.name.getText()==='controllers'&&ts.isArrayLiteralExpression(n.initializer))for(const e of n.initializer.elements)registered.add(e.getText());});
+// A controller can be registered by a reachable Nest domain module, not
+// just AppModule. Follow static local module imports; fail on unsupported
+// module expressions rather than silently accepting orphaned controllers.
+const visitedModules=new Set(),registrationCounts=new Map();
+async function collectModule(path,source,expectedName){
+ const key=path+':'+expectedName;
+ if(visitedModules.has(key))return;
+ visitedModules.add(key);
+ const cls=source.statements.find(n=>ts.isClassDeclaration(n)&&n.name?.text===expectedName);
+ const decorator=(cls?ts.getDecorators(cls)??[]:[]).map(d=>d.expression).find(e=>ts.isCallExpression(e)&&e.expression.getText()==='Module');
+ const metadata=decorator?.arguments[0];
+ if(!metadata||!ts.isObjectLiteralExpression(metadata)){errors.push('Missing static Nest module metadata: '+key);return;}
+ const controllers=prop(metadata,'controllers');
+ if(controllers&&!ts.isArrayLiteralExpression(controllers))errors.push('Nonstatic controller registration: '+key);
+ if(controllers&&ts.isArrayLiteralExpression(controllers))for(const entry of controllers.elements){
+  if(!ts.isIdentifier(entry)){errors.push('Unsupported controller registration: '+entry.getText());continue;}
+  registered.add(entry.text);
+  registrationCounts.set(entry.text,(registrationCounts.get(entry.text)??0)+1);
+ }
+ const imports=prop(metadata,'imports');
+ if(!imports)return;
+ if(!ts.isArrayLiteralExpression(imports)){errors.push('Nonstatic module imports: '+key);return;}
+ for(const entry of imports.elements){
+  if(!ts.isIdentifier(entry)){errors.push('Unsupported Nest module import: '+entry.getText());continue;}
+  const binding=source.statements.find(n=>ts.isImportDeclaration(n)&&n.importClause?.namedBindings&&ts.isNamedImports(n.importClause.namedBindings)&&n.importClause.namedBindings.elements.some(e=>e.name.text===entry.text));
+  const spec=binding&&literal(binding.moduleSpecifier);
+  if(!spec?.startsWith('.')){errors.push('Unresolved local Nest module: '+entry.text);continue;}
+  const imported=binding.importClause.namedBindings.elements.find(e=>e.name.text===entry.text);
+  const name=imported.propertyName?.text??entry.text;
+  const child=relative(root,resolve(root,dirname(path),spec+'.ts'));
+  await collectModule(child,await read(child),name);
+ }
+}
+await collectModule('apps/api/src/app.module.ts',module,'AppModule');
+for(const [name,count] of registrationCounts)if(count>1)errors.push('Controller registered in multiple modules: '+name);
 const resolver=bridge.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='resolveGovernedWorkflow');
 const returned=resolver?.body?.statements.find(n=>ts.isReturnStatement(n))?.expression;
 if(!returned||!ts.isObjectLiteralExpression(returned))errors.push('Governed bridge return object missing');

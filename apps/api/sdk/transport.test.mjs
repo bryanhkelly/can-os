@@ -32,3 +32,22 @@ test('transport enforces origin and version, credentials, redirect and cache pol
   }
   assert.throws(()=>createSameOriginFetch(origin+'/api/v1'),/exact application origin/);
 });
+
+test('recorded instruction adapter forwards pagination and does not replay failed commands',async()=>{
+  const {recordedInstructionApi}=await import('./recorded-instruction.ts');
+  const calls=[];
+  const client={
+    GET:async(path,options)=>{calls.push({path,options});return {response:new Response(null,{status:200}),data:{items:[],nextBeforeId:null}};},
+    POST:async(path,options)=>{calls.push({path,options});return {response:new Response(null,{status:409}),error:{code:'CONFLICT'}};},
+  };
+  const api=recordedInstructionApi(client);
+  const id='00000000-0000-4000-8000-000000000001',cursor='00000000-0000-4000-8000-000000000002';
+  assert.deepEqual(await api.history(id,cursor),{items:[],nextBeforeId:null});
+  assert.deepEqual(calls[0].options.params,{path:{courseAttemptId:id},query:{beforeId:cursor}});
+  const command={requestId:id,trackVersionId:cursor,expectedRevision:2};
+  await assert.rejects(()=>api.select(id,command),{status:409,code:'CONFLICT'});
+  assert.equal(calls.length,2);
+  assert.deepEqual(calls[1].options.body,command);
+  await assert.rejects(()=>api.practice(id,{requestId:id,courseVersionId:id,trackVersionId:cursor,materialId:id,expectedRevision:2,responses:Array.from({length:100},(_,i)=>({promptKey:String(i),response:'😀'.repeat(10000)}))}),{status:413,code:'PAYLOAD_TOO_LARGE'});
+  assert.equal(calls.length,2,'oversized UTF-8 payload is rejected before network transmission');
+});

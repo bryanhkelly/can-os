@@ -8,9 +8,11 @@ type Download=Body<`${Base}/instruction-asset-access`>;
 const problemCodes:Readonly<Record<number,string>>={400:'VALIDATION_FAILED',401:'AUTHENTICATION_REQUIRED',403:'FORBIDDEN',409:'CONFLICT',413:'PAYLOAD_TOO_LARGE',503:'UNAVAILABLE'};
 export class RecordedInstructionApiError extends Error{
  readonly code:string;
- constructor(readonly status:number){
+ readonly status:number;
+ constructor(status:number){
   super(status===413?'Practice exceeds the 1 MiB request limit. Shorten responses before retrying.':'Recorded instruction request failed.');
   this.name='RecordedInstructionApiError';
+  this.status=status;
   this.code=problemCodes[status]??'UNEXPECTED';
  }
 }
