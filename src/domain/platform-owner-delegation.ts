@@ -23,3 +23,12 @@ export function platformOwnerMayActAs(role:string):boolean {
 export function platformOwnerDelegationIsCurrent(until:Date|null,now:Date=new Date()):boolean {
   return until!==null && until.getTime()>now.getTime();
 }
+
+/** Synthetic rehearsal is a bounded extension of the same owner delegation,
+ * not authority to impersonate real families or attest independent consent.
+ * The caller must establish the synthetic Person and exact Site from live
+ * database evidence; an email suffix alone is never sufficient. */
+export function platformOwnerMayActAsTarget(role:string, syntheticSitePerson:boolean):boolean {
+  return platformOwnerMayActAs(role) ||
+    (syntheticSitePerson && (role==="student" || role==="guardian"));
+}
