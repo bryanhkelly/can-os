@@ -4,7 +4,7 @@ import type { FastifyRequest } from 'fastify';
 import { CanonicalReadOperation, CanonicalWriteOperation, verifiedIdentity } from './security';
 import { CanonicalIdentityService } from './identity.service';
 import { problemOpenApiSchema } from './contracts';
-import { enrollmentId, resumeSchema, resumeDoc, homeworkSchema, homeworkDoc, validated, lessonParams, assignmentParams, emptyCommand, submissionBody, completionResult, submissionResult, emptyDoc, submissionBodyDoc, completionDoc, submissionResultDoc } from './learning.contracts';
+import { enrollmentId, workspaceSchema, workspaceDoc, resumeSchema, resumeDoc, homeworkSchema, homeworkDoc, validated, lessonParams, assignmentParams, emptyCommand, submissionBody, completionResult, submissionResult, emptyDoc, submissionBodyDoc, completionDoc, submissionResultDoc } from './learning.contracts';
 
 function LearnerRead(){
   return applyDecorators(CanonicalReadOperation(),
@@ -23,6 +23,14 @@ function LearnerWrite(resource:'lessonId'|'assignmentId'){
 @Controller('me/class-enrollments')
 export class LearningController{
   constructor(private readonly identity:CanonicalIdentityService){}
+  @Get(':classEnrollmentId/learning')
+  @LearnerRead()
+  @ApiOperation({operationId:'getMyClassLearning',summary:'Read own authorized class lesson workspace and recorded outcomes'})
+  @ApiOkResponse({schema:workspaceDoc})
+  workspace(@Req() request:FastifyRequest,@Param() params:unknown){
+    const id=enrollmentId(params);
+    return this.identity.run(verifiedIdentity(request),async actor=>workspaceSchema.parse(await actor.readLearningWorkspace(id)));
+  }
   @Get(':classEnrollmentId/resume')
   @LearnerRead()
   @ApiOperation({operationId:'getMyClassResume',summary:'Read the next eligible lesson and progress for own active enrollment'})
