@@ -1,6 +1,6 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { readSiteBrandVersionView } from "@/modules/sites/site-brand.functions";
-import { listSiteMarketingPackageReleases, listSiteMarketingReleases } from "@/modules/programs/site-marketing-artifacts.functions";
+import {legacyMarketingTransport,type MarketingWorkspaceTransport,type MarketingWorkspaceApi} from "@/modules/programs/marketing-workspace-transport";
 import type { listSiteMarketingPackagesV61 } from "@/modules/programs/site-marketing-packages-v61.functions";
 import type { MarketingEditorView } from "./marketing-package-editor-state";
 
@@ -16,9 +16,11 @@ export function useMarketingPackageReadResources(
   view: MarketingEditorView,
   record: PackageRecord | null,
   setError: Dispatch<SetStateAction<string>>,
+  transport:MarketingWorkspaceTransport=legacyMarketingTransport,
 ) {
-  const [releases,setReleases]=useState<Awaited<ReturnType<typeof listSiteMarketingReleases>>>([]);
-  const [packageReleases,setPackageReleases]=useState<Awaited<ReturnType<typeof listSiteMarketingPackageReleases>>>([]);
+  const {listSiteMarketingReleases,listSiteMarketingPackageReleases}=transport.api;
+  const [releases,setReleases]=useState<Awaited<ReturnType<MarketingWorkspaceApi['listSiteMarketingReleases']>>>([]);
+  const [packageReleases,setPackageReleases]=useState<Awaited<ReturnType<MarketingWorkspaceApi['listSiteMarketingPackageReleases']>>>([]);
   const [releasesLoading,setReleasesLoading]=useState(false);
   const [releasesUnavailable,setReleasesUnavailable]=useState(false);
   const [releaseRefreshKey,setReleaseRefreshKey]=useState(0);
@@ -66,7 +68,7 @@ export function useMarketingPackageReadResources(
     }).catch(error=>{if(live){setError(error instanceof Error ? error.message : "The outreach history could not be loaded.");setReleasesLoading(false);
       setReleasesUnavailable(true);}});
     return ()=>{live=false;};
-  },[view,packageId,pinnedBrandVersionId,siteId,releaseRefreshKey]);
+  },[view,packageId,pinnedBrandVersionId,siteId,releaseRefreshKey,listSiteMarketingReleases,listSiteMarketingPackageReleases]);
   return {
     releases,setReleases,packageReleases,setPackageReleases,
     releasesLoading,setReleasesLoading,releasesUnavailable,setReleasesUnavailable,

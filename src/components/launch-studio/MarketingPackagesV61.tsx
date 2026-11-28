@@ -7,7 +7,7 @@ import { MarketingPackageReleaseHistoryV61 } from "./MarketingPackageReleaseHist
 import { useMarketingPackageReadResources } from "./useMarketingPackageReadResources";
 import { marketingPackageArchiveFiles } from "./marketing-package-archive-files";
 import { MarketingPackageLibraryList } from "./MarketingPackageLibraryList";
-import { createSiteMarketingPackageRelease, listSiteMarketingPackageReleases, listSiteMarketingReleases, getSiteMarketingReleaseOutput } from "@/modules/programs/site-marketing-artifacts.functions";
+import {legacyMarketingTransport,type MarketingWorkspaceTransport,type MarketingWorkspaceApi} from "@/modules/programs/marketing-workspace-transport";
 import { useReducer, useState, type SetStateAction } from "react";
 import type { SiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
 import { MarketingMaterialPreviewV61 } from "./MarketingMaterialPreviewV61";
@@ -25,12 +25,7 @@ import {
   outreachFormatsV61, composeOutreachDraftV61, outreachSourceChangedV61,
   type MarketingFormat, type MarketingPackageContent, type OutreachPlanV61,
 } from "@/domain/marketing-package-v61";
-import {
-  archiveSiteMarketingPackageV61, createSiteMarketingPackageV61,
-  deleteSiteMarketingPackageV61, duplicateSiteMarketingPackageV61,
-  listSiteMarketingPackagesV61, readSiteMarketingSuggestionsV61,
-  saveSiteMarketingPackageV61, selectSiteMarketingPackageBrandV61,
-} from "@/modules/programs/site-marketing-packages-v61.functions";
+import type {listSiteMarketingPackagesV61} from "@/modules/programs/site-marketing-packages-v61.functions";
 import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
 import { downloadOriginalMarketingOutput, downloadMarketingPng, downloadMarketingPackageZip } from "./marketing-output-download";
 import { packageReleaseIsDownloadableV61 } from "@/domain/marketing-package-release-v61";
@@ -40,13 +35,14 @@ import { SiteEngagementLibrary } from "./SiteEngagementLibrary";
 import { introduceModuleConfigV61, type IntroduceModuleV61 } from "@/domain/launch-introduce-v61";
 
 type PackageRecord = Awaited<ReturnType<typeof listSiteMarketingPackagesV61>>[number];
-type MarketingSuggestions = Awaited<ReturnType<typeof readSiteMarketingSuggestionsV61>>;
+type MarketingSuggestions = Awaited<ReturnType<MarketingWorkspaceApi['readSiteMarketingSuggestionsV61']>>;
 
 function message(error:unknown) {
   return error instanceof Error ? error.message : "The outreach action could not be completed.";
 }
 
 type MarketingPackagesV61Props = {
+  transport?:MarketingWorkspaceTransport;
   siteId:string;siteName:string;initial:PackageRecord[];
   suggestions:MarketingSuggestions|null;onExit:()=>void;
   module?:IntroduceModuleV61;suggestionsUnavailable?:boolean;
@@ -61,12 +57,13 @@ type MarketingPackagesV61Props = {
  */
 export function MarketingPackagesV61(props:MarketingPackagesV61Props) {
   return <MarketingPackagesV61Scoped
-    key={props.siteId+":"+(props.module??"create-outreach")} {...props}/>;
+    key={props.siteId+":"+(props.module??"create-outreach")+":"+(props.transport?.kind??"legacy")} {...props}/>;
 }
 
 function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
   module="create-outreach",suggestionsUnavailable=false,siteIntent=null,
-  intentUnavailable=false,siteRevision=null}:MarketingPackagesV61Props) {
+  intentUnavailable=false,siteRevision=null,transport=legacyMarketingTransport}:MarketingPackagesV61Props) {
+  const {archiveSiteMarketingPackageV61,createSiteMarketingPackageV61,deleteSiteMarketingPackageV61,duplicateSiteMarketingPackageV61,saveSiteMarketingPackageV61,selectSiteMarketingPackageBrandV61,createSiteMarketingPackageRelease,listSiteMarketingPackageReleases,listSiteMarketingReleases,getSiteMarketingReleaseOutput}=transport.api;
   const router=useRouter();
   const context=introduceModuleConfigV61[module];
   const purposeOptions=marketingPurposeOptions.filter(option=>context.purposes.includes(option.id));
@@ -108,7 +105,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
     releasesLoading,setReleasesLoading,releasesUnavailable,setReleasesUnavailable,
     setReleaseRefreshKey,currentBrand,brandReadiness,setBrandRefreshKey,
     selectedBrandRevision,
-  }=useMarketingPackageReadResources(siteId,view,record,setError);
+  }=useMarketingPackageReadResources(siteId,view,record,setError,transport);
   const [releaseRequestId,setReleaseRequestId]=useState(()=>crypto.randomUUID());
   const [compare,setCompare]=useState<{id:string;format:MarketingFormat;mimeType:string;body:string;releaseNumber:number}|null>(null);
   const dirty=(view==="wizard" || (view==="detail" && editingFormat!==null)) && (!record || title!==record.title ||
@@ -477,7 +474,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
               disabled={Boolean(editingFormat&&editingFormat!==format)}
               onClick={()=>setPreviewFormat(format)}>{format==="handout"?"Conversation Kit / Handout":format}</Button>)}</div>
           {activePreviewFormat&&<div className="mt-4">
-            <MarketingMaterialPreviewV61 siteId={siteId} title={record.title}
+            <MarketingMaterialPreviewV61 transport={transport} siteId={siteId} title={record.title}
               content={editingFormat===activePreviewFormat?content:record.content}
               brandVersionId={record.brandVersionId} format={activePreviewFormat}/>
           </div>}
@@ -566,7 +563,7 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
           onRetryHistory={() => setReleaseRefreshKey(value=>value+1)}
           onPreview={() => {setTitle(record.title);setContent(record.content);setStep(5);setView("wizard");}}
           onRelease={() => {void releasePackage();}} />
-        <MarketingPackageReleaseHistoryV61
+        <MarketingPackageReleaseHistoryV61 transport={transport}
           siteId={siteId} record={record} versions={packageReleases}
           historicalSingles={legacyReleases} loading={releasesLoading}
           busy={busy} compare={compare}
@@ -587,9 +584,9 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
         <OutreachProgressV61 step={6}/>
         {record.status==="archived"?<WorkspaceNotice tone="attention">Restore this outreach before distributing it.</WorkspaceNotice>:<>
         {record.content.formats.includes("email")&&<WorkspacePanel title="Email recipients" description="Resume a saved invitation or prepare a new one, then enter addresses or choose a saved recipient list. Nothing is sent until you confirm.">
-          {!(emailPreparation?.packageId===record.id&&emailPreparation.revision===record.revision)&&<SiteEngagementLibrary key={"saved-email:"+record.id} siteId={siteId} packageId={record.id} emailOnly/>}
+          {!(emailPreparation?.packageId===record.id&&emailPreparation.revision===record.revision)&&<SiteEngagementLibrary transport={transport.engagement} key={"saved-email:"+record.id} siteId={siteId} packageId={record.id} emailOnly/>}
           <Button type="button" variant="outline" onClick={()=>setEmailPreparation(current=>current?.packageId===record.id&&current.revision===record.revision?null:{packageId:record.id,revision:record.revision})}>{emailPreparation?.packageId===record.id&&emailPreparation.revision===record.revision?"Return to saved invitations":"Prepare a new email invitation"}</Button>
-          {emailPreparation?.packageId===record.id&&emailPreparation.revision===record.revision&&<UniversalEngagementPublisher key={"email:"+record.id+":"+record.revision} siteId={siteId} packageId={record.id} outreach={{title:record.title,headline:record.content.materialOverrides?.email?.headline??record.content.headline,message:record.content.materialOverrides?.email?.message??record.content.message,callToAction:record.content.materialOverrides?.email?.callToAction??record.content.callToAction}} />}
+          {emailPreparation?.packageId===record.id&&emailPreparation.revision===record.revision&&<UniversalEngagementPublisher transport={transport.engagement} key={"email:"+record.id+":"+record.revision} siteId={siteId} packageId={record.id} outreach={{title:record.title,headline:record.content.materialOverrides?.email?.headline??record.content.headline,message:record.content.materialOverrides?.email?.message??record.content.message,callToAction:record.content.materialOverrides?.email?.callToAction??record.content.callToAction}} />}
         </WorkspacePanel>}
         </>}
         <MarketingPackageReleaseControlsV61 record={record} versions={packageReleases} currentBrand={currentBrand} selectedBrandRevision={selectedBrandRevision} busy={busy} releasesLoading={releasesLoading} releasesUnavailable={releasesUnavailable} onSelectCurrentBrand={()=>{void selectCurrentBrand();}} onRetryHistory={()=>setReleaseRefreshKey(value=>value+1)} onPreview={()=>{setTitle(record.title);setContent(record.content);setStep(5);setView("wizard");}} onRelease={()=>{void releasePackage();}} />
@@ -611,8 +608,8 @@ function MarketingPackagesV61Scoped({siteId,siteName,initial,suggestions,onExit,
         </WorkspacePanel>
         {record.status!=="archived"&&<details className="border p-4" open={advancedDistribution} onToggle={event=>setAdvancedDistribution(event.currentTarget.open)}><summary className="cursor-pointer font-semibold">Manage invitations, digital links and existing campaigns</summary>
           {advancedDistribution&&<>
-          <UniversalEngagementPublisher key={"engagement:"+record.id} siteId={siteId} packageId={record.id} />
-          <SiteEngagementLibrary key={"library:"+record.id} siteId={siteId} packageId={record.id} />
+          <UniversalEngagementPublisher transport={transport.engagement} key={"engagement:"+record.id} siteId={siteId} packageId={record.id} />
+          <SiteEngagementLibrary transport={transport.engagement} key={"library:"+record.id} siteId={siteId} packageId={record.id} />
         </>}</details>}
         <ActionFooter><Button variant="outline" onClick={()=>setView("detail")}>Back to Details</Button><Button variant="outline" onClick={()=>{setEmailPreparation(null);setView("library");setRecord(null);}}>Finish / My Outreach</Button></ActionFooter>
       </>}

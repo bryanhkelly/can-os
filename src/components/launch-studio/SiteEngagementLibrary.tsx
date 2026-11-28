@@ -9,26 +9,23 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { ActionDialog, ActionFooter, EmptyState, QueryState, WorkspaceNotice, WorkspacePanel, StatusBadge, RecordFacts } from "@/components/workspace";
-import {
-  createEngagementGoLink, listEngagementGoLinks,
-  listSiteEngagementDefinitions, listOwnerEngagementDefinitions, retireEngagementDefinition,
-  revokeEngagementGoLink,
-} from "@/modules/engagement/engagement-registry.functions";
+import {legacyEngagementTransport,type EngagementWorkspaceTransport,type EngagementRegistryApi} from "@/modules/engagement/engagement-workspace-transport";
 
-type Entry=Awaited<ReturnType<typeof listSiteEngagementDefinitions>>[number];
-type Link=Awaited<ReturnType<typeof listEngagementGoLinks>>[number];
+type Entry=Awaited<ReturnType<EngagementRegistryApi['listSiteEngagementDefinitions']>>[number];
+type Link=Awaited<ReturnType<EngagementRegistryApi['listEngagementGoLinks']>>[number];
 const problem=(error:unknown)=>error instanceof Error?error.message:"Action unavailable.";
 
 /**
  * Recover published experiences and their actual persisted Go Links. In-memory
  * authoring state must never be the only way to manage a distributed link.
  */
-type LibraryProps={siteId?:string;packageId?:string;ownerSurface?:OwnerEngagementSurface;emailOnly?:boolean};
+type LibraryProps={transport?:EngagementWorkspaceTransport;siteId?:string;packageId?:string;ownerSurface?:OwnerEngagementSurface;emailOnly?:boolean};
 export function SiteEngagementLibrary(props:LibraryProps){
-  const scope=engagementOwnerScopeKey(props.siteId,props.packageId,props.ownerSurface?.owner);
+  const scope=engagementOwnerScopeKey(props.siteId,props.packageId,props.ownerSurface?.owner)+(props.transport?.kind==='nest'?':nest':'');
   return <SiteEngagementLibrarySession key={props.emailOnly?scope+":email":scope} {...props}/>;
 }
-function SiteEngagementLibrarySession({siteId,packageId,ownerSurface,emailOnly=false}:LibraryProps){
+function SiteEngagementLibrarySession({siteId,packageId,ownerSurface,emailOnly=false,transport=legacyEngagementTransport}:LibraryProps){
+  const {createEngagementGoLink,listEngagementGoLinks,listSiteEngagementDefinitions,listOwnerEngagementDefinitions,retireEngagementDefinition,revokeEngagementGoLink}=transport.api;
   const [records,setRecords]=useState<Entry[]>([]);
   const [selected,setSelected]=useState<string|null>(null);
   const [links,setLinks]=useState<Link[]>([]);
@@ -60,7 +57,7 @@ function SiteEngagementLibrarySession({siteId,packageId,ownerSurface,emailOnly=f
         if(active){setRecords([]);setSelected(null);setError("Unable to load published engagements.");setLoading(false);}
       });
     return ()=>{active=false;};
-  },[siteId,packageId,ownerSurface?.owner.kind,ownerSurface?.owner.kind==="organization"?ownerSurface.owner.organizationId:null,refresh,emailOnly]);
+  },[siteId,packageId,ownerSurface?.owner.kind,ownerSurface?.owner.kind==="organization"?ownerSurface.owner.organizationId:null,refresh,emailOnly,listSiteEngagementDefinitions,listOwnerEngagementDefinitions]);
 
   useEffect(()=>{
     let active=true;
@@ -176,7 +173,7 @@ function SiteEngagementLibrarySession({siteId,packageId,ownerSurface,emailOnly=f
           </ActionFooter>
         </WorkspacePanel>)}
       </div>}
-      {distribution&&!linksLoading&&linksFor===selected&&record?.status==="active"&&links.some(link=>link.id===distribution&&link.status==="active")&&<EngagementEmailDistribution key={distribution} engagementId={record.engagementId} linkId={distribution} onClose={()=>setDistribution(null)}/>}
+      {distribution&&!linksLoading&&linksFor===selected&&record?.status==="active"&&links.some(link=>link.id===distribution&&link.status==="active")&&<EngagementEmailDistribution transport={transport.campaign} key={distribution} engagementId={record.engagementId} linkId={distribution} onClose={()=>setDistribution(null)}/>}
     </>}
     {!emailOnly&&siteId&&!ownerSurface&&<SiteCampaignEvidencePanel key={siteId} siteId={siteId}/>}
     {error&&<WorkspaceNotice tone="danger" className="mt-4">{error}</WorkspaceNotice>}

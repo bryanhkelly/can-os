@@ -9,17 +9,11 @@ import {NoncreditPublicationController} from './noncredit-publication.controller
 import {KnowledgeCheckController} from './knowledge-check.controller';
 import {OutcomesController} from './outcomes.controller';
 import {SurveysController} from './surveys.controller';
-import {MarketingArtifactsController} from './marketing-artifacts.controller';
-import {MarketingPackagesController} from './marketing-packages.controller';
-import {EngagementController} from './engagement.controller';
-import {SenderAdminController} from './sender-admin.controller';
-import {CampaignController} from './campaign.controller';
 import {AccessController} from './access.controller';
 import {LaunchWorkspaceController} from './launch-workspace.controller';
 import {CatalogController} from './catalog.controller';
 import {PreviewSharesController} from './preview-shares.controller';
 import {WebsiteController} from './website.controller';
-import {GoLinksController} from './go-links.controller';
 import {SitePublishingController} from './site-publishing.controller';
 import {SiteProfileController} from './site-profile.controller';
 import {BrandController} from './brand.controller';
@@ -34,7 +28,8 @@ import {ParticipationController} from './participation.controller';
 import {WorkflowController} from './workflow.controller';
 import { LearningController } from './learning.controller';
 import { IdentityController } from './identity';
-import { CanonicalIdentityService } from './identity.service';
+import { CanonicalIdentityModule } from './canonical-identity.module';
+import { EngagementModule } from './engagement.module';
 import { ProblemFilter } from './problem.filter';
 
 @ApiTags('Platform')
@@ -48,9 +43,9 @@ export class HealthController {
 }
 
 @Module({
-  controllers: [CompletionAdminController, NoncreditPublicationController, KnowledgeCheckController, OutcomesController, SurveysController, MarketingArtifactsController, MarketingPackagesController, EngagementController, SenderAdminController, CampaignController, LaunchWorkspaceController, CatalogController, PreviewSharesController, WebsiteController, GoLinksController, SitePublishingController, SiteProfileController, BrandController, SitePlanningController, LaunchController, RoleWorkspacesController, ReportingController, ClassAdminController, RoomController, ClassroomController, ParticipationController, WorkflowController, AccessController, HealthController, IdentityController, LearningController, SitesController, OfferingReleaseController],
+  imports: [CanonicalIdentityModule, EngagementModule],
+  controllers: [CompletionAdminController, NoncreditPublicationController, KnowledgeCheckController, OutcomesController, SurveysController, LaunchWorkspaceController, CatalogController, PreviewSharesController, WebsiteController, SitePublishingController, SiteProfileController, BrandController, SitePlanningController, LaunchController, RoleWorkspacesController, ReportingController, ClassAdminController, RoomController, ClassroomController, ParticipationController, WorkflowController, AccessController, HealthController, IdentityController, LearningController, SitesController, OfferingReleaseController],
   providers: [
-    CanonicalIdentityService,
     { provide: APP_GUARD, useClass: DefaultDenyGuard },
     { provide: APP_FILTER, useClass: ProblemFilter },
   ],

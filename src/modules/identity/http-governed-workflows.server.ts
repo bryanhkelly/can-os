@@ -15,18 +15,10 @@ import * as roomSurvey from "@/modules/learning/classroom-surveys.server";
 import * as surveyDraft from "@/modules/operations/canonical-survey-draft.server";
 import * as surveyApproval from "@/modules/operations/canonical-survey-approvals.server";
 import * as courseSurvey from "@/modules/learning/course-surveys.server";
-import * as artifacts from "@/modules/programs/site-marketing-artifacts.server";
-import * as marketing from "@/modules/programs/site-marketing-packages-v61.server";
-import * as engagement from "@/modules/engagement/engagement-registry-service.server";
-import * as engagementInput from "@/modules/engagement/engagement-registry.inputs";
-import * as sender from "@/modules/communication/sender-registry-service.server";
-import * as senderInput from "@/modules/communication/sender-registry.inputs";
-import {parseCommandInput} from "@/domain/command-input";
-import * as campaign from "@/modules/communication/engagement-campaigns-service.server";
-import * as campaignInput from "@/modules/communication/engagement-campaigns.inputs";
 import {getIdentityContext} from "./command-context.server";
 import {getCanonicalCommandContext} from "./canonical-command-context.server";
 import {getBlueprintPlanningContext} from "@/modules/blueprints/verified-site-planning.server";
+import {createEngagementHttpWorkflows} from "@/modules/engagement/http-engagement-workflows.server";
 import {AuthorizationError} from "@/domain/command-context";
 import {readCanonicalBlueprintConfigurationService,readCanonicalBlueprintReviewService,readCanonicalBlueprintReviewHistoryService,createCanonicalBlueprintConfigurationService,saveCanonicalBlueprintConfigurationService,submitCanonicalBlueprintConfigurationService,decideCanonicalBlueprintReviewService,executeCanonicalBlueprintConfigurationService} from "@/modules/blueprints/blueprint-commands.server";
 import {recordNativeDeploymentReadinessService} from "@/modules/programs/native-deployment-readiness.server";
@@ -66,7 +58,6 @@ import {readSiteBrandHttp,saveSiteBrandHttp,revokeSiteBrandAssetHttp} from "@/mo
 import {readLaunchSitePublicationService,reviewLaunchSiteWebsiteCopyService} from "@/modules/sites/launch-site-publication.server";
 import {updateLaunchSiteAddressService,updateLaunchSiteContactService,updateLaunchSiteInformationService,updateLaunchSiteIdentityService,getLaunchSiteConfigurationService} from "@/modules/programs/site-configuration.server";
 import {renameSitePublicIdentityService,reserveSitePublicationAddressService,setSitePublicationStatusService,setAcademicProgramMarketingStatusService} from "@/modules/sites/site-publication-commands.server";
-import {createSiteGoLinkService,listSiteGoLinksPageService,listAvailableGoDestinationsService,inspectSavedGoLinkService,setSiteGoLinkPausedService,revokeSiteGoLinkService} from "@/modules/engagement/site-go-link-management.server";
 import {getPartnerWebsitePreviewViewService,previewChurchWebsiteDraftService,saveSiteWebsiteAndBrandService,restoreChurchWebsiteContentService,prepareSchoolWebsiteService} from "@/modules/sites/site-website-commands.server";
 import {listSitePreviewSharesService,createSitePreviewShareService,setSitePreviewSharePausedService,revokeSitePreviewShareService} from "@/modules/sites/site-preview-sharing.server";
 import {exploreCanonicalBlueprintReferencesService,discoverCanonicalBlueprintOfferingsService,readCanonicalBlueprintWorkspaceService,listCanonicalBlueprintReviewsService,listCanonicalBlueprintReviewEvidenceService} from "@/modules/blueprints/blueprint-catalog-read.server";
@@ -81,6 +72,7 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
  const context=await (mode==="operator-reporting"?(readCookie(request,accessSessionCookie)!==undefined?getIdentityContext(request):getCanonicalCommandContext(request)):mode==="planning"?getBlueprintPlanningContext(request):mode==="canonical"?getCanonicalCommandContext(request):mode==="learner"?getInstructionalLearnerContext(request):getIdentityContext(request));
  if(!context.actorPersonId)throw new AuthorizationError("verified Person");
  return {
+  ...createEngagementHttpWorkflows(request,mode),
   decideNoncreditCompletion:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Completion administration context");return completionAdmin0.decideNoncreditCompletionService(request,raw);},
   getNoncreditCompletionPolicyCatalog:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="canonical")throw new AuthorizationError("Completion administration context");return completionAdmin1.getNoncreditCompletionPolicyCatalogService(request);},
   publishNoncreditCompletionPolicy:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="canonical")throw new AuthorizationError("Completion administration context");return completionAdmin1.publishNoncreditCompletionPolicyService(request,raw);},
@@ -116,39 +108,6 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
   listNoncreditCourseSurveys:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="learner")throw new AuthorizationError("Survey context");return courseSurvey.listNoncreditCourseSurveys(request,raw);},
   getCourseSurvey:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="learner")throw new AuthorizationError("Survey context");return courseSurvey.getCourseSurvey(request,raw);},
   submitCourseSurvey:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="learner")throw new AuthorizationError("Survey context");return courseSurvey.submitCourseSurvey(request,raw);},
-  previewSiteMarketingArtifact:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Marketing artifact context");return artifacts.previewSiteMarketingArtifact(request,raw);},
-  createSiteMarketingPackageRelease:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Marketing artifact context");return artifacts.createSiteMarketingPackageRelease(request,raw);},
-  listSiteMarketingPackageReleases:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Marketing artifact context");return artifacts.listSiteMarketingPackageReleases(request,raw);},
-  listSiteMarketingReleases:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Marketing artifact context");return artifacts.listSiteMarketingReleases(request,raw);},
-  getSiteMarketingReleaseOutput:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Marketing artifact context");return artifacts.getSiteMarketingReleaseOutput(request,raw);},
-  withdrawSiteMarketingRelease:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Marketing artifact context");return artifacts.withdrawSiteMarketingRelease(request,raw);},
-  readSiteMarketingSuggestionsV61:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Marketing package context");return marketing.readSiteMarketingSuggestionsV61(request,raw);},
-  listSiteMarketingPackagesPageV61:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Marketing package context");return marketing.listSiteMarketingPackagesPageV61(request,raw);},
-  createSiteMarketingPackageV61:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Marketing package context");return marketing.createSiteMarketingPackageV61(request,raw);},
-  saveSiteMarketingPackageV61:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Marketing package context");return marketing.saveSiteMarketingPackageV61(request,raw);},
-  duplicateSiteMarketingPackageV61:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Marketing package context");return marketing.duplicateSiteMarketingPackageV61(request,raw);},
-  archiveSiteMarketingPackageV61:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Marketing package context");return marketing.archiveSiteMarketingPackageV61(request,raw);},
-  selectSiteMarketingPackageBrandV61:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Marketing package context");return marketing.selectSiteMarketingPackageBrandV61(request,raw);},
-  deleteSiteMarketingPackageV61:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Marketing package context");return marketing.deleteSiteMarketingPackageV61(request,raw);},
-  createEngagementDefinition:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Engagement context");return engagement.createEngagementDefinition(request,parseCommandInput(engagementInput.createEngagementDefinitionInput,raw));},
-  createEngagementGoLink:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Engagement context");return engagement.createEngagementGoLink(request,parseCommandInput(engagementInput.createEngagementGoLinkInput,raw));},
-  listEngagementGoLinks:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Engagement context");return engagement.listEngagementGoLinks(request,parseCommandInput(engagementInput.listEngagementGoLinksInput,raw));},
-  retireEngagementDefinition:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Engagement context");return engagement.retireEngagementDefinition(request,parseCommandInput(engagementInput.retireEngagementDefinitionInput,raw));},
-  revokeEngagementGoLink:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Engagement context");return engagement.revokeEngagementGoLink(request,parseCommandInput(engagementInput.revokeEngagementGoLinkInput,raw));},
-  listSiteEngagementDefinitions:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Engagement context");return engagement.listSiteEngagementDefinitions(request,parseCommandInput(engagementInput.listSiteEngagementDefinitionsInput,raw));},
-  prepareEngagementEmailDraft:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Engagement context");return engagement.prepareEngagementEmailDraft(request,parseCommandInput(engagementInput.prepareEngagementEmailDraftInput,raw));},
-  listOwnerEngagementDestinations:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Engagement context");return engagement.listOwnerEngagementDestinations(request,parseCommandInput(engagementInput.listOwnerEngagementDestinationsInput,raw));},
-  listOwnerEngagementDefinitions:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Engagement context");return engagement.listOwnerEngagementDefinitions(request,parseCommandInput(engagementInput.listOwnerEngagementDefinitionsInput,raw));},
-  readSenderAdministration:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Sender administration context");return sender.readSenderAdministration(request,parseCommandInput(senderInput.scopeInput,raw).organizationId);},
-  listSenderOrganizationsPage:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Sender administration context");return sender.listSenderOrganizationsPage(request,parseCommandInput(senderInput.pageInput,raw));},
-  changeSenderAdministration:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Sender administration context");return sender.changeSenderAdministration(request,parseCommandInput(senderInput.changeInput,raw));},
-  revokeSenderAdministration:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Sender administration context");return sender.revokeSenderAdministration(request,parseCommandInput(senderInput.revokeInput,raw));},
-  readEngagementCampaignWorkspace:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Campaign read context");const result=await campaign.readEngagementCampaignWorkspace(request,parseCommandInput(campaignInput.readEngagementCampaignWorkspaceInput,raw));return {...result,campaigns:result.campaigns.map(row=>({...row,scheduled_at:new Date(row.scheduled_at).toISOString(),cancelled_at:row.cancelled_at===null?null:new Date(row.cancelled_at).toISOString()}))};},
-  saveCampaignRecipientList:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Campaign command context");const result=await campaign.saveCampaignRecipientList(request,parseCommandInput(campaignInput.saveCampaignRecipientListInput,raw));return result;},
-  queueEngagementCampaign:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Campaign command context");const result=await campaign.queueEngagementCampaign(request,parseCommandInput(campaignInput.queueEngagementCampaignInput,raw));return result;},
-  cancelEngagementCampaign:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Campaign command context");const result=await campaign.cancelEngagementCampaign(request,parseCommandInput(campaignInput.cancelEngagementCampaignInput,raw));return result;},
-  readCampaignListMembers:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Campaign read context");const result=await campaign.readCampaignListMembers(request,parseCommandInput(campaignInput.readCampaignListMembersInput,raw));return {...result,members:result.members.map(row=>({...row,consent_at:new Date(row.consent_at).toISOString()}))};},
-  updateCampaignListMember:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Campaign command context");const result=await campaign.updateCampaignListMember(request,parseCommandInput(campaignInput.updateCampaignListMemberInput,raw));return result;},
   getStaffLaunchWorkspace:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Launch workspace context");return getStaffLaunchWorkspaceService(request);},
   getLaunchStudioDraft:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Launch workspace context");return getLaunchStudioDraftService(request,raw);},
   saveLaunchStudioDraft:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Launch workspace context");return saveLaunchStudioDraftService(request,raw);},
@@ -168,12 +127,6 @@ export async function resolveGovernedWorkflow(request:Request,mode:WorkflowMode)
   saveSiteWebsiteAndBrand:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Site website context");return saveSiteWebsiteAndBrandService(request,raw);},
   restoreChurchWebsiteContent:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Site website context");return restoreChurchWebsiteContentService(request,raw);},
   prepareSchoolWebsite:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Site website context");return prepareSchoolWebsiteService(request,raw);},
-  createSiteGoLink:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Site Go Link context");return createSiteGoLinkService(request,raw);},
-  listSiteGoLinksPage:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Site Go Link context");return listSiteGoLinksPageService(request,raw);},
-  listAvailableGoDestinations:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Site Go Link context");return listAvailableGoDestinationsService(request,raw);},
-  inspectSavedGoLink:async(raw:unknown)=>{if(request.method!=="GET"||mode!=="can")throw new AuthorizationError("Site Go Link context");return inspectSavedGoLinkService(request,raw);},
-  setSiteGoLinkPaused:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Site Go Link context");return setSiteGoLinkPausedService(request,raw);},
-  revokeSiteGoLink:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Site Go Link context");return revokeSiteGoLinkService(request,raw);},
   renameSitePublicIdentity:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Site publication context");return renameSitePublicIdentityService(request,raw);},
   reserveSitePublicationAddress:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Site publication context");return reserveSitePublicationAddressService(request,raw);},
   setSitePublicationStatus:async(raw:unknown)=>{if(request.method!=="POST"||mode!=="can")throw new AuthorizationError("Site publication context");return setSitePublicationStatusService(request,raw);},

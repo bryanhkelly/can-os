@@ -69,3 +69,14 @@ export function parseCampaignRecipientCsv(raw: string) {
   }
   return parsed.recipients.join("\n");
 }
+
+/** A stable request key binds the recipient source as well as recipient identity.
+ * Internal direct snapshots are never interchangeable with a saved list. */
+export function campaignReplayMatchesRecipientSource(
+  existing: {list_id:string;list_name:string},
+  requested: {requestId:string;listId?:string},
+): boolean {
+  return requested.listId !== undefined
+    ? existing.list_id === requested.listId && !existing.list_name.startsWith("__direct__")
+    : existing.list_name === "__direct__" + requested.requestId;
+}

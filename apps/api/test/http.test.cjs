@@ -473,7 +473,7 @@ test('launch workspace drafts are revisioned, role-bound, and reject supplied id
 test('all registered OpenAPI operations have unique IDs and explicit security posture',async()=>{
  await withServer('0',async(url,document)=>{
   const ids=new Set();
-  const anonymous=new Set(['getLiveness','requestAccessLink','verifyAccess','registerAccount','requestSiteSignup']);
+  const anonymous=new Set(['getLiveness','requestAccessLink','verifyAccess','registerAccount','requestSiteSignup','resolvePublicGoLink','previewCampaignUnsubscribe','confirmCampaignUnsubscribe','receiveResendDeliveryReceipt']);
   const methods=new Set(['get','post','put','patch','delete','head','options']);
   for(const [path,item] of Object.entries(document.paths)){
    assert.ok(path.startsWith('/api/v1/'),path);
@@ -507,7 +507,7 @@ test('actual browser SDK projection retains all operations while canonical write
     assert.deepEqual(projected.security,operation.security);
     assert.deepEqual(projected.requestBody,operation.requestBody);
     assert.deepEqual(projected.responses,operation.responses);
-    if(method==='post'){
+    if(method==='post'&&!['confirmCampaignUnsubscribe','receiveResendDeliveryReceipt'].includes(operation.operationId)){
      writes++;
      assert.ok([...(item.parameters??[]),...(operation.parameters??[])].some(p=>p.in==='header'&&p.name.toLowerCase()==='origin'&&p.required===true),'Missing canonical Origin: '+operation.operationId);
     }
@@ -659,3 +659,84 @@ test('knowledge checks and completion require verified learner or provider autho
 test('noncredit enrollment publication protects provider scope and explicit Site selection',async()=>{await withServer('0',async(url,document)=>{for(const [route,method] of [["/api/v1/noncredit-enrollment-publisher","GET"],["/api/v1/noncredit-training-readiness","GET"],["/api/v1/noncredit-enrollment-releases","POST"],["/api/v1/noncredit-enrollment-closures","POST"],["/api/v1/noncredit-multisite-releases","POST"]]){assert.ok(document.paths[route][method.toLowerCase()].security);assert.equal((await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined)).status,method==='POST'?503:401);}assert.ok(document.paths['/api/v1/noncredit-enrollment-releases'].post.requestBody.content['application/json'].schema.required.includes('siteId'));});});
 
 test('completion administration requires canonical provider credentials and distinguishes decisions from corrections',async()=>{await withServer('0',async(url,document)=>{for(const [route,method] of [["/api/v1/noncredit-completion-decisions","POST"],["/api/v1/noncredit-completion-policy-catalog","GET"],["/api/v1/noncredit-completion-policies","POST"],["/api/v1/noncredit-completion-review","GET"],["/api/v1/noncredit-completion-queue","GET"],["/api/v1/noncredit-completion-corrections","POST"]]){assert.ok(document.paths[route][method.toLowerCase()].security);assert.equal((await fetch(url+route,method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined)).status,method==='POST'?503:401);}});const c=require('../dist/completion-admin.contracts');assert.equal(c.queueQuery.safeParse({page:'101'}).success,false);assert.equal(c.queueQuery.parse({page:'2'}).page,2);});
+
+test('EngagementModule registers controllers with one shared canonical identity provider', async () => {
+ const {CanonicalIdentityService}=require('../dist/identity.service');
+ const {EngagementModule}=require('../dist/engagement.module');
+ const {CampaignController}=require('../dist/campaign.controller');
+ const {GoLinksController}=require('../dist/go-links.controller');
+ const {app,document}=await createApi(readConfig({API_DOCS:'0'}));
+ try{
+  const providers=app.get(CanonicalIdentityService,{each:true});
+  assert.equal(providers.length,1);
+  const engagement=app.select(EngagementModule);
+  const campaigns=engagement.get(CampaignController,{strict:true});
+  const links=engagement.get(GoLinksController,{strict:true});
+  assert.equal(campaigns.identity,providers[0]);
+  assert.equal(links.identity,providers[0]);
+  assert.equal(document.paths['/api/v1/engagement-campaigns'].post.operationId,'queueEngagementCampaign');
+  assert.equal(document.paths['/api/v1/sites/{siteId}/go-links'].get.operationId,'listSiteGoLinksPage');
+  await app.listen(0,'127.0.0.1');
+  const url=await app.getUrl();
+  const denied=await fetch(url+'/api/v1/engagement-campaigns/workspace',{headers:{'x-role':'platform_owner'}});
+  assert.equal(denied.status,401);
+  const deniedWrite=await fetch(url+'/api/v1/engagement-campaigns',{method:'POST',headers:{'content-type':'application/json',Origin:url},body:'{}'});
+  assert.equal(deniedWrite.status,503);
+ }finally{await app.close();}
+});
+
+
+test('public protocols are documented but disabled outside isolated canonical runtime',async()=>{
+ await withServer('0',async(url,document)=>{
+  const operations=[['get','/api/v1/go/{code}'],['get','/api/v1/campaigns/unsubscribe'],['post','/api/v1/campaigns/unsubscribe'],['post','/api/v1/webhooks/resend']];
+  for(const [method,path] of operations)assert.ok(!document.paths[path][method].security?.length);
+  assert.equal((await fetch(url+'/api/v1/go/0123456789ab')).status,503);
+  assert.equal((await fetch(url+'/api/v1/campaigns/unsubscribe?token=11111111-1111-4111-8111-111111111111')).status,503);
+  assert.equal((await fetch(url+'/api/v1/campaigns/unsubscribe',{method:'POST',body:new URLSearchParams({'List-Unsubscribe':'One-Click'})})).status,503);
+  assert.equal((await fetch(url+'/api/v1/webhooks/resend',{method:'POST',headers:{'content-type':'application/json'},body:'{  not yet parsed  }'})).status,503);
+ });
+});
+
+test('public HTTP transport preserves raw webhook bytes, form bytes, query and response security headers',async()=>{
+ const {CanonicalIdentityService}=require('../dist/identity.service');
+ const {app}=await createApi(readConfig({API_DOCS:'0'}));
+ const service=app.get(CanonicalIdentityService);
+ const calls=[];
+ // Transport contract test only: no production route, identity bypass or database call.
+ service.executePublicProtocol=async(handler,request,code)=>{
+  calls.push({handler,request,code,body:Buffer.from(await request.arrayBuffer())});
+  if(handler==='handlePublicGo')return new Response(null,{status:302,headers:{Location:'/learn/enroll?release=published','Cache-Control':'private, no-store','Set-Cookie':'untrusted=1'}});
+  if(handler==='handlePublicCampaignUnsubscribe')return new Response('confirmation',{headers:{'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':"default-src 'none'"}});
+  return new Response(null,{status:401});
+ };
+ try{
+  await app.listen(0,'127.0.0.1');
+  const url=await app.getUrl(), raw=Buffer.from('\uFEFF{  "x": "é", "y":  1 }\n','utf8');
+  const webhook=await fetch(url+'/api/v1/webhooks/resend',{method:'POST',headers:{'content-type':'application/json','svix-id':'evt','svix-timestamp':'1234567890','svix-signature':'v1,abc','cookie':'untrusted=1','x-role':'platform_owner'},body:raw});
+  assert.equal(webhook.status,401);
+  assert.deepEqual(calls[0].body,raw);
+  assert.equal(calls[0].request.headers.get('svix-id'),'evt');
+  assert.equal(calls[0].request.headers.get('svix-signature'),'v1,abc');
+  assert.equal(calls[0].request.headers.get('cookie'),null);
+  assert.equal(calls[0].request.headers.get('x-role'),null);
+  const go=await fetch(url+'/api/v1/go/0123456789ab?page=%2Fabout',{redirect:'manual'});
+  assert.equal(go.status,302);
+  assert.equal(go.headers.get('location'),'/learn/enroll?release=published');
+  assert.equal(go.headers.get('set-cookie'),null);
+  assert.equal(calls[1].code,'0123456789ab');
+  assert.equal(new URL(calls[1].request.url).searchParams.get('page'),'/about');
+  const form=new URLSearchParams({'List-Unsubscribe':'One-Click'});
+  const token='11111111-1111-4111-8111-111111111111';
+  const unsub=await fetch(url+'/api/v1/campaigns/unsubscribe?token='+token,{method:'POST',body:form});
+  assert.equal(unsub.status,200);
+  assert.equal(unsub.headers.get('content-security-policy'),"default-src 'none'");
+  assert.equal(calls[2].body.toString(),form.toString());
+  assert.equal(new URL(calls[2].request.url).searchParams.get('token'),token);
+  const multipart=new FormData();multipart.set('List-Unsubscribe','One-Click');
+  assert.equal((await fetch(url+'/api/v1/campaigns/unsubscribe?token='+token,{method:'POST',body:multipart})).status,200);
+  assert.equal((await new Response(calls[3].body,{headers:{'content-type':calls[3].request.headers.get('content-type')}}).formData()).get('List-Unsubscribe'),'One-Click');
+  const rejected=await fetch(url+'/api/v1/webhooks/resend',{method:'POST',headers:{'content-type':'application/json'},body:'x'.repeat(65537)});
+  assert.equal(rejected.status,413);
+  assert.equal(calls.length,4);
+ }finally{await app.close();}
+});

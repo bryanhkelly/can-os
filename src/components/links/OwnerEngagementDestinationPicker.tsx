@@ -5,22 +5,22 @@ import {GoDestinationChoiceField} from "./GoDestinationChoiceField";
 import {useGoDestinationChoices} from "@/hooks/use-go-destination-choices";
 import {Select} from "@/components/ui/select";
 import {Input} from "@/components/ui/input";
-import {listOwnerEngagementDestinations} from "@/modules/engagement/engagement-registry.functions";
+import {legacyEngagementTransport,type EngagementWorkspaceTransport} from "@/modules/engagement/engagement-workspace-transport";
 import type {EngagementOwner} from "@/domain/engagement-definition";
 import type {GoDestination} from "@/domain/site-go-links";
 export type OwnerEngagementSurface={owner:Extract<EngagementOwner,{kind:"platform"|"organization"}>;sites:readonly {id:string;name:string}[]};
 /** Governed pilot destinations for platform and HQ ownership, without inventing
  * local Site ownership or an affiliate's right to distribute an Offering. */
-export function OwnerEngagementDestinationPicker({surface,value,onChange,disabled}:{
-  surface:OwnerEngagementSurface;value:GoDestination|null;onChange:(value:GoDestination|null)=>void;disabled:boolean;
+export function OwnerEngagementDestinationPicker({surface,value,onChange,disabled,transport=legacyEngagementTransport}:{
+  transport?:EngagementWorkspaceTransport;surface:OwnerEngagementSurface;value:GoDestination|null;onChange:(value:GoDestination|null)=>void;disabled:boolean;
 }){
   const [kind,setKind]=useState<"information"|"adult-training">("information");
   const [siteId,setSiteId]=useState("");
   const [term,setTerm]=useState("");
   const ownerId=surface.owner.kind==="organization"?surface.owner.organizationId:null;
   const {choices,loading,error,retry}=useGoDestinationChoices(
-    ["owner",surface.owner.kind,ownerId,kind,siteId||null,term.trim()],
-    ()=>listOwnerEngagementDestinations({data:{owner:surface.owner,kind,siteId:siteId||undefined,term:term.trim()}}),
+    ["owner",transport.kind,surface.owner.kind,ownerId,kind,siteId||null,term.trim()],
+    ()=>transport.api.listOwnerEngagementDestinations({data:{owner:surface.owner,kind,siteId:siteId||undefined,term:term.trim()}}),
   );
   return <div className="grid gap-3 sm:grid-cols-2">
     <Field label="Destination type"><Select value={kind} disabled={disabled} onChange={e=>{setKind(e.target.value as typeof kind);onChange(null);}}><option value="information">Information or inquiry</option><option value="adult-training">Published adult training</option></Select></Field>

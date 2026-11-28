@@ -18,10 +18,7 @@ import {
 import type {GoDestination} from "@/domain/site-go-links";
 import {GovernedGoDestinationPicker} from "@/components/links/GovernedGoDestinationPicker";
 import { engagementActionAvailable } from "@/domain/engagement-action-policy";
-import {
-  createEngagementDefinition, createEngagementGoLink,
-  revokeEngagementGoLink,
-} from "@/modules/engagement/engagement-registry.functions";
+import {legacyEngagementTransport,type EngagementWorkspaceTransport} from "@/modules/engagement/engagement-workspace-transport";
 
 type Published={engagementId:string;versionId:string;version:number};
 type CreatedLink={linkId:string;code:string};
@@ -32,11 +29,12 @@ const errorMessage=(error:unknown)=>error instanceof Error?error.message:"Unable
  * Site-specific consumer of the platform registry. It does not own registry
  * data and does not create a separate outreach/contact/admissions service.
  */
-type PublisherProps={siteId?:string;packageId?:string;ownerSurface?:OwnerEngagementSurface;outreach?:{title:string;headline:string;message:string;callToAction:string}};
+type PublisherProps={transport?:EngagementWorkspaceTransport;siteId?:string;packageId?:string;ownerSurface?:OwnerEngagementSurface;outreach?:{title:string;headline:string;message:string;callToAction:string}};
 export function UniversalEngagementPublisher(props:PublisherProps){
-  return <UniversalEngagementPublisherSession key={engagementOwnerScopeKey(props.siteId,props.packageId,props.ownerSurface?.owner)} {...props}/>;
+  return <UniversalEngagementPublisherSession key={engagementOwnerScopeKey(props.siteId,props.packageId,props.ownerSurface?.owner)+(props.transport?.kind==='nest'?':nest':'')} {...props}/>;
 }
-function UniversalEngagementPublisherSession({siteId,packageId,ownerSurface,outreach}:PublisherProps){
+function UniversalEngagementPublisherSession({siteId,packageId,ownerSurface,outreach,transport=legacyEngagementTransport}:PublisherProps){
+  const {createEngagementDefinition,createEngagementGoLink,revokeEngagementGoLink}=transport.api;
   const owner:EngagementOwner=ownerSurface?.owner??{kind:"site",siteId:siteId!};
   const [domain,setDomain]=useState<EngagementDefinition["domain"]>("outreach");
   const [subjectKind,setSubjectKind]=useState<EngagementDefinition["subject"]["kind"]>("initiative");
@@ -180,7 +178,7 @@ function UniversalEngagementPublisherSession({siteId,packageId,ownerSurface,outr
           </Select>
         </Field>}
         <div className="sm:col-span-2">
-          {ownerSurface?<OwnerEngagementDestinationPicker surface={ownerSurface} value={target} onChange={setTarget} disabled={busy}/>:siteId?<GovernedGoDestinationPicker siteId={siteId} packageId={packageId}
+          {ownerSurface?<OwnerEngagementDestinationPicker transport={transport} surface={ownerSurface} value={target} onChange={setTarget} disabled={busy}/>:siteId?<GovernedGoDestinationPicker transport={transport.go} siteId={siteId} packageId={packageId}
             value={target} onChange={setTarget} disabled={busy}/>:null}
         </div>
         {execution==="page"&&<Field label="Button label">
@@ -196,7 +194,7 @@ function UniversalEngagementPublisherSession({siteId,packageId,ownerSurface,outr
         {outreach?"Prepare invitation & add recipients":"Publish engagement"}
       </Button></ActionFooter>
     </> : <>
-      {outreach&&emailLink&& !revoked.has(emailLink)&&<EngagementEmailDistribution engagementId={published.engagementId} linkId={emailLink} onClose={()=>setEmailLink(null)}/>}
+      {outreach&&emailLink&& !revoked.has(emailLink)&&<EngagementEmailDistribution transport={transport.campaign} engagementId={published.engagementId} linkId={emailLink} onClose={()=>setEmailLink(null)}/>}
       {outreach&&!emailLink&&links.filter(link=>!revoked.has(link.linkId)).map(link=><Button key={link.linkId} type="button" variant="outline" onClick={()=>setEmailLink(link.linkId)}>Add recipients</Button>)}
       <p className="mt-4 text-sm font-medium">Published engagement version {published.version}</p>
       <p className="mt-1 text-xs text-muted-foreground">The public experience content cannot be changed in this version. New Go Links can be issued or revoked.</p>

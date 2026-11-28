@@ -340,9 +340,8 @@ export async function authorizeEngagementDistribution(engagementId:string,actor:
  else assertCapability(actor,"communication.send");
  return record;
 }
-export async function readAuthorizedEngagementInvitation(engagementId:string,linkId:string,actor:AccessContext){
+export async function authorizeEngagementEmailLink(engagementId:string,linkId:string,actor:AccessContext){
  const record=await authorizeEngagementDistribution(engagementId,actor);
-    if(record.status!=="active")throw new DomainError("UNAVAILABLE","Engagement is retired.");
     const [link]=await db.select().from(siteGoLinks).where(eq(siteGoLinks.id,linkId)).limit(1);
     if(!link?.engagementVersionId||link.channel!=="email"||
        link.organizationId!==record.organizationId||link.siteId!==record.siteId)
@@ -351,6 +350,12 @@ export async function readAuthorizedEngagementInvitation(engagementId:string,lin
       eq(engagementDefinitionVersions.id,link.engagementVersionId),
       eq(engagementDefinitionVersions.engagementId,record.id))).limit(1);
     if(!version)throw new AuthorizationError("exact published engagement version");
+    return {record,link,version};
+}
+
+export async function readAuthorizedEngagementInvitation(engagementId:string,linkId:string,actor:AccessContext){
+    const {record,link,version}=await authorizeEngagementEmailLink(engagementId,linkId,actor);
+    if(record.status!=="active")throw new DomainError("UNAVAILABLE","Engagement is retired.");
     const definition=engagementDefinitionSchema.parse(version.content);
     const experience=await resolveGoExperience(link.code,"/",false);
     if(!experience||experience.mode==="website-preview")
