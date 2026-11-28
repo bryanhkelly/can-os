@@ -754,3 +754,11 @@ test('credential issuance is not published before restricted-role acceptance',as
   assert.equal(response.status,404);
  });
 });
+
+test('assessment and outcome domain controllers publish each fixed governed operation exactly once',async()=>{
+ const {assessmentsOutcomesOperations}=require('../dist/assessments-outcomes.operations');
+ await withServer('0',async(_url,document)=>{
+  const operations=Object.values(document.paths).flatMap(path=>Object.values(path));
+  for(const id of assessmentsOutcomesOperations){const matches=operations.filter(operation=>operation?.operationId===id);assert.equal(matches.length,1,id);assert.ok(matches[0].security?.length,id);}
+ });
+});
