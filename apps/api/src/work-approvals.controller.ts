@@ -239,4 +239,29 @@ export class WorkApprovalsController{
   const value=await this.identity.runWorkflow(()=>workflow.getWorkInbox(input));
   return c.manualResults.inbox.parse(JSON.parse(JSON.stringify(value)));
  }
+ @Get('work/tasks/:id/dependencies')
+ @WorkOperation('GET')
+ @ApiOperation({operationId:'getOperationalTaskDependencies',summary:'Read authorized prerequisites and current revision'})
+ @ApiParam({name:'id',type:String,format:'uuid',required:true})
+ 
+ @ApiOkResponse({schema:c.dependencyDocs.read})
+ async getOperationalTaskDependencies(@Req() req:FastifyRequest,@Param() params:unknown,@Query() query:unknown){
+  const workflow=verifiedWorkflow(req);
+  const input={...validated(c.params.id,params),...validated(c.queries.none,query)};
+  const value=await this.identity.runWorkflow(()=>workflow.getOperationalTaskDependencies(input));
+  return c.dependencyResults.read.parse(JSON.parse(JSON.stringify(value)));
+ }
+
+ @Post('work/tasks/:id/dependencies')
+ @WorkOperation('POST')
+ @ApiOperation({operationId:'changeOperationalTaskDependency',summary:'Add or remove an audited dependency without cycles'})
+ @ApiParam({name:'id',type:String,format:'uuid',required:true})
+ @ApiBody({schema:c.dependencyBodyDoc})
+ @ApiOkResponse({schema:c.dependencyDocs.changed})
+ async changeOperationalTaskDependency(@Req() req:FastifyRequest,@Param() params:unknown,@Body() body:unknown){
+  const workflow=verifiedWorkflow(req);
+  const input={...validated(c.params.id,params),...validated(c.dependencyBody,body)};
+  const value=await this.identity.runWorkflow(()=>workflow.changeOperationalTaskDependency(input));
+  return c.dependencyResults.changed.parse(JSON.parse(JSON.stringify(value)));
+ }
 }
