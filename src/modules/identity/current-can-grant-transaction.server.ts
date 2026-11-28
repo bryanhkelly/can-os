@@ -6,7 +6,6 @@ import { hasValidAccessGrantScope } from "@/domain/access-grant-scope";
 import { AuthorizationError } from "@/domain/command-context";
 import { accessSessionCookie, hashAccessSecret } from "@/domain/access-tokens";
 import { readCookie } from "@/domain/session-cookies";
-import { LOCAL_DEMO_ADMIN } from "@/domain/local-demo-access";
 import { demoCredentialScopePredicate } from "./demo-school-tenants.server";
 
 type Tx = Pick<typeof db, "execute">;
@@ -39,7 +38,7 @@ export async function assertCurrentCANGrantForMutation(
   expected: CANGrantScope,
 ): Promise<void> {
   if (!actor.accountId || !actor.sessionId || !actor.grantId ||
-      !actor.actorPersonId || !actor.role || actor.sessionAccountId ||
+      !actor.actorPersonId || !actor.role || actor.sessionAccountId || actor.impersonatedByAccountId ||
       actor.delegatedByPlatformOwner || actor.delegationMode ||
       !hasValidAccessGrantScope({role:actor.role,organizationId:expected.organizationId,siteId:expected.siteId}) ||
       !expected.roles.includes(actor.role) ||
@@ -67,7 +66,7 @@ export async function assertCurrentCANGrantForMutation(
   const organizationCheck = expected.organizationType
     ? sql`AND verified_org.type::text=${expected.organizationType}::text`
     : sql``;
-  const ownerId=actor.impersonatedByAccountId ?? actor.accountId;
+  const ownerId=actor.accountId;
   const lockTargets = expected.organizationType
     ? sql`FOR SHARE OF session,session_owner,target_account,current_grant,person,verified_org`
     : sql`FOR SHARE OF session,session_owner,target_account,current_grant,person`;
@@ -122,8 +121,7 @@ export async function assertCurrentCANGrantForMutation(
           ))
       )
       AND session.revoked_at IS NULL
-      -- This is a direct-grant transaction guard (with the existing exact
-      -- Demo Admin exception below), not a Platform Owner delegation grant.
+      -- This is a direct-grant transaction guard, not a Platform Owner delegation grant.
       -- Recheck while holding the session row lock: a stale direct request
       -- must not authorize a write after a delegation has begun.
       AND session.delegated_grant_id IS NULL
@@ -139,32 +137,7 @@ export async function assertCurrentCANGrantForMutation(
         WHERE conflict.account_id=target_account.id AND conflict.active
           AND conflict.person_id<>person.id
       )
-      AND (
-        (current_grant.account_id=session_owner.id
-          AND ${actor.impersonatedByAccountId ?? null}::uuid IS NULL)
-        OR
-        (session_owner.id=${LOCAL_DEMO_ADMIN.accountId}::uuid
-          AND session_owner.email_normalized=${LOCAL_DEMO_ADMIN.email}
-          AND session_owner.private_access_code_hash IS NULL
-          AND target_account.private_access_code_hash IS NULL
-          AND target_account.email_normalized LIKE '%@valorschool.demo'
-          AND ${actor.impersonatedByAccountId ?? null}::uuid=session_owner.id
-          AND EXISTS (
-            SELECT 1 FROM public.account_person_grants admin_grant
-            WHERE admin_grant.id=${LOCAL_DEMO_ADMIN.grantId}::uuid
-              AND admin_grant.account_id=session_owner.id
-              AND admin_grant.person_id=session_owner.person_id
-              AND admin_grant.role='site_admin' AND admin_grant.active
-              AND admin_grant.organization_id=current_grant.organization_id
-              AND admin_grant.site_id=current_grant.site_id
-          )
-          AND NOT EXISTS(
-            SELECT 1 FROM public.account_person_grants foreign_owner
-            WHERE foreign_owner.account_id=session_owner.id
-              AND foreign_owner.active
-              AND foreign_owner.person_id<>session_owner.person_id
-          ))
-      )
+      AND current_grant.account_id=session_owner.id
     ${lockTargets}
   `);
   if(result.rows.length!==1 ||
