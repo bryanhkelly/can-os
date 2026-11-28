@@ -1,3 +1,4 @@
+import {listScopedSitesService,listPeopleService,listAccessAccountsService,inviteStaffMemberService,setGrantActiveService} from "./staff-admin.server";
 import {completeNativeClassLesson,submitNativeClassHomeworkCommand} from "@/modules/classes/native-class-learner-write.server";
 import {selectCurrentSessionMembership,recordCurrentSessionActivity} from "./session-lifecycle.server";
 import { getInstructionalLearnerContext } from "./learning-command-context.server";
@@ -16,6 +17,7 @@ export async function resolveHttpIdentity(request: Request) {
   const actor = await getIdentityContext(request);
   if (!actor.actorPersonId) throw new Error("Authenticated Person missing");
   const personId = actor.actorPersonId;
+  const staffActor={...actor,actorPersonId:personId};
   async function learner() {
     const context = await getInstructionalLearnerContext(request);
     if (context.actorPersonId !== personId) throw new AuthorizationError("one verified learning Person");
@@ -56,6 +58,11 @@ export async function resolveHttpIdentity(request: Request) {
         ...(session.ownerDelegation?{ownerDelegation:session.ownerDelegation}:{}),
       };
     },
+    listStaffSites:()=>listScopedSitesService(staffActor),
+    listStaffPeople:(input:unknown)=>listPeopleService(staffActor,input),
+    listStaffAccounts:()=>listAccessAccountsService(staffActor),
+    inviteStaff:(input:unknown)=>{requireWrite();return inviteStaffMemberService(staffActor,request,input);},
+    setStaffGrantState:(input:unknown)=>{requireWrite();return setGrantActiveService(staffActor,request,input);},
     readStudentClasses: () => readStudentClasses(actor),
     readLearningResume: async (id:string) => readNativeClassResume(await learner(),id),
     readHomeworkSummary: async (id:string) => readNativeClassHomeworkSummary(await learner(),id),
