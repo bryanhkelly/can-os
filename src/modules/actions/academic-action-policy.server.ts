@@ -1,9 +1,12 @@
-import { inArray, and, eq, or, isNull } from "drizzle-orm";
+import { inArray, and, eq, or, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db/client";
 import { accountPersonGrants, enrollments, programs, sections, sectionTeachers, terms } from "@/db/schema";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { authorizeClass } from "@/modules/learning/class-access.server";
+import { assertNativeClassTeacher } from "@/modules/classes/native-class-teacher-authority.server";
+import { nativeClassWorkRows } from "@/modules/classes/native-class-work-query.server";
+import { z } from "zod";
 import type { Actor } from "@/modules/identity/actors.server";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -14,13 +17,50 @@ type AcademicResource = {
   siteId: string | null;
   programId: string | null;
   sectionId: string | null;
+  type?: string;
+  ownerPersonId?: string | null;
+  metadata?: Record<string, unknown>;
 };
+
+const nativeMissingWorkMetadata=z.object({
+  classId:z.string().uuid(),assignmentId:z.string().uuid(),
+  source:z.literal("native_class_missing_work"),
+});
+
+export function isNativeAcademicAction(resource:{subjectType:string}){
+  return resource.subjectType==="class_enrollment";
+}
+
+/** Native Actions carry the exact Class Enrollment as their subject. The
+ * metadata is a reference, not authority. Revalidate all relationships. */
+export async function assertNativeAcademicActionAuthority(tx:Tx,context:CommandContext,resource:AcademicResource){
+  const metadata=nativeMissingWorkMetadata.safeParse(resource.metadata);
+  if(!metadata.success||resource.type!=="missing_work_follow_up"||
+     !isNativeAcademicAction(resource)||resource.sectionId!==null||resource.programId!==null||
+     resource.ownerPersonId!==context.actorPersonId||!context.actorPersonId)
+    throw new AuthorizationError("own native Class academic Action");
+  const cls=await assertNativeClassTeacher(tx,context,metadata.data.classId);
+  if(resource.organizationId!==cls.operatingOrganizationId||resource.siteId!==cls.siteId)
+    throw new AuthorizationError("original Class academic Action scope");
+  const result=await tx.execute(sql`
+    SELECT enrollment_id FROM (${nativeClassWorkRows([cls.id])}) work
+    WHERE enrollment_id=${resource.subjectId}::uuid
+      AND assignment_id=${metadata.data.assignmentId}::uuid
+    LIMIT 1
+  `);
+  if(result.rows.length!==1)throw new AuthorizationError("current Class Enrollment and assignment");
+  return {classId:cls.id,assignmentId:metadata.data.assignmentId};
+}
 
 export async function assertAcademicActionAuthority(
   tx: Tx,
   context: CommandContext,
   resource: AcademicResource,
 ): Promise<void> {
+  if(isNativeAcademicAction(resource)){
+    await assertNativeAcademicActionAuthority(tx,context,resource);
+    return;
+  }
   if (!context.actorPersonId || resource.subjectType !== "student_profile" ||
       !resource.sectionId || !resource.programId || !resource.organizationId)
     throw new AuthorizationError("academic Action scope");
