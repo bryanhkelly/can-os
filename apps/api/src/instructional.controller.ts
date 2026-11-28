@@ -1,5 +1,5 @@
 import { Controller,Get,Post,Req,Param,Query,Body,HttpCode,applyDecorators } from '@nestjs/common';
-import { ApiTags,ApiCookieAuth,ApiParam,ApiOperation,ApiOkResponse,ApiBody,ApiHeader,ApiResponse } from '@nestjs/swagger';
+import { ApiTags,ApiCookieAuth,ApiParam,ApiOperation,ApiOkResponse,ApiBody,ApiHeader,ApiResponse,ApiQuery } from '@nestjs/swagger';
 import type {FastifyRequest} from 'fastify';
 import {CanonicalIdentityService} from './identity.service';
 import {CanonicalReadOperation,CanonicalWriteOperation,verifiedIdentity} from './security';
@@ -38,12 +38,13 @@ export class InstructionalController{
  }
  @Get('practice-history')
  @InstructionOperation('GET')
- @ApiOperation({operationId:'getMyRecordedPracticeHistory',summary:'Read own formative practice history under current authority'})
+ @ApiOperation({operationId:'getMyRecordedPracticeHistory',summary:'Read at most ten authorized formative practice attempts, newest first; continue using nextBeforeId'})
+ @ApiQuery({name:"beforeId",required:false,type:String,description:"Opaque continuation from the preceding page in this course attempt"})
  @ApiOkResponse({schema:c.outputDocs.history})
  history(@Req() req:FastifyRequest,@Param() params:unknown,@Query() query:unknown){
   const attempt=validated(c.attemptParams,params);
-  validated(c.noQuery,query);
-  return this.identity.run(verifiedIdentity(req),async actor=>c.output.history.parse(await actor.instruction.history(attempt.courseAttemptId)));
+  const input={...attempt,...validated(c.historyQuery,query)};
+  return this.identity.run(verifiedIdentity(req),async actor=>c.output.history.parse(await actor.instruction.history(input)));
  }
  @Post('instructor-selections')
  @InstructionOperation('POST')

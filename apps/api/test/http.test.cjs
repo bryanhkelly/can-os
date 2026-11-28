@@ -720,7 +720,7 @@ test('WS07 recorded instruction and history operations require ordinary authenti
  });
 });
 test('recorded instruction wire contracts reject caller-selected identity, invalid revisions, and leaked practice keys',()=>{
- const {input,output}=require('../dist/instructional.contracts');
+ const {input,output,historyQuery}=require('../dist/instructional.contracts');
  const id='00000000-0000-4000-8000-000000000001';
  const selection={requestId:id,trackVersionId:id,expectedRevision:0};
  assert.equal(input.select.safeParse(selection).success,true);
@@ -731,8 +731,13 @@ test('recorded instruction wire contracts reject caller-selected identity, inval
  assert.equal(output.choices.safeParse({choices:[],blocked:[],selection:null,personId:id}).success,false);
  assert.equal(output.download.safeParse({downloadUrl:'https://example.test/signed',expiresInSeconds:60}).success,false);
  const row={id,courseUnitId:id,trackVersionId:id,policyVersionId:id,scoreNumeric:null,recordedAt:'2026-11-28T00:00:00.000Z',trackTitle:null,courseUnitTitle:null,answers:[{promptKey:'a',promptText:'Question',response:'Answer'}]};
- assert.equal(output.history.safeParse([row]).success,true);
- assert.equal(output.history.safeParse([{...row,answers:[{...row.answers[0],answerKey:'private'}]}]).success,false);
+ assert.equal(output.history.safeParse({items:[row],nextBeforeId:null}).success,true);
+ assert.equal(output.history.safeParse({items:[{...row,answers:[{...row.answers[0],answerKey:'private'}]}],nextBeforeId:null}).success,false);
+ assert.equal(output.history.safeParse({items:Array(11).fill(row),nextBeforeId:id}).success,false);
+ assert.equal(historyQuery.safeParse({beforeId:id}).success,true);
+ assert.equal(historyQuery.safeParse({beforeId:'invalid'}).success,false);
+ assert.equal(historyQuery.safeParse({personId:id}).success,false);
+ assert.equal(output.download.safeParse({downloadUrl:'http://example.test/signed',expiresInSeconds:30}).success,false);
 });
 
 test('facilitator workspace and activity aggregates have protected contracts',async()=>{

@@ -65,7 +65,16 @@ test("independent standard HTTP client validates both students and rejects forei
        const choices=await http.get(instructionTarget+"/instructors");expect(choices.status()).toBe(200);
        const choiceShape=z.object({choices:z.array(z.object({trackVersionId:uuid,policyVersionId:uuid})),blocked:z.array(z.object({trackVersionId:uuid})),selection:z.object({trackVersionId:uuid,revision:z.number().int().positive(),policyVersionId:uuid}).nullable()}).parse(await choices.json());
        const history=await http.get(instructionTarget+"/practice-history");expect(history.status()).toBe(200);
-       expect(Array.isArray(await history.json())).toBe(true);
+       const historyShape=z.object({items:z.array(z.object({id:uuid})).max(10),nextBeforeId:uuid.nullable()}).strict();
+       const firstPage=historyShape.parse(await history.json());
+       expect((await http.get(instructionTarget+"/practice-history?beforeId=not-a-uuid")).status()).toBe(400);
+       expect((await http.get(instructionTarget+"/practice-history?beforeId="+randomUUID())).status()).toBe(403);
+       if(firstPage.nextBeforeId){
+         const response=await http.get(instructionTarget+"/practice-history?beforeId="+firstPage.nextBeforeId);expect(response.status()).toBe(200);
+         const secondPage=historyShape.parse(await response.json());
+         expect(secondPage.items.length).toBeGreaterThan(0);
+         expect(secondPage.items.every(row=>!firstPage.items.some(prior=>prior.id===row.id))).toBe(true);
+       }
        expect((await http.get(instructionTarget+"/instructors?personId="+student.personId)).status()).toBe(400);
        if(choiceShape.selection&&choiceShape.choices.some(c=>c.trackVersionId===choiceShape.selection?.trackVersionId&&c.policyVersionId===choiceShape.selection?.policyVersionId)){
          // A currently eligible selected presenter must open via the same course attempt.

@@ -4,6 +4,7 @@ const uuid=z.string().uuid(), str=z.string(), integer=z.number().int(), iso=z.st
 const nullableId=uuid.nullable(), nullableText=str.nullable(), revision=integer.min(1);
 export const attemptParams=z.object({courseAttemptId:uuid}).strict();
 export const noQuery=z.object({}).strict();
+export const historyQuery=z.object({beforeId:uuid.optional()}).strict();
 export const input={
  select:z.object({requestId:uuid,trackVersionId:uuid,expectedRevision:integer.min(0),switchReason:str.trim().min(1).max(500).nullable().optional()}).strict(),
  download:z.object({assetVersionId:uuid}).strict(),
@@ -12,7 +13,7 @@ export const input={
 };
 type Attempt={courseAttemptId:string};
 export type InstructionalOperations={
- choices:(id:string)=>Promise<unknown>;selected:(id:string)=>Promise<unknown>;history:(id:string)=>Promise<unknown>;
+ choices:(id:string)=>Promise<unknown>;selected:(id:string)=>Promise<unknown>;history:(data:Attempt&z.infer<typeof historyQuery>)=>Promise<unknown>;
  select:(data:Attempt&z.infer<typeof input.select>)=>Promise<unknown>;
  download:(data:Attempt&z.infer<typeof input.download>)=>Promise<unknown>;
  complete:(data:Attempt&z.infer<typeof input.complete>)=>Promise<unknown>;
@@ -31,10 +32,10 @@ export const output={
  presentations:z.array(z.object({assetVersionId:uuid,presentationKind:str,ordinal:integer,accessibilityNotes:json}).strict())}).strict()),
  materials:z.array(z.object({id:uuid,courseUnitId:uuid,assetVersionId:nullableId,materialKind:str,practice:z.object({instructions:str,prompts:z.array(prompt)}).strict().nullable()}).strict())}).strict(),
  select:selection.extend({courseAttemptId:uuid,selectionId:uuid}).strict(),
- download:z.object({downloadUrl:str.url(),expiresInSeconds:z.literal(30)}).strict(),
+ download:z.object({downloadUrl:str.url().refine(v=>v.startsWith('https://')),expiresInSeconds:z.literal(30)}).strict(),
  complete:z.object({courseAttemptId:uuid,courseVersionId:uuid,lessonId:uuid,status:z.literal('completed')}).strict(),
  practice:z.object({practiceAttemptId:uuid,courseAttemptId:uuid,trackVersionId:uuid,policyVersionId:uuid,courseUnitId:uuid}).strict(),
- history:z.array(z.object({id:uuid,courseUnitId:uuid,trackVersionId:nullableId,policyVersionId:nullableId,scoreNumeric:nullableText,recordedAt:iso,trackTitle:nullableText,courseUnitTitle:nullableText,answers:z.array(z.object({promptKey:str,promptText:str,response:str}).strict())}).strict()),
+ history:z.object({items:z.array(z.object({id:uuid,courseUnitId:uuid,trackVersionId:nullableId,policyVersionId:nullableId,scoreNumeric:nullableText,recordedAt:iso,trackTitle:nullableText,courseUnitTitle:nullableText,answers:z.array(z.object({promptKey:str,promptText:str,response:str}).strict())}).strict()).max(10),nextBeforeId:nullableId}).strict(),
 };
 const id={type:'string' as const,format:'uuid'},s={type:'string' as const},n={type:'integer' as const},pos={...n,minimum:1},bool={type:'boolean' as const},dt={...s,format:'date-time'};
 const ni={...id,nullable:true},ns={...s,nullable:true};
@@ -57,5 +58,5 @@ export const outputDocs={
  download:obj({downloadUrl:{...s,format:'uri'},expiresInSeconds:{...n,enum:[30]}}),
  complete:obj({courseAttemptId:id,courseVersionId:id,lessonId:id,status:{...s,enum:['completed']}}),
  practice:obj({practiceAttemptId:id,courseAttemptId:id,trackVersionId:id,policyVersionId:id,courseUnitId:id}),
- history:arr(obj({id,courseUnitId:id,trackVersionId:ni,policyVersionId:ni,scoreNumeric:ns,recordedAt:dt,trackTitle:ns,courseUnitTitle:ns,answers:arr(obj({promptKey:s,promptText:s,response:s}))})),
+ history:obj({items:{...arr(obj({id,courseUnitId:id,trackVersionId:ni,policyVersionId:ni,scoreNumeric:ns,recordedAt:dt,trackTitle:ns,courseUnitTitle:ns,answers:arr(obj({promptKey:s,promptText:s,response:s}))})),maxItems:10},nextBeforeId:ni}),
 };
