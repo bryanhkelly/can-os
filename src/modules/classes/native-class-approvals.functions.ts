@@ -147,13 +147,9 @@ export const decideNativeClassApproval=createServerFn({method:"POST"})
       approval.operatingOrganizationId!==cls.operatingOrganizationId||
       approval.siteId!==cls.siteId)
     throw new AuthorizationError("scoped Class approval");
-   if(approval.applicantPersonId===actor.actorPersonId)
+   if(approval.applicantPersonId===actor.actorPersonId||approval.learnerPersonId===actor.actorPersonId)
     throw new AuthorizationError("independent approval reviewer required");
    const now=new Date();
-   if(approval.state===data.decision&&approval.reviewedByPersonId===actor.actorPersonId)
-    return {approvalRequestId:approval.id,state:approval.state,duplicate:true};
-   if(approval.state!=="pending"||approval.expiresAt<=now)
-    throw new AuthorizationError("current pending approval request");
    if(approval.guardianPersonId){
      if(approval.applicantPersonId!==approval.guardianPersonId)
        throw new AuthorizationError("guardian must be original applicant");
@@ -162,6 +158,10 @@ export const decideNativeClassApproval=createServerFn({method:"POST"})
    }else if(approval.applicantPersonId!==approval.learnerPersonId){
      throw new AuthorizationError("verified adult applicant only");
    }
+   if(approval.state===data.decision&&approval.reviewedByPersonId===actor.actorPersonId)
+    return {approvalRequestId:approval.id,state:approval.state,duplicate:true};
+   if(approval.state!=="pending"||approval.expiresAt<=now)
+    throw new AuthorizationError("current pending approval request");
    const current=await currentClassAuthority(tx,cls.id,now);
    if(current.classState!=="active"||current.siteId!==approval.siteId)
     throw new AuthorizationError("active authorized Class and Site");

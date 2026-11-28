@@ -19,7 +19,7 @@ import { createInitialNativeClassAttempt, withdrawNativeClassAttempts } from "./
 import {writeNativeClassAttribution} from "./native-class-attribution.server";
 import {requireNativeRepeatAuthorization} from "./native-class-repeats.server";
 import {consumeNativeClassRepeatAuthorization} from "./native-class-repeat-consumption.server";
-import {requireNativeGuardian,requireNativeGuardianChild,currentNativeGuardianAuthorityPredicate} from
+import {requireNativeGuardian,requireNativeGuardianChild,currentNativeGuardianAuthorityPredicate,assertCurrentNativeGuardianSession} from
  "./native-class-guardian-authority.server";
 import {assertOperationalClassOfferingTerms,assertNativeClassSeatAvailable} from "@/domain/native-class-lifecycle";
 
@@ -46,6 +46,7 @@ export const getMyNativeGuardianLearners=createServerFn({method:"GET"})
   guard();const now=new Date();
   const guardian=await requireNativeGuardian(getRequest(),now);
   return db.transaction(async tx=>{
+   await assertCurrentNativeGuardianSession(tx,getRequest(),guardian.personId,new Date());
    const rows=await tx.select({
     learnerPersonId:learnerProfiles.personId,
     firstName:people.legalFirstName,
@@ -76,6 +77,7 @@ export const requestNativeGuardianClassApproval=createServerFn({method:"POST"})
   guard();const request=getRequest(),now=new Date();
   const guardian=await requireNativeGuardian(request,now);
   return db.transaction(async tx=>{
+   await assertCurrentNativeGuardianSession(tx,getRequest(),guardian.personId,new Date());
    const [locator]=await tx.select({classId:canonicalClassOfferingVersions.classId})
     .from(canonicalClassOfferingVersions)
     .where(eq(canonicalClassOfferingVersions.id,data.classOfferingVersionId)).limit(1);
@@ -158,6 +160,7 @@ export const getMyNativeGuardianClassApprovals=createServerFn({method:"GET"})
  .handler(async()=>{
   guard();const now=new Date(),guardian=await requireNativeGuardian(getRequest(),now);
   return db.transaction(async tx=>{
+   await assertCurrentNativeGuardianSession(tx,getRequest(),guardian.personId,new Date());
    const rows=await tx.select({
     approvalRequestId:canonicalClassEnrollmentApprovalRequests.id,
     classId:canonicalClassEnrollmentApprovalRequests.classId,
@@ -199,6 +202,7 @@ export const acceptNativeGuardianClassApproval=createServerFn({method:"POST"})
   guard();const request=getRequest(),now=new Date();
   const guardian=await requireNativeGuardian(request,now);
   return db.transaction(async tx=>{
+   await assertCurrentNativeGuardianSession(tx,getRequest(),guardian.personId,new Date());
    const [locator]=await tx.select({classId:canonicalClassEnrollmentApprovalRequests.classId})
     .from(canonicalClassEnrollmentApprovalRequests)
     .where(eq(canonicalClassEnrollmentApprovalRequests.id,data.approvalRequestId)).limit(1);
@@ -211,7 +215,7 @@ export const acceptNativeGuardianClassApproval=createServerFn({method:"POST"})
     .where(eq(canonicalClassEnrollmentApprovalRequests.id,data.approvalRequestId))
     .for("update").limit(1);
    if(!approval||approval.state!=="approved"||
-      approval.acceptedEnrollmentId||approval.expiresAt<=new Date()||
+      (!approval.acceptedEnrollmentId&&approval.expiresAt<=new Date())||
       approval.classId!==cls.id||
       approval.applicantPersonId!==guardian.personId||
       approval.guardianPersonId!==guardian.personId||
@@ -223,6 +227,21 @@ export const acceptNativeGuardianClassApproval=createServerFn({method:"POST"})
       current.classState!=="active")
     throw new AuthorizationError("independently reviewed current guardian request");
    await requireNativeGuardianChild(tx,guardian.personId,approval.learnerPersonId,new Date());
+   // A lost response must not create another enrollment or consent record.
+   if(approval.acceptedEnrollmentId){
+    const [prior]=await tx.select().from(canonicalClassEnrollments).where(and(
+     eq(canonicalClassEnrollments.id,approval.acceptedEnrollmentId),
+     eq(canonicalClassEnrollments.classId,cls.id),
+     eq(canonicalClassEnrollments.learnerPersonId,approval.learnerPersonId),
+     eq(canonicalClassEnrollments.enrolledByPersonId,guardian.personId),
+     eq(canonicalClassEnrollments.classOfferingVersionId,approval.classOfferingVersionId),
+     eq(canonicalClassEnrollments.enrollmentMethod,"approval"),
+    )).limit(1);
+    if(!prior||!prior.courseAttemptId||prior.creditMode!==data.creditMode||!prior.consentedAt||
+       !prior.consentVersion||!prior.consentSha256)
+     throw new AuthorizationError("exact original guardian consent replay");
+    return {classEnrollmentId:prior.id,courseAttemptId:prior.courseAttemptId};
+   }
    const [terms]=await tx.select().from(canonicalClassOfferingVersions)
     .where(and(eq(canonicalClassOfferingVersions.id,approval.classOfferingVersionId),
       eq(canonicalClassOfferingVersions.classId,cls.id))).for("update").limit(1);
@@ -297,6 +316,7 @@ export const withdrawMyGuardianNativeClassEnrollment=createServerFn({method:"POS
  .handler(async({data})=>{
   guard();const now=new Date(),guardian=await requireNativeGuardian(getRequest(),now);
   return db.transaction(async tx=>{
+   await assertCurrentNativeGuardianSession(tx,getRequest(),guardian.personId,new Date());
    const [locator]=await tx.select({classId:canonicalClassEnrollments.classId})
     .from(canonicalClassEnrollments)
     .where(eq(canonicalClassEnrollments.id,data.classEnrollmentId)).limit(1);
@@ -341,6 +361,7 @@ export const getMyNativeGuardianClassEnrollments=createServerFn({method:"GET"})
   guard();const now=new Date();
   const guardian=await requireNativeGuardian(getRequest(),now);
   return db.transaction(async tx=>{
+   await assertCurrentNativeGuardianSession(tx,getRequest(),guardian.personId,new Date());
    const rows=await tx.select({
     classEnrollmentId:canonicalClassEnrollments.id,
     classId:canonicalClassEnrollments.classId,

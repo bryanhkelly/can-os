@@ -286,6 +286,8 @@ for (const eventType of [
   // Access and authorization lifecycle facts: audit evidence is already written
   // transactionally; these only complete the outbox for shared subscriptions.
   EventTypes.AccessAccountDisabled,
+  EventTypes.GuardianMinorEnrollmentReviewed,
+  EventTypes.GuardianRelationshipRevoked,
   EventTypes.GuardianAccessRevoked,
   EventTypes.GuardianAccessRestored,
   EventTypes.StudentLearningAccessRevoked,

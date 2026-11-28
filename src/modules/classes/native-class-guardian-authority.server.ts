@@ -1,6 +1,8 @@
 import {and,eq,gt,inArray,isNull,lte,or} from "drizzle-orm";
 import {db} from "@/db/client";
-import {accessAccounts,guardianRelationships,people} from "@/db/schema";
+import {accessAccounts,accessSessions,accountPersonGrants,guardianRelationships,people} from "@/db/schema";
+import {accessSessionCookie,hashAccessSecret,sessionIdleCutoff} from "@/domain/access-tokens";
+import {readCookie} from "@/domain/session-cookies";
 import {minorReviewRecord,requireMinorReviewEvidence} from "./guardian-minor-review-evidence.server";
 import {guardianRelationshipPredicate,schoolGuardianAuthorityCompatible} from "@/domain/guardian-relationship";
 import {canonicalPersons,guardianAuthorities,learnerProfiles} from "@/db/canonical-v301";
@@ -106,4 +108,24 @@ export async function requireNativeGuardianChild(
   ((now.getUTCMonth()+1<m!||(now.getUTCMonth()+1===m!&&now.getUTCDate()<d!))?1:0);
  if(age<0||age>=18)throw new AuthorizationError("minor guardian placement only");
  return authority;
+}
+
+/** Recheck the actual direct session and active guardian grant within the
+ * business transaction, before any replay or mutation. */
+export async function assertCurrentNativeGuardianSession(tx:Tx,request:Request,personId:string,now:Date){
+ const raw=readCookie(request,accessSessionCookie),pepper=process.env.CAN_ACCESS_TOKEN_PEPPER;
+ if(!raw||!/^[A-Za-z0-9_-]{40,}$/.test(raw)||!pepper||pepper.length<32)
+  throw new AuthorizationError("authenticated session");
+ const [session]=await tx.select({id:accessSessions.id}).from(accessSessions)
+  .innerJoin(accessAccounts,eq(accessAccounts.id,accessSessions.accountId))
+  .innerJoin(accountPersonGrants,and(eq(accountPersonGrants.id,accessSessions.activeGrantId),
+   eq(accountPersonGrants.accountId,accessAccounts.id)))
+  .where(and(eq(accessSessions.secretHash,hashAccessSecret(raw,pepper)),
+   isNull(accessSessions.revokedAt),isNull(accessSessions.delegatedGrantId),
+   gt(accessSessions.expiresAt,now),gt(accessSessions.updatedAt,sessionIdleCutoff(now)),
+   eq(accessAccounts.personId,personId),eq(accessAccounts.disabled,false),
+   lte(accessAccounts.emailVerifiedAt,now),eq(accountPersonGrants.personId,personId),
+   eq(accountPersonGrants.role,"guardian"),eq(accountPersonGrants.active,true)))
+  .for("share").limit(1);
+ if(!session)throw new AuthorizationError("current direct guardian membership");
 }
