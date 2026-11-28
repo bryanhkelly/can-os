@@ -15,7 +15,7 @@ type Scope=Pick<RelationshipProposal,"scopeKind"|"scopeId">;
 /** Mount beside a resource already selected by its authoritative workspace.
  * The server re-resolves ownership and exact active membership on every read
  * and mutation; this presentation filter is not a grant. */
-export function ContextualReportingRelationships({scopeKind,scopeId}:Scope){
+export function ContextualReportingRelationships({scopeKind,scopeId,onChanged}:Scope&{onChanged?:()=>Promise<unknown>}){
   const {session}=useWorkspaceSession();
   const privateScope=usePrivateReportScope();
   if(!privateScope||!session?.authenticated)return null;
@@ -25,9 +25,9 @@ export function ContextualReportingRelationships({scopeKind,scopeId}:Scope){
     ["site","program","class"].includes(scopeKind);
   if(!manager&&!initiator)return null;
   return <ContextualRelationshipContent key={privateScope+":"+scopeKind+":"+scopeId}
-    privateScope={privateScope} scope={{scopeKind,scopeId}}/>;
+    privateScope={privateScope} scope={{scopeKind,scopeId}} onChanged={onChanged}/>;
 }
-function ContextualRelationshipContent({scope,privateScope}:{scope:Scope;privateScope:string}){
+function ContextualRelationshipContent({scope,privateScope,onChanged}:{scope:Scope;privateScope:string;onChanged?:()=>Promise<unknown>}){
   const [after,setAfter]=useState<string|undefined>();
   const [search,setSearch]=useState("");
   const [query,setQuery]=useState("");
@@ -37,7 +37,7 @@ function ContextualRelationshipContent({scope,privateScope}:{scope:Scope;private
     read:()=>getRelationshipRequests({data:{direction:"outgoing",scope,after}})});
   const recipients=usePrivateReportQuery({scope:privateScope,key:["relationship-recipients",query,recipientAfter??null],
     enabled:query.length>=2,read:()=>findRelationshipRecipients({data:{query,after:recipientAfter}})});
-  const feedback=useMutationFeedback(async()=>{await entries.query.refetch({throwOnError:true});});
+  const feedback=useMutationFeedback(async()=>{await entries.query.refetch({throwOnError:true});await onChanged?.();});
   const busy=feedback.pending||feedback.refreshFailed||entries.query.isFetching;
   async function propose(proposal:RelationshipProposal){
     const result=await feedback.run(()=>requestReportingRelationship({data:proposal}),{
