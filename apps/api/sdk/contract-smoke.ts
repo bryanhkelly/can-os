@@ -1,4 +1,5 @@
 import type {BecomunaBrowserApi} from './client';
+import {recordedInstructionApi} from './recorded-instruction';
 // These compile-time assertions use the generated paths from the actual server.
 // No network request is made by this file.
 export async function checkStudentContract(client:BecomunaBrowserApi, enrollmentId:string){
@@ -32,6 +33,12 @@ export async function checkStudentContract(client:BecomunaBrowserApi, enrollment
   const page=await client.GET('/api/v1/me/course-attempts/{courseAttemptId}/practice-history',{params:{path:{courseAttemptId:enrollmentId},query:{beforeId:practice.data.nextBeforeId}}});
   if(page.data){const responses=page.data.items[0]?.answers;void responses;}
  }
+ const recorded=recordedInstructionApi(client);
+ const page=await recorded.history(enrollmentId);
+ const continuation:string|null=page.nextBeforeId;void continuation;
+ await recorded.select(enrollmentId,{requestId:enrollmentId,trackVersionId:enrollmentId,expectedRevision:0});
+ // @ts-expect-error no caller-supplied identity or course attempt in command body
+ await recorded.select(enrollmentId,{requestId:enrollmentId,trackVersionId:enrollmentId,expectedRevision:0,personId:enrollmentId});
  // Browser-owned Origin is still mandatory on the wire; the browser, not UI code, supplies it.
  await client.POST('/api/v1/me/session/membership',{body:{grantId:enrollmentId}});
  await client.POST('/api/v1/me/session/activity',{body:{}});

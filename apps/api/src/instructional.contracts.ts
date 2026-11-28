@@ -46,7 +46,7 @@ export const inputDocs={
  select:obj({requestId:id,trackVersionId:id,expectedRevision:{...n,minimum:0},switchReason:{...ns,minLength:1,maxLength:500}},['requestId','trackVersionId','expectedRevision']),
  download:obj({assetVersionId:id}),
  complete:obj({requestId:id,lessonId:id,expectedRevision:pos}),
- practice:obj({requestId:id,courseVersionId:id,trackVersionId:id,materialId:id,expectedRevision:pos,responses:{...arr(obj({promptKey:{...s,minLength:1,maxLength:100},response:{...s,maxLength:20000}})),maxItems:100}}),
+ practice:{...obj({requestId:id,courseVersionId:id,trackVersionId:id,materialId:id,expectedRevision:pos,responses:{...arr(obj({promptKey:{...s,minLength:1,maxLength:100},response:{...s,maxLength:20000}})),maxItems:100}}),description:'Encoded JSON request must fit within the platform 1 MiB limit; individual field maxima do not guarantee that the aggregate fits.'},
 };
 export const outputDocs={
  choices:obj({choices:arr(obj({trackVersionId:id,title:s,presenterPersonId:ni,policyVersionId:id,allowSwitching:bool})),blocked:arr(obj({trackVersionId:id,reason:s})),selection:{...selectionDoc,nullable:true}}),

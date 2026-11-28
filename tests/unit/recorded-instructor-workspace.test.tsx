@@ -14,6 +14,7 @@ vi.mock("@/modules/learning/instructional-tracks.functions", () => ({
   getStudentRecordedInstructors: vi.fn(),
   getRecordedLessonInstruction: vi.fn(),
   getRecordedInstructorPracticeHistory: vi.fn(),
+  getRecordedInstructorPracticeHistoryPage: vi.fn(),
   getRecordedInstructionAssetDownload: vi.fn(),
   selectRecordedInstructor: vi.fn(),
   recordRecordedInstructorPractice: vi.fn(),
@@ -113,6 +114,15 @@ describe("recorded instructor learner workspace", () => {
     expect(html).toContain("Switching teachers does not erase this history");
   });
 
+  it("offers bounded history continuation without claiming a total",()=>{
+    const row={id:"a",courseUnitId:"unit",courseUnitTitle:"Foundations",trackVersionId:null,trackTitle:null,answers:[],policyVersionId:null,scoreNumeric:null,recordedAt:new Date("2026-11-12T12:00:00Z")};
+    const html=renderToStaticMarkup(<RecordedPracticeHistory history={[row]} hasMore onLoadMore={vi.fn()}/>);
+    expect(html).toContain("1 saved practice attempt");
+    expect(html).toContain("loaded");
+    expect(html).toContain("Load older practice");
+    const last=renderToStaticMarkup(<RecordedPracticeHistory history={[row]}/>);
+    expect(last).not.toContain("Load older practice");
+  });
   it("shows switching restrictions while still letting a learner renew the same teacher", () => {
     const choices = [
       { trackVersionId: "teacher-a", presenterPersonId: "presenter-a",

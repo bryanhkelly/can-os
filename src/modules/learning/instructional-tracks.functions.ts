@@ -22,6 +22,8 @@ import {
   getSelectedInstructionalTrackAssetDownload,
   instructionalTrackAssetDownloadSchema,
   readFormativePracticeHistory,
+  readFormativePracticeHistoryPage,
+  practiceHistoryPageSchema,
   readInstructionalTrackSchema,
   readSelectedInstructionalTrack,
   recordFormativePractice,
@@ -127,3 +129,12 @@ export const getRecordedInstructorPracticeHistory = createServerFn({ method: "GE
     privateNoStore();
     return readFormativePracticeHistory(await getInstructionalLearnerContext(getRequest()), data);
   });
+
+/** Bounded UI compatibility transport until same-origin SDK ingress is accepted. */
+export const getRecordedInstructorPracticeHistoryPage=createServerFn({method:"GET"})
+ .validator((raw:unknown)=>practiceHistoryPageSchema.parse(raw))
+ .handler(async({data})=>{
+  privateNoStore();
+  setResponseHeader("Referrer-Policy","no-referrer");
+  return readFormativePracticeHistoryPage(await getInstructionalLearnerContext(getRequest()),data);
+ });

@@ -79,6 +79,7 @@ export class InstructionalController{
  @Post('practice-attempts')
  @InstructionOperation('POST')
  @ApiOperation({operationId:'recordMyFormativePractice',summary:'Record formative practice for current selected presenter'})
+ @ApiResponse({status:413,description:'Encoded JSON exceeds the platform 1 MiB request limit',content:{'application/problem+json':{schema:problemOpenApiSchema}}})
  @ApiBody({schema:c.inputDocs.practice})
  @ApiOkResponse({schema:c.outputDocs.practice})
  practice(@Req() req:FastifyRequest,@Param() params:unknown,@Body() body:unknown){

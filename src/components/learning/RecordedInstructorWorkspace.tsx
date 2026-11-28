@@ -18,7 +18,7 @@ import { normalizeClientError } from "@/lib/client-error";
 import { nextRecordedLessonId, recordedInstructorSelectionIsCurrent, resumeRecordedLessonId } from "@/domain/instructional-tracks";
 import {
   completeRecordedCourseLesson,
-  getRecordedInstructorPracticeHistory,
+  getRecordedInstructorPracticeHistoryPage,
   getRecordedInstructionAssetDownload,
   getRecordedLessonInstruction,
   getStudentRecordedInstructors,
@@ -28,7 +28,8 @@ import {
 
 type InstructorCatalog = Awaited<ReturnType<typeof getStudentRecordedInstructors>>;
 type SelectedInstruction = Awaited<ReturnType<typeof getRecordedLessonInstruction>>;
-type PracticeHistory = Awaited<ReturnType<typeof getRecordedInstructorPracticeHistory>>;
+type PracticeHistoryPage = Awaited<ReturnType<typeof getRecordedInstructorPracticeHistoryPage>>;
+type PracticeHistory = PracticeHistoryPage['items'];
 
 /**
  * Canonical learner workspace. Mount only after the v3.0.1 application-role
@@ -72,6 +73,9 @@ function RecordedInstructorCourseSession({ courseAttemptId, activityEnabled, fac
   const [catalog, setCatalog] = useState<InstructorCatalog | null>(null);
   const [instruction, setInstruction] = useState<SelectedInstruction | null>(null);
   const [history, setHistory] = useState<PracticeHistory>([]);
+  const [nextHistoryId,setNextHistoryId]=useState<string|null>(null);
+  const historyLoading=useRef(false);
+  const historyGeneration=useRef(0);
   const [lessonId, setLessonId] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [pending, setPending] = useState(false);
@@ -81,16 +85,19 @@ function RecordedInstructorCourseSession({ courseAttemptId, activityEnabled, fac
   const [lessonProgressRevision,setLessonProgressRevision]=useState(0);
 
   const reload = useCallback(async () => {
+    const generation=++historyGeneration.current;
     const nextCatalog = await getStudentRecordedInstructors({ data: { courseAttemptId } });
     const [nextInstruction, nextHistory] = await Promise.all([
       recordedInstructorSelectionIsCurrent(nextCatalog)
         ? getRecordedLessonInstruction({ data: { courseAttemptId } })
         : Promise.resolve(null),
-      getRecordedInstructorPracticeHistory({ data: { courseAttemptId } }),
+      getRecordedInstructorPracticeHistoryPage({ data: { courseAttemptId } }),
     ]);
+    if(generation!==historyGeneration.current)return;
     setCatalog(nextCatalog);
     setInstruction(nextInstruction);
-    setHistory(nextHistory);
+    setHistory(nextHistory.items);
+    setNextHistoryId(nextHistory.nextBeforeId);
     setLessonId(previous => nextInstruction
       ? resumeRecordedLessonId(nextInstruction.lessons, previous)
       : null);
@@ -116,6 +123,26 @@ function RecordedInstructorCourseSession({ courseAttemptId, activityEnabled, fac
     }
   },[initialLessonId,instruction]);
 
+  async function loadOlderPractice(){
+    if(!nextHistoryId||pending||loading||historyLoading.current)return;
+    const generation=historyGeneration.current;
+    historyLoading.current=true;
+    setPending(true);setError("");
+    try{
+      const page=await getRecordedInstructorPracticeHistoryPage({data:{courseAttemptId,beforeId:nextHistoryId}});
+      if(generation!==historyGeneration.current)return;
+      setHistory(current=>{
+        const existing=new Set(current.map(attempt=>attempt.id));
+        return [...current,...page.items.filter(attempt=>!existing.has(attempt.id))];
+      });
+      setNextHistoryId(page.nextBeforeId);
+    }catch(failure){
+      setError(normalizeClientError(failure,"Unable to load older practice.").message);
+    }finally{
+      historyLoading.current=false;
+      setPending(false);
+    }
+  }
   async function selectTeacher(trackVersionId: string) {
     if (!catalog || pending) return;
     setPending(true);
@@ -350,7 +377,8 @@ function RecordedInstructorCourseSession({ courseAttemptId, activityEnabled, fac
       </div>}
     </>}
 
-    {history.length > 0 && <RecordedPracticeHistory history={history}/>}
+    {history.length > 0 && <RecordedPracticeHistory history={history}
+      hasMore={nextHistoryId!==null} pending={pending||loading} onLoadMore={()=>void loadOlderPractice()}/>}
     {mode === "training" && <NoncreditCourseActivities courseAttemptId={courseAttemptId}
       lessonProgressRevision={lessonProgressRevision}/>}
     {activityEnabled && <CanonicalCourseEvidencePanel courseAttemptId={courseAttemptId}/>}
@@ -402,11 +430,11 @@ export function RecordedOfficialCourseLinks({ sectionId }: { sectionId: string }
   </WorkspaceLinkNavigation>;
 }
 
-export function RecordedPracticeHistory({ history }: { history: PracticeHistory }) {
+export function RecordedPracticeHistory({ history,hasMore=false,pending=false,onLoadMore }: { history: PracticeHistory;hasMore?:boolean;pending?:boolean;onLoadMore?:()=>void }) {
   return <section aria-label="Practice history" className="border bg-card p-4">
     <h3 className="font-semibold">Practice history</h3>
     <p className="mt-1 text-sm text-muted-foreground">
-      {history.length} saved practice {history.length === 1 ? "attempt" : "attempts"}.
+      {history.length} saved practice {history.length === 1 ? "attempt" : "attempts"}{hasMore?" loaded":""}.
       Switching teachers does not erase this history or change official grades.
     </p>
     <ol className="mt-3 divide-y">
@@ -424,5 +452,8 @@ export function RecordedPracticeHistory({ history }: { history: PracticeHistory 
         </DisclosureSection>
       </li>)}
     </ol>
+    {hasMore&&onLoadMore&&<ActionFooter layout="inline"><Button type="button" variant="outline" size="sm" disabled={pending} onClick={onLoadMore}>
+      {pending?"Loading…":"Load older practice"}
+    </Button></ActionFooter>}
   </section>;
 }
