@@ -24,9 +24,9 @@ describe("native Class writes use current single-login authority",()=>{
   });
   it("revalidates sensitive staff assignment and direct enrollment writes",()=>{
     const staff=read("src/modules/classes/class-staff.functions.ts");
-    const enrollment=read("src/modules/classes/native-class-assignment.functions.ts");
+    const enrollment=read("src/modules/classes/native-class-assignment.server.ts");
     expect(occurrences(staff,"await assertCurrentCanonicalStaffForMutation(tx,getRequest(),manager.actor)")).toBe(2);
-    expect(occurrences(enrollment,"await assertCurrentCanonicalStaffForMutation(tx,getRequest(),actor)")).toBe(1);
+    expect(occurrences(enrollment,"await assertCurrentCanonicalStaffForMutation(tx,request,actor)")).toBe(1);
     expect(enrollment).toContain("isNull(canonicalAccountGrants.siteId)");
   });
   it("requires a verified current facilitator bearer session in BOTH schedule and room opening commands",()=>{
