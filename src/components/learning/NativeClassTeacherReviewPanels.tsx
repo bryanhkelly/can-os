@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
+import { getNativeClassTeacherGradebook } from "@/modules/classes/native-class-gradebook.functions";
 import { HistoricalClassWork } from "./HistoricalClassWork";
 import { SubmissionRevisionHistory } from "./SubmissionRevisionHistory";
 import { getNativeClassTeacherHomework, getNativeClassTeacherMissingWork, getNativeClassTeacherOpenFollowUps, createNativeClassMissingWorkFollowUp, getNativeClassTeacherHomeworkHistory, getNativeClassTeacherHistoricalWork, getNativeClassTeacherAssessments,
@@ -41,6 +42,7 @@ function NativeClassTeacherWork({classId}:{classId:string}){
       await Promise.all([
         client.invalidateQueries({queryKey:["native-class-teacher-homework",classId]}),
         client.invalidateQueries({queryKey:["native-class-teacher-missing-work",classId]}),
+        client.invalidateQueries({queryKey:["native-class-gradebook",classId]}),
         client.invalidateQueries({queryKey:["native-teacher-homework-history",classId,submissionId]}),
       ]);
     }catch(failure){setError(normalizeClientError(failure,"Unable to return practice feedback.").message);}
@@ -51,7 +53,7 @@ function NativeClassTeacherWork({classId}:{classId:string}){
     queryFn:()=>getNativeClassTeacherHomework({data:{classId,offset}}),
     retry:false,
   });
-  return <div className="space-y-4"><NativeClassMissingWork classId={classId}/><section aria-label="Class homework review" className="space-y-4 border border-border bg-card p-5">
+  return <div className="space-y-4"><NativeClassGradebook classId={classId}/><NativeClassMissingWork classId={classId}/><section aria-label="Class homework review" className="space-y-4 border border-border bg-card p-5">
     <div>
       <h2 className="font-serif text-2xl">Student homework</h2>
       <p className="mt-2 text-sm text-muted-foreground">
@@ -122,6 +124,38 @@ function NativeClassTeacherWork({classId}:{classId:string}){
         onClick={()=>void queue.refetch()}>Refresh submissions</Button>
     </>}
   </section></div>;
+}
+
+function NativeClassGradebook({classId}:{classId:string}){
+  const [offset,setOffset]=useState(0);
+  const gradebook=useQuery({queryKey:["native-class-gradebook",classId,offset],
+    queryFn:()=>getNativeClassTeacherGradebook({data:{classId,offset}}),retry:false});
+  return <section aria-label="Official Class grading decisions" className="space-y-4 border border-border bg-card p-5">
+    <h2 className="font-serif text-2xl">Class gradebook</h2>
+    <p className="text-sm text-muted-foreground">Recorded official decisions only. Practice scores are not official grades. This staff view is not a student grade release or a grading appointment.</p>
+    <QueryState loading={gradebook.isPending&&"Loading Class gradebook…"}
+      error={gradebook.isError&&"Gradebook unavailable under your current appointment."}
+      onRetry={()=>void gradebook.refetch()} retrying={gradebook.isFetching}/>
+    {gradebook.data&&<>
+      {gradebook.data.items.length===0&&<EmptyState title="No current Class assignment records on this page."/>}
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm">
+          <thead><tr className="border-b border-border"><th scope="col" className="p-2">Learner</th><th scope="col" className="p-2">Assignment</th><th scope="col" className="p-2">Work</th><th scope="col" className="p-2">Official decision</th><th scope="col" className="p-2">Recorded score / policy</th></tr></thead>
+          <tbody>{gradebook.data.items.map(item=><tr key={item.classEnrollmentId+":"+item.assignmentId} className="border-b border-border">
+            <td className="p-2">{item.studentName}</td><td className="p-2">{item.assignmentTitle}</td>
+            <td className="p-2">{item.submissionStatus.replaceAll("_"," ")}</td>
+            <td className="p-2">{item.integrityIssue?"Reconciliation required":item.practiceOnly?"Practice only":item.officialDecision??"No decision"}</td>
+            <td className="p-2">{item.officialScore??"—"}{item.policyKey&&<p className="text-xs text-muted-foreground">{item.policyKey}</p>}</td>
+          </tr>)}</tbody>
+        </table>
+      </div>
+      <div className="flex items-center gap-2">
+        <Button type="button" size="sm" variant="outline" disabled={offset===0||gradebook.isFetching} onClick={()=>setOffset(n=>Math.max(0,n-100))}>Previous</Button>
+        <span className="text-xs text-muted-foreground">Page {offset/100+1}</span>
+        <Button type="button" size="sm" variant="outline" disabled={gradebook.data.nextOffset===null||gradebook.isFetching} onClick={()=>setOffset(n=>n+100)}>Next</Button>
+      </div>
+    </>}
+  </section>;
 }
 
 function NativeClassMissingWork({classId}:{classId:string}){
