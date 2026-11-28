@@ -1,42 +1,48 @@
-import { useState } from "react";
+import {useAssessmentWorkspaceScope} from "@/lib/api/use-assessment-workspace-scope";
+import { useState, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { normalizeClientError } from "@/lib/client-error";
 import {
   finalizeNativeClassKnowledgeCheck,getNativeClassPendingKnowledgeReviews,
-} from "@/modules/classes/native-class-assessment-finalize.functions";
+} from "@/lib/api/browser-assessments-outcomes";
 
 /** Provider-only confirmation of existing canonical item scores.
  * Never presents raw answers, hidden keys, grades or awards.
  */
 export function NativeClassAssessmentReviewPanel({classId}:{classId:string}){
+  const scope=useAssessmentWorkspaceScope();
+  if(!scope)return <p role="status">Verified workspace membership is required.</p>;
+  return <NativeClassAssessmentReviewPanelSession key={JSON.stringify(scope)} classId={classId} scope={scope}/>;
+}
+function NativeClassAssessmentReviewPanelSession({classId,scope}:{classId:string;scope:NonNullable<ReturnType<typeof useAssessmentWorkspaceScope>>}){
   const client=useQueryClient();
+  const inFlight=useRef(false);
   const [pending,setPending]=useState<string|null>(null);
   const [notice,setNotice]=useState("");
   const [error,setError]=useState("");
   const queue=useQuery({
-    queryKey:["native-class-assessment-review",classId],
-    queryFn:()=>getNativeClassPendingKnowledgeReviews({data:{classId}}),
-    retry:false,refetchOnReconnect:true,
+    queryKey:["native-class-assessment-review",scope,classId],
+    queryFn:({signal})=>getNativeClassPendingKnowledgeReviews(classId,signal),
+    retry:false,refetchOnReconnect:true,gcTime:0,
   });
   async function confirm(classEnrollmentId:string,assessmentAttemptId:string){
-    if(pending)return;
+    if(inFlight.current)return;
+    inFlight.current=true;
     setPending(assessmentAttemptId);setNotice("");setError("");
     try{
-      const result=await finalizeNativeClassKnowledgeCheck({
-        data:{classEnrollmentId,assessmentAttemptId},
-      });
+      const result=await finalizeNativeClassKnowledgeCheck({classEnrollmentId,assessmentAttemptId});
       setNotice(result.alreadyFinalized?
         "This canonical assessment result was already finalized.":
         "Canonical assessment result independently confirmed. A training completion decision is separate.");
       await Promise.all([
         client.invalidateQueries({queryKey:["native-class-assessment-review",classId]}),
-        client.invalidateQueries({queryKey:["native-class-canonical-evidence"]}),
+        client.invalidateQueries({queryKey:["native-class-canonical-evidence",scope]}),
       ]);
     }catch(e){
       setError(normalizeClientError(e,
         "Unable to confirm this result. Verify independent provider authority and current Class/assessment evidence.").message);
-    }finally{setPending(null);}
+    }finally{inFlight.current=false;setPending(null);}
   }
   return <section className="mt-5 border border-border bg-card p-5"
     aria-label="Independent Course assessment review">
@@ -52,7 +58,7 @@ export function NativeClassAssessmentReviewPanel({classId}:{classId:string}){
     {queue.isError&&<p role="status" className="mt-3 text-sm">
       The review queue is unavailable or your role is not permitted to finalize scores.
     </p>}
-    {queue.data&&<div className="mt-4 space-y-3">
+    {queue.data&&!queue.isError&&<div className="mt-4 space-y-3">
       {queue.data.pending.length===0&&<p className="text-sm">
         No provisionally scored checks are awaiting independent confirmation.
       </p>}

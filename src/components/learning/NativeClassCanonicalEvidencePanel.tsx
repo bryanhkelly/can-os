@@ -1,17 +1,21 @@
+import {useAssessmentWorkspaceScope} from "@/lib/api/use-assessment-workspace-scope";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { CourseAssessmentPanel } from "@/components/learning/CourseAssessmentPanel";
 import { NoncreditCourseSurveys } from "@/components/learning/NoncreditCourseSurveys";
-import { getNativeClassCanonicalEvidence } from "@/modules/classes/native-class-canonical-evidence.functions";
+import { getNativeClassCanonicalEvidence } from "@/lib/api/browser-assessments-outcomes";
 
 /** Existing canonical evidence only. No parallel Class quiz or completion authority. */
-export function NativeClassCanonicalEvidencePanel({classEnrollmentId}:{
-  classEnrollmentId:string;
-}){
+export function NativeClassCanonicalEvidencePanel({classEnrollmentId}:{classEnrollmentId:string}){
+  const scope=useAssessmentWorkspaceScope();
+  if(!scope)return <p role="status">Verified workspace membership is required.</p>;
+  return <NativeClassEvidenceSession key={JSON.stringify([scope,classEnrollmentId])} classEnrollmentId={classEnrollmentId} scope={scope}/>;
+}
+function NativeClassEvidenceSession({classEnrollmentId,scope}:{classEnrollmentId:string;scope:NonNullable<ReturnType<typeof useAssessmentWorkspaceScope>>}){
   const query=useQuery({
-    queryKey:["native-class-canonical-evidence",classEnrollmentId],
-    queryFn:()=>getNativeClassCanonicalEvidence({data:{classEnrollmentId}}),
-    retry:false,refetchOnReconnect:true,
+    queryKey:["native-class-canonical-evidence",scope,classEnrollmentId],
+    queryFn:({signal})=>getNativeClassCanonicalEvidence(classEnrollmentId,signal),
+    retry:false,refetchOnReconnect:true,gcTime:0,
   });
   return <section className="space-y-4 border border-border bg-card p-5"
     aria-label="Your Course learning evidence">
@@ -30,7 +34,7 @@ export function NativeClassCanonicalEvidencePanel({classEnrollmentId}:{
         Retry evidence check
       </Button>
     </div>}
-    {query.data&&<>
+    {query.data&&!query.isError&&<>
       <section aria-label="Learning and completion checklist" className="space-y-3">
         <h3 className="font-serif text-xl">Your learning checklist</h3>
         <p className="text-sm text-muted-foreground">

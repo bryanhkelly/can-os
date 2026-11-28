@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState,useRef,useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { WorkspaceShell } from "@/components/workspace";
 import { CapabilityLabNav } from "@/components/capability-lab/CapabilityLabNav";
@@ -8,7 +8,7 @@ import { downloadBase64 } from "@/lib/download";
 import { normalizeClientError } from "@/lib/client-error";
 import { safeLoader } from "@/lib/safe-loader";
 import { getCanonicalCapabilityLab } from "@/modules/operations/canonical-capability-lab.functions";
-import { previewNoncreditCredential } from "@/modules/learning/credential-preview.functions";
+import { previewNoncreditCredential } from "@/lib/api/browser-assessments-outcomes";
 
 export const Route = createFileRoute("/canonical/lab/credentials")({
   loader: () => safeLoader(() => getCanonicalCapabilityLab())(),
@@ -25,19 +25,24 @@ function CredentialPreviewLab() {
 function CredentialPreviewContent({ trainings }: {
   trainings: Awaited<ReturnType<typeof getCanonicalCapabilityLab>>["trainings"];
 }) {
+  const active=useRef(false);
+  const inFlight=useRef(false);
+  useEffect(()=>{active.current=true;return()=>{active.current=false;};},[]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
   async function preview(trainingVersionId: string, format: PreviewFormat) {
-    if (busy) return;
+    if (inFlight.current||!active.current) return;
+    inFlight.current=true;
     setBusy(trainingVersionId + ":" + format);
     setError("");
     try {
-      const file = await previewNoncreditCredential({ data: { trainingVersionId, format } });
-      downloadBase64(file.base64, file.filename, file.mediaType);
+      const file = await previewNoncreditCredential({trainingVersionId,format});
+      if(active.current)downloadBase64(file.base64, file.filename, file.mediaType);
     } catch (cause) {
       setError(normalizeClientError(cause, "Unable to generate the credential preview.").message);
     } finally {
-      setBusy(null);
+      inFlight.current=false;
+      if(active.current)setBusy(null);
     }
   }
 

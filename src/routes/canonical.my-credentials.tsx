@@ -1,4 +1,5 @@
-import { useRef, useState } from "react";
+import {useAssessmentWorkspaceScope} from "@/lib/api/use-assessment-workspace-scope";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { WorkspaceShell, QueryState } from "@/components/workspace";
@@ -7,33 +8,40 @@ import { downloadBase64 } from "@/lib/download";
 import { normalizeClientError } from "@/lib/client-error";
 import {
   listMyNoncreditCredentials, downloadMyNoncreditCredential,
-} from "@/modules/learning/learner-credentials.functions";
+} from "@/lib/api/browser-assessments-outcomes";
 
 export const Route = createFileRoute("/canonical/my-credentials")({
   component: MyNoncreditCredentials,
 });
 
 function MyNoncreditCredentials() {
+  const scope=useAssessmentWorkspaceScope();
+  if(!scope)return <WorkspaceShell title="My achievements"><p role="status">Verified workspace membership is required.</p></WorkspaceShell>;
+  return <MyCredentialsSession key={JSON.stringify(scope)} scope={scope}/>;
+}
+function MyCredentialsSession({scope}:{scope:NonNullable<ReturnType<typeof useAssessmentWorkspaceScope>>}) {
   const query = useQuery({
-    queryKey: ["my-canonical-noncredit-credentials"],
-    queryFn: () => listMyNoncreditCredentials(),
+    queryKey: ["my-canonical-noncredit-credentials",scope],
+    queryFn: ({signal}) => listMyNoncreditCredentials(signal),
     retry: false, gcTime: 0,
   });
   const [busy, setBusy] = useState(false);
   const inFlight = useRef(false);
   const [error, setError] = useState("");
-  const awards = query.data ?? [];
+  const awards = query.isError?[]:query.data??[];
+  const active=useRef(false);
+  useEffect(()=>{active.current=true;return()=>{active.current=false;};},[]);
 
   async function download(issuanceId: string, format: "pdf" | "badge_svg" | "badge_json") {
-    if (inFlight.current) return;
+    if (inFlight.current || !active.current) return;
     inFlight.current = true;
     setBusy(true); setError("");
     try {
-      const file = await downloadMyNoncreditCredential({ data: { issuanceId, format } });
-      downloadBase64(file.base64, file.filename, file.mediaType);
+      const file = await downloadMyNoncreditCredential({issuanceId,format});
+      if(active.current)downloadBase64(file.base64, file.filename, file.mediaType);
     } catch (cause) {
       setError(normalizeClientError(cause, "Unable to download this award.").message);
-    } finally { inFlight.current = false; setBusy(false); }
+    } finally { inFlight.current = false; if(active.current)setBusy(false); }
   }
 
   return <WorkspaceShell eyebrow="Learning records" title="My achievements"

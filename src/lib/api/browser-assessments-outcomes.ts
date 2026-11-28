@@ -17,3 +17,46 @@ export async function submitNoncreditKnowledgeCheckAnswers(body:Body<"/api/v1/kn
 export async function getCanonicalCourseEvidence(courseAttemptId:string,signal?:AbortSignal){
  return requireApiData(await createBrowserApiClient().GET("/api/v1/me/course-evidence",{params:{query:{courseAttemptId}},signal}));
 }
+
+export async function getNativeClassPendingKnowledgeReviews(classId:string,signal?:AbortSignal){
+ return requireApiData(await createBrowserApiClient().GET("/api/v1/class-knowledge-review-queue",{params:{query:{classId}},signal}));
+}
+export async function getNativeClassCanonicalEvidence(classEnrollmentId:string,signal?:AbortSignal){
+ return requireApiData(await createBrowserApiClient().GET("/api/v1/me/class-completion-evidence",{params:{query:{classEnrollmentId}},signal}));
+}
+export async function listMyNoncreditCredentials(signal?:AbortSignal){
+ return requireApiData(await createBrowserApiClient().GET("/api/v1/me/credentials",{signal}));
+}
+export async function getPendingCompletionEvidenceReviews(page:number,signal?:AbortSignal){
+ return requireApiData(await createBrowserApiClient().GET("/api/v1/completion-evidence-review-queue",{params:{query:{page}},signal}));
+}
+export async function getNativeClassCompletionQueue(classId:string,page:number,signal?:AbortSignal){
+ return requireApiData(await createBrowserApiClient().GET("/api/v1/class-completion-queue",{params:{query:{classId,page}},signal}));
+}
+export async function getNativeClassCompletionReview(classEnrollmentId:string,signal?:AbortSignal){
+ return requireApiData(await createBrowserApiClient().GET("/api/v1/class-completion-review",{params:{query:{classEnrollmentId}},signal}));
+}
+export async function finalizeNativeClassKnowledgeCheck(body:Body<"/api/v1/class-knowledge-check-finalizations">){
+ return requireApiData(await createBrowserApiClient().POST("/api/v1/class-knowledge-check-finalizations",{body}));
+}
+export async function downloadMyNoncreditCredential(body:Body<"/api/v1/me/credential-downloads">){
+ return requireApiData(await createBrowserApiClient().POST("/api/v1/me/credential-downloads",{body}));
+}
+export async function previewNoncreditCredential(body:Body<"/api/v1/credential-previews">){
+ return requireApiData(await createBrowserApiClient().POST("/api/v1/credential-previews",{body}));
+}
+export async function decideCompletionEvidenceReview(body:Body<"/api/v1/completion-evidence-review-decisions">){
+ return requireApiData(await createBrowserApiClient().POST("/api/v1/completion-evidence-review-decisions",{body}));
+}
+export async function requestCompletionEvidenceReview(body:Body<"/api/v1/completion-evidence-review-requests">){
+ return requireApiData(await createBrowserApiClient().POST("/api/v1/completion-evidence-review-requests",{body}));
+}
+export async function revokeLearningAwardIssuance(body:Body<"/api/v1/credential-revocations">){
+ return requireApiData(await createBrowserApiClient().POST("/api/v1/credential-revocations",{body}));
+}
+export async function decideNativeClassCompletion(body:Body<"/api/v1/class-completion-decisions">){
+ return requireApiData(await createBrowserApiClient().POST("/api/v1/class-completion-decisions",{body}));
+}
+export async function publishNativeClassCompletionPolicy(body:Body<"/api/v1/class-completion-policies">){
+ return requireApiData(await createBrowserApiClient().POST("/api/v1/class-completion-policies",{body}));
+}
