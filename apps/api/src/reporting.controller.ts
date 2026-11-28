@@ -119,4 +119,66 @@ export class ReportingController{
   const input=validated(c.requestQuery,query),workflow=verifiedWorkflow(req);
   return this.identity.runWorkflow(async()=>c.intelligenceResults.requests.parse(await workflow.getRelationshipRequests({direction:input.direction,after:input.after,...(input.scopeKind&&input.scopeId?{scope:{scopeKind:input.scopeKind,scopeId:input.scopeId}}:{})})));
  }
+
+ @Get('reports/metric-definitions')
+ @Governed('can','GET')
+ 
+ 
+ @ApiOperation({operationId:'getReportingMetricDefinitions',summary:'Versioned source-owned metric definitions; no report access'})
+ @ApiOkResponse({schema:c.evidenceDocs.definitions})
+ getReportingMetricDefinitions(@Req() req:FastifyRequest,@Query() query:unknown){
+  validated(c.emptyQuery,query);
+  const workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>c.evidenceResults.definitions.parse(await workflow.getReportingMetricDefinitions(undefined)));
+ }
+
+ @Get('reports/projection-health')
+ @Governed('can','GET')
+ 
+ 
+ @ApiOperation({operationId:'getReportingProjectionHealth',summary:'Platform administrator only: aggregate projection health'})
+ @ApiOkResponse({schema:c.evidenceDocs.health})
+ getReportingProjectionHealth(@Req() req:FastifyRequest,@Query() query:unknown){
+  validated(c.emptyQuery,query);
+  const workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>c.evidenceResults.health.parse(await workflow.getReportingProjectionHealth(undefined)));
+ }
+
+ @Get('sites/:siteId/reports/source-coverage')
+ @Governed('can','GET')
+ @ApiParam({name:'siteId',type:String,format:'uuid',required:true})
+ @ApiQuery({name:'from',schema:{type:'string',format:'date-time'},required:true,description:'Inclusive, closed reporting period up to 90 days'})
+ @ApiQuery({name:'to',schema:{type:'string',format:'date-time'},required:true,description:'Exclusive end, no future dates'})
+ @ApiOperation({operationId:'getSiteReportingSourceCoverage',summary:'Authorized Site source quality; not verified outcomes'})
+ @ApiOkResponse({schema:c.evidenceDocs.coverage})
+ getSiteReportingSourceCoverage(@Req() req:FastifyRequest,@Param() params:unknown,@Query() query:unknown){
+  const input={...validated(c.siteEvidenceParams,params),...validated(c.evidencePeriodQuery,query)};
+  const workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>c.evidenceResults.coverage.parse(await workflow.getSiteReportingSourceCoverage(input)));
+ }
+
+ @Get('sites/:siteId/reports/campaign-delivery')
+ @Governed('can','GET')
+ @ApiParam({name:'siteId',type:String,format:'uuid',required:true})
+ @ApiQuery({name:'from',schema:{type:'string',format:'date-time'},required:true,description:'Inclusive, closed reporting period up to 90 days'})
+ @ApiQuery({name:'to',schema:{type:'string',format:'date-time'},required:true,description:'Exclusive end, no future dates'})
+ @ApiOperation({operationId:'getSiteCampaignDeliveryMetrics',summary:'Authorized Site current delivery cohort; not people reached'})
+ @ApiOkResponse({schema:c.evidenceDocs.campaign})
+ getSiteCampaignDeliveryMetrics(@Req() req:FastifyRequest,@Param() params:unknown,@Query() query:unknown){
+  const input={...validated(c.siteEvidenceParams,params),...validated(c.evidencePeriodQuery,query)};
+  const workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>c.evidenceResults.campaign.parse(await workflow.getSiteCampaignDeliveryMetrics(input)));
+ }
+
+ @Get('reporting-source-snapshots/:snapshotId')
+ @Governed('can','GET')
+ @ApiParam({name:'snapshotId',type:String,format:'uuid',required:true})
+ 
+ @ApiOperation({operationId:'getReportingSourceSnapshot',summary:'Revalidated private source snapshot receipt; no source event identifiers'})
+ @ApiOkResponse({schema:c.evidenceDocs.snapshot})
+ getReportingSourceSnapshot(@Req() req:FastifyRequest,@Param() params:unknown,@Query() query:unknown){
+  validated(c.emptyQuery,query);const input=validated(c.snapshotParams,params);
+  const workflow=verifiedWorkflow(req);
+  return this.identity.runWorkflow(async()=>c.evidenceResults.snapshot.parse(await workflow.getReportingSourceSnapshot(input)));
+ }
 }

@@ -28,3 +28,12 @@ export async function checkReportingContract(client:BecomunaBrowserApi){
  // @ts-expect-error invalid geography basis
  await client.GET('/api/v1/reports/geography-options',{params:{query:{basis:'any'}}});
 }
+
+export async function checkReportingEvidenceContract(client:BecomunaBrowserApi,siteId:string,snapshotId:string,from:string,to:string){
+ await client.GET('/api/v1/reports/metric-definitions');
+ await client.GET('/api/v1/reports/projection-health');
+ await client.GET('/api/v1/sites/{siteId}/reports/source-coverage',{params:{path:{siteId},query:{from,to}}});
+ await client.GET('/api/v1/sites/{siteId}/reports/campaign-delivery',{params:{path:{siteId},query:{from,to}}});
+ const snapshot=await client.GET('/api/v1/reporting-source-snapshots/{snapshotId}',{params:{path:{snapshotId}}});
+ if(snapshot.data){const completeness:false=snapshot.data.lifecycleCompletenessVerified;void completeness;}
+}

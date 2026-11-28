@@ -11,3 +11,7 @@ Implementation increment; runtime and release acceptance pending. Six existing g
 
 ## Outstanding
 Run API build, HTTP tests, SDK generation/typecheck, reporting foundation tests and disposable database journeys using ordinary sessions. Verify revocation, tenant isolation, stale cache prevention, repeatable reads, geography time basis, deduplication and both pilot reconciliations. Migrate existing frontend consumers before removing their TanStack transports. National aggregates, funding and disclosure-ready outcomes remain open. No production or live database changes.
+
+## Evidence API increment
+
+Five additional protected reads expose the existing metric definitions, projection health, Site source coverage, Site campaign delivery and revalidated source snapshot receipts. The snapshot reader has been extracted from the TanStack handler into a shared transport-neutral service; the legacy handler delegates to it. No event identifiers, source payloads, recipient addresses or claimed disclosure approval are added. Existing snapshot creation and replay mutations remain on their current guarded transport until idempotency/concurrency and write acceptance are established. Build, runtime tests and frontend SDK cutover are still pending.

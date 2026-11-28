@@ -679,3 +679,27 @@ test('WS09 intelligence reads have documented security and deny anonymous forged
  assert.equal(r.recipients.safeParse({items:Array.from({length:26},()=>({id:'00000000-0000-4000-8000-000000000001',name:'Site'})),next:null}).success,false);
  assert.equal(r.readiness.safeParse({networkOrganizationId:'00000000-0000-4000-8000-000000000001',asOf:'2026-11-28T00:00:00Z',counts:{configuredUnits:0,activeUnits:0,configuredMemberships:0,currentMemberships:0,configuredGrants:0,currentGrants:0,currentGrantHosts:0},blockers:[],classification:'private_setup_inventory',disclosureApproved:true}).success,false);
 });
+
+test('WS09 evidence APIs are protected and cannot label source evidence as verified outcomes',async()=>{
+ await withServer('0',async(url,document)=>{
+  const id='00000000-0000-4000-8000-000000000001';
+  for(const route of ["/api/v1/reports/metric-definitions","/api/v1/reports/projection-health","/api/v1/sites/{siteId}/reports/source-coverage","/api/v1/sites/{siteId}/reports/campaign-delivery","/api/v1/reporting-source-snapshots/{snapshotId}"]){
+   const op=document.paths[route].get;assert.ok(op.security);assert.ok(op.responses['403']);
+   const path=route.replace(/\{[^}]+\}/g,id);
+   const response=await fetch(url+path,{headers:{'x-role':'platform_admin'}});
+   assert.equal(response.status,401);assert.equal(response.headers.get('cache-control'),'no-store');
+  }
+ });
+ const {evidenceResults:r,evidencePeriodQuery:q}=require('../dist/reporting.contracts');
+ const id='00000000-0000-4000-8000-000000000001';
+ const period={siteId:id,from:'2020-01-01T00:00:00Z',to:'2020-02-01T00:00:00Z',asOf:'2020-02-02T00:00:00Z'};
+ const snapshot={...period,snapshotId:id,sourceCount:1,manifestDigest:'a'.repeat(64),status:'private_source_snapshot',lifecycleCompletenessVerified:false};
+ assert.equal(r.snapshot.safeParse(snapshot).success,true);
+ assert.equal(r.snapshot.safeParse({...snapshot,lifecycleCompletenessVerified:true}).success,false);
+ assert.equal(r.snapshot.safeParse({...snapshot,sourceIds:[id]}).success,false);
+ assert.equal(r.snapshot.safeParse({...snapshot,sourceCount:0}).success,false);
+ assert.equal(q.safeParse({from:period.from,to:period.to}).success,true);
+ assert.equal(q.safeParse({from:period.to,to:period.from}).success,false);
+ assert.equal(q.safeParse({from:period.from,to:'2021-01-01T00:00:00Z'}).success,false);
+ assert.equal(q.safeParse({from:period.from,to:period.to,organizationId:id}).success,false);
+});
