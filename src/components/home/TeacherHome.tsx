@@ -3,6 +3,7 @@ import { TeacherGradeResponsesPanel, type TeacherGradeResponseItem } from "@/com
 import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { BookOpen, ClipboardList, CalendarDays, MessageCircle, School, Users } from "lucide-react";
+import { getNativeTeacherToday } from "@/modules/classes/native-class-teacher-home.functions";
 import { getTeacherToday } from "@/modules/learning/teacher-today.functions";
 import { getTeacherLearningEvidence } from "@/modules/learning/teacher-learning-evidence.functions";
 import { TeacherLearningParticipationPanel } from "@/components/teacher/TeacherLearningParticipationPanel";
@@ -12,14 +13,18 @@ import { TeacherConferencePanel } from "@/components/teacher/TeacherConferencePa
 import { TeacherFirstWeekCard } from "@/components/teacher/TeacherFirstWeekCard";
 import { TeacherDaySchedule } from "@/components/teacher/TeacherDaySchedule";
 import { StatCard, EmptyState } from "@/components/workspace";
-import { DashboardShortcut } from "@/components/workspace/dashboard-layout";
+import { DashboardPanel, DashboardShortcut } from "@/components/workspace/dashboard-layout";
 import { AttentionQueue } from "@/components/operations/AttentionQueue";
 import { useWorkspaceSession } from "@/components/shell/WorkspaceSession";
 import { buildTeacherAttention } from "@/domain/daily-operations";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 
-export const loadTeacherHome = safeLoader(() => getTeacherToday(), {
+export const loadTeacherHome = safeLoader(async () => {
+ const native = await getNativeTeacherToday();
+ if (native.kind === "teacher") return {kind:"native" as const,data:native};
+ return {kind:"legacy" as const,data:await getTeacherToday()};
+}, {
  authMessage: "Sign in with an authorized teacher account to view your day.",
 });
 
@@ -30,7 +35,71 @@ export function TeacherHome({ outcome, gradeAction }: {
  outcome: Awaited<ReturnType<typeof loadTeacherHome>>; gradeAction?: string;
 }) {
  if (!outcome.ok) return <LoaderFailure eyebrow="Teacher" title="Teacher Today" outcome={outcome} />;
- return <TeacherTodayView data={outcome.data} gradeAction={gradeAction} />;
+ return outcome.data.kind === "native"
+   ? <NativeTeacherTodayView data={outcome.data.data} gradeAction={gradeAction} />
+   : <TeacherTodayView data={outcome.data.data} gradeAction={gradeAction} />;
+}
+
+type NativeToday = Extract<Awaited<ReturnType<typeof getNativeTeacherToday>>, {kind:"teacher"}>;
+
+function NativeTeacherTodayView({data,gradeAction}:{data:NativeToday;gradeAction?:string}){
+ const totals=data.classes.reduce((sum,item)=>({
+   enrollments:sum.enrollments+item.enrollmentCount,
+   review:sum.review+item.reviewCount,
+   overdue:sum.overdue+item.overdueCount,
+ }),{enrollments:0,review:0,overdue:0});
+ const next=data.classes.find(item=>item.reviewCount>0);
+ return <DashboardHome eyebrow="Your teaching day"
+   subtitle="Your currently assigned Classes and current learner work."
+   shortcuts={<>
+     <DashboardShortcut title="My classes" description="Open your assigned Classes" icon={<BookOpen className="size-5"/>}>
+       <Link to="/class"/>
+     </DashboardShortcut>
+     {next&&<DashboardShortcut title="Review work" description="Open a Class submission queue" icon={<ClipboardList className="size-5"/>}>
+       <Link to="/class/$classId" params={{classId:next.classId}} search={{view:"teach",tab:"assignments"}}/>
+     </DashboardShortcut>}
+     <DashboardShortcut title="Messages" description="Review authorized conversations" icon={<MessageCircle className="size-5"/>}>
+       <Link to="/messages"/>
+     </DashboardShortcut>
+     <DashboardShortcut title="Schedule" description="Open your calendar" icon={<CalendarDays className="size-5"/>}>
+       <Link to="/calendar" search={{view:"agenda"}}/>
+     </DashboardShortcut>
+     <DashboardShortcut title="Study groups" description="Open your authorized groups" icon={<Users className="size-5"/>}>
+       <Link to="/groups"/>
+     </DashboardShortcut>
+   </>}
+   actions={<><Link to="/profiles">Professional profile</Link>
+     <Link to="/teacher/gradebook">Historical Section gradebook</Link>
+     <Link to="/teacher/missing-work">Historical Section follow-ups</Link>
+     <Link to="/teacher/discussions">Historical Section discussions</Link></>}>
+   <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Native teaching summary">
+     <StatCard asChild label="Classes" value={data.classes.length}><Link to="/class"/></StatCard>
+     <StatCard label="Active Class enrollments" value={totals.enrollments}/>
+     <StatCard label="Submitted work to review" value={totals.review}/>
+     <StatCard label="Overdue or returned work" value={totals.overdue}/>
+   </div>
+   <section className="mt-10">
+     <p className="text-xs font-bold uppercase tracking-eyebrow text-muted-foreground">My classes</p>
+     {data.classes.length===0&&<EmptyState className="mt-4" title="No currently authorized teaching Classes."
+       description="Contact your administrator to review your current Class appointments."/>}
+     <div className="mt-4 grid gap-3 sm:grid-cols-2">
+       {data.classes.map(item=><DashboardPanel key={item.classId} title={item.title}
+         description={`${item.enrollmentCount} active enrollments`}
+         action={<Link to="/class/$classId" params={{classId:item.classId}} search={{view:"teach"}} className="font-semibold underline">Open class</Link>}>
+         <p className="text-sm text-muted-foreground">{item.reviewCount} submitted · {item.overdueCount} overdue or returned</p>
+         <div className="mt-3 flex flex-wrap gap-4 text-sm">
+           <Link to="/class/$classId" params={{classId:item.classId}} search={{view:"teach",tab:"assignments"}} className="underline">Assignments</Link>
+           <Link to="/class/$classId" params={{classId:item.classId}} search={{view:"teach",tab:"roster"}} className="underline">Roster</Link>
+           <Link to="/class/$classId" params={{classId:item.classId}} search={{view:"teach",tab:"discussions"}} className="underline">Discussions</Link>
+         </div>
+       </DashboardPanel>)}
+     </div>
+   </section>
+   <p className="mt-4 text-sm text-muted-foreground">Counts are current native Class work, not official grades. Historical Section workflows remain separate until their records and services are migrated.</p>
+   <TeacherGradeResponsesPanel selectedAction={gradeAction}/>
+   <TeacherLearningFollowUpsPanel revision={0}/>
+   <TeacherConferencePanel/>
+ </DashboardHome>;
 }
 
 function TeacherTodayView({ data, gradeAction }: { data: Today; gradeAction?: string }) {
