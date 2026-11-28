@@ -7,6 +7,7 @@ const { NativeCourseDraftController } = require('../dist/native-course-draft.con
 const { PublisherPackController } = require('../dist/publisher-pack.controller');
 const { CurriculumMarketplaceController } = require('../dist/curriculum-marketplace.controller');
 const { InstructionalTrackAuthoringController } = require('../dist/instructional-track-authoring.controller');
+const { CurriculumAuthoringController } = require('../dist/curriculum-authoring.controller');
 const { CatalogController } = require('../dist/catalog.controller');
 const { WorkflowController } = require('../dist/workflow.controller');
 const { OfferingReleaseController } = require('../dist/platform-commands.controller');
@@ -17,7 +18,7 @@ test('WS04 registers its controllers once and shares the configured identity ser
   try {
     const domain = app.select(ProgramsOfferingsModule);
     const identity = app.get(CanonicalIdentityService);
-    for (const Controller of [CatalogController, WorkflowController, OfferingReleaseController, NoncreditPublicationController, NativeCourseDraftController, PublisherPackController, CurriculumMarketplaceController, InstructionalTrackAuthoringController]) {
+    for (const Controller of [CatalogController, WorkflowController, OfferingReleaseController, NoncreditPublicationController, NativeCourseDraftController, PublisherPackController, CurriculumMarketplaceController, InstructionalTrackAuthoringController, CurriculumAuthoringController]) {
       const instance = domain.get(Controller, { strict: true });
       assert.equal(instance.identity, identity);
     }
@@ -39,7 +40,8 @@ test('WS04 registers its controllers once and shares the configured identity ser
       'publishNoncreditAcrossAuthorizedSites',
       'getNativeCourseDraftLessons', 'saveNativeCourseLessonDraft', 'getNativeCourseReleaseReadiness', 'createNativeCourseAssignmentDraft', 'getNativeCourseAssignmentDrafts', 'getPublisherPackStudio', 'createAuthoredPublisherPack', 'startPublisherPackDraft', 'saveAuthoredPublisherPack', 'publishAuthoredPublisherPack',
       'getCurriculumAdopterPrograms', 'getCurriculumJourneyReadiness', 'getCurriculumMarketplace', 'installCurriculumPack', 'adoptCurriculumPack', 'reviewAnnualCurriculumAdoption', 'rolloverAnnualCurriculumAdoption', 'rollbackAnnualCurriculumPackAdoption', 'addMarketplaceSupplement',
-      'createRecordedInstructionDraft', 'saveRecordedInstructionDraft', 'submitRecordedInstructionDraft', 'decideRecordedInstructionReview', 'publishRecordedInstruction', 'withdrawRecordedInstruction', 'getCreatorRecordedInstructionDraft', 'getRecordedInstructionReview'
+      'createRecordedInstructionDraft', 'saveRecordedInstructionDraft', 'submitRecordedInstructionDraft', 'decideRecordedInstructionReview', 'publishRecordedInstruction', 'withdrawRecordedInstruction', 'getCreatorRecordedInstructionDraft', 'getRecordedInstructionReview',
+      'getCurriculumPrograms', 'getCurriculumStudio', 'createAuthoredCourse', 'startCurriculumDraft', 'saveAuthoredCurriculum', 'saveAuthoredLesson', 'publishAuthoredCurriculum'
     ]) {
       assert.ok(ids.includes(id), 'Missing WS04 operation: ' + id);
     }
@@ -217,4 +219,41 @@ test('Instructional Track reviewer snapshot is diagnostic and excludes storage a
  assert.equal(reviewSnapshot.safeParse(snapshot).success,true);
  assert.equal(reviewSnapshot.safeParse({...snapshot,publicationAuthorityVerified:true}).success,false);
  assert.equal(reviewSnapshot.safeParse({...snapshot,items:[{...snapshot.items[0],storageReference:'private'}]}).success,false);
+});
+
+test('Curriculum publisher routes retain protected compatibility contracts',async()=>{
+ const {app,document}=await createApi(readConfig({API_DOCS:'0'}));
+ const id='00000000-0000-4000-8000-000000000001';
+ try{
+  await app.listen(0,'127.0.0.1');const url=await app.getUrl();
+  const base='/api/v1/programs/{programId}/',version=base+'curriculum-versions/{versionId}/';
+  for(const [path,method] of [
+   ['/api/v1/curriculum-publisher-programs','GET'],[base+'curriculum-studio','GET'],
+   [base+'curriculum-courses','POST'],[base+'curriculum-courses/{courseId}/drafts','POST'],
+   [version+'revisions','POST'],[version+'modules/{moduleId}/lessons/{lessonId}/revisions','POST'],[version+'publication','POST']
+  ]){
+   const op=document.paths[path][method.toLowerCase()];
+   assert.ok(op.security);assert.ok(op.responses['403']);assert.ok(op.responses['409']);
+   const response=await fetch(url+path.replace(/\{[^}]+\}/g,id),method==='POST'?{method,headers:{Origin:url,'content-type':'application/json'},body:'{}'}:undefined);
+   assert.equal(response.status,method==='POST'?503:401);
+  }
+ }finally{await app.close();}
+});
+test('Curriculum input contracts separate learner content, teacher guides and authority',()=>{
+ const {inputs,params,results}=require('../dist/curriculum-authoring.contracts');
+ const id='00000000-0000-4000-8000-000000000001',expectedRevision='a'.repeat(64);
+ const lesson={id:'lesson-1',title:'Introduction',body:'Lesson body',resources:[]};
+ const content={version:1,syllabus:'Course outline',modules:[{id:'module-1',title:'Module',lessons:[lesson]}],resources:[]};
+ const save={expectedRevision,content};
+ assert.equal(inputs.save.safeParse(save).success,true);
+ assert.equal(inputs.save.safeParse({...save,teacherGuides:null}).success,true);
+ assert.equal(inputs.save.safeParse({...save,content:{...content,teacherGuides:{}}}).success,false);
+ assert.equal(inputs.lesson.safeParse({expectedRevision,lesson:{...lesson,answerKey:'private'}}).success,false);
+ assert.equal(inputs.lesson.safeParse({expectedRevision,lesson:{...lesson,resources:[{id:'r',title:'Resource',url:'https://example.org',documentId:id}]}}).success,false);
+ assert.equal(inputs.lesson.safeParse({expectedRevision,lesson:{...lesson,resources:[{id:'r',title:'Resource',url:'https://user:pass@example.org'}]}}).success,false);
+ assert.equal(inputs.publish.safeParse({expectedRevision,confirmed:false,reason:'Review completed'}).success,false);
+ assert.equal(inputs.publish.safeParse({expectedRevision,confirmed:true,reason:'Review completed',reviewerPersonId:id}).success,false);
+ assert.equal(params.lesson.safeParse({programId:id,versionId:id,moduleId:'module-1',lessonId:'lesson-1'}).success,true);
+ assert.equal(params.lesson.safeParse({programId:id,versionId:id,moduleId:'module/1',lessonId:'lesson-1'}).success,false);
+ assert.equal(results.version.safeParse({versionId:id,nativeOfferingPublished:true}).success,false);
 });

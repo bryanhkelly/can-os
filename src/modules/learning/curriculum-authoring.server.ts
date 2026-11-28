@@ -5,6 +5,7 @@ import { db } from "@/db/client";
 import { auditEvents, courseTemplates, courseTemplateVersions, programs, sections } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
+import { parseCommandInput } from "@/domain/command-input";
 import { EventTypes } from "@/domain/event-types";
 import { assertPublishableCurriculum, curriculumDraftContent, assertTeacherGuidesMatchCourse } from "@/domain/curriculum-authoring";
 import { readClassContent, type ClassContent } from "@/domain/class-content";
@@ -133,7 +134,7 @@ export async function saveCurriculumDraft(actor: Actor, input: {
   programId: string; versionId: string; expectedRevision: string; content: ClassContent;
   teacherGuides?: ClassTeacherGuides | null;
 }) {
-  const content = curriculumDraftContent.parse(input.content);
+  const content = parseCommandInput(curriculumDraftContent,input.content);
   return db.transaction(async tx => {
     const program = await authorize(actor, input.programId, tx);
     const [lookup] = await tx.select().from(courseTemplateVersions).where(eq(courseTemplateVersions.id, input.versionId)).limit(1);
@@ -188,7 +189,7 @@ export async function saveCurriculumLesson(actor: Actor, input: {
   if(!module||!module.lessons.some(l=>l.id===input.lessonId))
     throw new DomainError("VALIDATION_FAILED","The existing lesson must belong to the selected publisher module.");
   const original=module.lessons.find(l=>l.id===input.lessonId)!;
-  const next=curriculumDraftContent.parse({
+  const next=parseCommandInput(curriculumDraftContent,{
    ...content,modules:content.modules.map(m=>m.id===input.moduleId?{
     ...m,lessons:m.lessons.map(l=>l.id===input.lessonId?input.lesson:l),
    }:m),

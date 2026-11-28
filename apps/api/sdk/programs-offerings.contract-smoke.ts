@@ -80,3 +80,19 @@ export async function checkTrackReviewSnapshot(client:BecomunaBrowserApi,id:stri
  const response=await client.GET('/api/v1/instructional-track-versions/{trackVersionId}/review',{params:{path:{trackVersionId:id}}});
  if(response.data){const hash:string=response.data.manifestHash;void hash;}
 }
+
+export async function checkLegacyCurriculumContracts(client:BecomunaBrowserApi,id:string,hash:string){
+ const program={programId:id},version={...program,versionId:id};
+ const lesson={id:'lesson-1',title:'Introduction',body:'Lesson body'};
+ await client.GET('/api/v1/curriculum-publisher-programs');
+ await client.GET('/api/v1/programs/{programId}/curriculum-studio',{params:{path:program}});
+ await client.POST('/api/v1/programs/{programId}/curriculum-courses',{params:{path:program},body:{requestId:id,code:'BIO-1',title:'Biology',subject:'Science'}});
+ await client.POST('/api/v1/programs/{programId}/curriculum-courses/{courseId}/drafts',{params:{path:{...program,courseId:id}},body:{requestId:id}});
+ await client.POST('/api/v1/programs/{programId}/curriculum-versions/{versionId}/revisions',{params:{path:version},body:{expectedRevision:hash,content:{version:1,modules:[{id:'module-1',title:'Module',lessons:[lesson]}]},teacherGuides:null}});
+ await client.POST('/api/v1/programs/{programId}/curriculum-versions/{versionId}/modules/{moduleId}/lessons/{lessonId}/revisions',{params:{path:{...version,moduleId:'module-1',lessonId:'lesson-1'}},body:{expectedRevision:hash,lesson}});
+ await client.POST('/api/v1/programs/{programId}/curriculum-versions/{versionId}/publication',{params:{path:version},body:{expectedRevision:hash,confirmed:true,reason:'Reviewed publication'}});
+ // @ts-expect-error no teacher answer keys in learner-facing lesson
+ await client.POST('/api/v1/programs/{programId}/curriculum-versions/{versionId}/modules/{moduleId}/lessons/{lessonId}/revisions',{params:{path:{...version,moduleId:'module-1',lessonId:'lesson-1'}},body:{expectedRevision:hash,lesson:{...lesson,answerKey:'private'}}});
+ // @ts-expect-error exact revision required for publication
+ await client.POST('/api/v1/programs/{programId}/curriculum-versions/{versionId}/publication',{params:{path:version},body:{confirmed:true,reason:'Reviewed publication'}});
+}
